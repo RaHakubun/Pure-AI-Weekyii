@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E583F2F2B593A00DB2DEE /* View+Modifiers.swift */; };
-		944E58542F2B593A00DB2DEE /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
 		944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581E2F2B593A00DB2DEE /* DayDetailView.swift */; };
 		944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58202F2B593A00DB2DEE /* WeekViewModel.swift */; };
 		944E58572F2B593A00DB2DEE /* KillTimeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58372F2B593A00DB2DEE /* KillTimeEditor.swift */; };
@@ -26,7 +25,6 @@
 		944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580A2F2B593A00DB2DEE /* ContentView.swift */; };
 		944E58662F2B593A00DB2DEE /* DayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58232F2B593A00DB2DEE /* DayStatus.swift */; };
 		944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58182F2B593A00DB2DEE /* FocusZoneView.swift */; };
-		944E58682F2B593A00DB2DEE /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58432F2B593A00DB2DEE /* StateMachineTests.swift */; };
 		944E58692F2B593A00DB2DEE /* PendingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58132F2B593A00DB2DEE /* PendingView.swift */; };
 		944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58322F2B593A00DB2DEE /* StateMachine.swift */; };
 		944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */; };
@@ -35,11 +33,12 @@
 		944E586E2F2B593A00DB2DEE /* PastDayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580D2F2B593A00DB2DEE /* PastDayDetailView.swift */; };
 		944E58702F2B593A00DB2DEE /* WeekStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58262F2B593A00DB2DEE /* WeekStatus.swift */; };
 		944E58712F2B593A00DB2DEE /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58292F2B593A00DB2DEE /* TaskItem.swift */; };
+		E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7A6CE6657A22194F5108AB /* TaskStep.swift */; };
+		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
 		944E58722F2B593A00DB2DEE /* FrozenZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */; };
 		944E58732F2B593A00DB2DEE /* MonthPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58122F2B593A00DB2DEE /* MonthPickerView.swift */; };
 		944E58742F2B593A00DB2DEE /* WeekCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58342F2B593A00DB2DEE /* WeekCalculator.swift */; };
 		944E58752F2B593A00DB2DEE /* WeekyiiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580B2F2B593A00DB2DEE /* WeekyiiApp.swift */; };
-		944E58762F2B593A00DB2DEE /* WeekCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */; };
 		944E58772F2B593A00DB2DEE /* Calendar+Week.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E583C2F2B593A00DB2DEE /* Calendar+Week.swift */; };
 		944E58782F2B593A00DB2DEE /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58362F2B593A00DB2DEE /* EmptyStateView.swift */; };
 		944E587B2F2B593A00DB2DEE /* TaskType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58242F2B593A00DB2DEE /* TaskType.swift */; };
@@ -53,6 +52,24 @@
 		944E58842F2B593A00DB2DEE /* PendingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58142F2B593A00DB2DEE /* PendingViewModel.swift */; };
 		944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */; };
 		944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 944E582D2F2B593A00DB2DEE /* Assets.xcassets */; };
+		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
+		94982D712F2BB70700CE8621 /* UserSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982D702F2BB70700CE8621 /* UserSettings.swift */; };
+		94982D732F2BB71F00CE8621 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982D722F2BB71F00CE8621 /* SettingsView.swift */; };
+		94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */; };
+		94982DB02F2BBB3C00CE8621 /* WeekButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */; };
+		94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */; };
+		94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */; };
+		94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */; };
+		94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */; };
+		94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */; };
+		94982DBC2F2BBCF800CE8621 /* TaskZoneBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DBB2F2BBCF800CE8621 /* TaskZoneBadge.swift */; };
+		94982DBF2F2BBF6400CE8621 /* WeekStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DBE2F2BBF6400CE8621 /* WeekStatCard.swift */; };
+		94982DC02F2BBF6400CE8621 /* DayCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DBD2F2BBF6400CE8621 /* DayCard.swift */; };
+		94982DC52F2BC0AC00CE8621 /* PendingWeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DC42F2BC0AC00CE8621 /* PendingWeekCard.swift */; };
+		94982DC92F2BC2A300CE8621 /* Animation+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DC62F2BC2A300CE8621 /* Animation+Weekyii.swift */; };
+		94982DCA2F2BC2A300CE8621 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DC72F2BC2A300CE8621 /* LoadingView.swift */; };
+		94982DCB2F2BC2A300CE8621 /* View+Transitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DC82F2BC2A300CE8621 /* View+Transitions.swift */; };
+		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,9 +119,12 @@
 		944E58262F2B593A00DB2DEE /* WeekStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStatus.swift; sourceTree = "<group>"; };
 		944E58282F2B593A00DB2DEE /* DayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayModel.swift; sourceTree = "<group>"; };
 		944E58292F2B593A00DB2DEE /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
+		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
+		902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachment.swift; sourceTree = "<group>"; };
 		944E582A2F2B593A00DB2DEE /* WeekModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekModel.swift; sourceTree = "<group>"; };
 		944E582B2F2B593A00DB2DEE /* WeekyiiError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiError.swift; sourceTree = "<group>"; };
 		944E582D2F2B593A00DB2DEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		944E58312F2B593A00DB2DEE /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		944E58322F2B593A00DB2DEE /* StateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachine.swift; sourceTree = "<group>"; };
@@ -123,6 +143,23 @@
 		944E58432F2B593A00DB2DEE /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
 		944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalculatorTests.swift; sourceTree = "<group>"; };
 		944E584B2F2B593A00DB2DEE /* Weekyii.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = Weekyii.xcodeproj; sourceTree = "<group>"; };
+		94982D702F2BB70700CE8621 /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
+		94982D722F2BB71F00CE8621 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
+		94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCard.swift; sourceTree = "<group>"; };
+		94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekButton.swift; sourceTree = "<group>"; };
+		94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCard.swift; sourceTree = "<group>"; };
+		94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekLogo.swift; sourceTree = "<group>"; };
+		94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Spacing+Weekyii.swift"; sourceTree = "<group>"; };
+		94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography+Weekyii.swift"; sourceTree = "<group>"; };
+		94982DBB2F2BBCF800CE8621 /* TaskZoneBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskZoneBadge.swift; sourceTree = "<group>"; };
+		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		94982DBD2F2BBF6400CE8621 /* DayCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCard.swift; sourceTree = "<group>"; };
+		94982DBE2F2BBF6400CE8621 /* WeekStatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStatCard.swift; sourceTree = "<group>"; };
+		94982DC42F2BC0AC00CE8621 /* PendingWeekCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingWeekCard.swift; sourceTree = "<group>"; };
+		94982DC62F2BC2A300CE8621 /* Animation+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Animation+Weekyii.swift"; sourceTree = "<group>"; };
+		94982DC72F2BC2A300CE8621 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		94982DC82F2BC2A300CE8621 /* View+Transitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Transitions.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -198,6 +235,7 @@
 		944E58152F2B593A00DB2DEE /* Pending */ = {
 			isa = PBXGroup;
 			children = (
+				94982DC42F2BC0AC00CE8621 /* PendingWeekCard.swift */,
 				944E58112F2B593A00DB2DEE /* CreateWeekSheet.swift */,
 				944E58122F2B593A00DB2DEE /* MonthPickerView.swift */,
 				944E58132F2B593A00DB2DEE /* PendingView.swift */,
@@ -222,6 +260,8 @@
 		944E58212F2B593A00DB2DEE /* Week */ = {
 			isa = PBXGroup;
 			children = (
+				94982DBD2F2BBF6400CE8621 /* DayCard.swift */,
+				94982DBE2F2BBF6400CE8621 /* WeekStatCard.swift */,
 				944E581D2F2B593A00DB2DEE /* DayCardView.swift */,
 				944E581E2F2B593A00DB2DEE /* DayDetailView.swift */,
 				944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */,
@@ -258,6 +298,8 @@
 				944E58272F2B593A00DB2DEE /* Enums */,
 				944E58282F2B593A00DB2DEE /* DayModel.swift */,
 				944E58292F2B593A00DB2DEE /* TaskItem.swift */,
+				8C7A6CE6657A22194F5108AB /* TaskStep.swift */,
+				902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */,
 				944E582A2F2B593A00DB2DEE /* WeekModel.swift */,
 				944E582B2F2B593A00DB2DEE /* WeekyiiError.swift */,
 			);
@@ -268,7 +310,10 @@
 			isa = PBXGroup;
 			children = (
 				944E582D2F2B593A00DB2DEE /* Assets.xcassets */,
+				180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */,
 				944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */,
+				94982D702F2BB70700CE8621 /* UserSettings.swift */,
+				94982D722F2BB71F00CE8621 /* SettingsView.swift */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -287,6 +332,13 @@
 		944E583A2F2B593A00DB2DEE /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				94982DBB2F2BBCF800CE8621 /* TaskZoneBadge.swift */,
+				94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */,
+				94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */,
+				C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */,
+				94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */,
+				94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */,
+				94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */,
 				944E58362F2B593A00DB2DEE /* EmptyStateView.swift */,
 				944E58372F2B593A00DB2DEE /* KillTimeEditor.swift */,
 				944E58382F2B593A00DB2DEE /* StatusBadge.swift */,
@@ -310,6 +362,11 @@
 		944E58412F2B593A00DB2DEE /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				94982DC62F2BC2A300CE8621 /* Animation+Weekyii.swift */,
+				94982DC72F2BC2A300CE8621 /* LoadingView.swift */,
+				94982DC82F2BC2A300CE8621 /* View+Transitions.swift */,
+				94982DC22F2BBF8000CE8621 /* Styles */,
+				94982DB72F2BBB4B00CE8621 /* DesignSystem */,
 				944E583A2F2B593A00DB2DEE /* Components */,
 				944E58402F2B593A00DB2DEE /* Extensions */,
 			);
@@ -329,6 +386,22 @@
 		944E58512F2B593A00DB2DEE /* Products */ = {
 			isa = PBXGroup;
 			name = Products;
+			sourceTree = "<group>";
+		};
+		94982DB72F2BBB4B00CE8621 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */,
+				94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		94982DC22F2BBF8000CE8621 /* Styles */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Styles;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -450,6 +523,7 @@
 			files = (
 				944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */,
 				944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */,
+				6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -477,18 +551,24 @@
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
 				944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */,
+				94982DBF2F2BBF6400CE8621 /* WeekStatCard.swift in Sources */,
+				94982DC02F2BBF6400CE8621 /* DayCard.swift in Sources */,
 				944E58572F2B593A00DB2DEE /* KillTimeEditor.swift in Sources */,
 				944E58582F2B593A00DB2DEE /* StatusBadge.swift in Sources */,
 				944E58592F2B593A00DB2DEE /* WeekModel.swift in Sources */,
 				944E585A2F2B593A00DB2DEE /* TaskZone.swift in Sources */,
 				944E585B2F2B593A00DB2DEE /* CreateWeekSheet.swift in Sources */,
 				944E585C2F2B593A00DB2DEE /* TaskRowView.swift in Sources */,
+				224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */,
 				944E585D2F2B593A00DB2DEE /* CompleteZoneView.swift in Sources */,
 				944E585F2F2B593A00DB2DEE /* NotificationService.swift in Sources */,
 				944E58602F2B593A00DB2DEE /* WeekyiiError.swift in Sources */,
+				94982D732F2BB71F00CE8621 /* SettingsView.swift in Sources */,
 				944E58612F2B593A00DB2DEE /* AppState.swift in Sources */,
 				944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */,
 				944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */,
+				94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */,
+				94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */,
 				944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */,
 				944E58662F2B593A00DB2DEE /* DayStatus.swift in Sources */,
 				944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */,
@@ -497,13 +577,25 @@
 				944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,
 				944E586C2F2B593A00DB2DEE /* Array+Move.swift in Sources */,
 				944E586D2F2B593A00DB2DEE /* Date+Weekyii.swift in Sources */,
+				94982DBC2F2BBCF800CE8621 /* TaskZoneBadge.swift in Sources */,
 				944E586E2F2B593A00DB2DEE /* PastDayDetailView.swift in Sources */,
 				944E58702F2B593A00DB2DEE /* WeekStatus.swift in Sources */,
+				94982D712F2BB70700CE8621 /* UserSettings.swift in Sources */,
 				944E58712F2B593A00DB2DEE /* TaskItem.swift in Sources */,
+				E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */,
+				C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */,
 				944E58722F2B593A00DB2DEE /* FrozenZoneView.swift in Sources */,
 				944E58732F2B593A00DB2DEE /* MonthPickerView.swift in Sources */,
 				944E58742F2B593A00DB2DEE /* WeekCalculator.swift in Sources */,
 				944E58752F2B593A00DB2DEE /* WeekyiiApp.swift in Sources */,
+				94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */,
+				94982DB02F2BBB3C00CE8621 /* WeekButton.swift in Sources */,
+				94982DC92F2BC2A300CE8621 /* Animation+Weekyii.swift in Sources */,
+				94982DCA2F2BC2A300CE8621 /* LoadingView.swift in Sources */,
+				94982DCB2F2BC2A300CE8621 /* View+Transitions.swift in Sources */,
+				94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */,
+				94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */,
+				94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */,
 				944E58772F2B593A00DB2DEE /* Calendar+Week.swift in Sources */,
 				944E58782F2B593A00DB2DEE /* EmptyStateView.swift in Sources */,
 				944E587B2F2B593A00DB2DEE /* TaskType.swift in Sources */,
@@ -515,6 +607,7 @@
 				944E58822F2B593A00DB2DEE /* DraftEditorView.swift in Sources */,
 				944E58832F2B593A00DB2DEE /* PastViewModel.swift in Sources */,
 				944E58842F2B593A00DB2DEE /* PendingViewModel.swift in Sources */,
+				94982DC52F2BC0AC00CE8621 /* PendingWeekCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -678,7 +771,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -709,7 +803,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

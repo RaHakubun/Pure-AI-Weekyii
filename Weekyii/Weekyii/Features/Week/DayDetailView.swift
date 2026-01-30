@@ -64,30 +64,33 @@ struct DayDetailView: View {
         .sheet(isPresented: $showingAddSheet) {
             TaskEditorSheet(
                 title: String(localized: "draft.add_title"),
-                initialTitle: "",
-                initialType: .regular
-            ) { title, type in
-                do {
-                    try addTask(title: title, type: type)
-                    showingAddSheet = false
-                } catch {
-                    errorMessage = error.localizedDescription
+                onSave: { title, description, type, steps, attachments in
+                    do {
+                        try addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
+                        showingAddSheet = false
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
-            }
+            )
         }
         .sheet(item: $editingTask) { task in
             TaskEditorSheet(
                 title: String(localized: "draft.edit_title"),
                 initialTitle: task.title,
-                initialType: task.taskType
-            ) { title, type in
-                do {
-                    try updateTask(task, title: title, type: type)
-                    editingTask = nil
-                } catch {
-                    errorMessage = error.localizedDescription
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments,
+                onSave: { title, description, type, steps, attachments in
+                    do {
+                        try updateTask(task, title: title, description: description, type: type, steps: steps, attachments: attachments)
+                        editingTask = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
-            }
+            )
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             errorMessage != nil
@@ -111,15 +114,15 @@ struct DayDetailView: View {
 
     private var draftSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "draft.title"))
-                .font(.headline)
-
             if day.sortedDraftTasks.isEmpty {
-                Text(String(localized: "draft.empty"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                EmptyStateView(
+                    title: String(localized: "day.empty.title"),
+                    subtitle: String(localized: "day.empty.subtitle"),
+                    systemImage: "square.and.pencil"
+                )
+                .weekyiiCard()
             } else {
-                List {
+                LazyVStack(spacing: 0) {
                     ForEach(day.sortedDraftTasks) { task in
                         Button(action: { editingTask = task }) {
                             TaskRowView(task: task)
@@ -141,11 +144,10 @@ struct DayDetailView: View {
                         }
                     }
                 }
-                .listStyle(.plain)
-                .frame(minHeight: 120)
+                .background(Color(uiColor: .systemBackground))
+                .cornerRadius(WeekRadius.medium)
             }
         }
-        .weekyiiCard()
     }
 
     private var expiredSection: some View {
@@ -158,22 +160,34 @@ struct DayDetailView: View {
         .weekyiiCard()
     }
 
-    private func addTask(title: String, type: TaskType) throws {
+    private func addTask(title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard isEditable else { throw WeekyiiError.cannotEditStartedDay }
         if day.status == .empty {
             day.status = .draft
         }
         let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
-        let task = TaskItem(title: title, taskType: type, order: order, zone: .draft)
+        let task = TaskItem(
+            title: title,
+            taskDescription: description,
+            taskType: type,
+            order: order,
+            zone: .draft
+        )
         task.day = day
+        // Assign relationships
+        task.steps = steps
+        task.attachments = attachments
         day.tasks.append(task)
         try? modelContext.save()
     }
 
-    private func updateTask(_ task: TaskItem, title: String, type: TaskType) throws {
+    private func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard isEditable else { throw WeekyiiError.cannotEditStartedDay }
         task.title = title
+        task.taskDescription = description
         task.taskType = type
+        task.steps = steps
+        task.attachments = attachments
         try? modelContext.save()
     }
 
@@ -206,44 +220,4 @@ struct DayDetailView: View {
     }
 }
 
-private struct TaskEditorSheet: View {
-    let title: String
-    @State var initialTitle: String
-    @State var initialType: TaskType
-    var onSave: (String, TaskType) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text(String(localized: "task.title"))) {
-                    TextField(String(localized: "task.title.placeholder"), text: $initialTitle)
-                }
-
-                Section(header: Text(String(localized: "task.type"))) {
-                    Picker(String(localized: "task.type"), selection: $initialType) {
-                        ForEach(TaskType.allCases, id: \.self) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-            }
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "action.save")) {
-                        onSave(initialTitle, initialType)
-                    }
-                    .disabled(initialTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "action.cancel")) {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}

@@ -1,21 +1,21 @@
 import SwiftUI
 
+// MARK: - FocusZoneView - 专注区视图
+
 struct FocusZoneView: View {
     let task: TaskItem?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "zone.focus"))
-                .font(.headline)
-
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             if let task {
-                TaskRowView(task: task)
+                TaskCard(task: task, showStatus: false)
             } else {
                 Text(String(localized: "zone.focus.empty"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .weekPaddingVertical(WeekSpacing.md)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

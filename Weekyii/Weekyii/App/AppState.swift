@@ -39,4 +39,12 @@ final class AppState {
         lastRolloverAt = date
         save()
     }
+
+    func reset() {
+        daysStartedCount = 0
+        systemStartDate = nil
+        lastProcessedDate = nil
+        lastRolloverAt = nil
+        save()
+    }
 }

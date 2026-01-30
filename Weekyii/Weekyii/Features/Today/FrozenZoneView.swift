@@ -1,23 +1,23 @@
 import SwiftUI
 
+// MARK: - FrozenZoneView - 冻结区视图
+
 struct FrozenZoneView: View {
     let tasks: [TaskItem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "zone.frozen"))
-                .font(.headline)
-
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             if tasks.isEmpty {
                 Text(String(localized: "zone.frozen.empty"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .weekPaddingVertical(WeekSpacing.md)
             } else {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    TaskCard(task: task, showStatus: false)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

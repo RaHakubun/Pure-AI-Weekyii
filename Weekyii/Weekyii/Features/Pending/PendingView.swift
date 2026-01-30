@@ -9,61 +9,38 @@ struct PendingView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                MonthPickerView(month: $selectedMonth)
-                    .padding(.horizontal)
-
-                ScrollView {
-                    if let viewModel {
+            ScrollView {
+                if let viewModel {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        // 月份选择器（限制只能看未来和当前月份）
+                        MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
+                        
+                        // 周列表
                         let weeks = viewModel.weeks(in: selectedMonth)
                         if weeks.isEmpty {
-                            EmptyStateView(
-                                title: String(localized: "pending.empty.title"),
-                                subtitle: String(localized: "pending.empty.subtitle"),
-                                systemImage: "calendar.badge.plus"
-                            )
-                            .weekyiiCard()
-                            .padding()
+                            emptyStateView
                         } else {
-                            VStack(spacing: 12) {
-                                ForEach(weeks) { week in
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("\(String(localized: "pending.week")) \(week.weekId)")
-                                            .font(.headline)
-
-                                        ForEach(week.days.sorted(by: { $0.date < $1.date })) { day in
-                                            NavigationLink {
-                                                DayDetailView(day: day)
-                                            } label: {
-                                                HStack {
-                                                    Text(day.date, format: Date.FormatStyle().weekday(.abbreviated).month().day())
-                                                    Spacer()
-                                                    StatusBadge(status: day.status)
-                                                }
-                                                .padding(.vertical, 6)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                    .weekyiiCard()
-                                }
-                            }
-                            .padding()
+                            weeksList(weeks: weeks)
                         }
-                    } else {
-                        ProgressView()
                     }
+                    .weekPadding(WeekSpacing.base)
+                } else {
+                    ProgressView()
                 }
             }
-            .navigationTitle(String(localized: "pending.title"))
+            .background(Color.backgroundPrimary)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    WeekLogo(size: .small, animated: false)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showingCreateSheet = true }) {
-                        Image(systemName: "plus.circle")
-                    }
+                    addWeekButton
                 }
             }
-            .sheet(isPresented: $showingCreateSheet) {
+            .sheet(isPresented: $showingCreateSheet, onDismiss: {
+                viewModel?.refresh()
+            }) {
                 if let viewModel {
                     CreateWeekSheet(viewModel: viewModel)
                 }
@@ -74,6 +51,82 @@ struct PendingView: View {
                 viewModel = PendingViewModel(modelContext: modelContext)
             }
             viewModel?.refresh()
+        }
+    }
+
+    private var addWeekButton: some View {
+        Button {
+            showingCreateSheet = true
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.orangeGradient)
+                    .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 36, height: 36)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "pending.add_week"))
+    }
+    
+    // MARK: - Empty State
+    
+    private var emptyStateView: some View {
+        WeekCard {
+            VStack(spacing: WeekSpacing.xl) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 60))
+                    .foregroundStyle(Color.weekyiiGradient)
+                
+                VStack(spacing: WeekSpacing.sm) {
+                    Text(String(localized: "pending.empty.title"))
+                        .font(.titleMedium)
+                        .foregroundColor(.textPrimary)
+                    
+                    Text(String(localized: "pending.empty.subtitle"))
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .weekPaddingVertical(WeekSpacing.xl)
+        }
+    }
+    
+    // MARK: - Weeks List
+    
+    private func weeksList(weeks: [WeekModel]) -> some View {
+        VStack(spacing: WeekSpacing.md) {
+            // 统计信息
+            WeekCard(accentColor: .accentOrange) {
+                HStack {
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text(String(localized: "pending.total_weeks"))
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+                        Text("\(weeks.count)")
+                            .font(.titleLarge)
+                            .foregroundColor(.accentOrange)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 40))
+                        .foregroundColor(.accentOrange.opacity(0.3))
+                }
+            }
+            
+            // 周卡片列表
+            ForEach(weeks) { week in
+                PendingWeekCard(week: week)
+            }
         }
     }
 }

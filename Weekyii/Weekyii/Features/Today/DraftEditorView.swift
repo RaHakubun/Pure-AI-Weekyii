@@ -7,23 +7,30 @@ struct DraftEditorView: View {
     @State private var showingAddSheet = false
     @State private var editingTask: TaskItem?
     @State private var errorMessage: String?
+    @State private var editMode: EditMode = .inactive
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
             HStack {
                 Text(String(localized: "draft.title"))
-                    .font(.headline)
+                    .font(.titleSmall)
+                    .foregroundColor(.textPrimary)
                 Spacer()
+                EditButton()
+                    .disabled(!(day.status == .draft || day.status == .empty))
                 Button(action: { showingAddSheet = true }) {
                     Image(systemName: "plus.circle")
+                        .font(.title2)
+                        .foregroundColor(.weekyiiPrimary)
                 }
                 .disabled(!(day.status == .draft || day.status == .empty))
             }
 
             if day.sortedDraftTasks.isEmpty {
                 Text(String(localized: "draft.empty"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .padding(.vertical, WeekSpacing.lg)
             } else {
                 List {
                     ForEach(day.sortedDraftTasks) { task in
@@ -48,36 +55,40 @@ struct DraftEditorView: View {
                     }
                 }
                 .listStyle(.plain)
-                .frame(minHeight: 120)
+                .frame(height: CGFloat(min(day.sortedDraftTasks.count, 8)) * 60)
             }
         }
+        .environment(\.editMode, $editMode)
         .sheet(isPresented: $showingAddSheet) {
             TaskEditorSheet(
                 title: String(localized: "draft.add_title"),
-                initialTitle: "",
-                initialType: .regular
-            ) { title, type in
-                do {
-                    try viewModel.addTask(title: title, type: type)
-                    showingAddSheet = false
-                } catch {
-                    errorMessage = error.localizedDescription
+                onSave: { title, description, type, steps, attachments in
+                    do {
+                        try viewModel.addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
+                        showingAddSheet = false
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
-            }
+            )
         }
         .sheet(item: $editingTask) { task in
             TaskEditorSheet(
                 title: String(localized: "draft.edit_title"),
                 initialTitle: task.title,
-                initialType: task.taskType
-            ) { newTitle, newType in
-                do {
-                    try viewModel.updateTask(task, title: newTitle, type: newType)
-                    editingTask = nil
-                } catch {
-                    errorMessage = error.localizedDescription
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments,
+                onSave: { newTitle, newDescription, newType, newSteps, newAttachments in
+                    do {
+                        try viewModel.updateTask(task, title: newTitle, description: newDescription, type: newType, steps: newSteps, attachments: newAttachments)
+                        editingTask = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
-            }
+            )
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             errorMessage != nil
@@ -91,44 +102,3 @@ struct DraftEditorView: View {
     }
 }
 
-private struct TaskEditorSheet: View {
-    let title: String
-    @State var initialTitle: String
-    @State var initialType: TaskType
-    var onSave: (String, TaskType) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text(String(localized: "task.title"))) {
-                    TextField(String(localized: "task.title.placeholder"), text: $initialTitle)
-                }
-
-                Section(header: Text(String(localized: "task.type"))) {
-                    Picker(String(localized: "task.type"), selection: $initialType) {
-                        ForEach(TaskType.allCases, id: \.self) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-            }
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "action.save")) {
-                        onSave(initialTitle, initialType)
-                    }
-                    .disabled(initialTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "action.cancel")) {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}

@@ -10,16 +10,20 @@ final class TaskItem {
     var order: Int
     var zone: TaskZone
 
+    var taskDescription: String = ""
+    
+    @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
+    @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+
     var startedAt: Date?
     var endedAt: Date?
     var completedOrder: Int = 0
 
     var day: DayModel?
 
-    var subtasks: [String] = []
-
-    init(title: String, taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
+    init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
         self.title = title
+        self.taskDescription = taskDescription
         self.taskType = taskType
         self.order = order
         self.zone = zone

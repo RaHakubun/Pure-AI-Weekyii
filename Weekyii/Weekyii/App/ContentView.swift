@@ -3,6 +3,11 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
+            PastView()
+                .tabItem {
+                    Label(String(localized: "tab.past"), systemImage: "clock.arrow.circlepath")
+                }
+            
             TodayView()
                 .tabItem {
                     Label(String(localized: "tab.today"), systemImage: "sun.max")
@@ -18,9 +23,9 @@ struct ContentView: View {
                     Label(String(localized: "tab.pending"), systemImage: "calendar.badge.plus")
                 }
 
-            PastView()
+            SettingsView()
                 .tabItem {
-                    Label(String(localized: "tab.past"), systemImage: "clock.arrow.circlepath")
+                    Label(String(localized: "tab.settings"), systemImage: "gearshape")
                 }
         }
     }

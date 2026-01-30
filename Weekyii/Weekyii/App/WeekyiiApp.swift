@@ -6,13 +6,14 @@ import Combine
 struct WeekyiiApp: App {
     let modelContainer: ModelContainer
     @State private var appState = AppState()
+    @State private var userSettings = UserSettings()
     @State private var stateMachine: StateMachine?
     @Environment(\.scenePhase) private var scenePhase
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     init() {
         do {
-            let schema = Schema([WeekModel.self, DayModel.self, TaskItem.self])
+            let schema = Schema([WeekModel.self, DayModel.self, TaskItem.self, TaskStep.self, TaskAttachment.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
             modelContainer = try ModelContainer(for: schema, configurations: config)
         } catch {
@@ -24,6 +25,7 @@ struct WeekyiiApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .environment(userSettings)
                 .modelContainer(modelContainer)
                 .onAppear {
                     initializeStateMachine()

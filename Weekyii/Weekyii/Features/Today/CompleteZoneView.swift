@@ -1,23 +1,23 @@
 import SwiftUI
 
+// MARK: - CompleteZoneView - 完成区视图
+
 struct CompleteZoneView: View {
     let tasks: [TaskItem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "zone.complete"))
-                .font(.headline)
-
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             if tasks.isEmpty {
                 Text(String(localized: "zone.complete.empty"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .weekPaddingVertical(WeekSpacing.md)
             } else {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    TaskCard(task: task, showStatus: false)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

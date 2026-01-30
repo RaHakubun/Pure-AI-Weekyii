@@ -9,6 +9,7 @@ final class TodayViewModel {
     private let timeProvider: TimeProviding
     private let notificationService: NotificationService
     private let appState: AppState
+    private let userSettings: UserSettings
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -19,22 +20,33 @@ final class TodayViewModel {
         modelContext: ModelContext,
         timeProvider: TimeProviding,
         notificationService: NotificationService,
-        appState: AppState
+        appState: AppState,
+        userSettings: UserSettings
     ) {
         self.modelContext = modelContext
         self.timeProvider = timeProvider
         self.notificationService = notificationService
         self.appState = appState
+        self.userSettings = userSettings
     }
 
     func refresh() {
         ensurePresentWeek()
         let dayId = timeProvider.today.dayId
-        today = fetchDay(by: dayId)
+        var day = fetchDay(by: dayId)
+        
+        // Apply default kill time if day is newly created or empty
+        if let day = day, day.status == .empty {
+            day.killTimeHour = userSettings.defaultKillTimeHour
+            day.killTimeMinute = userSettings.defaultKillTimeMinute
+            try? modelContext.save()
+        }
+        
+        today = day
         errorMessage = nil
     }
 
-    func addTask(title: String, type: TaskType) throws {
+    func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
         guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
 
@@ -43,17 +55,23 @@ final class TodayViewModel {
         }
 
         let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
-        let task = TaskItem(title: title, taskType: type, order: order, zone: .draft)
+        let task = TaskItem(title: title, taskDescription: description, taskType: type, order: order, zone: .draft)
         task.day = day
+        // Assign relationships
+        task.steps = steps
+        task.attachments = attachments
         day.tasks.append(task)
         try? modelContext.save()
     }
 
-    func updateTask(_ task: TaskItem, title: String, type: TaskType) throws {
+    func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         task.title = title
+        task.taskDescription = description
         task.taskType = type
+        task.steps = steps
+        task.attachments = attachments
         try? modelContext.save()
     }
 

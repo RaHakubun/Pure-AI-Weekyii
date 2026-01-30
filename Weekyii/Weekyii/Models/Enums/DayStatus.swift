@@ -19,11 +19,11 @@ enum DayStatus: String, Codable {
 
     var color: Color {
         switch self {
-        case .empty: return .statusEmpty
-        case .draft: return .statusDraft
-        case .execute: return .statusExecute
-        case .completed: return .statusCompleted
-        case .expired: return .statusExpired
+        case .empty: return .textTertiary
+        case .draft: return .weekyiiPrimary
+        case .execute: return .accentOrange
+        case .completed: return .accentGreen
+        case .expired: return .taskDDL
         }
     }
 }
