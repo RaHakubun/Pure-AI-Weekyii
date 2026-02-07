@@ -33,7 +33,7 @@ final class TodayViewModel {
     func refresh() {
         ensurePresentWeek()
         let dayId = timeProvider.today.dayId
-        var day = fetchDay(by: dayId)
+        let day = fetchDay(by: dayId) ?? createMissingDay(for: timeProvider.today)
         
         // Apply default kill time if day is newly created or empty
         if let day = day, day.status == .empty {
@@ -199,8 +199,8 @@ final class TodayViewModel {
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {
-        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
-        return try? modelContext.fetch(descriptor).first
+        let descriptor = FetchDescriptor<DayModel>()
+        return try? modelContext.fetch(descriptor).first(where: { $0.dayId == dayId })
     }
 
     private func ensurePresentWeek() {
@@ -210,6 +210,17 @@ final class TodayViewModel {
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
         try? modelContext.save()
+    }
+
+    private func createMissingDay(for date: Date) -> DayModel? {
+        // Locate present week; if absent, bail (caller already called ensurePresentWeek)
+        let descriptor = FetchDescriptor<WeekModel>()
+        guard let week = try? modelContext.fetch(descriptor).first(where: { $0.status == .present }) else { return nil }
+        let day = DayModel(dayId: date.dayId, date: date, status: .empty)
+        day.week = week
+        week.days.append(day)
+        try? modelContext.save()
+        return day
     }
 }
 

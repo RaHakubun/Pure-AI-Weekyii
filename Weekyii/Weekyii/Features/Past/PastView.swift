@@ -2,30 +2,38 @@ import SwiftUI
 import SwiftData
 
 struct PastView: View {
-    @Environment(\.modelContext) private var modelContext
-    @State private var viewModel: PastViewModel?
+    @Query(sort: \WeekModel.startDate, order: .reverse) private var allWeeks: [WeekModel]
+    @Query(sort: \DayModel.date, order: .reverse) private var allDays: [DayModel]
     @State private var selectedMonth = Date()
+    private let analyticsService = PastAnalyticsService()
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                if let viewModel {
-                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                        // 月份选择器（限制只能看过去和当前月份）
-                        MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
-                        
-                        // 周列表
-                        let weeks = viewModel.weeks(in: selectedMonth)
-                        if weeks.isEmpty {
-                            emptyStateView
-                        } else {
-                            weeksList(weeks: weeks)
-                        }
+                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                    // 月份选择器（限制只能看过去和当前月份）
+                    MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
+                    
+                    // 统计概览卡片
+                    if let stats = monthStats {
+                        PastStatsOverview(stats: stats)
                     }
-                    .weekPadding(WeekSpacing.base)
-                } else {
-                    ProgressView()
+                    
+                    // 月趋势图
+                    MonthTrendChart(dataPoints: monthTrendData, month: selectedMonth)
+                    
+                    // 日热力图
+                    ContributionHeatmap(data: monthHeatmapData, dateRange: monthRange)
+                    
+                    // 周列表
+                    let weeks = weeksInSelectedMonth
+                    if weeks.isEmpty {
+                        emptyStateView
+                    } else {
+                        weeksList(weeks: weeks)
+                    }
                 }
+                .weekPadding(WeekSpacing.base)
             }
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
@@ -35,12 +43,47 @@ struct PastView: View {
                 }
             }
         }
-        .onAppear {
-            if viewModel == nil {
-                viewModel = PastViewModel(modelContext: modelContext)
-            }
-            viewModel?.refresh()
+    }
+
+    private var monthRange: ClosedRange<Date> {
+        let calendar = Calendar(identifier: .iso8601)
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth)) ?? selectedMonth
+        let nextMonth = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
+        let monthEnd = calendar.date(byAdding: .day, value: -1, to: nextMonth) ?? monthStart
+        return calendar.startOfDay(for: monthStart)...calendar.startOfDay(for: monthEnd)
+    }
+    
+    private var monthDays: [DayModel] {
+        let range = monthRange
+        return allDays.filter { day in
+            guard let weekStatus = day.week?.status, weekStatus == .past else { return false }
+            let date = Calendar(identifier: .iso8601).startOfDay(for: day.date)
+            return date >= range.lowerBound && date <= range.upperBound
         }
+    }
+    
+    private var monthStats: PastAnalyticsService.OverviewStats? {
+        let stats = analyticsService.getOverviewStats(days: monthDays)
+        return stats.totalStartedDays > 0 ? stats : nil
+    }
+    
+    private var monthTrendData: [DayTaskDataPoint] {
+        let totalTasks = monthDays.reduce(0) { $0 + $1.completedTasks.count + $1.expiredCount }
+        guard totalTasks > 0 else { return [] }
+        return analyticsService.getMonthTrendData(days: monthDays, month: selectedMonth)
+    }
+    
+    private var monthHeatmapData: [DayHeatmapDataPoint] {
+        let totalTasks = monthDays.reduce(0) { $0 + $1.completedTasks.count + $1.expiredCount }
+        guard totalTasks > 0 else { return [] }
+        return analyticsService.getHeatmapData(days: monthDays, startDate: monthRange.lowerBound, endDate: monthRange.upperBound)
+    }
+    
+    private var weeksInSelectedMonth: [WeekModel] {
+        let range = monthRange
+        return allWeeks.filter { week in
+            week.status == .past && week.startDate <= range.upperBound && week.endDate >= range.lowerBound
+        }.sorted { $0.startDate < $1.startDate }
     }
     
     // MARK: - Empty State
@@ -109,7 +152,7 @@ struct PastView: View {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     // 周标题
                     HStack {
-                        Text(week.weekId)
+                        Text(week.relativeWeekLabel(referenceDate: Date()))
                             .font(.titleSmall)
                             .foregroundColor(.textPrimary)
                         
@@ -157,11 +200,20 @@ struct PastView: View {
 private struct PastWeekDetailView: View {
     let week: WeekModel
     private let calendar = Calendar(identifier: .iso8601)
+    private let analyticsService = PastAnalyticsService()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 summaryCard
+                
+                if let stats = weekStats {
+                    PastStatsOverview(stats: stats)
+                }
+                
+                WeekTrendChart(dataPoints: weekTrendData)
+                
+                ContributionHeatmap(data: weekHeatmapData, dateRange: weekRange)
 
                 ForEach(sortedDays) { day in
                     dayCard(day)
@@ -170,12 +222,36 @@ private struct PastWeekDetailView: View {
             .weekPadding(WeekSpacing.base)
         }
         .background(Color.backgroundPrimary)
-        .navigationTitle(week.weekId)
+        .navigationTitle(week.relativeWeekLabel(referenceDate: Date()))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var sortedDays: [DayModel] {
         week.days.sorted { $0.date < $1.date }
+    }
+    
+    private var weekRange: ClosedRange<Date> {
+        let start = calendar.startOfDay(for: week.startDate)
+        let end = calendar.startOfDay(for: week.endDate)
+        return start...end
+    }
+    
+    private var weekStats: PastAnalyticsService.OverviewStats? {
+        let stats = analyticsService.getOverviewStats(days: week.days)
+        return stats.totalStartedDays > 0 ? stats : nil
+    }
+    
+    private var weekTrendData: [DayTaskDataPoint] {
+        let totalTasks = week.days.reduce(0) { $0 + $1.completedTasks.count + $1.expiredCount }
+        guard totalTasks > 0 else { return [] }
+        let weekStart = calendar.startOfDay(for: week.startDate)
+        return analyticsService.getWeekTrendData(days: week.days, weekStart: weekStart)
+    }
+    
+    private var weekHeatmapData: [DayHeatmapDataPoint] {
+        let totalTasks = week.days.reduce(0) { $0 + $1.completedTasks.count + $1.expiredCount }
+        guard totalTasks > 0 else { return [] }
+        return analyticsService.getHeatmapData(days: week.days, startDate: weekRange.lowerBound, endDate: weekRange.upperBound)
     }
 
     private var completedTasksCount: Int {

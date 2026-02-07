@@ -377,7 +377,7 @@ private struct SampleDataSeeder {
         for (index, day) in sortedDays.enumerated() {
             switch week.status {
             case .pending:
-                day.status = .empty
+                seedDraftDay(day, index: index, options: options)
             case .past:
                 seedPastDay(day, index: index, options: options)
             case .present:
@@ -386,7 +386,7 @@ private struct SampleDataSeeder {
                 } else if day.date < today {
                     seedPastDay(day, index: index, options: options)
                 } else {
-                    day.status = .empty
+                    seedDraftDay(day, index: index, options: options)
                 }
             }
         }

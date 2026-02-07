@@ -16,6 +16,9 @@ struct DraftEditorView: View {
                     .font(.titleSmall)
                     .foregroundColor(.textPrimary)
                 Spacer()
+                Text("\(day.sortedDraftTasks.count)")
+                    .font(.titleSmall)
+                    .foregroundColor(.weekyiiPrimary)
                 EditButton()
                     .disabled(!(day.status == .draft || day.status == .empty))
                 Button(action: { showingAddSheet = true }) {
@@ -55,7 +58,8 @@ struct DraftEditorView: View {
                     }
                 }
                 .listStyle(.plain)
-                .frame(height: CGFloat(min(day.sortedDraftTasks.count, 8)) * 60)
+                .scrollDisabled(true)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .environment(\.editMode, $editMode)
@@ -101,4 +105,3 @@ struct DraftEditorView: View {
         }
     }
 }
-

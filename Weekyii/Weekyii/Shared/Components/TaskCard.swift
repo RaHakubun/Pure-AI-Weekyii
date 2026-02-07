@@ -14,51 +14,61 @@ struct TaskCard: View {
     }
     
     var body: some View {
-        Button(action: { onTap?() }) {
-            HStack(spacing: WeekSpacing.md) {
-                // 左侧彩色边条
-                RoundedRectangle(cornerRadius: WeekRadius.full)
-                    .fill(task.taskType.color)
-                    .frame(width: 4)
-                
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    HStack(spacing: WeekSpacing.sm) {
-                        // 任务类型图标
-                        Image(systemName: task.taskType.iconName)
-                            .foregroundColor(task.taskType.color)
-                            .font(.caption)
-                        
-                        Text(task.title)
-                            .font(.bodyLarge)
-                            .foregroundColor(.textPrimary)
-                            .lineLimit(2)
-                        
-                        Spacer()
-                        
-                        if showStatus {
-                            TaskZoneBadge(zone: task.zone)
-                        }
-                    }
-                    
-                    // 时间信息
-                    if let startedAt = task.startedAt {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "clock")
-                                .font(.captionSmall)
-                            Text(formatTime(startedAt))
-                                .font(.caption)
-                        }
-                        .foregroundColor(.textSecondary)
+        Group {
+            if let onTap {
+                Button(action: onTap) {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                cardContent
+            }
+        }
+    }
+
+    private var cardContent: some View {
+        HStack(spacing: WeekSpacing.md) {
+            // 左侧彩色边条
+            RoundedRectangle(cornerRadius: WeekRadius.full)
+                .fill(task.taskType.color)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                HStack(spacing: WeekSpacing.sm) {
+                    // 任务类型图标
+                    Image(systemName: task.taskType.iconName)
+                        .foregroundColor(task.taskType.color)
+                        .font(.caption)
+
+                    Text(task.title)
+                        .font(.bodyLarge)
+                        .foregroundColor(.textPrimary)
+                        .lineLimit(2)
+
+                    Spacer()
+
+                    if showStatus {
+                        TaskZoneBadge(zone: task.zone)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // 时间信息
+                if let startedAt = task.startedAt {
+                    HStack(spacing: WeekSpacing.xs) {
+                        Image(systemName: "clock")
+                            .font(.captionSmall)
+                        Text(formatTime(startedAt))
+                            .font(.caption)
+                    }
+                    .foregroundColor(.textSecondary)
+                }
             }
-            .weekPadding(WeekSpacing.base)
-            .background(Color.backgroundSecondary)
-            .cornerRadius(WeekRadius.medium)
-            .shadow(color: WeekShadow.light.color, radius: WeekShadow.light.radius, x: WeekShadow.light.x, y: WeekShadow.light.y)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(PlainButtonStyle())
+        .weekPadding(WeekSpacing.base)
+        .background(Color.backgroundSecondary)
+        .cornerRadius(WeekRadius.medium)
+        .shadow(color: WeekShadow.light.color, radius: WeekShadow.light.radius, x: WeekShadow.light.x, y: WeekShadow.light.y)
     }
     
     private func formatTime(_ date: Date) -> String {

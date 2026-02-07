@@ -1,7 +1,13 @@
 import SwiftUI
 import SwiftData
 
+private enum TodaySection: Int {
+    case today
+    case week
+}
+
 struct TodayView: View {
+
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Environment(UserSettings.self) private var userSettings
@@ -9,6 +15,7 @@ struct TodayView: View {
     @State private var viewModel: TodayViewModel?
     @State private var showingTaskCreator = false
     @State private var errorMessage: String?
+    @State private var selectedSection: TodaySection = .today
     
 
     var body: some View {
@@ -24,11 +31,6 @@ struct TodayView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .medium, animated: true)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if let day = viewModel?.today, day.status == .draft {
-                        EditButton()
-                    }
                 }
             }
             .alert(String(localized: "alert.title"), isPresented: Binding(get: {
@@ -58,20 +60,28 @@ struct TodayView: View {
 
     @ViewBuilder
     private func content(for day: DayModel, viewModel: TodayViewModel) -> some View {
+        TodayWeekSwitcher(
+            selectedSection: $selectedSection,
+            todayContent: { todayContent(day: day, viewModel: viewModel) },
+            weekContent: { WeekOverviewContentView() }
+        )
+        .background(Color.backgroundPrimary)
+    }
+
+    private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 // 顶部状态卡片
                 statusCard(for: day)
-                
+
                 // 任务流区域
                 taskFlowSection(day: day, viewModel: viewModel)
-                
+
                 // 截止时间（放在最后）
                 killTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
         }
-        .background(Color.backgroundPrimary)
     }
 
     @ViewBuilder
@@ -210,20 +220,6 @@ struct TodayView: View {
     private func draftStateContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "list.bullet.clipboard")
-                        .foregroundColor(.weekyiiPrimary)
-                    Text(String(localized: "draft.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-                    
-                    Spacer()
-                    
-                    Text("\(day.sortedDraftTasks.count)")
-                        .font(.titleSmall)
-                        .foregroundColor(.weekyiiPrimary)
-                }
-                
                 DraftEditorView(day: day, viewModel: viewModel)
             }
         }
@@ -450,6 +446,220 @@ struct TodayView: View {
         return formatter.string(from: date)
     }
     
+}
+
+private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
+    @Binding var selectedSection: TodaySection
+    let todayContent: TodayContent
+    let weekContent: WeekContent
+
+    @GestureState private var dragTranslation: CGFloat = 0
+    @GestureState private var isDragging = false
+
+    init(
+        selectedSection: Binding<TodaySection>,
+        @ViewBuilder todayContent: () -> TodayContent,
+        @ViewBuilder weekContent: () -> WeekContent
+    ) {
+        self._selectedSection = selectedSection
+        self.todayContent = todayContent()
+        self.weekContent = weekContent()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 胶囊切换器 - 独立于 GeometryReader
+            SectionToggleView(
+                progress: selectedSection == .today ? 0 : 1,
+                selectedSection: selectedSection,
+                onSelect: { target in
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedSection = target
+                    }
+                }
+            )
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.top, WeekSpacing.sm)
+            .padding(.bottom, WeekSpacing.md)
+            
+            // 内容页面 - 使用 GeometryReader 测量宽度
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let baseOffset = -CGFloat(selectedIndex) * width
+                let rawOffset = baseOffset + dragTranslation
+                let clampedOffset = min(0, max(rawOffset, -width))
+
+                HStack(spacing: 0) {
+                    todayContent
+                        .frame(width: width)
+                    weekContent
+                        .frame(width: width)
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .offset(x: clampedOffset)
+                .clipped()
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedSection)
+                .transaction { transaction in
+                    if isDragging {
+                        transaction.animation = nil
+                    }
+                }
+                .simultaneousGesture(dragGesture(width: width))
+            }
+        }
+    }
+
+    private var selectedIndex: Int {
+        selectedSection == .today ? 0 : 1
+    }
+
+    private func dragGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10)
+            .updating($dragTranslation) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                state = value.translation.width
+            }
+            .updating($isDragging) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                state = true
+            }
+            .onEnded { value in
+                let baseOffset = -CGFloat(selectedIndex) * width
+                let predictedOffset = baseOffset + value.predictedEndTranslation.width
+                let clamped = min(0, max(predictedOffset, -width))
+                let predictedProgress = max(0, min(-clamped / max(width, 1), 1))
+                let target: TodaySection = predictedProgress > 0.5 ? .week : .today
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    selectedSection = target
+                }
+            }
+    }
+}
+/// 高级 Segmented Control 样式的切换器
+/// 两个标签始终可见，高亮胶囊在背后滑动，带渐变和玻璃质感
+private struct SectionToggleView: View {
+    let progress: CGFloat
+    let selectedSection: TodaySection
+    let onSelect: (TodaySection) -> Void
+    
+    private let height: CGFloat = 44
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // 今日 按钮
+            Button {
+                onSelect(.today)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 14, weight: .medium))
+                    Text(String(localized: "tab.today"))
+                        .font(.bodyMedium.weight(.semibold))
+                }
+                .foregroundColor(selectedSection == .today ? .white : .textSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            // 本周 按钮
+            Button {
+                onSelect(.week)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .medium))
+                    Text(String(localized: "tab.week"))
+                        .font(.bodyMedium.weight(.semibold))
+                }
+                .foregroundColor(selectedSection == .week ? .white : .textSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .background(
+            GeometryReader { geo in
+                let halfWidth = geo.size.width / 2
+                let indicatorX = progress * halfWidth
+                
+                // 滑动的高亮胶囊 - 带渐变
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.weekyiiPrimary,
+                                Color.weekyiiPrimary.opacity(0.85)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: halfWidth - 4, height: height - 6)
+                    .offset(x: indicatorX + 2, y: 3)
+                    // 顶部高光
+                    .overlay(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .center
+                                )
+                            )
+                            .frame(width: halfWidth - 4, height: height - 6)
+                            .offset(x: indicatorX + 2, y: 3)
+                    )
+                    // 边框
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                            .frame(width: halfWidth - 4, height: height - 6)
+                            .offset(x: indicatorX + 2, y: 3)
+                    )
+                    // 阴影
+                    .shadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+            }
+        )
+        .background(
+            // 底层背景胶囊 - 带内阴影效果
+            Capsule()
+                .fill(Color.backgroundSecondary.opacity(0.8))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1),
+                                    Color.black.opacity(0.05)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                // 内阴影模拟
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.08), lineWidth: 2)
+                        .blur(radius: 2)
+                        .mask(Capsule().fill(Color.black))
+                        .offset(y: 1)
+                )
+        )
+        .clipShape(Capsule())
+        .frame(height: height)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress)
+    }
 }
 
 // MARK: - Task Creator Sheet

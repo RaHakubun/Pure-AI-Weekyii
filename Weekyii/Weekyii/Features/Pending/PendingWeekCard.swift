@@ -7,8 +7,7 @@ struct PendingWeekCard: View {
     
     var body: some View {
         NavigationLink {
-            // TODO: 周详情视图
-            Text("Week Detail: \(week.weekId)")
+            PendingWeekDetailView(week: week)
         } label: {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
@@ -16,7 +15,7 @@ struct PendingWeekCard: View {
                     HStack {
                         Image(systemName: "calendar")
                             .foregroundColor(.weekyiiPrimary)
-                        Text(week.weekId)
+                        Text(week.relativeWeekLabel())
                             .font(.titleSmall)
                             .foregroundColor(.textPrimary)
                         
