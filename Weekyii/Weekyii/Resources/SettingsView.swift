@@ -11,18 +11,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - Default Parameters
+                // MARK: - Tasks & Time
                 Section {
                     killTimeSettings
-                    taskTypeSettings
                     reminderSettings
+                    taskTypeSettings
                 } header: {
-                    Text(String(localized: "settings.defaults.header"))
-                } footer: {
-                    Text(String(localized: "settings.defaults.footer"))
+                    Text(String(localized: "settings.section.tasks"))
                 }
                 
-                // MARK: - Week Settings
+                // MARK: - Week & Stats
                 Section {
                     Toggle(isOn: Binding(
                         get: { settings.weekStartsOnMonday },
@@ -36,10 +34,10 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text(String(localized: "settings.week.header"))
+                    Text(String(localized: "settings.section.week"))
                 }
                 
-                // MARK: - iCloud Sync (Placeholder)
+                // MARK: - Data & Privacy
                 Section {
                     Toggle(isOn: .constant(false)) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -50,113 +48,124 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(true)
-                    
+
                     HStack {
-                        Text(String(localized: "settings.icloud.status"))
-                            .foregroundStyle(.secondary)
+                        Text(String(localized: "settings.data.export"))
                         Spacer()
-                        Text(String(localized: "settings.icloud.status.disabled"))
+                        Text(String(localized: "settings.data.export.coming_soon"))
                             .foregroundStyle(.tertiary)
                     }
                 } header: {
-                    Text(String(localized: "settings.icloud.header"))
-                } footer: {
-                    Text(String(localized: "settings.icloud.footer"))
+                    Text(String(localized: "settings.section.data"))
                 }
 
-                // MARK: - Debug Tools
+                // MARK: - Developer Settings
                 Section {
-                    Stepper(value: Binding(
-                        get: { settings.seedPastWeeks },
-                        set: { settings.seedPastWeeks = $0 }
-                    ), in: 1...24) {
-                        Text(String(localized: "settings.debug.seed.past_weeks") + " \(settings.seedPastWeeks)")
-                    }
-                    
-                    Stepper(value: Binding(
-                        get: { settings.seedFutureWeeks },
-                        set: { settings.seedFutureWeeks = $0 }
-                    ), in: 0...12) {
-                        Text(String(localized: "settings.debug.seed.future_weeks") + " \(settings.seedFutureWeeks)")
-                    }
-                    
-                    Stepper(value: Binding(
-                        get: { settings.seedTasksPerPastDay },
-                        set: { settings.seedTasksPerPastDay = $0 }
-                    ), in: 1...12) {
-                        Text(String(localized: "settings.debug.seed.past_tasks") + " \(settings.seedTasksPerPastDay)")
-                    }
-                    
-                    Stepper(value: Binding(
-                        get: { settings.seedTasksPerDraftDay },
-                        set: { settings.seedTasksPerDraftDay = $0 }
-                    ), in: 1...12) {
-                        Text(String(localized: "settings.debug.seed.draft_tasks") + " \(settings.seedTasksPerDraftDay)")
-                    }
-                    
-                    Stepper(value: Binding(
-                        get: { settings.seedExpiredEveryNDays },
-                        set: { settings.seedExpiredEveryNDays = $0 }
-                    ), in: 0...7) {
-                        Text(expiredEveryLabel)
-                    }
-                    
                     Toggle(isOn: Binding(
-                        get: { settings.seedIncludeSteps },
-                        set: { settings.seedIncludeSteps = $0 }
+                        get: { settings.developerSettingsEnabled },
+                        set: { settings.developerSettingsEnabled = $0 }
                     )) {
-                        Text(String(localized: "settings.debug.seed.include_steps"))
-                    }
-                    
-                    Toggle(isOn: Binding(
-                        get: { settings.seedIncludeAttachments },
-                        set: { settings.seedIncludeAttachments = $0 }
-                    )) {
-                        Text(String(localized: "settings.debug.seed.include_attachments"))
-                    }
-                    
-                    Toggle(isOn: Binding(
-                        get: { settings.seedIncludeDescriptions },
-                        set: { settings.seedIncludeDescriptions = $0 }
-                    )) {
-                        Text(String(localized: "settings.debug.seed.include_descriptions"))
-                    }
-                    
-                    Toggle(isOn: Binding(
-                        get: { settings.seedAllowExisting },
-                        set: { settings.seedAllowExisting = $0 }
-                    )) {
-                        Text(String(localized: "settings.debug.seed.allow_existing"))
-                    }
-                    
-                    Button {
-                        do {
-                            let seeder = SampleDataSeeder(modelContext: modelContext)
-                            let result = try seeder.seed(options: seedOptions)
-                            switch result {
-                            case .seeded:
-                                seedAlertMessage = String(localized: "settings.debug.seed.success")
-                            case .skippedExisting:
-                                seedAlertMessage = String(localized: "settings.debug.seed.already")
-                            case .skippedAll:
-                                seedAlertMessage = String(localized: "settings.debug.seed.none")
-                            }
-                        } catch {
-                            seedAlertMessage = String(localized: "settings.debug.seed.failed") + " " + error.localizedDescription
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(String(localized: "settings.developer.show_debug"))
+                            Text(String(localized: "settings.developer.show_debug.subtitle"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        Text(String(localized: "settings.debug.seed"))
                     }
                     
-                    Button(role: .destructive) {
-                        showingClearConfirm = true
-                    } label: {
-                        Text(String(localized: "settings.debug.clear"))
+                    if settings.developerSettingsEnabled {
+                        Stepper(value: Binding(
+                            get: { settings.seedPastWeeks },
+                            set: { settings.seedPastWeeks = $0 }
+                        ), in: 1...24) {
+                            Text(String(localized: "settings.debug.seed.past_weeks") + " \(settings.seedPastWeeks)")
+                        }
+                        
+                        Stepper(value: Binding(
+                            get: { settings.seedFutureWeeks },
+                            set: { settings.seedFutureWeeks = $0 }
+                        ), in: 0...12) {
+                            Text(String(localized: "settings.debug.seed.future_weeks") + " \(settings.seedFutureWeeks)")
+                        }
+                        
+                        Stepper(value: Binding(
+                            get: { settings.seedTasksPerPastDay },
+                            set: { settings.seedTasksPerPastDay = $0 }
+                        ), in: 1...12) {
+                            Text(String(localized: "settings.debug.seed.past_tasks") + " \(settings.seedTasksPerPastDay)")
+                        }
+                        
+                        Stepper(value: Binding(
+                            get: { settings.seedTasksPerDraftDay },
+                            set: { settings.seedTasksPerDraftDay = $0 }
+                        ), in: 1...12) {
+                            Text(String(localized: "settings.debug.seed.draft_tasks") + " \(settings.seedTasksPerDraftDay)")
+                        }
+                        
+                        Stepper(value: Binding(
+                            get: { settings.seedExpiredEveryNDays },
+                            set: { settings.seedExpiredEveryNDays = $0 }
+                        ), in: 0...7) {
+                            Text(expiredEveryLabel)
+                        }
+                        
+                        Toggle(isOn: Binding(
+                            get: { settings.seedIncludeSteps },
+                            set: { settings.seedIncludeSteps = $0 }
+                        )) {
+                            Text(String(localized: "settings.debug.seed.include_steps"))
+                        }
+                        
+                        Toggle(isOn: Binding(
+                            get: { settings.seedIncludeAttachments },
+                            set: { settings.seedIncludeAttachments = $0 }
+                        )) {
+                            Text(String(localized: "settings.debug.seed.include_attachments"))
+                        }
+                        
+                        Toggle(isOn: Binding(
+                            get: { settings.seedIncludeDescriptions },
+                            set: { settings.seedIncludeDescriptions = $0 }
+                        )) {
+                            Text(String(localized: "settings.debug.seed.include_descriptions"))
+                        }
+                        
+                        Toggle(isOn: Binding(
+                            get: { settings.seedAllowExisting },
+                            set: { settings.seedAllowExisting = $0 }
+                        )) {
+                            Text(String(localized: "settings.debug.seed.allow_existing"))
+                        }
+                        
+                        Button {
+                            do {
+                                let seeder = SampleDataSeeder(modelContext: modelContext)
+                                let result = try seeder.seed(options: seedOptions)
+                                switch result {
+                                case .seeded:
+                                    seedAlertMessage = String(localized: "settings.debug.seed.success")
+                                case .skippedExisting:
+                                    seedAlertMessage = String(localized: "settings.debug.seed.already")
+                                case .skippedAll:
+                                    seedAlertMessage = String(localized: "settings.debug.seed.none")
+                                }
+                            } catch {
+                                seedAlertMessage = String(localized: "settings.debug.seed.failed") + " " + error.localizedDescription
+                            }
+                        } label: {
+                            Text(String(localized: "settings.debug.seed"))
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingClearConfirm = true
+                        } label: {
+                            Text(String(localized: "settings.debug.clear"))
+                        }
                     }
                 } header: {
-                    Text(String(localized: "settings.debug.header"))
+                    Text(String(localized: "settings.developer.header"))
                 } footer: {
-                    Text(String(localized: "settings.debug.seed.footer"))
+                    Text(String(localized: "settings.developer.footer"))
                 }
                 
                 // MARK: - About

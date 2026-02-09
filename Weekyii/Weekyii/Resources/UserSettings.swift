@@ -30,6 +30,11 @@ final class UserSettings {
     var iCloudSyncEnabled: Bool {
         didSet { save() }
     }
+    
+    // Developer Settings
+    var developerSettingsEnabled: Bool {
+        didSet { save() }
+    }
 
     // Demo Seed Settings
     var seedPastWeeks: Int {
@@ -77,6 +82,7 @@ final class UserSettings {
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 30
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
+        self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
         
         self.seedPastWeeks = defaults.object(forKey: "seedPastWeeks") as? Int ?? 8
         self.seedFutureWeeks = defaults.object(forKey: "seedFutureWeeks") as? Int ?? 4
@@ -96,6 +102,7 @@ final class UserSettings {
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
+        defaults.set(developerSettingsEnabled, forKey: "developerSettingsEnabled")
         
         defaults.set(seedPastWeeks, forKey: "seedPastWeeks")
         defaults.set(seedFutureWeeks, forKey: "seedFutureWeeks")

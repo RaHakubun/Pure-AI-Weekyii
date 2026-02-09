@@ -55,6 +55,7 @@ struct TodayView: View {
                 viewModel = model
             }
             viewModel?.refresh()
+            viewModel?.seedDraftTasksForUITestsIfNeeded()
         }
     }
 
@@ -258,16 +259,40 @@ struct TodayView: View {
                         .font(.titleMedium)
                         .foregroundColor(.white)
                     
-                    if let startedAt = focusTask.startedAt {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                            Text(formatTime(startedAt))
-                                .font(.caption)
+                    HStack {
+                        if let startedAt = focusTask.startedAt {
+                            HStack(spacing: WeekSpacing.xs) {
+                                Image(systemName: "clock")
+                                    .font(.caption)
+                                Text(formatTime(startedAt))
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.white.opacity(0.9))
                         }
-                        .foregroundColor(.white.opacity(0.9))
+                        
+                        Spacer()
+                        
+                        Button {
+                            do {
+                                try viewModel.doneFocus()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        } label: {
+                            HStack(spacing: WeekSpacing.xs) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text(String(localized: "action.done_focus"))
+                            }
+                            .font(.caption.weight(.semibold))
+                            .padding(.vertical, WeekSpacing.xs)
+                            .padding(.horizontal, WeekSpacing.sm)
+                        }
+                        .foregroundColor(.white)
+                        .background(.white.opacity(0.2), in: Capsule())
+                        .buttonStyle(.plain)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         
@@ -317,18 +342,6 @@ struct TodayView: View {
             }
         }
         
-        WeekButton(
-            String(localized: "action.done_focus"),
-            icon: "checkmark.circle.fill",
-            style: .primary,
-            isEnabled: day.focusTask != nil
-        ) {
-            do {
-                try viewModel.doneFocus()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
     }
     
     // MARK: - Completed State

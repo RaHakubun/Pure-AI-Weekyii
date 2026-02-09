@@ -1220,6 +1220,38 @@
         }
       }
     },
+    "settings.data.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出数据"
+          }
+        }
+      }
+    },
+    "settings.data.export.coming_soon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coming Soon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将上线"
+          }
+        }
+      }
+    },
     "settings.debug.clear" : {
       "localizations" : {
         "en" : {
@@ -1317,6 +1349,7 @@
       }
     },
     "settings.debug.header" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1445,6 +1478,7 @@
       }
     },
     "settings.debug.seed.footer" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1621,6 +1655,7 @@
       }
     },
     "settings.defaults.footer" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1637,6 +1672,7 @@
       }
     },
     "settings.defaults.header" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1648,6 +1684,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认参数"
+          }
+        }
+      }
+    },
+    "settings.developer.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable to access data seeding and maintenance tools."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启后可访问数据填充与维护工具。"
+          }
+        }
+      }
+    },
+    "settings.developer.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Developer Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者设置"
+          }
+        }
+      }
+    },
+    "settings.developer.show_debug" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show developer tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示调试工具"
+          }
+        }
+      }
+    },
+    "settings.developer.show_debug.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced options for seeding and clearing data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含数据填充与清空等高级选项。"
           }
         }
       }
@@ -1669,6 +1769,7 @@
       }
     },
     "settings.icloud.footer" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1685,6 +1786,7 @@
       }
     },
     "settings.icloud.header" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1701,6 +1803,7 @@
       }
     },
     "settings.icloud.status" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1717,6 +1820,7 @@
       }
     },
     "settings.icloud.status.disabled" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1844,6 +1948,54 @@
         }
       }
     },
+    "settings.section.data" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data & Privacy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据与隐私"
+          }
+        }
+      }
+    },
+    "settings.section.tasks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasks & Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务与时间"
+          }
+        }
+      }
+    },
+    "settings.section.week" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Week & Stats"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周与统计"
+          }
+        }
+      }
+    },
     "settings.title" : {
       "localizations" : {
         "en" : {
@@ -1861,6 +2013,7 @@
       }
     },
     "settings.week.header" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

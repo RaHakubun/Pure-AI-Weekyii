@@ -2,6 +2,12 @@ import SwiftUI
 
 struct TaskRowView: View {
     let task: TaskItem
+    let titleAccessibilityIdentifier: String?
+
+    init(task: TaskItem, titleAccessibilityIdentifier: String? = nil) {
+        self.task = task
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
@@ -19,11 +25,7 @@ struct TaskRowView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 // Title
-                Text(task.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(.textPrimary)
-                    .lineLimit(2)
+                titleView
                 
                 // Description
                 if !task.taskDescription.isEmpty {
@@ -52,5 +54,23 @@ struct TaskRowView: View {
         .padding(.horizontal, 12)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(WeekRadius.medium)
+    }
+    
+    @ViewBuilder
+    private var titleView: some View {
+        if let titleAccessibilityIdentifier {
+            Text(task.title)
+                .font(.body)
+                .fontWeight(.medium)
+                .foregroundColor(.textPrimary)
+                .lineLimit(2)
+                .accessibilityIdentifier(titleAccessibilityIdentifier)
+        } else {
+            Text(task.title)
+                .font(.body)
+                .fontWeight(.medium)
+                .foregroundColor(.textPrimary)
+                .lineLimit(2)
+        }
     }
 }

@@ -46,6 +46,21 @@ final class TodayViewModel {
         errorMessage = nil
     }
 
+    func seedDraftTasksForUITestsIfNeeded() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-uiTestingSeedDraft") else { return }
+        guard let day = today else { return }
+        guard day.status == .draft || day.status == .empty else { return }
+
+        let currentCount = day.sortedDraftTasks.count
+        if currentCount >= 2 { return }
+
+        let titles = ["Draft Task A", "Draft Task B"]
+        for index in currentCount..<2 {
+            try? addTask(title: titles[index], type: .regular)
+        }
+    }
+
     func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
         guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
