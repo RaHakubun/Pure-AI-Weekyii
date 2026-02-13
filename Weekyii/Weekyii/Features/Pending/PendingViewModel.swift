@@ -5,6 +5,16 @@ import SwiftData
 @MainActor
 @Observable
 final class PendingViewModel {
+    struct WeekSelectionOption: Identifiable {
+        let weekId: String
+        let startDate: Date
+        let endDate: Date
+        let isExisting: Bool
+        let isPast: Bool
+
+        var id: String { weekId }
+    }
+
     private let modelContext: ModelContext
     private let weekCalculator = WeekCalculator()
     private let calendar = Calendar(identifier: .iso8601)
@@ -33,17 +43,17 @@ final class PendingViewModel {
     }
 
     @discardableResult
-    func createWeek(containing date: Date) -> Bool {
+    func createWeek(containing date: Date) -> WeekModel? {
         let today = calendar.startOfDay(for: Date())
         guard calendar.startOfDay(for: date) >= today else {
             errorMessage = "只能创建今天或未来的周"
-            return false
+            return nil
         }
 
         let weekId = date.weekId
         guard !weekExists(weekId) else {
             errorMessage = "该周已存在"
-            return false
+            return nil
         }
 
         let week = weekCalculator.makeWeek(for: date, status: .pending)
@@ -51,29 +61,29 @@ final class PendingViewModel {
         do {
             try modelContext.save()
             refresh()
-            return true
+            return week
         } catch {
             errorMessage = error.localizedDescription
-            return false
+            return nil
         }
     }
 
     @discardableResult
-    func createWeek(weekId: String) -> Bool {
+    func createWeek(weekId: String) -> WeekModel? {
         let normalizedWeekId = weekId.uppercased()
         guard !weekExists(normalizedWeekId) else {
             errorMessage = "该周已存在"
-            return false
+            return nil
         }
         guard let startDate = weekCalculator.weekStartDate(for: normalizedWeekId) else {
             errorMessage = String(localized: "error.date_format_invalid")
-            return false
+            return nil
         }
 
         let today = calendar.startOfDay(for: Date())
         guard startDate >= today else {
             errorMessage = "只能创建今天或未来的周"
-            return false
+            return nil
         }
 
         let week = weekCalculator.makeWeek(weekId: normalizedWeekId, startDate: startDate, status: .pending)
@@ -81,11 +91,47 @@ final class PendingViewModel {
         do {
             try modelContext.save()
             refresh()
-            return true
+            return week
         } catch {
             errorMessage = error.localizedDescription
-            return false
+            return nil
         }
+    }
+
+    func day(in week: WeekModel, for date: Date) -> DayModel? {
+        let targetDayId = calendar.startOfDay(for: date).dayId
+        return week.days.first { $0.dayId == targetDayId }
+    }
+
+    func weekOptions(in month: Date) -> [WeekSelectionOption] {
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
+        let today = calendar.startOfDay(for: Date())
+
+        var options: [WeekSelectionOption] = []
+        var cursor = monthStart.startOfWeek
+
+        while cursor < monthEnd {
+            let weekStart = cursor
+            let weekEnd = weekStart.addingDays(6)
+            let weekId = weekStart.weekId
+            let exists = weekExists(weekId)
+            let isPast = weekEnd < today
+            options.append(
+                WeekSelectionOption(
+                    weekId: weekId,
+                    startDate: weekStart,
+                    endDate: weekEnd,
+                    isExisting: exists,
+                    isPast: isPast
+                )
+            )
+
+            guard let next = calendar.date(byAdding: .day, value: 7, to: weekStart) else { break }
+            cursor = next
+        }
+
+        return options
     }
 
     private func weekExists(_ weekId: String) -> Bool {
