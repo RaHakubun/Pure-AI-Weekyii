@@ -20,8 +20,8 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(firstTitle.waitForExistence(timeout: 2))
         XCTAssertTrue(secondTitle.waitForExistence(timeout: 2))
 
-        let firstHandle = app.buttons["draftDragHandle_0"]
-        let secondHandle = app.buttons["draftDragHandle_1"]
+        let firstHandle = app.images["draftDragHandle_0"]
+        let secondHandle = app.images["draftDragHandle_1"]
         XCTAssertTrue(firstHandle.waitForExistence(timeout: 2))
         XCTAssertTrue(secondHandle.waitForExistence(timeout: 2))
 

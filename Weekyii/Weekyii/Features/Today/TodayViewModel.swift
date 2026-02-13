@@ -31,25 +31,32 @@ final class TodayViewModel {
     }
 
     func refresh() {
+        errorMessage = nil
         ensurePresentWeek()
-        let dayId = timeProvider.today.dayId
-        let day = fetchDay(by: dayId) ?? createMissingDay(for: timeProvider.today)
+        guard let day = fetchOrCreateToday() else {
+            today = nil
+            errorMessage = String(localized: "error.day_not_found")
+            return
+        }
+        today = day
         
         // Apply default kill time if day is newly created or empty
-        if let day = day, day.status == .empty {
+        if day.status == .empty {
             day.killTimeHour = userSettings.defaultKillTimeHour
             day.killTimeMinute = userSettings.defaultKillTimeMinute
-            try? modelContext.save()
+            persistOrRecordError()
         }
-        
-        today = day
-        errorMessage = nil
+
+        if day.status == .draft || day.status == .execute {
+            updateNotificationSchedule(for: day)
+            persistOrRecordError()
+        }
     }
 
     func seedDraftTasksForUITestsIfNeeded() {
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("-uiTestingSeedDraft") else { return }
-        guard let day = today else { return }
+        guard let day = fetchOrCreateToday() else { return }
         guard day.status == .draft || day.status == .empty else { return }
 
         let currentCount = day.sortedDraftTasks.count
@@ -57,12 +64,16 @@ final class TodayViewModel {
 
         let titles = ["Draft Task A", "Draft Task B"]
         for index in currentCount..<2 {
-            try? addTask(title: titles[index], type: .regular)
+            do {
+                try addTask(title: titles[index], type: .regular)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
 
         if day.status == .empty {
@@ -71,50 +82,66 @@ final class TodayViewModel {
 
         let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
         let task = TaskItem(title: title, taskDescription: description, taskType: type, order: order, zone: .draft)
-        task.day = day
-        // Assign relationships
-        task.steps = steps
+        task.steps = normalizedStepCopies(from: steps)
         task.attachments = attachments
         day.tasks.append(task)
-        try? modelContext.save()
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
     }
 
     func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         task.title = title
         task.taskDescription = description
         task.taskType = type
-        task.steps = steps
+        replaceSteps(for: task, with: steps)
         task.attachments = attachments
-        try? modelContext.save()
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
     }
 
     func deleteTasks(at offsets: IndexSet) throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let tasks = day.sortedDraftTasks
-        for index in offsets {
-            let task = tasks[index]
+        let tasksToDelete = offsets.compactMap { index in
+            tasks.indices.contains(index) ? tasks[index] : nil
+        }
+        day.tasks.removeAll { task in
+            tasksToDelete.contains { $0.id == task.id }
+        }
+        for task in tasksToDelete {
             modelContext.delete(task)
         }
         renumberDraftTasks(for: day)
-        try? modelContext.save()
+        if day.sortedDraftTasks.isEmpty {
+            day.status = .empty
+        }
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
     }
 
     func moveDraftTasks(from source: IndexSet, to destination: Int) throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
+        let count = day.sortedDraftTasks.count
+        guard source.isEmpty == false, destination >= 0, destination <= count else { return }
         var tasks = day.sortedDraftTasks
         tasks.move(fromOffsets: source, toOffset: destination)
         for (index, task) in tasks.enumerated() {
             task.order = index + 1
         }
-        try? modelContext.save()
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
     }
 
     func startDay() throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let sortedTasks = day.sortedDraftTasks
         guard !sortedTasks.isEmpty else { throw WeekyiiError.cannotStartEmptyDay }
@@ -134,18 +161,14 @@ final class TodayViewModel {
             }
         }
 
-        if let killDate = killDate(for: day), now >= killDate {
-            expire(day: day, expiredCount: day.focusTaskCount + day.frozenTasks.count)
-            notificationService.cancelKillTimeNotification(for: day)
-        } else {
-            notificationService.scheduleKillTimeNotification(for: day)
-        }
+        updateNotificationSchedule(for: day)
 
-        try? modelContext.save()
+        try modelContext.save()
+        syncToday()
     }
 
     func doneFocus() throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
         guard let focusTask = day.focusTask else { return }
 
@@ -164,24 +187,21 @@ final class TodayViewModel {
             notificationService.cancelKillTimeNotification(for: day)
         }
 
-        try? modelContext.save()
+        try modelContext.save()
+        syncToday()
     }
 
     func changeKillTime(hour: Int, minute: Int) throws {
-        guard let day = today else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
         if let killDate = killDate(for: day), timeProvider.now >= killDate {
             throw WeekyiiError.killTimePassed
         }
         day.killTimeHour = hour
         day.killTimeMinute = minute
-        if day.status == .execute, let newKillDate = killDate(for: day), timeProvider.now >= newKillDate {
-            expire(day: day, expiredCount: day.focusTaskCount + day.frozenTasks.count)
-            notificationService.cancelKillTimeNotification(for: day)
-        } else if day.status == .draft || day.status == .execute {
-            notificationService.scheduleKillTimeNotification(for: day)
-        }
-        try? modelContext.save()
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
     }
 
     private func killDate(for day: DayModel) -> Date? {
@@ -201,6 +221,7 @@ final class TodayViewModel {
 
     private func removeTasks(in zones: [TaskZone], from day: DayModel) {
         let toRemove = day.tasks.filter { zones.contains($0.zone) }
+        day.tasks.removeAll { zones.contains($0.zone) }
         for task in toRemove {
             modelContext.delete(task)
         }
@@ -213,18 +234,53 @@ final class TodayViewModel {
         }
     }
 
+    private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps = normalizedStepCopies(from: steps)
+    }
+
+    private func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
+        steps
+            .sorted {
+                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+                return $0.createdAt < $1.createdAt
+            }
+            .enumerated()
+            .map { index, step in
+                TaskStep(
+                    title: step.title,
+                    isCompleted: step.isCompleted,
+                    sortOrder: index
+                )
+            }
+    }
+
     private func fetchDay(by dayId: String) -> DayModel? {
-        let descriptor = FetchDescriptor<DayModel>()
-        return try? modelContext.fetch(descriptor).first(where: { $0.dayId == dayId })
+        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchOrCreateToday() -> DayModel? {
+        let dayId = timeProvider.today.dayId
+        return fetchDay(by: dayId) ?? createMissingDay(for: timeProvider.today)
+    }
+
+    private func resolveToday() -> DayModel? {
+        if let today {
+            return today
+        }
+        let resolved = fetchOrCreateToday()
+        self.today = resolved
+        return resolved
     }
 
     private func ensurePresentWeek() {
         let descriptor = FetchDescriptor<WeekModel>()
         let presentWeeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .present }
-        if let _ = presentWeeks.first { return }
+        if presentWeeks.isEmpty == false { return }
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
-        try? modelContext.save()
+        persistOrRecordError()
     }
 
     private func createMissingDay(for date: Date) -> DayModel? {
@@ -232,10 +288,40 @@ final class TodayViewModel {
         let descriptor = FetchDescriptor<WeekModel>()
         guard let week = try? modelContext.fetch(descriptor).first(where: { $0.status == .present }) else { return nil }
         let day = DayModel(dayId: date.dayId, date: date, status: .empty)
-        day.week = week
         week.days.append(day)
-        try? modelContext.save()
+        persistOrRecordError()
         return day
+    }
+
+    private func persistOrRecordError() {
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateNotificationSchedule(for day: DayModel) {
+        guard day.status == .draft || day.status == .execute else {
+            notificationService.cancelKillTimeNotification(for: day)
+            return
+        }
+
+        guard let killDate = killDate(for: day) else { return }
+        if timeProvider.now >= killDate {
+            let expiredCount = day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
+            expire(day: day, expiredCount: expiredCount)
+            return
+        }
+
+        notificationService.scheduleKillTimeNotification(
+            for: day,
+            reminderMinutes: userSettings.killTimeReminderMinutes
+        )
+    }
+
+    private func syncToday() {
+        today = fetchDay(by: timeProvider.today.dayId)
     }
 }
 

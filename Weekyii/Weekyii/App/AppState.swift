@@ -1,12 +1,13 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class AppState {
-    var daysStartedCount: Int = 0
-    var systemStartDate: Date?
-    var lastProcessedDate: Date?
-    var lastRolloverAt: Date?
+final class AppState: ObservableObject, AppStateStore {
+    @Published var daysStartedCount: Int = 0
+    @Published var dataRevision: Int = 0
+    @Published var systemStartDate: Date?
+    @Published var lastProcessedDate: Date?
+    @Published var lastRolloverAt: Date?
+    @Published var runtimeErrorMessage: String?
 
     private let defaults = UserDefaults.standard
 
@@ -16,6 +17,7 @@ final class AppState {
 
     func load() {
         daysStartedCount = defaults.integer(forKey: "daysStartedCount")
+        dataRevision = defaults.integer(forKey: "dataRevision")
         systemStartDate = defaults.object(forKey: "systemStartDate") as? Date
         lastProcessedDate = defaults.object(forKey: "lastProcessedDate") as? Date
         lastRolloverAt = defaults.object(forKey: "lastRolloverAt") as? Date
@@ -23,6 +25,7 @@ final class AppState {
 
     func save() {
         defaults.set(daysStartedCount, forKey: "daysStartedCount")
+        defaults.set(dataRevision, forKey: "dataRevision")
         defaults.set(systemStartDate, forKey: "systemStartDate")
         defaults.set(lastProcessedDate, forKey: "lastProcessedDate")
         defaults.set(lastRolloverAt, forKey: "lastRolloverAt")
@@ -42,9 +45,16 @@ final class AppState {
 
     func reset() {
         daysStartedCount = 0
+        dataRevision += 1
         systemStartDate = nil
         lastProcessedDate = nil
         lastRolloverAt = nil
+        runtimeErrorMessage = nil
+        save()
+    }
+
+    func bumpDataRevision() {
+        dataRevision += 1
         save()
     }
 }

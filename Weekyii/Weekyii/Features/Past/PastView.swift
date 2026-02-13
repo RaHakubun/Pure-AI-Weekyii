@@ -201,6 +201,16 @@ private struct PastWeekDetailView: View {
     let week: WeekModel
     private let calendar = Calendar(identifier: .iso8601)
     private let analyticsService = PastAnalyticsService()
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter
+    }()
+    private static let monthDayWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MdE")
+        return formatter
+    }()
 
     var body: some View {
         ScrollView {
@@ -340,17 +350,12 @@ private struct PastWeekDetailView: View {
     }
 
     private func formatDateRange() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
-        let start = formatter.string(from: week.startDate)
-        let end = formatter.string(from: week.endDate)
+        let start = Self.monthDayFormatter.string(from: week.startDate)
+        let end = Self.monthDayFormatter.string(from: week.endDate)
         return "\(start) - \(end)"
     }
 
     private func formatDay(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日 E"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.string(from: date)
+        Self.monthDayWeekdayFormatter.string(from: date)
     }
 }

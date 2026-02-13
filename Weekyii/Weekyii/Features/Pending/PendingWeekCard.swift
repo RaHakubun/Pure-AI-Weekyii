@@ -4,6 +4,11 @@ import SwiftUI
 
 struct PendingWeekCard: View {
     let week: WeekModel
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter
+    }()
     
     var body: some View {
         NavigationLink {
@@ -69,10 +74,8 @@ struct PendingWeekCard: View {
             return ""
         }
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
-        let start = formatter.string(from: firstDay.date)
-        let end = formatter.string(from: lastDay.date)
+        let start = Self.monthDayFormatter.string(from: firstDay.date)
+        let end = Self.monthDayFormatter.string(from: lastDay.date)
         
         return "\(start) - \(end)"
     }

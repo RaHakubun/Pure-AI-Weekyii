@@ -4,6 +4,16 @@ import SwiftUI
 
 struct DayCard: View {
     let day: DayModel
+    private static let shortWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter
+    }()
+    private static let dayNumberFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("d")
+        return formatter
+    }()
     
     var body: some View {
         WeekCard(accentColor: day.status.color, shadow: .medium) {
@@ -33,26 +43,11 @@ struct DayCard: View {
     }
     
     private var weekdayName: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: day.dayId) else {
-            return ""
-        }
-        
-        formatter.dateFormat = "EEE"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.string(from: date)
+        Self.shortWeekdayFormatter.string(from: day.date)
     }
     
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: day.dayId) else {
-            return ""
-        }
-        
-        formatter.dateFormat = "d"
-        return formatter.string(from: date)
+        Self.dayNumberFormatter.string(from: day.date)
     }
     
     private var completionRate: Double {

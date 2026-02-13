@@ -10,6 +10,7 @@ final class WeekViewModel {
     private let weekCalculator = WeekCalculator()
 
     var presentWeek: WeekModel?
+    var errorMessage: String?
 
     init(modelContext: ModelContext, timeProvider: TimeProviding) {
         self.modelContext = modelContext
@@ -17,15 +18,25 @@ final class WeekViewModel {
     }
 
     func refresh() {
-        let descriptor = FetchDescriptor<WeekModel>()
-        let weeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .present }
-        if let week = weeks.first {
+        errorMessage = nil
+        if let week = fetchPresentWeek() {
             presentWeek = week
             return
         }
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
-        presentWeek = week
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            presentWeek = week
+        } catch {
+            errorMessage = error.localizedDescription
+            presentWeek = nil
+        }
     }
+
+    private func fetchPresentWeek() -> WeekModel? {
+        let descriptor = FetchDescriptor<WeekModel>()
+        return ((try? modelContext.fetch(descriptor)) ?? []).first { $0.status == .present }
+    }
+
 }

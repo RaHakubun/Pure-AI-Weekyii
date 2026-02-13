@@ -6,6 +6,7 @@ struct CreateWeekSheet: View {
     @State private var weekIdText = ""
     @State private var selectedMode: Mode = .date
     @State private var errorMessage: String?
+    private let weekCalculator = WeekCalculator()
 
     let viewModel: PendingViewModel
 
@@ -41,17 +42,23 @@ struct CreateWeekSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "action.create")) {
+                        let created: Bool
                         if selectedMode == .date {
-                            viewModel.createWeek(containing: selectedDate)
+                            created = viewModel.createWeek(containing: selectedDate)
                         } else {
                             let trimmed = weekIdText.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard isValidWeekId(trimmed) else {
                                 errorMessage = String(localized: "error.date_format_invalid")
                                 return
                             }
-                            viewModel.createWeek(weekId: trimmed)
+                            created = viewModel.createWeek(weekId: trimmed)
                         }
-                        dismiss()
+
+                        if created {
+                            dismiss()
+                        } else {
+                            errorMessage = viewModel.errorMessage ?? String(localized: "error.operation_failed_retry")
+                        }
                     }
                     .disabled(selectedMode == .weekId && weekIdText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -74,7 +81,6 @@ struct CreateWeekSheet: View {
     }
 
     private func isValidWeekId(_ value: String) -> Bool {
-        let pattern = #"^\d{4}-W\d{2}$"#
-        return value.range(of: pattern, options: .regularExpression) != nil
+        weekCalculator.isValidWeekId(value.uppercased())
     }
 }

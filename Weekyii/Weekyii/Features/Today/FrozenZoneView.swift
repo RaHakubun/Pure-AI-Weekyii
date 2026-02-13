@@ -4,6 +4,7 @@ import SwiftUI
 
 struct FrozenZoneView: View {
     let tasks: [TaskItem]
+    var onTapTask: ((TaskItem) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
@@ -15,7 +16,9 @@ struct FrozenZoneView: View {
                     .weekPaddingVertical(WeekSpacing.md)
             } else {
                 ForEach(tasks) { task in
-                    TaskCard(task: task, showStatus: false)
+                    TaskCard(task: task, showStatus: false, onTap: {
+                        onTapTask?(task)
+                    })
                 }
             }
         }

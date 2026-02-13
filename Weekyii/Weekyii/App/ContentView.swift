@@ -8,6 +8,7 @@ private enum MainTab: Hashable {
 }
 
 struct ContentView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var selectedTab: MainTab = .today
 
     var body: some View {
@@ -35,6 +36,18 @@ struct ContentView: View {
                     Label(String(localized: "tab.settings"), systemImage: "gearshape")
                 }
                 .tag(MainTab.settings)
+        }
+        .id(appState.dataRevision)
+        .tint(.weekyiiPrimary)
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { appState.runtimeErrorMessage != nil },
+            set: { newValue in
+                if !newValue { appState.runtimeErrorMessage = nil }
+            }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(appState.runtimeErrorMessage ?? "")
         }
     }
 }

@@ -26,7 +26,11 @@ struct WeekCard<Content: View>: View {
         }
         .weekPadding(WeekSpacing.lg)
         .background(backgroundView)
-        .cornerRadius(WeekRadius.large)
+        .clipShape(.rect(cornerRadius: WeekRadius.large))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.large)
+                .stroke(borderColor, lineWidth: 1)
+        )
         .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
         .overlay(accentBar, alignment: .top)
     }
@@ -38,6 +42,10 @@ struct WeekCard<Content: View>: View {
         } else {
             Color.backgroundSecondary
         }
+    }
+
+    private var borderColor: Color {
+        useGradient ? Color.white.opacity(0.18) : Color.backgroundTertiary
     }
     
     @ViewBuilder

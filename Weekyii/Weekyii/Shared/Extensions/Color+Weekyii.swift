@@ -5,67 +5,67 @@ import SwiftUI
 extension Color {
     // MARK: Primary Colors - 主品牌色
     
-    /// 深邃蓝紫 - 主品牌色
-    static let weekyiiPrimary = Color(hex: "#5B4FE9")
+    /// 深琥珀 - 主品牌色
+    static let weekyiiPrimary = Color(hex: "#C46A1A")
     
-    /// 浅紫蓝 - 主品牌色(浅色)
-    static let weekyiiPrimaryLight = Color(hex: "#7C6FF2")
+    /// 亮琥珀 - 主品牌色(浅色)
+    static let weekyiiPrimaryLight = Color(hex: "#E0A35B")
     
-    /// 暗紫蓝 - 主品牌色(深色)
-    static let weekyiiPrimaryDark = Color(hex: "#4A3FD8")
+    /// 深琥珀 - 主品牌色(深色)
+    static let weekyiiPrimaryDark = Color(hex: "#8A4A13")
     
     // MARK: Accent Colors - 强调色
     
     /// 温暖橙 - 强调色,用于重要操作
-    static let accentOrange = Color(hex: "#FF8A5B")
+    static let accentOrange = Color(hex: "#F08A3C")
     
     /// 浅橙色
-    static let accentOrangeLight = Color(hex: "#FFA07A")
+    static let accentOrangeLight = Color(hex: "#F4AE77")
     
-    /// 清新绿 - 成功/完成状态
-    static let accentGreen = Color(hex: "#4ECDC4")
+    /// 温润绿 - 成功/完成状态
+    static let accentGreen = Color(hex: "#3FA67A")
     
     /// 浅绿色
-    static let accentGreenLight = Color(hex: "#6EDDD5")
+    static let accentGreenLight = Color(hex: "#6DC7A3")
     
-    /// 柔和粉 - 休闲/轻松元素
-    static let accentPink = Color(hex: "#FF6B9D")
+    /// 柔和珊瑚 - 休闲/轻松元素
+    static let accentPink = Color(hex: "#D97A6C")
     
     // MARK: Background Colors - 背景色系
     
     /// 主背景色
-    static let backgroundPrimary = Color(hex: "#F8F9FA")
+    static let backgroundPrimary = Color(hex: "#FFF7EE")
     
     /// 卡片背景色
-    static let backgroundSecondary = Color(hex: "#FFFFFF")
+    static let backgroundSecondary = Color(hex: "#FFFDF9")
     
     /// 次级区域背景色
-    static let backgroundTertiary = Color(hex: "#F0F2F5")
+    static let backgroundTertiary = Color(hex: "#F6EDE3")
     
     // MARK: Text Colors - 文字色系
     
     /// 主文字颜色
-    static let textPrimary = Color(hex: "#1A1A1A")
+    static let textPrimary = Color(hex: "#2A1D16")
     
     /// 次要文字颜色
-    static let textSecondary = Color(hex: "#6B7280")
+    static let textSecondary = Color(hex: "#6B5A4F")
     
     /// 辅助文字颜色
-    static let textTertiary = Color(hex: "#9CA3AF")
+    static let textTertiary = Color(hex: "#9B887C")
     
     // MARK: Task Type Colors - 任务类型色彩
     
-    /// Regular 任务 - 蓝色系
-    static let taskRegular = Color(hex: "#3B82F6")
-    static let taskRegularBg = Color(hex: "#DBEAFE")
+    /// Regular 任务 - 青蓝色系
+    static let taskRegular = Color(hex: "#2F7E79")
+    static let taskRegularBg = Color(hex: "#D9F0EC")
     
-    /// DDL 任务 - 红橙色系
-    static let taskDDL = Color(hex: "#EF4444")
-    static let taskDDLBg = Color(hex: "#FEE2E2")
+    /// DDL 任务 - 锈橙色系
+    static let taskDDL = Color(hex: "#D05C3E")
+    static let taskDDLBg = Color(hex: "#F8E1DB")
     
-    /// Leisure 任务 - 紫粉色系
-    static let taskLeisure = Color(hex: "#A855F7")
-    static let taskLeisureBg = Color(hex: "#F3E8FF")
+    /// Leisure 任务 - 李子色系
+    static let taskLeisure = Color(hex: "#8C6AD9")
+    static let taskLeisureBg = Color(hex: "#EFE8FB")
     
     // MARK: Gradients - 渐变
     

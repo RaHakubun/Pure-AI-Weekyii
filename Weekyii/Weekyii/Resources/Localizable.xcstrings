@@ -212,7 +212,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今日任务已全部完成。"
+            "value" : "今日任务已全部完成，请劳逸结合，好好休息！"
           }
         }
       }
@@ -392,6 +392,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前时间已超过 Kill Time。"
+          }
+        }
+      }
+    },
+    "error.operation_failed_retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operation failed. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建失败，请重试。"
           }
         }
       }
@@ -2563,6 +2579,22 @@
         }
       }
     },
+    "task.detail.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务详情"
+          }
+        }
+      }
+    },
     "task.step.add" : {
       "localizations" : {
         "en" : {
@@ -2968,6 +3000,9 @@
       }
     },
     "月趋势" : {
+
+    },
+    "本周时间线" : {
 
     }
   },

@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @Environment(UserSettings.self) private var settings
-    @Environment(AppState.self) private var appState
+    @EnvironmentObject private var settings: UserSettings
+    @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -139,10 +139,12 @@ struct SettingsView: View {
                         
                         Button {
                             do {
-                                let seeder = SampleDataSeeder(modelContext: modelContext)
+                                let seederContext = ModelContext(modelContext.container)
+                                let seeder = SampleDataSeeder(modelContext: seederContext)
                                 let result = try seeder.seed(options: seedOptions)
                                 switch result {
                                 case .seeded:
+                                    appState.bumpDataRevision()
                                     seedAlertMessage = String(localized: "settings.debug.seed.success")
                                 case .skippedExisting:
                                     seedAlertMessage = String(localized: "settings.debug.seed.already")
@@ -211,7 +213,8 @@ struct SettingsView: View {
             Button(String(localized: "action.cancel"), role: .cancel) { }
             Button(String(localized: "settings.debug.clear.confirm_action"), role: .destructive) {
                 do {
-                    let seeder = SampleDataSeeder(modelContext: modelContext)
+                    let seederContext = ModelContext(modelContext.container)
+                    let seeder = SampleDataSeeder(modelContext: seederContext)
                     try seeder.clearAllData()
                     appState.reset()
                     seedAlertMessage = String(localized: "settings.debug.clear.success")
@@ -412,21 +415,21 @@ private struct SampleDataSeeder {
             day.status = .expired
             let completedCount = max(1, totalCount / 2)
             day.expiredCount = max(0, totalCount - completedCount)
-            day.tasks.append(contentsOf: makeTasks(count: completedCount, zone: .complete, day: day, seed: index, options: options))
+            day.tasks.append(contentsOf: makeTasks(count: completedCount, zone: .complete, seed: index, dayDate: day.date, options: options))
         } else {
             day.status = .completed
             let completedCount = totalCount
-            day.tasks.append(contentsOf: makeTasks(count: completedCount, zone: .complete, day: day, seed: index, options: options))
+            day.tasks.append(contentsOf: makeTasks(count: completedCount, zone: .complete, seed: index, dayDate: day.date, options: options))
         }
     }
 
     private func seedDraftDay(_ day: DayModel, index: Int, options: SeedOptions) {
         day.status = .draft
         let draftCount = max(1, options.tasksPerDraftDay)
-        day.tasks.append(contentsOf: makeTasks(count: draftCount, zone: .draft, day: day, seed: index, options: options))
+        day.tasks.append(contentsOf: makeTasks(count: draftCount, zone: .draft, seed: index, dayDate: day.date, options: options))
     }
 
-    private func makeTasks(count: Int, zone: TaskZone, day: DayModel, seed: Int, options: SeedOptions) -> [TaskItem] {
+    private func makeTasks(count: Int, zone: TaskZone, seed: Int, dayDate: Date, options: SeedOptions) -> [TaskItem] {
         var tasks: [TaskItem] = []
         for i in 0..<count {
             let title = sampleTitles[(seed + i) % sampleTitles.count]
@@ -441,11 +444,11 @@ private struct SampleDataSeeder {
                 order: i + 1,
                 zone: zone
             )
-            task.day = day
 
             if zone == .complete {
                 task.completedOrder = i + 1
-                task.endedAt = day.date.addingTimeInterval(TimeInterval((10 + i) * 3600))
+                task.startedAt = dayDate.addingTimeInterval(TimeInterval((9 + i) * 3600))
+                task.endedAt = dayDate.addingTimeInterval(TimeInterval((10 + i) * 3600))
             }
 
             if options.includeSteps, i % 2 == 0 {
@@ -476,20 +479,23 @@ private struct SampleDataSeeder {
         for week in weeks {
             modelContext.delete(week)
         }
-        let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
-        for day in days {
+        try modelContext.save()
+
+        // Clean up any historical orphan records left by prior model bugs.
+        let orphanDays = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
+        for day in orphanDays {
             modelContext.delete(day)
         }
-        let tasks = (try? modelContext.fetch(FetchDescriptor<TaskItem>())) ?? []
-        for task in tasks {
+        let orphanTasks = (try? modelContext.fetch(FetchDescriptor<TaskItem>())) ?? []
+        for task in orphanTasks {
             modelContext.delete(task)
         }
-        let steps = (try? modelContext.fetch(FetchDescriptor<TaskStep>())) ?? []
-        for step in steps {
+        let orphanSteps = (try? modelContext.fetch(FetchDescriptor<TaskStep>())) ?? []
+        for step in orphanSteps {
             modelContext.delete(step)
         }
-        let attachments = (try? modelContext.fetch(FetchDescriptor<TaskAttachment>())) ?? []
-        for attachment in attachments {
+        let orphanAttachments = (try? modelContext.fetch(FetchDescriptor<TaskAttachment>())) ?? []
+        for attachment in orphanAttachments {
             modelContext.delete(attachment)
         }
         try modelContext.save()

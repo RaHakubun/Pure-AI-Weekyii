@@ -10,54 +10,86 @@ final class PendingViewModel {
     private let calendar = Calendar(identifier: .iso8601)
 
     var pendingWeeks: [WeekModel] = []
+    var errorMessage: String?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
 
     func refresh() {
+        errorMessage = nil
         let descriptor = FetchDescriptor<WeekModel>()
-        pendingWeeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .pending }
+        pendingWeeks = ((try? modelContext.fetch(descriptor)) ?? [])
+            .filter { $0.status == .pending }
+            .sorted { $0.startDate < $1.startDate }
     }
 
     func weeks(in month: Date) -> [WeekModel] {
-        pendingWeeks.filter {
-            calendar.isDate($0.startDate, equalTo: month, toGranularity: .month)
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
+        return pendingWeeks.filter {
+            $0.startDate < monthEnd && $0.endDate >= monthStart
         }.sorted { $0.startDate < $1.startDate }
     }
 
-    func createWeek(containing date: Date) {
+    @discardableResult
+    func createWeek(containing date: Date) -> Bool {
+        let today = calendar.startOfDay(for: Date())
+        guard calendar.startOfDay(for: date) >= today else {
+            errorMessage = "只能创建今天或未来的周"
+            return false
+        }
+
         let weekId = date.weekId
-        guard !weekExists(weekId) else { return }
+        guard !weekExists(weekId) else {
+            errorMessage = "该周已存在"
+            return false
+        }
+
         let week = weekCalculator.makeWeek(for: date, status: .pending)
         modelContext.insert(week)
-        try? modelContext.save()
-        refresh()
+        do {
+            try modelContext.save()
+            refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
-    func createWeek(weekId: String) {
-        guard !weekExists(weekId) else { return }
-        guard let startDate = weekStartDate(for: weekId) else { return }
-        let week = weekCalculator.makeWeek(weekId: weekId, startDate: startDate, status: .pending)
+    @discardableResult
+    func createWeek(weekId: String) -> Bool {
+        let normalizedWeekId = weekId.uppercased()
+        guard !weekExists(normalizedWeekId) else {
+            errorMessage = "该周已存在"
+            return false
+        }
+        guard let startDate = weekCalculator.weekStartDate(for: normalizedWeekId) else {
+            errorMessage = String(localized: "error.date_format_invalid")
+            return false
+        }
+
+        let today = calendar.startOfDay(for: Date())
+        guard startDate >= today else {
+            errorMessage = "只能创建今天或未来的周"
+            return false
+        }
+
+        let week = weekCalculator.makeWeek(weekId: normalizedWeekId, startDate: startDate, status: .pending)
         modelContext.insert(week)
-        try? modelContext.save()
-        refresh()
+        do {
+            try modelContext.save()
+            refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     private func weekExists(_ weekId: String) -> Bool {
         let descriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
         return (try? modelContext.fetch(descriptor).first) != nil
-    }
-
-    private func weekStartDate(for weekId: String) -> Date? {
-        let parts = weekId.split(separator: "-")
-        guard parts.count == 2, let year = Int(parts[0]) else { return nil }
-        let weekPart = parts[1].replacingOccurrences(of: "W", with: "")
-        guard let week = Int(weekPart) else { return nil }
-        var components = DateComponents()
-        components.yearForWeekOfYear = year
-        components.weekOfYear = week
-        components.weekday = 2
-        return calendar.date(from: components)
     }
 }

@@ -52,8 +52,12 @@ struct TaskRowView: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(WeekRadius.medium)
+        .background(Color.backgroundSecondary)
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .stroke(Color.backgroundTertiary, lineWidth: 1)
+        )
     }
     
     @ViewBuilder

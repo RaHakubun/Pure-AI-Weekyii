@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		DF3C2419516E4D6FB1ABAE0F /* DraftReorderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */; };
+		F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
+		F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58432F2B593A00DB2DEE /* StateMachineTests.swift */; };
+		F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */; };
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
@@ -650,6 +653,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */,
+				F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */,
+				F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

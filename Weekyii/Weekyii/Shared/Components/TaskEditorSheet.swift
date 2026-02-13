@@ -4,10 +4,11 @@ import SwiftData
 
 struct TaskEditorSheet: View {
     let title: String
+    let isReadOnly: Bool
     @State var taskTitle: String
     @State var taskDescription: String
     @State var taskType: TaskType
-    @State var steps: [TaskStep]
+    @State private var stepDrafts: [TaskStepDraft]
     @State var attachments: [TaskAttachment]
     
     // Config for save callback: returns necessary data
@@ -24,6 +25,7 @@ struct TaskEditorSheet: View {
     
     init(
         title: String,
+        isReadOnly: Bool = false,
         initialTitle: String = "",
         initialDescription: String = "",
         initialType: TaskType = .regular,
@@ -32,10 +34,25 @@ struct TaskEditorSheet: View {
         onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
     ) {
         self.title = title
+        self.isReadOnly = isReadOnly
         _taskTitle = State(initialValue: initialTitle)
         _taskDescription = State(initialValue: initialDescription)
         _taskType = State(initialValue: initialType)
-        _steps = State(initialValue: initialSteps)
+        _stepDrafts = State(initialValue: initialSteps
+            .sorted {
+                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+                return $0.createdAt < $1.createdAt
+            }
+            .enumerated()
+            .map { index, step in
+                TaskStepDraft(
+                    id: UUID(),
+                    title: step.title,
+                    isCompleted: step.isCompleted,
+                    sortOrder: index
+                )
+            }
+        )
         _attachments = State(initialValue: initialAttachments)
         self.onSave = onSave
     }
@@ -57,6 +74,7 @@ struct TaskEditorSheet: View {
                                 .padding(WeekSpacing.md)
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.medium)
+                                .disabled(isReadOnly)
                             
                             TextField(String(localized: "task.description.placeholder"), text: $taskDescription, axis: .vertical)
                                 .font(.bodyMedium)
@@ -64,6 +82,7 @@ struct TaskEditorSheet: View {
                                 .padding(WeekSpacing.md)
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.medium)
+                                .disabled(isReadOnly)
                             
                             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                                 Text(String(localized: "task.type"))
@@ -87,35 +106,36 @@ struct TaskEditorSheet: View {
                         )
                         
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                            if steps.isEmpty {
+                            if stepDrafts.isEmpty {
                                 Text(String(localized: "task.steps.empty"))
                                     .font(.bodyMedium)
                                     .foregroundColor(.textSecondary)
                                     .padding(.vertical, WeekSpacing.sm)
                             } else {
                                 VStack(spacing: WeekSpacing.sm) {
-                                    ForEach(steps.indices, id: \.self) { index in
-                                        stepRow(for: index)
+                                    ForEach(stepDrafts) { draft in
+                                        stepRow(for: draft.id)
                                     }
                                 }
                             }
                             
                             Divider()
                                 .padding(.vertical, WeekSpacing.xs)
-                            
-                            HStack(spacing: WeekSpacing.sm) {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.accentGreen)
-                                TextField(String(localized: "task.step.add"), text: $newStepTitle)
-                                    .focused($isStepInputFocused)
-                                    .onSubmit { addNewStep() }
-                                
-                                if !newStepTitle.isEmpty {
-                                    Button(String(localized: "action.add")) {
-                                        addNewStep()
+                            if !isReadOnly {
+                                HStack(spacing: WeekSpacing.sm) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.accentGreen)
+                                    TextField(String(localized: "task.step.add"), text: $newStepTitle)
+                                        .focused($isStepInputFocused)
+                                        .onSubmit { addNewStep() }
+                                    
+                                    if !newStepTitle.isEmpty {
+                                        Button(String(localized: "action.add")) {
+                                            addNewStep()
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(.accentGreen)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.accentGreen)
                                 }
                             }
                         }
@@ -137,36 +157,39 @@ struct TaskEditorSheet: View {
                                             .scaledToFill()
                                             .frame(width: 84, height: 84)
                                             .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-                                            .overlay(
-                                                Button(action: {
-                                                    deleteAttachment(attachment)
-                                                }) {
-                                                    Image(systemName: "xmark.circle.fill")
-                                                        .foregroundColor(.red)
-                                                        .background(Circle().fill(.white))
+                                            .overlay(alignment: .topTrailing) {
+                                                if !isReadOnly {
+                                                    Button(action: {
+                                                        deleteAttachment(attachment)
+                                                    }) {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .foregroundColor(.red)
+                                                            .background(Circle().fill(.white))
+                                                    }
+                                                    .offset(x: 8, y: -8)
                                                 }
-                                                .offset(x: 32, y: -32)
-                                            )
+                                            }
                                     }
                                 }
-                                
-                                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                    RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                        .fill(Color.accentOrangeLight.opacity(0.2))
-                                        .frame(width: 84, height: 84)
-                                        .overlay(
-                                            VStack(spacing: 6) {
-                                                Image(systemName: "photo.badge.plus")
-                                                    .font(.title2)
-                                                    .foregroundColor(.accentOrange)
-                                                Text(String(localized: "action.add"))
-                                                    .font(.caption)
-                                                    .foregroundColor(.accentOrange)
-                                            }
-                                        )
-                                }
-                                .onChange(of: selectedPhoto) { _, newItem in
-                                    loadPhoto(newItem)
+                                if !isReadOnly {
+                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                        RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                            .fill(Color.accentOrangeLight.opacity(0.2))
+                                            .frame(width: 84, height: 84)
+                                            .overlay(
+                                                VStack(spacing: 6) {
+                                                    Image(systemName: "photo.badge.plus")
+                                                        .font(.title2)
+                                                        .foregroundColor(.accentOrange)
+                                                    Text(String(localized: "action.add"))
+                                                        .font(.caption)
+                                                        .foregroundColor(.accentOrange)
+                                                }
+                                            )
+                                    }
+                                    .onChange(of: selectedPhoto) { _, newItem in
+                                        loadPhoto(newItem)
+                                    }
                                 }
                             }
                             .padding(.vertical, WeekSpacing.xs)
@@ -180,10 +203,26 @@ struct TaskEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "action.save")) {
-                        onSave(taskTitle, taskDescription, taskType, steps, attachments)
+                    if isReadOnly {
+                        Button(String(localized: "action.ok")) {
+                            dismiss()
+                        }
+                    } else {
+                        Button(String(localized: "action.save")) {
+                            normalizeStepOrder()
+                            let normalizedSteps = stepDrafts
+                                .sorted { $0.sortOrder < $1.sortOrder }
+                                .map { draft in
+                                    TaskStep(
+                                        title: draft.title,
+                                        isCompleted: draft.isCompleted,
+                                        sortOrder: draft.sortOrder
+                                    )
+                                }
+                            onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
+                        }
+                        .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "action.cancel")) {
@@ -228,56 +267,84 @@ struct TaskEditorSheet: View {
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
     
-    private func stepRow(for index: Int) -> some View {
-        let binding = $steps[index]
-        
-        return HStack(spacing: WeekSpacing.sm) {
-            Button(action: { binding.isCompleted.wrappedValue.toggle() }) {
-                Image(systemName: binding.isCompleted.wrappedValue ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(binding.isCompleted.wrappedValue ? .accentGreen : .textTertiary)
+    @ViewBuilder
+    private func stepRow(for stepID: UUID) -> some View {
+        if let index = stepDrafts.firstIndex(where: { $0.id == stepID }) {
+            let binding = $stepDrafts[index]
+
+            HStack(spacing: WeekSpacing.sm) {
+                if isReadOnly {
+                    Image(systemName: binding.isCompleted.wrappedValue ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(binding.isCompleted.wrappedValue ? .accentGreen : .textTertiary)
+                } else {
+                    Button(action: { binding.isCompleted.wrappedValue.toggle() }) {
+                        Image(systemName: binding.isCompleted.wrappedValue ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(binding.isCompleted.wrappedValue ? .accentGreen : .textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                TextField(String(localized: "Step"), text: binding.title)
+                    .font(.bodyMedium)
+                    .disabled(isReadOnly)
+
+                Spacer()
+
+                if !isReadOnly {
+                    HStack(spacing: WeekSpacing.xs) {
+                        Button(action: {
+                            guard index > 0 else { return }
+                            stepDrafts.swapAt(index, index - 1)
+                            normalizeStepOrder()
+                        }) {
+                            Image(systemName: "arrow.up")
+                        }
+                        .disabled(index == 0)
+
+                        Button(action: {
+                            guard index < stepDrafts.count - 1 else { return }
+                            stepDrafts.swapAt(index, index + 1)
+                            normalizeStepOrder()
+                        }) {
+                            Image(systemName: "arrow.down")
+                        }
+                        .disabled(index == stepDrafts.count - 1)
+
+                        Button(action: {
+                            stepDrafts.remove(at: index)
+                            normalizeStepOrder()
+                        }) {
+                            Image(systemName: "trash")
+                        }
+                        .foregroundColor(.accentOrange)
+                    }
+                    .font(.caption)
+                }
             }
-            .buttonStyle(.plain)
-            
-            TextField(String(localized: "Step"), text: binding.title)
-                .font(.bodyMedium)
-            
-            Spacer()
-            
-            HStack(spacing: WeekSpacing.xs) {
-                Button(action: {
-                    guard index > 0 else { return }
-                    steps.swapAt(index, index - 1)
-                }) {
-                    Image(systemName: "arrow.up")
-                }
-                .disabled(index == 0)
-                
-                Button(action: {
-                    guard index < steps.count - 1 else { return }
-                    steps.swapAt(index, index + 1)
-                }) {
-                    Image(systemName: "arrow.down")
-                }
-                .disabled(index == steps.count - 1)
-                
-                Button(action: { steps.remove(at: index) }) {
-                    Image(systemName: "trash")
-                }
-                .foregroundColor(.accentOrange)
-            }
-            .font(.caption)
+            .padding(WeekSpacing.sm)
+            .background(Color.backgroundTertiary)
+            .cornerRadius(WeekRadius.medium)
         }
-        .padding(WeekSpacing.sm)
-        .background(Color.backgroundTertiary)
-        .cornerRadius(WeekRadius.medium)
     }
     
     private func addNewStep() {
         guard !newStepTitle.isEmpty else { return }
-        let step = TaskStep(title: newStepTitle)
-        steps.append(step)
+        let step = TaskStepDraft(
+            id: UUID(),
+            title: newStepTitle,
+            isCompleted: false,
+            sortOrder: stepDrafts.count
+        )
+        stepDrafts.append(step)
+        normalizeStepOrder()
         newStepTitle = ""
         isStepInputFocused = true
+    }
+
+    private func normalizeStepOrder() {
+        for index in stepDrafts.indices {
+            stepDrafts[index].sortOrder = index
+        }
     }
     
     private func loadPhoto(_ item: PhotosPickerItem?) {
@@ -291,8 +358,8 @@ struct TaskEditorSheet: View {
                         self.attachments.append(attachment)
                     }
                 }
-            case .failure(let error):
-                print("Error loading image: \(error)")
+            case .failure:
+                break
             }
         }
     }
@@ -302,4 +369,11 @@ struct TaskEditorSheet: View {
             attachments.remove(at: index)
         }
     }
+}
+
+private struct TaskStepDraft: Identifiable {
+    let id: UUID
+    var title: String
+    var isCompleted: Bool
+    var sortOrder: Int
 }

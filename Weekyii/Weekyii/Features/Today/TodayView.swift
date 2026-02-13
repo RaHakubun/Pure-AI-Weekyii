@@ -9,20 +9,30 @@ private enum TodaySection: Int {
 struct TodayView: View {
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppState.self) private var appState
-    @Environment(UserSettings.self) private var userSettings
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var userSettings: UserSettings
 
     @State private var viewModel: TodayViewModel?
     @State private var showingTaskCreator = false
+    @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
+    @GestureState private var isInteractingWithKillTime = false
     @State private var selectedSection: TodaySection = .today
     
 
     var body: some View {
         NavigationStack {
             Group {
-                if let viewModel, let day = viewModel.today {
-                    content(for: day, viewModel: viewModel)
+                if let viewModel {
+                    if let day = viewModel.today {
+                        content(for: day, viewModel: viewModel)
+                    } else if let message = viewModel.errorMessage {
+                        loadingErrorView(message: message) {
+                            viewModel.refresh()
+                        }
+                    } else {
+                        ProgressView()
+                    }
                 } else {
                     ProgressView()
                 }
@@ -57,12 +67,30 @@ struct TodayView: View {
             viewModel?.refresh()
             viewModel?.seedDraftTasksForUITestsIfNeeded()
         }
+        .onChange(of: viewModel?.errorMessage) { _, newValue in
+            if let newValue {
+                errorMessage = newValue
+            }
+        }
+        .sheet(item: $selectedTaskForDetail) { task in
+            TaskEditorSheet(
+                title: String(localized: "task.detail.title"),
+                isReadOnly: true,
+                initialTitle: task.title,
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments,
+                onSave: { _, _, _, _, _ in }
+            )
+        }
     }
 
     @ViewBuilder
     private func content(for day: DayModel, viewModel: TodayViewModel) -> some View {
         TodayWeekSwitcher(
             selectedSection: $selectedSection,
+            isPagingEnabled: !isInteractingWithKillTime,
             todayContent: { todayContent(day: day, viewModel: viewModel) },
             weekContent: { WeekOverviewContentView() }
         )
@@ -168,6 +196,12 @@ struct TodayView: View {
                 )
             }
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .updating($isInteractingWithKillTime) { _, state, _ in
+                    state = true
+                }
+        )
     }
     
     // MARK: - Empty State
@@ -258,6 +292,9 @@ struct TodayView: View {
                     Text(focusTask.title)
                         .font(.titleMedium)
                         .foregroundColor(.white)
+                        .onTapGesture {
+                            selectedTaskForDetail = focusTask
+                        }
                     
                     HStack {
                         if let startedAt = focusTask.startedAt {
@@ -314,7 +351,9 @@ struct TodayView: View {
                             .foregroundColor(.weekyiiPrimary)
                     }
                     
-                    FrozenZoneView(tasks: day.frozenTasks)
+                    FrozenZoneView(tasks: day.frozenTasks, onTapTask: { task in
+                        selectedTaskForDetail = task
+                    })
                 }
             }
         }
@@ -337,7 +376,9 @@ struct TodayView: View {
                             .foregroundColor(.accentGreen)
                     }
                     
-                    CompleteZoneView(tasks: day.completedTasks)
+                    CompleteZoneView(tasks: day.completedTasks, onTapTask: { task in
+                        selectedTaskForDetail = task
+                    })
                 }
             }
         }
@@ -442,6 +483,26 @@ struct TodayView: View {
     }
     
     // MARK: - Helper Methods
+
+    @ViewBuilder
+    private func loadingErrorView(message: String, onRetry: @escaping () -> Void) -> some View {
+        WeekCard(accentColor: .taskDDL) {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                HStack(spacing: WeekSpacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.taskDDL)
+                    Text(String(localized: "alert.title"))
+                        .font(.titleSmall)
+                        .foregroundColor(.textPrimary)
+                }
+                Text(message)
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                WeekButton("重试", icon: "arrow.clockwise", style: .secondary, action: onRetry)
+            }
+        }
+        .padding(WeekSpacing.base)
+    }
     
     private func formatDate(_ dayId: String) -> String {
         let formatter = DateFormatter()
@@ -463,6 +524,7 @@ struct TodayView: View {
 
 private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
     @Binding var selectedSection: TodaySection
+    let isPagingEnabled: Bool
     let todayContent: TodayContent
     let weekContent: WeekContent
 
@@ -471,10 +533,12 @@ private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
 
     init(
         selectedSection: Binding<TodaySection>,
+        isPagingEnabled: Bool = true,
         @ViewBuilder todayContent: () -> TodayContent,
         @ViewBuilder weekContent: () -> WeekContent
     ) {
         self._selectedSection = selectedSection
+        self.isPagingEnabled = isPagingEnabled
         self.todayContent = todayContent()
         self.weekContent = weekContent()
     }
@@ -529,14 +593,17 @@ private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
     private func dragGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 10)
             .updating($dragTranslation) { value, state, _ in
+                guard isPagingEnabled else { return }
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 state = value.translation.width
             }
             .updating($isDragging) { value, state, _ in
+                guard isPagingEnabled else { return }
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 state = true
             }
             .onEnded { value in
+                guard isPagingEnabled else { return }
                 let baseOffset = -CGFloat(selectedIndex) * width
                 let predictedOffset = baseOffset + value.predictedEndTranslation.width
                 let clamped = min(0, max(predictedOffset, -width))

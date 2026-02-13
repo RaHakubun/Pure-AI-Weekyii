@@ -1,67 +1,66 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class UserSettings {
+final class UserSettings: ObservableObject {
     // Default Kill Time
-    var defaultKillTimeHour: Int {
+    @Published var defaultKillTimeHour: Int {
         didSet { save() }
     }
-    var defaultKillTimeMinute: Int {
+    @Published var defaultKillTimeMinute: Int {
         didSet { save() }
     }
     
     // Default Task Type
-    var defaultTaskType: TaskType {
+    @Published var defaultTaskType: TaskType {
         didSet { save() }
     }
     
     // Notification Settings
-    var killTimeReminderMinutes: Int {
+    @Published var killTimeReminderMinutes: Int {
         didSet { save() }
     }
     
     // Week Settings
-    var weekStartsOnMonday: Bool {
+    @Published var weekStartsOnMonday: Bool {
         didSet { save() }
     }
     
     // iCloud Sync (placeholder)
-    var iCloudSyncEnabled: Bool {
+    @Published var iCloudSyncEnabled: Bool {
         didSet { save() }
     }
     
     // Developer Settings
-    var developerSettingsEnabled: Bool {
+    @Published var developerSettingsEnabled: Bool {
         didSet { save() }
     }
 
     // Demo Seed Settings
-    var seedPastWeeks: Int {
+    @Published var seedPastWeeks: Int {
         didSet { save() }
     }
-    var seedFutureWeeks: Int {
+    @Published var seedFutureWeeks: Int {
         didSet { save() }
     }
-    var seedTasksPerPastDay: Int {
+    @Published var seedTasksPerPastDay: Int {
         didSet { save() }
     }
-    var seedTasksPerDraftDay: Int {
+    @Published var seedTasksPerDraftDay: Int {
         didSet { save() }
     }
-    var seedExpiredEveryNDays: Int {
+    @Published var seedExpiredEveryNDays: Int {
         didSet { save() }
     }
-    var seedIncludeSteps: Bool {
+    @Published var seedIncludeSteps: Bool {
         didSet { save() }
     }
-    var seedIncludeAttachments: Bool {
+    @Published var seedIncludeAttachments: Bool {
         didSet { save() }
     }
-    var seedIncludeDescriptions: Bool {
+    @Published var seedIncludeDescriptions: Bool {
         didSet { save() }
     }
-    var seedAllowExisting: Bool {
+    @Published var seedAllowExisting: Bool {
         didSet { save() }
     }
     
@@ -79,7 +78,7 @@ final class UserSettings {
             self.defaultTaskType = .regular
         }
         
-        self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 30
+        self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false

@@ -7,6 +7,7 @@ struct KillTimeEditor: View {
     let minute: Int
     let isEditable: Bool
     let onChange: (Int, Int) -> Void
+    var onEditingChanged: ((Bool) -> Void)? = nil
     
     // 计算当前时间+1小时对应的分钟数（作为滑动条最小值，避免立即过期）
     private var minTimeInMinutes: Int {
@@ -101,7 +102,10 @@ struct KillTimeEditor: View {
                             }
                         ),
                         in: sliderMinValue...Double(endOfDayInMinutes),
-                        step: 1
+                        step: 1,
+                        onEditingChanged: { editing in
+                            onEditingChanged?(editing)
+                        }
                     )
                     .tint(.weekyiiPrimary)
                     
@@ -151,9 +155,7 @@ struct KillTimeEditor: View {
             hour: 20,
             minute: 30,
             isEditable: true,
-            onChange: { h, m in
-                print("Time changed: \(h):\(m)")
-            }
+            onChange: { _, _ in }
         )
     }
     .padding()

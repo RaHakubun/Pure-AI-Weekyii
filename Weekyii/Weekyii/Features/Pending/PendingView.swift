@@ -6,6 +6,7 @@ struct PendingView: View {
     @State private var viewModel: PendingViewModel?
     @State private var selectedMonth = Date()
     @State private var showingCreateSheet = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -51,6 +52,20 @@ struct PendingView: View {
                 viewModel = PendingViewModel(modelContext: modelContext)
             }
             viewModel?.refresh()
+        }
+        .onChange(of: viewModel?.errorMessage) { _, newValue in
+            if let newValue {
+                errorMessage = newValue
+            }
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(get: {
+            errorMessage != nil
+        }, set: { newValue in
+            if !newValue { errorMessage = nil }
+        })) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 

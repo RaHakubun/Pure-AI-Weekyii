@@ -24,7 +24,7 @@ final class TimeProvider: TimeProviding {
     }
 }
 
-final class MockTimeProvider: TimeProviding {
+struct MockTimeProvider: TimeProviding {
     private let iso8601Calendar = Calendar(identifier: .iso8601)
     var mockDate: Date
 

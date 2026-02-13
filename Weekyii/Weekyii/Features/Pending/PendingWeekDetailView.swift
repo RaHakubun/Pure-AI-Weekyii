@@ -4,6 +4,16 @@ import SwiftUI
 
 struct PendingWeekDetailView: View {
     let week: WeekModel
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter
+    }()
+    private static let monthDayWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MdE")
+        return formatter
+    }()
     private let calendar = Calendar(identifier: .iso8601)
     
     var body: some View {
@@ -152,18 +162,13 @@ struct PendingWeekDetailView: View {
     // MARK: - Formatting
     
     private func formatDateRange() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
-        let start = formatter.string(from: week.startDate)
-        let end = formatter.string(from: week.endDate)
+        let start = Self.monthDayFormatter.string(from: week.startDate)
+        let end = Self.monthDayFormatter.string(from: week.endDate)
         return "\(start) - \(end)"
     }
     
     private func formatDay(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日 E"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.string(from: date)
+        Self.monthDayWeekdayFormatter.string(from: date)
     }
 }
 

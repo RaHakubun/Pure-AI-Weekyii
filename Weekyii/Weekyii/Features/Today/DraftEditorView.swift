@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct DraftEditorView: View {
     let day: DayModel
@@ -9,10 +8,7 @@ struct DraftEditorView: View {
     @State private var editingTask: TaskItem?
     @State private var errorMessage: String?
     @State private var editMode: EditMode = .inactive
-    @State private var draggingTaskID: UUID?
-    @State private var lastDragTargetID: UUID?
-    @State private var dropTargetID: UUID?
-    
+
     private var isEditing: Bool {
         editMode.isEditing
     }
@@ -47,18 +43,6 @@ struct DraftEditorView: View {
                 LazyVStack(spacing: WeekSpacing.sm) {
                     ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
                         rowView(task: task, index: index)
-                            .onDrop(
-                                of: [UTType.text],
-                                delegate: DraftTaskDropDelegate(
-                                    target: task,
-                                    tasks: day.sortedDraftTasks,
-                                    isEnabled: canReorder,
-                                    draggingTaskID: $draggingTaskID,
-                                    lastDragTargetID: $lastDragTargetID,
-                                    dropTargetID: $dropTargetID,
-                                    onMove: moveTask(from:to:)
-                                )
-                            )
                     }
                 }
             }
@@ -109,7 +93,7 @@ struct DraftEditorView: View {
     private var canReorder: Bool {
         isEditing && day.status == .draft
     }
-    
+
     @ViewBuilder
     private func rowView(task: TaskItem, index: Int) -> some View {
         HStack(spacing: WeekSpacing.sm) {
@@ -118,11 +102,11 @@ struct DraftEditorView: View {
             }
             .buttonStyle(.plain)
             .disabled(!(day.status == .draft || day.status == .empty))
-            
+
             if isEditing {
                 VStack(spacing: WeekSpacing.xs) {
                     dragHandle(task: task, index: index)
-                    
+
                     Button(role: .destructive, action: { deleteTask(task) }) {
                         Image(systemName: "trash")
                             .font(.caption)
@@ -131,15 +115,8 @@ struct DraftEditorView: View {
             }
         }
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(
-                    dropTargetID == task.id ? Color.weekyiiPrimary.opacity(0.6) : Color.clear,
-                    lineWidth: 1
-                )
-        )
     }
-    
+
     private func dragHandle(task: TaskItem, index: Int) -> some View {
         let isEnabled = canReorder
         return Image(systemName: "line.3.horizontal")
@@ -150,73 +127,36 @@ struct DraftEditorView: View {
             .accessibilityIdentifier("draftDragHandle_\(index)")
             .opacity(isEditing ? 1 : 0)
             .allowsHitTesting(isEditing)
-            .onDrag {
-                draggingTaskID = task.id
-                lastDragTargetID = task.id
-                return NSItemProvider(object: NSString(string: task.id.uuidString))
-            }
+            .gesture(DragGesture(minimumDistance: 8).onEnded { value in
+                guard isEnabled else { return }
+                if value.translation.height <= -20 {
+                    moveTask(id: task.id, direction: -1)
+                } else if value.translation.height >= 20 {
+                    moveTask(id: task.id, direction: 1)
+                }
+            })
     }
-    
+
+    private func moveTask(id taskID: UUID, direction: Int) {
+        let tasks = day.sortedDraftTasks
+        guard let from = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        let to = from + direction
+        guard to >= 0, to < tasks.count else { return }
+
+        let destination = direction > 0 ? to + 1 : to
+        do {
+            try viewModel.moveDraftTasks(from: IndexSet(integer: from), to: destination)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteTask(_ task: TaskItem) {
         guard let index = day.sortedDraftTasks.firstIndex(where: { $0.id == task.id }) else { return }
         do {
             try viewModel.deleteTasks(at: IndexSet(integer: index))
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-    
-    private func moveTask(from source: Int, to destination: Int) {
-        guard destination >= 0, destination < day.sortedDraftTasks.count else { return }
-        do {
-            try viewModel.moveDraftTasks(from: IndexSet(integer: source), to: destination)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private struct DraftTaskDropDelegate: DropDelegate {
-        let target: TaskItem
-        let tasks: [TaskItem]
-        let isEnabled: Bool
-        @Binding var draggingTaskID: UUID?
-        @Binding var lastDragTargetID: UUID?
-        @Binding var dropTargetID: UUID?
-        let onMove: (Int, Int) -> Void
-        
-        func dropEntered(info: DropInfo) {
-            guard isEnabled else { return }
-            guard let draggingTaskID,
-                  draggingTaskID != target.id,
-                  let from = tasks.firstIndex(where: { $0.id == draggingTaskID }),
-                  let to = tasks.firstIndex(where: { $0.id == target.id }) else { return }
-            
-            dropTargetID = target.id
-            
-            if lastDragTargetID == target.id { return }
-            lastDragTargetID = target.id
-            
-            let destination = to
-            if from != destination {
-                onMove(from, destination)
-            }
-        }
-        
-        func dropExited(info: DropInfo) {
-            if dropTargetID == target.id {
-                dropTargetID = nil
-            }
-        }
-        
-        func performDrop(info: DropInfo) -> Bool {
-            draggingTaskID = nil
-            lastDragTargetID = nil
-            dropTargetID = nil
-            return true
-        }
-        
-        func dropUpdated(info: DropInfo) -> DropProposal? {
-            DropProposal(operation: isEnabled ? .move : .cancel)
         }
     }
 }
