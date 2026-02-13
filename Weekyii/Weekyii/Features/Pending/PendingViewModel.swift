@@ -98,6 +98,44 @@ final class PendingViewModel {
         }
     }
 
+    /// 查询某月中哪些日期已有任务或非空状态（用于绿点标记）
+    func datesWithTasks(in month: Date) -> Set<String> {
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
+
+        let descriptor = FetchDescriptor<DayModel>()
+        let allDays = (try? modelContext.fetch(descriptor)) ?? []
+
+        var result = Set<String>()
+        for day in allDays {
+            let dayDate = calendar.startOfDay(for: day.date)
+            guard dayDate >= monthStart, dayDate < monthEnd else { continue }
+            if day.status != .empty || !day.tasks.isEmpty {
+                result.insert(day.dayId)
+            }
+        }
+        return result
+    }
+
+    /// 查询某月中哪些日期含有 DDL 类型任务（用于火焰图标标记）
+    func datesWithDDL(in month: Date) -> Set<String> {
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
+        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
+
+        let descriptor = FetchDescriptor<DayModel>()
+        let allDays = (try? modelContext.fetch(descriptor)) ?? []
+
+        var result = Set<String>()
+        for day in allDays {
+            let dayDate = calendar.startOfDay(for: day.date)
+            guard dayDate >= monthStart, dayDate < monthEnd else { continue }
+            if day.tasks.contains(where: { $0.taskType == .ddl }) {
+                result.insert(day.dayId)
+            }
+        }
+        return result
+    }
+
     func day(in week: WeekModel, for date: Date) -> DayModel? {
         let targetDayId = calendar.startOfDay(for: date).dayId
         return week.days.first { $0.dayId == targetDayId }

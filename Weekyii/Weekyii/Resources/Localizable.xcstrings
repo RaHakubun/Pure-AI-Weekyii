@@ -868,13 +868,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Week"
+            "value" : "Create New Task"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建周"
+            "value" : "创建新任务"
           }
         }
       }
