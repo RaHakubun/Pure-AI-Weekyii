@@ -18,10 +18,19 @@ final class StateMachineTests: XCTestCase {
             lastProcessedDate = calendar.startOfDay(for: date)
             lastRolloverAt = date
         }
+
+        func incrementDaysStarted() {}
     }
 
     private static func makeContainer() throws -> ModelContainer {
-        let schema = Schema([WeekModel.self, DayModel.self, TaskItem.self, TaskStep.self, TaskAttachment.self])
+        let schema = Schema([
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self
+        ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: config)
     }

@@ -7,9 +7,10 @@ import SwiftData
 final class TodayViewModel {
     private let modelContext: ModelContext
     private let timeProvider: TimeProviding
-    private let notificationService: NotificationService
-    private let appState: AppState
+    private let notificationService: any NotificationScheduling
+    private let appState: any AppStateStore
     private let userSettings: UserSettings
+    private let randomMindStampProvider: () -> MindStampItem?
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -19,15 +20,21 @@ final class TodayViewModel {
     init(
         modelContext: ModelContext,
         timeProvider: TimeProviding,
-        notificationService: NotificationService,
-        appState: AppState,
-        userSettings: UserSettings
+        notificationService: any NotificationScheduling,
+        appState: any AppStateStore,
+        userSettings: UserSettings,
+        randomMindStampProvider: (() -> MindStampItem?)? = nil
     ) {
         self.modelContext = modelContext
         self.timeProvider = timeProvider
         self.notificationService = notificationService
         self.appState = appState
         self.userSettings = userSettings
+        self.randomMindStampProvider = randomMindStampProvider ?? {
+            let descriptor = FetchDescriptor<MindStampItem>()
+            let stamps = (try? modelContext.fetch(descriptor)) ?? []
+            return stamps.randomElement()
+        }
     }
 
     func refresh() {
@@ -140,7 +147,7 @@ final class TodayViewModel {
         syncToday()
     }
 
-    func startDay() throws {
+    func startDay() throws -> MindStampItem? {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let sortedTasks = day.sortedDraftTasks
@@ -165,6 +172,7 @@ final class TodayViewModel {
 
         try modelContext.save()
         syncToday()
+        return randomMindStampProvider()
     }
 
     func doneFocus() throws {

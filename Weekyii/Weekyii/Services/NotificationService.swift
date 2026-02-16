@@ -1,7 +1,12 @@
 import Foundation
 import UserNotifications
 
-final class NotificationService {
+protocol NotificationScheduling {
+    func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int)
+    func cancelKillTimeNotification(for day: DayModel)
+}
+
+final class NotificationService: NotificationScheduling {
     static let shared = NotificationService()
     private let calendar = Calendar(identifier: .iso8601)
 

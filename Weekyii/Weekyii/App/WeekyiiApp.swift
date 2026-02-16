@@ -14,7 +14,15 @@ struct WeekyiiApp: App {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     init() {
-        let schema = Schema([WeekModel.self, DayModel.self, TaskItem.self, TaskStep.self, TaskAttachment.self])
+        let schema = Schema([
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self
+        ])
         let storeURL = Self.persistentStoreURL()
         let config = ModelConfiguration("Weekyii", schema: schema, url: storeURL, allowsSave: true, cloudKitDatabase: .none)
 

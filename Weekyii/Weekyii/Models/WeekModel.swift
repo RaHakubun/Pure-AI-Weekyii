@@ -34,7 +34,7 @@ extension WeekModel {
         let targetStart = startDate.startOfWeek
         let diff = calendar.dateComponents([.weekOfYear], from: referenceStart, to: targetStart).weekOfYear ?? 0
 
-        let isChinese = (Locale.current.languageCode ?? "").hasPrefix("zh")
+        let isChinese = (Locale.current.language.languageCode?.identifier ?? "").hasPrefix("zh")
         if diff == 0 {
             return isChinese ? "本周" : "This week"
         }

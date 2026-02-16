@@ -20,6 +20,7 @@ final class TaskItem {
     var completedOrder: Int = 0
 
     var day: DayModel?
+    var project: ProjectModel?
 
     init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
         self.title = title

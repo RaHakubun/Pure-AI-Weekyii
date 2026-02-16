@@ -16,6 +16,7 @@ struct TodayView: View {
     @State private var showingTaskCreator = false
     @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
+    @State private var ritualStamp: MindStampItem?
     @GestureState private var isInteractingWithKillTime = false
     @State private var selectedSection: TodaySection = .today
     
@@ -58,7 +59,7 @@ struct TodayView: View {
                 let model = TodayViewModel(
                     modelContext: modelContext,
                     timeProvider: TimeProvider(),
-                    notificationService: .shared,
+                    notificationService: NotificationService.shared,
                     appState: appState,
                     userSettings: userSettings
                 )
@@ -83,6 +84,18 @@ struct TodayView: View {
                 initialAttachments: task.attachments,
                 onSave: { _, _, _, _, _ in }
             )
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { ritualStamp != nil },
+                set: { if !$0 { ritualStamp = nil } }
+            )
+        ) {
+            if let stamp = ritualStamp {
+                MindStampRitualView(stamp: stamp) {
+                    ritualStamp = nil
+                }
+            }
         }
     }
 
@@ -266,7 +279,7 @@ struct TodayView: View {
             isEnabled: !day.sortedDraftTasks.isEmpty
         ) {
             do {
-                try viewModel.startDay()
+                ritualStamp = try viewModel.startDay()
             } catch {
                 errorMessage = error.localizedDescription
             }

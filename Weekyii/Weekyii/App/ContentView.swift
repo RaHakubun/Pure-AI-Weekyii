@@ -4,6 +4,7 @@ private enum MainTab: Hashable {
     case past
     case today
     case pending
+    case extensions
     case settings
 }
 
@@ -30,6 +31,12 @@ struct ContentView: View {
                     Label(String(localized: "tab.pending"), systemImage: "calendar.badge.plus")
                 }
                 .tag(MainTab.pending)
+
+            ExtensionsView()
+                .tabItem {
+                    Label(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
+                }
+                .tag(MainTab.extensions)
 
             SettingsView()
                 .tabItem {

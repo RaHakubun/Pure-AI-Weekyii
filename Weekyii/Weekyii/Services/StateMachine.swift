@@ -8,6 +8,7 @@ protocol AppStateStore: AnyObject {
     var runtimeErrorMessage: String? { get set }
     func save()
     func markProcessed(at date: Date)
+    func incrementDaysStarted()
 }
 
 @MainActor
