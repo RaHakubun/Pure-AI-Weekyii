@@ -6,6 +6,7 @@ struct ProjectDetailView: View {
 
     @State private var showingAddTaskSheet = false
     @State private var showingDeleteAlert = false
+    @State private var deletingTask: TaskItem?
     @State private var animateProgress = false
     @Environment(\.dismiss) private var dismiss
 
@@ -62,6 +63,26 @@ struct ProjectDetailView: View {
             Button(String(localized: "action.cancel"), role: .cancel) { }
         } message: {
             Text(String(localized: "project.delete.choice.message"))
+        }
+        .confirmationDialog(
+            String(localized: "project.task.delete.confirm"),
+            isPresented: Binding(
+                get: { deletingTask != nil },
+                set: { if !$0 { deletingTask = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "project.task.delete.action"), role: .destructive) {
+                if let task = deletingTask {
+                    viewModel.deleteProjectTask(task)
+                }
+                deletingTask = nil
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                deletingTask = nil
+            }
+        } message: {
+            Text(String(localized: "project.task.delete.message"))
         }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -372,6 +393,18 @@ struct ProjectDetailView: View {
                                                 .font(.caption2)
                                                 .foregroundColor(task.zone == .complete ? .accentGreen : .textTertiary)
                                         }
+
+                                        Button {
+                                            deletingTask = task
+                                        } label: {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(.taskDDL)
+                                                .frame(width: 22, height: 22)
+                                                .background(Color.taskDDL.opacity(0.1))
+                                                .clipShape(Circle())
+                                        }
+                                        .buttonStyle(.plain)
                                     }
 
                                     if task.id != group.tasks.last?.id {

@@ -7,6 +7,9 @@
     ":" : {
 
     },
+    "·" : {
+
+    },
     "%" : {
 
     },
@@ -450,6 +453,86 @@
         }
       }
     },
+    "extensions.module.mindstamps.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture words and images that keep you grounded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记录提醒自己的文字与图像"
+          }
+        }
+      }
+    },
+    "extensions.module.mindstamps.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mind Stamps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "思想钢印"
+          }
+        }
+      }
+    },
+    "extensions.module.projects.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage cross-day tasks and progress"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理跨天任务与进度"
+          }
+        }
+      }
+    },
+    "extensions.module.projects.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projects"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目"
+          }
+        }
+      }
+    },
+    "extensions.module.see_all" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See all"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部"
+          }
+        }
+      }
+    },
     "extensions.tab.mindstamps" : {
       "localizations" : {
         "en" : {
@@ -769,6 +852,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "钢印内容不能为空。"
+          }
+        }
+      }
+    },
+    "mindstamp.placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No text"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无文字内容"
           }
         }
       }
@@ -1883,6 +1982,38 @@
         }
       }
     },
+    "project.error.day_completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot add tasks to a completed day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当日已完成，无法再添加任务"
+          }
+        }
+      }
+    },
+    "project.error.day_expired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot add tasks to an expired day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当日已过期，无法添加任务"
+          }
+        }
+      }
+    },
     "project.error.name_empty" : {
       "localizations" : {
         "en" : {
@@ -2142,6 +2273,54 @@
         }
       }
     },
+    "project.task.delete.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Task"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除任务"
+          }
+        }
+      }
+    },
+    "project.task.delete.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this task?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认删除这个任务？"
+          }
+        }
+      }
+    },
+    "project.task.delete.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This action cannot be undone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此操作不可撤销。"
+          }
+        }
+      }
+    },
     "project.task.name" : {
       "localizations" : {
         "en" : {
@@ -2218,6 +2397,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加第一个任务"
+          }
+        }
+      }
+    },
+    "project.tasks.count" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个任务"
           }
         }
       }
@@ -4096,6 +4291,9 @@
           }
         }
       }
+    },
+    "主题色" : {
+
     },
     "月趋势" : {
 

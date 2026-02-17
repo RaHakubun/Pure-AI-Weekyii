@@ -84,9 +84,14 @@ final class ExtensionsViewModel {
         let projectStart = calendar.startOfDay(for: project.startDate)
         let projectEnd = calendar.startOfDay(for: project.endDate)
         let taskDate = calendar.startOfDay(for: date)
+        let today = calendar.startOfDay(for: Date())
         
         guard taskDate >= projectStart && taskDate <= projectEnd else {
             errorMessage = String(localized: "project.error.date_out_of_range")
+            return nil
+        }
+        guard taskDate >= today else {
+            errorMessage = String(localized: "project.error.day_expired")
             return nil
         }
 
@@ -94,6 +99,14 @@ final class ExtensionsViewModel {
         let day = findOrCreateDay(for: date)
         guard let day else {
             errorMessage = String(localized: "error.operation_failed_retry")
+            return nil
+        }
+        guard day.status != .expired else {
+            errorMessage = String(localized: "project.error.day_expired")
+            return nil
+        }
+        guard day.status != .completed else {
+            errorMessage = String(localized: "project.error.day_completed")
             return nil
         }
 
@@ -164,6 +177,27 @@ final class ExtensionsViewModel {
 
     func updateStatus(_ project: ProjectModel, to status: ProjectStatus) {
         project.status = status
+        do {
+            try modelContext.save()
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Delete Project Task
+
+    func deleteProjectTask(_ task: TaskItem) {
+        if let day = task.day {
+            day.tasks.removeAll { $0.id == task.id }
+            if day.tasks.isEmpty && day.status == .draft {
+                day.status = .empty
+            }
+        }
+        if let project = task.project {
+            project.tasks.removeAll { $0.id == task.id }
+        }
+        modelContext.delete(task)
         do {
             try modelContext.save()
             refresh()

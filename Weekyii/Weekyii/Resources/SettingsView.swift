@@ -33,6 +33,15 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    Picker("主题色", selection: Binding(
+                        get: { settings.selectedThemeRaw },
+                        set: { settings.selectedThemeRaw = $0 }
+                    )) {
+                        ForEach(WeekTheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme.rawValue)
+                        }
+                    }
                 } header: {
                     Text(String(localized: "settings.section.week"))
                 }

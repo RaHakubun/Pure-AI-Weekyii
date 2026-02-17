@@ -10,6 +10,7 @@ private enum MainTab: Hashable {
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var userSettings: UserSettings
     @State private var selectedTab: MainTab = .today
 
     var body: some View {
@@ -32,7 +33,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.pending)
 
-            ExtensionsView()
+            ExtensionsHubView()
                 .tabItem {
                     Label(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
                 }
@@ -44,7 +45,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.settings)
         }
-        .id(appState.dataRevision)
+        .id("\(appState.dataRevision)-\(userSettings.selectedThemeRaw)")
         .tint(.weekyiiPrimary)
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { appState.runtimeErrorMessage != nil },

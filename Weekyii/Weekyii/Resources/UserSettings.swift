@@ -29,6 +29,11 @@ final class UserSettings: ObservableObject {
     @Published var iCloudSyncEnabled: Bool {
         didSet { save() }
     }
+
+    // Theme Settings
+    @Published var selectedThemeRaw: String {
+        didSet { save() }
+    }
     
     // Developer Settings
     @Published var developerSettingsEnabled: Bool {
@@ -81,6 +86,7 @@ final class UserSettings: ObservableObject {
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
+        self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
         
         self.seedPastWeeks = defaults.object(forKey: "seedPastWeeks") as? Int ?? 8
@@ -101,6 +107,7 @@ final class UserSettings: ObservableObject {
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
+        defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(developerSettingsEnabled, forKey: "developerSettingsEnabled")
         
         defaults.set(seedPastWeeks, forKey: "seedPastWeeks")
@@ -122,5 +129,10 @@ final class UserSettings: ObservableObject {
     
     var isReminderValid: Bool {
         killTimeReminderMinutes >= 0 && killTimeReminderMinutes <= 120
+    }
+
+    var selectedTheme: WeekTheme {
+        get { WeekTheme(rawValue: selectedThemeRaw) ?? .amber }
+        set { selectedThemeRaw = newValue.rawValue }
     }
 }

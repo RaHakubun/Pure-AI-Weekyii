@@ -146,7 +146,7 @@ struct AddProjectTaskSheet: View {
     }
 
     private func createTasks() {
-        var anyFailed = false
+        var firstFailureMessage: String?
         for dc in sortedSelectedDates {
             guard let date = calendar.date(from: dc) else { continue }
             let result = viewModel.addTask(
@@ -155,10 +155,13 @@ struct AddProjectTaskSheet: View {
                 taskType: taskType,
                 on: date
             )
-            if result == nil { anyFailed = true }
+            if result == nil, firstFailureMessage == nil {
+                firstFailureMessage = viewModel.errorMessage ?? String(localized: "error.operation_failed_retry")
+            }
         }
-        if anyFailed {
-            errorMessage = viewModel.errorMessage
+
+        if let firstFailureMessage {
+            errorMessage = firstFailureMessage
         } else {
             dismiss()
         }
@@ -257,12 +260,15 @@ struct AddProjectTaskSheet: View {
                     let isToday = calendar.isDateInToday(day.date)
                     
                     let dayDate = calendar.startOfDay(for: day.date)
+                    let today = calendar.startOfDay(for: Date())
                     let projectStart = calendar.startOfDay(for: project.startDate)
                     let projectEnd = calendar.startOfDay(for: project.endDate)
                     let isWithinProject = dayDate >= projectStart && dayDate <= projectEnd
+                    let isPast = dayDate < today
+                    let isSelectable = day.isCurrent && isWithinProject && !isPast
 
                     Button {
-                        if day.isCurrent && isWithinProject {
+                        if isSelectable {
                             if isSelected {
                                 selectedDates.remove(dc)
                             } else {
@@ -284,7 +290,7 @@ struct AddProjectTaskSheet: View {
                             Text("\(dayNum)")
                                 .font(.body)
                                 .foregroundColor(
-                                    (!day.isCurrent || !isWithinProject) ? .textTertiary.opacity(0.3) :
+                                    (!isSelectable) ? .textTertiary.opacity(0.3) :
                                     isSelected ? .white :
                                     isToday ? Color(hex: project.color) :
                                     .textPrimary
@@ -293,7 +299,7 @@ struct AddProjectTaskSheet: View {
                         .frame(width: 36, height: 36)
                     }
                     .buttonStyle(.plain)
-                    .disabled(!day.isCurrent || !isWithinProject)
+                    .disabled(!isSelectable)
                 }
             }
         }
