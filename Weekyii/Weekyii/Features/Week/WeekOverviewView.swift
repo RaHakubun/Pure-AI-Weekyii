@@ -5,38 +5,39 @@ struct WeekOverviewView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: WeekViewModel?
 
-    private let columns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
-
     var body: some View {
         NavigationStack {
-            ScrollView {
-                if let week = viewModel?.presentWeek {
-                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                        // 周统计卡片
-                        WeekStatCard(week: week)
-                        
-                        // 日期网格
-                        LazyVGrid(columns: columns, spacing: WeekSpacing.md) {
-                            ForEach(week.days.sorted(by: { $0.date < $1.date })) { day in
-                                NavigationLink {
-                                    DayDetailView(day: day)
-                                } label: {
-                                    DayCard(day: day)
+            GeometryReader { geometry in
+                ScrollView {
+                    if let week = viewModel?.presentWeek {
+                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                            // 周统计卡片
+                            WeekStatCard(week: week)
+
+                            // 日期网格
+                            LazyVGrid(
+                                columns: WeekLayoutMetrics.dayGridColumns(containerWidth: geometry.size.width),
+                                spacing: WeekSpacing.md
+                            ) {
+                                ForEach(week.days.sorted(by: { $0.date < $1.date })) { day in
+                                    NavigationLink {
+                                        DayDetailView(day: day)
+                                    } label: {
+                                        DayCard(day: day)
+                                    }
+                                    .buttonStyle(ScaleButtonStyle())
                                 }
-                                .buttonStyle(ScaleButtonStyle())
                             }
                         }
+                        .weekPadding(WeekSpacing.base)
+                        .padding(.bottom, WeekSpacing.xl)
+                    } else if let message = viewModel?.errorMessage {
+                        errorState(message: message) {
+                            viewModel?.refresh()
+                        }
+                    } else {
+                        ProgressView()
                     }
-                    .weekPadding(WeekSpacing.base)
-                } else if let message = viewModel?.errorMessage {
-                    errorState(message: message) {
-                        viewModel?.refresh()
-                    }
-                } else {
-                    ProgressView()
                 }
             }
             .background(Color.backgroundPrimary)
@@ -87,36 +88,37 @@ struct WeekOverviewContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: WeekViewModel?
 
-    private let columns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
-
     var body: some View {
-        ScrollView {
-            if let week = viewModel?.presentWeek {
-                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    WeekStatCard(week: week)
-                    WeekTimelineView(week: week)
+        GeometryReader { geometry in
+            ScrollView {
+                if let week = viewModel?.presentWeek {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        WeekStatCard(week: week)
+                        WeekTimelineView(week: week)
 
-                    LazyVGrid(columns: columns, spacing: WeekSpacing.md) {
-                        ForEach(week.days.sorted(by: { $0.date < $1.date })) { day in
-                            NavigationLink {
-                                DayDetailView(day: day)
-                            } label: {
-                                DayCard(day: day)
+                        LazyVGrid(
+                            columns: WeekLayoutMetrics.dayGridColumns(containerWidth: geometry.size.width),
+                            spacing: WeekSpacing.md
+                        ) {
+                            ForEach(week.days.sorted(by: { $0.date < $1.date })) { day in
+                                NavigationLink {
+                                    DayDetailView(day: day)
+                                } label: {
+                                    DayCard(day: day)
+                                }
+                                .buttonStyle(ScaleButtonStyle())
                             }
-                            .buttonStyle(ScaleButtonStyle())
                         }
                     }
+                    .weekPadding(WeekSpacing.base)
+                    .padding(.bottom, WeekSpacing.xl)
+                } else if let message = viewModel?.errorMessage {
+                    errorState(message: message) {
+                        viewModel?.refresh()
+                    }
+                } else {
+                    ProgressView()
                 }
-                .weekPadding(WeekSpacing.base)
-            } else if let message = viewModel?.errorMessage {
-                errorState(message: message) {
-                    viewModel?.refresh()
-                }
-            } else {
-                ProgressView()
             }
         }
         .onAppear {

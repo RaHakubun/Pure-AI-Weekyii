@@ -83,8 +83,8 @@
 		94C1D0EF2F3F64DC00AA8E13 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */; };
 		94C1D0F02F3F64DC00AA8E13 /* ExtensionsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */; };
 		94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */; };
-		94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */; };
 		94C1D0F32F3F64FD00AA8E13 /* ProjectStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */; };
+		94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */; };
 		94C1D0F62F3F650B00AA8E13 /* ProjectModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */; };
 		94C1D0F72F3F650B00AA8E13 /* Analytics+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */; };
 		94E266502F2E5D180083581A /* PendingWeekDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */; };
@@ -197,11 +197,11 @@
 		94C1D0E72F3F64DC00AA8E13 /* AddProjectTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddProjectTaskSheet.swift; sourceTree = "<group>"; };
 		94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateProjectSheet.swift; sourceTree = "<group>"; };
 		94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsView.swift; sourceTree = "<group>"; };
-		94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsHubView.swift; sourceTree = "<group>"; };
 		94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsViewModel.swift; sourceTree = "<group>"; };
 		94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStatus.swift; sourceTree = "<group>"; };
 		94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Analytics+Extensions.swift"; sourceTree = "<group>"; };
+		94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsHubView.swift; sourceTree = "<group>"; };
 		94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectModel.swift; sourceTree = "<group>"; };
 		94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingWeekDetailView.swift; sourceTree = "<group>"; };
 		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
@@ -471,7 +471,7 @@
 				94C1D0E72F3F64DC00AA8E13 /* AddProjectTaskSheet.swift */,
 				94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */,
 				94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */,
-			94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
+				94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
 				94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */,
 				94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */,
 			);
@@ -655,7 +655,7 @@
 				94C1D0EF2F3F64DC00AA8E13 /* ProjectDetailView.swift in Sources */,
 				94C1D0F02F3F64DC00AA8E13 /* ExtensionsViewModel.swift in Sources */,
 				94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */,
-			94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */,
+				94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */,
 				94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */,
 				94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */,
 				944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */,
@@ -799,7 +799,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -856,7 +856,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -873,6 +873,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K89PH8PTJW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -905,6 +906,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K89PH8PTJW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -937,7 +939,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -958,7 +960,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";

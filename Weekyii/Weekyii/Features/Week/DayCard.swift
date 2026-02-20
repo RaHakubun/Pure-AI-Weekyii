@@ -31,15 +31,22 @@ struct DayCard: View {
                 
                 // 状态指示
                 StatusBadge(status: day.status)
-                
-                // 进度环(仅在有任务时显示)
-                if day.status != .empty {
-                    MiniProgressRing(progress: completionRate, size: 36)
+
+                // 统一占位，避免不同状态造成卡片高度跳变
+                Group {
+                    if day.status != .empty {
+                        MiniProgressRing(progress: completionRate, size: WeekLayoutMetrics.dayCardRingSize)
+                    } else {
+                        Circle()
+                            .stroke(Color.backgroundTertiary, lineWidth: 3)
+                            .frame(width: WeekLayoutMetrics.dayCardRingSize, height: WeekLayoutMetrics.dayCardRingSize)
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
             .weekPaddingVertical(WeekSpacing.lg)
         }
+        .frame(maxWidth: .infinity, minHeight: WeekLayoutMetrics.dayCardMinHeight, alignment: .top)
     }
     
     private var weekdayName: String {

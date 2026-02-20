@@ -50,6 +50,33 @@ enum WeekRadius {
     static let full: CGFloat = 999
 }
 
+// MARK: - Week Layout Metrics
+
+enum WeekLayoutMetrics {
+    static let dayCardMinWidth: CGFloat = 152
+    static let dayCardMinHeight: CGFloat = 188
+    static let dayCardRingSize: CGFloat = 36
+
+    static func dayGridColumnCount(
+        containerWidth: CGFloat,
+        horizontalPadding: CGFloat = WeekSpacing.base * 2,
+        interItemSpacing: CGFloat = WeekSpacing.md,
+        minCardWidth: CGFloat = WeekLayoutMetrics.dayCardMinWidth
+    ) -> Int {
+        let availableWidth = max(containerWidth - horizontalPadding, minCardWidth)
+        let twoColumnCardWidth = (availableWidth - interItemSpacing) / 2
+        return twoColumnCardWidth >= minCardWidth ? 2 : 1
+    }
+
+    static func dayGridColumns(containerWidth: CGFloat) -> [GridItem] {
+        let count = dayGridColumnCount(containerWidth: containerWidth)
+        return Array(
+            repeating: GridItem(.flexible(), spacing: WeekSpacing.md, alignment: .top),
+            count: max(count, 1)
+        )
+    }
+}
+
 // MARK: - Shadows
 
 struct WeekShadow {

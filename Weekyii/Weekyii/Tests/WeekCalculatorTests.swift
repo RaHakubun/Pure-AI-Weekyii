@@ -24,4 +24,14 @@ final class WeekCalculatorTests: XCTestCase {
         let futureYear = Calendar(identifier: .iso8601).component(.year, from: Date()) + 10
         XCTAssertFalse(WeekCalculator().isValidWeekId("\(futureYear)-W99"))
     }
+
+    func test_dayGridUsesTwoColumnsOnRegularPhoneWidth() {
+        let count = WeekLayoutMetrics.dayGridColumnCount(containerWidth: 393)
+        XCTAssertEqual(count, 2)
+    }
+
+    func test_dayGridFallsBackToSingleColumnOnNarrowWidth() {
+        let count = WeekLayoutMetrics.dayGridColumnCount(containerWidth: 320)
+        XCTAssertEqual(count, 1)
+    }
 }
