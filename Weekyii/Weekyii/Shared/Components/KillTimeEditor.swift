@@ -8,6 +8,7 @@ struct KillTimeEditor: View {
     let isEditable: Bool
     let onChange: (Int, Int) -> Void
     var onEditingChanged: ((Bool) -> Void)? = nil
+    @State private var flamePulse = false
     
     // 计算当前时间+1小时对应的分钟数（作为滑动条最小值，避免立即过期）
     private var minTimeInMinutes: Int {
@@ -24,6 +25,22 @@ struct KillTimeEditor: View {
     // 当前选择的时间对应的分钟数
     private var selectedTimeInMinutes: Int {
         hour * 60 + minute
+    }
+
+    private var minutesLeft: Int {
+        let now = Date()
+        let selectedDate = composeDate(hour: hour, minute: minute)
+        return Int(selectedDate.timeIntervalSince(now) / 60)
+    }
+
+    private var fireLevel: Double {
+        let left = max(0, minutesLeft)
+        if left <= 5 { return 1.0 }
+        if left <= 15 { return 0.85 }
+        if left <= 30 { return 0.65 }
+        if left <= 60 { return 0.45 }
+        if left <= 120 { return 0.25 }
+        return 0
     }
     
     // 计算滑动条的实际最小值（确保不超过当前选择值）
@@ -133,6 +150,42 @@ struct KillTimeEditor: View {
                         }
                     }
                     .frame(height: 24)
+                }
+            }
+
+            if fireLevel > 0 {
+                HStack(spacing: WeekSpacing.xs) {
+                    Image(systemName: "flame.fill")
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.red.opacity(0.9), Color.orange],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .scaleEffect(flamePulse ? 1.15 : 0.9)
+                    Text("临近截止")
+                        .font(.captionBold)
+                        .foregroundColor(.accentOrange)
+                    Spacer()
+                    Text("\(max(0, minutesLeft)) 分钟")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(.textSecondary)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                        .fill(Color.red.opacity(0.08 + 0.15 * fireLevel))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                        .stroke(Color.orange.opacity(0.35 + 0.45 * fireLevel), lineWidth: 1)
+                )
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                        flamePulse = true
+                    }
                 }
             }
         }

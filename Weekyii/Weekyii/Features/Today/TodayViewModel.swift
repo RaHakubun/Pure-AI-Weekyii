@@ -5,6 +5,11 @@ import SwiftData
 @MainActor
 @Observable
 final class TodayViewModel {
+    enum KillTimeChangeImpact: Equatable {
+        case normal
+        case immediateExpire(expiredCount: Int)
+    }
+
     private let modelContext: ModelContext
     private let timeProvider: TimeProviding
     private let notificationService: any NotificationScheduling
@@ -46,16 +51,15 @@ final class TodayViewModel {
             return
         }
         today = day
-        
-        // Apply default kill time if day is newly created or empty
-        if day.status == .empty {
-            day.killTimeHour = userSettings.defaultKillTimeHour
-            day.killTimeMinute = userSettings.defaultKillTimeMinute
-            persistOrRecordError()
-        }
+
+        var shouldPersist = false
 
         if day.status == .draft || day.status == .execute {
             updateNotificationSchedule(for: day)
+            shouldPersist = true
+        }
+
+        if shouldPersist {
             persistOrRecordError()
         }
     }
@@ -77,6 +81,10 @@ final class TodayViewModel {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    func pickStartRitualStamp() -> MindStampItem? {
+        randomMindStampProvider()
     }
 
     func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
@@ -147,7 +155,7 @@ final class TodayViewModel {
         syncToday()
     }
 
-    func startDay() throws -> MindStampItem? {
+    func startDay() throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let sortedTasks = day.sortedDraftTasks
@@ -172,7 +180,6 @@ final class TodayViewModel {
 
         try modelContext.save()
         syncToday()
-        return randomMindStampProvider()
     }
 
     func doneFocus() throws {
@@ -199,14 +206,38 @@ final class TodayViewModel {
         syncToday()
     }
 
-    func changeKillTime(hour: Int, minute: Int) throws {
+    func evaluateKillTimeChangeImpact(hour: Int, minute: Int) throws -> KillTimeChangeImpact {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
-        if let killDate = killDate(for: day), timeProvider.now >= killDate {
-            throw WeekyiiError.killTimePassed
+        guard isValidKillTime(hour: hour, minute: minute) else { throw WeekyiiError.dateFormatInvalid }
+
+        if willExpireImmediately(day: day, hour: hour, minute: minute) {
+            return .immediateExpire(expiredCount: expiredCountForImmediateExpire(day: day))
         }
+        return .normal
+    }
+
+    func changeKillTime(hour: Int, minute: Int, allowImmediateExpire: Bool = false) throws {
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
+        guard isValidKillTime(hour: hour, minute: minute) else { throw WeekyiiError.dateFormatInvalid }
+
+        if willExpireImmediately(day: day, hour: hour, minute: minute) {
+            guard allowImmediateExpire else {
+                throw WeekyiiError.killTimePassed
+            }
+            day.killTimeHour = hour
+            day.killTimeMinute = minute
+            day.followsDefaultKillTime = false
+            expire(day: day, expiredCount: expiredCountForImmediateExpire(day: day))
+            try modelContext.save()
+            syncToday()
+            return
+        }
+
         day.killTimeHour = hour
         day.killTimeMinute = minute
+        day.followsDefaultKillTime = false
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -218,6 +249,24 @@ final class TodayViewModel {
         components.minute = day.killTimeMinute
         components.second = 0
         return calendar.date(from: components)
+    }
+
+    private func isValidKillTime(hour: Int, minute: Int) -> Bool {
+        (0...23).contains(hour) && (0...59).contains(minute)
+    }
+
+    private func willExpireImmediately(day: DayModel, hour: Int, minute: Int) -> Bool {
+        guard day.status == .draft || day.status == .execute else { return false }
+        var components = calendar.dateComponents([.year, .month, .day], from: day.date)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        guard let newKillDate = calendar.date(from: components) else { return false }
+        return timeProvider.now >= newKillDate
+    }
+
+    private func expiredCountForImmediateExpire(day: DayModel) -> Int {
+        day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
     }
 
     private func expire(day: DayModel, expiredCount: Int) {
@@ -324,7 +373,10 @@ final class TodayViewModel {
 
         notificationService.scheduleKillTimeNotification(
             for: day,
-            reminderMinutes: userSettings.killTimeReminderMinutes
+            reminderMinutes: userSettings.killTimeReminderMinutes,
+            fixedReminder: userSettings.fixedReminderEnabled
+                ? DateComponents(hour: userSettings.fixedReminderHour, minute: userSettings.fixedReminderMinute)
+                : nil
         )
     }
 

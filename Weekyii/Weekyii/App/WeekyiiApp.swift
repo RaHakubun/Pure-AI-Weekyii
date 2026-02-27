@@ -76,7 +76,8 @@ struct WeekyiiApp: App {
             modelContainer: modelContainer,
             timeProvider: TimeProvider(),
             notificationService: .shared,
-            appState: appState
+            appState: appState,
+            userSettings: userSettings
         )
     }
 

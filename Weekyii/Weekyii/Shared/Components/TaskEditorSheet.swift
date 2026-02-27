@@ -22,6 +22,8 @@ struct TaskEditorSheet: View {
     
     // Photo picker state
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var showingStepFullText = false
+    @State private var selectedStepFullText = ""
     
     init(
         title: String,
@@ -75,6 +77,7 @@ struct TaskEditorSheet: View {
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.medium)
                                 .disabled(isReadOnly)
+                                .accessibilityIdentifier("taskEditorTitleField")
                             
                             TextField(String(localized: "task.description.placeholder"), text: $taskDescription, axis: .vertical)
                                 .font(.bodyMedium)
@@ -106,12 +109,7 @@ struct TaskEditorSheet: View {
                         )
                         
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                            if stepDrafts.isEmpty {
-                                Text(String(localized: "task.steps.empty"))
-                                    .font(.bodyMedium)
-                                    .foregroundColor(.textSecondary)
-                                    .padding(.vertical, WeekSpacing.sm)
-                            } else {
+                            if !stepDrafts.isEmpty {
                                 VStack(spacing: WeekSpacing.sm) {
                                     ForEach(stepDrafts) { draft in
                                         stepRow(for: draft.id)
@@ -148,51 +146,34 @@ struct TaskEditorSheet: View {
                             accent: .accentOrange
                         )
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: WeekSpacing.sm) {
-                                ForEach(attachments, id: \.id) { (attachment: TaskAttachment) in
-                                    if let data = attachment.data, let uiImage = UIImage(data: data) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 84, height: 84)
-                                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-                                            .overlay(alignment: .topTrailing) {
-                                                if !isReadOnly {
-                                                    Button(action: {
-                                                        deleteAttachment(attachment)
-                                                    }) {
-                                                        Image(systemName: "xmark.circle.fill")
-                                                            .foregroundColor(.red)
-                                                            .background(Circle().fill(.white))
-                                                    }
-                                                    .offset(x: 8, y: -8)
-                                                }
+                        let columns = [
+                            GridItem(.adaptive(minimum: 92), spacing: WeekSpacing.sm)
+                        ]
+
+                        LazyVGrid(columns: columns, spacing: WeekSpacing.sm) {
+                            ForEach(attachments, id: \.id) { (attachment: TaskAttachment) in
+                                attachmentTile(attachment)
+                            }
+                            if !isReadOnly {
+                                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                        .fill(Color.accentOrangeLight.opacity(0.22))
+                                        .frame(height: 96)
+                                        .overlay(
+                                            VStack(spacing: 6) {
+                                                Image(systemName: "plus.square.fill")
+                                                    .font(.title2)
+                                                    .foregroundColor(.accentOrange)
+                                                Text(String(localized: "action.add"))
+                                                    .font(.captionBold)
+                                                    .foregroundColor(.accentOrange)
                                             }
-                                    }
+                                        )
                                 }
-                                if !isReadOnly {
-                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                        RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                            .fill(Color.accentOrangeLight.opacity(0.2))
-                                            .frame(width: 84, height: 84)
-                                            .overlay(
-                                                VStack(spacing: 6) {
-                                                    Image(systemName: "photo.badge.plus")
-                                                        .font(.title2)
-                                                        .foregroundColor(.accentOrange)
-                                                    Text(String(localized: "action.add"))
-                                                        .font(.caption)
-                                                        .foregroundColor(.accentOrange)
-                                                }
-                                            )
-                                    }
-                                    .onChange(of: selectedPhoto) { _, newItem in
-                                        loadPhoto(newItem)
-                                    }
+                                .onChange(of: selectedPhoto) { _, newItem in
+                                    loadPhoto(newItem)
                                 }
                             }
-                            .padding(.vertical, WeekSpacing.xs)
                         }
                     }
                 }
@@ -222,14 +203,21 @@ struct TaskEditorSheet: View {
                             onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
                         }
                         .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("taskEditorSaveButton")
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "action.cancel")) {
                         dismiss()
                     }
+                    .accessibilityIdentifier("taskEditorCancelButton")
                 }
             }
+        }
+        .alert("步骤全文", isPresented: $showingStepFullText) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(selectedStepFullText)
         }
     }
 
@@ -284,9 +272,24 @@ struct TaskEditorSheet: View {
                     .buttonStyle(.plain)
                 }
 
-                TextField(String(localized: "Step"), text: binding.title)
-                    .font(.bodyMedium)
-                    .disabled(isReadOnly)
+                if isReadOnly {
+                    Text(binding.title.wrappedValue)
+                        .font(.bodyMedium)
+                        .foregroundColor(.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedStepFullText = binding.title.wrappedValue
+                            showingStepFullText = true
+                        }
+                } else {
+                    TextField(String(localized: "Step"), text: binding.title, axis: .vertical)
+                        .font(.bodyMedium)
+                        .lineLimit(1...8)
+                        .disabled(isReadOnly)
+                }
 
                 Spacer()
 
@@ -367,6 +370,56 @@ struct TaskEditorSheet: View {
     private func deleteAttachment(_ attachment: TaskAttachment) {
         if let index = attachments.firstIndex(where: { $0.id == attachment.id }) {
             attachments.remove(at: index)
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentTile(_ attachment: TaskAttachment) -> some View {
+        let fileLabel = attachment.fileName.isEmpty ? "Attachment" : attachment.fileName
+
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .fill(Color.accentOrangeLight.opacity(0.16))
+                .frame(height: 96)
+                .overlay(alignment: .bottomLeading) {
+                    Text(fileLabel)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(2)
+                        .foregroundColor(.textPrimary)
+                        .padding(8)
+                }
+
+            if let data = attachment.data, let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                    .overlay(alignment: .bottomLeading) {
+                        Rectangle()
+                            .fill(.black.opacity(0.32))
+                            .frame(height: 26)
+                            .overlay(alignment: .leading) {
+                                Text(fileLabel)
+                                    .font(.caption2.weight(.semibold))
+                                    .lineLimit(1)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                            }
+                    }
+            }
+
+            if !isReadOnly {
+                Button(action: {
+                    deleteAttachment(attachment)
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.white)
+                        .background(Circle().fill(.black.opacity(0.45)))
+                }
+                .offset(x: 6, y: -6)
+            }
         }
     }
 }

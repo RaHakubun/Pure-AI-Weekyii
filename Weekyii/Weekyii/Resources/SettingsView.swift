@@ -7,6 +7,12 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
+    @State private var pendingDefaultKillTimeHour = 0
+    @State private var pendingDefaultKillTimeMinute = 0
+    @State private var hasInitializedPendingDefaultKillTime = false
+    @State private var showingDefaultKillTimeApplyConfirm = false
+    @State private var showingDefaultKillTimeRiskConfirm = false
+    @State private var showingCannotSyncExpiredTodayAlert = false
     
     var body: some View {
         NavigationStack {
@@ -22,26 +28,30 @@ struct SettingsView: View {
                 
                 // MARK: - Week & Stats
                 Section {
-                    Toggle(isOn: Binding(
-                        get: { settings.weekStartsOnMonday },
-                        set: { settings.weekStartsOnMonday = $0 }
-                    )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "settings.week.starts_monday"))
-                            Text(String(localized: "settings.week.starts_monday.subtitle"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Picker("主题色", selection: Binding(
+                    Picker(selection: Binding(
                         get: { settings.selectedThemeRaw },
                         set: { settings.selectedThemeRaw = $0 }
                     )) {
                         ForEach(WeekTheme.allCases) { theme in
-                            Text(theme.displayName).tag(theme.rawValue)
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(theme.primaryColor)
+                                    .frame(width: 10, height: 10)
+                                Circle()
+                                    .fill(theme.accentColor)
+                                    .frame(width: 10, height: 10)
+                                Text(theme.displayName)
+                            }
+                            .tag(theme.rawValue)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            SettingsIcon(icon: "paintpalette.fill", color: .purple)
+                            Text("主题色")
                         }
                     }
+
+                    themePalettePreview
                 } header: {
                     Text(String(localized: "settings.section.week"))
                 }
@@ -49,16 +59,20 @@ struct SettingsView: View {
                 // MARK: - Data & Privacy
                 Section {
                     Toggle(isOn: .constant(false)) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "settings.icloud.sync"))
-                            Text(String(localized: "settings.icloud.coming_soon"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            SettingsIcon(icon: "icloud.fill", color: .blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "settings.icloud.sync"))
+                                Text(String(localized: "settings.icloud.coming_soon"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .disabled(true)
 
-                    HStack {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "square.and.arrow.up.fill", color: .indigo)
                         Text(String(localized: "settings.data.export"))
                         Spacer()
                         Text(String(localized: "settings.data.export.coming_soon"))
@@ -74,11 +88,14 @@ struct SettingsView: View {
                         get: { settings.developerSettingsEnabled },
                         set: { settings.developerSettingsEnabled = $0 }
                     )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "settings.developer.show_debug"))
-                            Text(String(localized: "settings.developer.show_debug.subtitle"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            SettingsIcon(icon: "hammer.fill", color: .gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "settings.developer.show_debug"))
+                                Text(String(localized: "settings.developer.show_debug.subtitle"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     
@@ -181,7 +198,8 @@ struct SettingsView: View {
                 
                 // MARK: - About
                 Section {
-                    HStack {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "info.circle.fill", color: .teal)
                         Text(String(localized: "settings.about.version"))
                         Spacer()
                         Text("1.0.0")
@@ -189,7 +207,8 @@ struct SettingsView: View {
                     }
                     
                     if let startDate = appState.systemStartDate {
-                        HStack {
+                        HStack(spacing: 12) {
+                            SettingsIcon(icon: "calendar", color: .blue)
                             Text(String(localized: "settings.about.start_date"))
                             Spacer()
                             Text(startDate, format: Date.FormatStyle().year().month().day())
@@ -197,7 +216,8 @@ struct SettingsView: View {
                         }
                     }
                     
-                    HStack {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "flag.fill", color: .orange)
                         Text(String(localized: "settings.about.days_started"))
                         Spacer()
                         Text("\(appState.daysStartedCount)")
@@ -208,6 +228,13 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(String(localized: "settings.title"))
+            .tint(.weekyiiPrimary)
+        }
+        .onAppear {
+            guard !hasInitializedPendingDefaultKillTime else { return }
+            pendingDefaultKillTimeHour = settings.defaultKillTimeHour
+            pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
+            hasInitializedPendingDefaultKillTime = true
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             seedAlertMessage != nil
@@ -234,40 +261,126 @@ struct SettingsView: View {
         } message: {
             Text(String(localized: "settings.debug.clear.confirm_message"))
         }
+        .alert("应用新的默认截止时间", isPresented: $showingDefaultKillTimeApplyConfirm) {
+            Button("同步至今日及以后") {
+                confirmDefaultKillTimeChange(syncToday: true)
+            }
+            Button("仅对明日以后生效") {
+                confirmDefaultKillTimeChange(syncToday: false)
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                syncPendingDefaultKillTimeWithSaved()
+            }
+        } message: {
+            Text("你可以选择同步今日，或只让新默认值从明日开始生效。")
+        }
+        .alert("新截止时间会导致今日任务立即过期", isPresented: $showingDefaultKillTimeRiskConfirm) {
+            Button("确认", role: .destructive) {
+                applyDefaultKillTime(hour: pendingDefaultKillTimeHour, minute: pendingDefaultKillTimeMinute)
+                applyKillTimeToTodayAndExpireIfNeeded(
+                    hour: pendingDefaultKillTimeHour,
+                    minute: pendingDefaultKillTimeMinute,
+                    allowImmediateExpire: true
+                )
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                syncPendingDefaultKillTimeWithSaved()
+            }
+        } message: {
+            Text("提交后今日未完成内容会立即过期，是否继续？")
+        }
+        .alert("今日已过期", isPresented: $showingCannotSyncExpiredTodayAlert) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text("今日任务流已过期，无法同步到今天。本次提交已取消。")
+        }
     }
     
     // MARK: - Kill Time Settings
+    @ViewBuilder
     private var killTimeSettings: some View {
-        HStack {
+        HStack(spacing: 12) {
+            SettingsIcon(icon: "clock.fill", color: .orange)
             Text(String(localized: "settings.default_kill_time"))
             Spacer()
-            Picker("", selection: Binding(
-                get: { settings.defaultKillTimeHour },
-                set: { settings.defaultKillTimeHour = $0 }
-            )) {
-                ForEach(0..<24, id: \.self) { hour in
-                    Text(String(format: "%02d", hour)).tag(hour)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 70)
             
+            HStack(spacing: 2) {
+                Picker("", selection: Binding(
+                    get: { pendingDefaultKillTimeHour },
+                    set: { pendingDefaultKillTimeHour = $0 }
+                )) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text(String(format: "%02d", hour)).tag(hour)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 58)
+                .clipped()
+                
+                Text(":")
+                    .foregroundStyle(.secondary)
+                
+                Picker("", selection: Binding(
+                    get: { pendingDefaultKillTimeMinute },
+                    set: { pendingDefaultKillTimeMinute = $0 }
+                )) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text(String(format: "%02d", minute)).tag(minute)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 58)
+                .clipped()
+            }
+            .padding(.vertical, 2)
+            .background(Color(uiColor: .tertiarySystemFill))
+            .cornerRadius(8)
+        }
+
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 28, height: 28) // Placeholder padding
+            Text("手动输入")
+                .foregroundStyle(.secondary)
+            Spacer()
+            timeInputField("HH", value: Binding(
+                get: { pendingDefaultKillTimeHour },
+                set: { pendingDefaultKillTimeHour = min(max($0, 0), 23) }
+            ))
             Text(":")
-            
-            Picker("", selection: Binding(
-                get: { settings.defaultKillTimeMinute },
-                set: { settings.defaultKillTimeMinute = $0 }
-            )) {
-                ForEach([0, 15, 30, 45], id: \.self) { minute in
-                    Text(String(format: "%02d", minute)).tag(minute)
+                .foregroundStyle(.secondary)
+            timeInputField("MM", value: Binding(
+                get: { pendingDefaultKillTimeMinute },
+                set: { pendingDefaultKillTimeMinute = min(max($0, 0), 59) }
+            ))
+        }
+
+        if hasPendingDefaultKillTimeChange {
+            HStack {
+                Spacer()
+                Button("取消更改") {
+                    withAnimation {
+                        syncPendingDefaultKillTimeWithSaved()
+                    }
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .padding(.trailing, 16)
+
+                Button("提交修改") {
+                    submitDefaultKillTimeChange()
+                }
+                .buttonStyle(.borderless)
+                .fontWeight(.bold)
+                Spacer()
             }
-            .pickerStyle(.menu)
-            .frame(width: 70)
         }
     }
     
     // MARK: - Task Type Settings
+    @ViewBuilder
     private var taskTypeSettings: some View {
         Picker(selection: Binding(
             get: { settings.defaultTaskType },
@@ -281,11 +394,15 @@ struct SettingsView: View {
                 .tag(type)
             }
         } label: {
-            Text(String(localized: "settings.default_task_type"))
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "checkmark.circle.fill", color: .green)
+                Text(String(localized: "settings.default_task_type"))
+            }
         }
     }
     
     // MARK: - Reminder Settings
+    @ViewBuilder
     private var reminderSettings: some View {
         Picker(selection: Binding(
             get: { settings.killTimeReminderMinutes },
@@ -296,11 +413,68 @@ struct SettingsView: View {
             Text(String(localized: "settings.reminder.30min")).tag(30)
             Text(String(localized: "settings.reminder.60min")).tag(60)
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "settings.kill_time_reminder"))
-                Text(String(localized: "settings.kill_time_reminder.subtitle"))
-                    .font(.caption)
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "bell.fill", color: .red)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.kill_time_reminder"))
+                    Text(String(localized: "settings.kill_time_reminder.subtitle"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        Toggle(isOn: Binding(
+            get: { settings.fixedReminderEnabled },
+            set: { settings.fixedReminderEnabled = $0 }
+        )) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "bell.badge.fill", color: .pink)
+                Text("固定时刻提醒")
+            }
+        }
+
+        if settings.fixedReminderEnabled {
+            HStack(spacing: 12) {
+                Color.clear
+                    .frame(width: 28, height: 28) // Placeholder alignment
+                Text("提醒时刻")
                     .foregroundStyle(.secondary)
+                Spacer()
+                
+                HStack(spacing: 2) {
+                    Picker("", selection: Binding(
+                        get: { settings.fixedReminderHour },
+                        set: { settings.fixedReminderHour = min(max($0, 0), 23) }
+                    )) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text(String(format: "%02d", hour)).tag(hour)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 58)
+                    .clipped()
+                    
+                    Text(":")
+                        .foregroundStyle(.secondary)
+                    
+                    Picker("", selection: Binding(
+                        get: { settings.fixedReminderMinute },
+                        set: { settings.fixedReminderMinute = min(max($0, 0), 59) }
+                    )) {
+                        ForEach(0..<60, id: \.self) { minute in
+                            Text(String(format: "%02d", minute)).tag(minute)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 58)
+                    .clipped()
+                }
+                .padding(.vertical, 2)
+                .background(Color(uiColor: .tertiarySystemFill))
+                .cornerRadius(8)
             }
         }
     }
@@ -325,6 +499,143 @@ struct SettingsView: View {
         }
         let template = String(localized: "settings.debug.seed.expired.every")
         return String(format: template, settings.seedExpiredEveryNDays)
+    }
+
+    private var themePalettePreview: some View {
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 28, height: 28) // Placeholder padding
+            Text("主题预览")
+                .foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(settings.selectedTheme.primaryColor)
+                    .frame(width: 28, height: 28)
+                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(settings.selectedTheme.accentColor)
+                    .frame(width: 28, height: 28)
+                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(settings.selectedTheme.backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(settings.selectedTheme.primaryColor.opacity(0.35), lineWidth: 1)
+                    )
+                    .frame(width: 28, height: 28)
+                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+            }
+        }
+    }
+
+    private func timeInputField(_ placeholder: String, value: Binding<Int>) -> some View {
+        TextField(placeholder, value: value, format: .number)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .frame(width: 56)
+            .textFieldStyle(.roundedBorder)
+            .font(.body.monospacedDigit())
+    }
+
+    private var hasPendingDefaultKillTimeChange: Bool {
+        pendingDefaultKillTimeHour != settings.defaultKillTimeHour
+            || pendingDefaultKillTimeMinute != settings.defaultKillTimeMinute
+    }
+
+    private func syncPendingDefaultKillTimeWithSaved() {
+        pendingDefaultKillTimeHour = settings.defaultKillTimeHour
+        pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
+    }
+
+    private func submitDefaultKillTimeChange() {
+        guard hasPendingDefaultKillTimeChange else { return }
+        showingDefaultKillTimeApplyConfirm = true
+    }
+
+    private func confirmDefaultKillTimeChange(syncToday: Bool) {
+        guard hasPendingDefaultKillTimeChange else { return }
+        if syncToday {
+            if isTodayExpired {
+                syncPendingDefaultKillTimeWithSaved()
+                showingCannotSyncExpiredTodayAlert = true
+                return
+            }
+            if shouldWarnImmediateExpiryForToday(hour: pendingDefaultKillTimeHour, minute: pendingDefaultKillTimeMinute) {
+                showingDefaultKillTimeRiskConfirm = true
+                return
+            }
+            applyDefaultKillTime(hour: pendingDefaultKillTimeHour, minute: pendingDefaultKillTimeMinute)
+            applyKillTimeToTodayAndExpireIfNeeded(
+                hour: pendingDefaultKillTimeHour,
+                minute: pendingDefaultKillTimeMinute,
+                allowImmediateExpire: false
+            )
+            return
+        }
+        applyDefaultKillTime(hour: pendingDefaultKillTimeHour, minute: pendingDefaultKillTimeMinute)
+    }
+
+    private var isTodayExpired: Bool {
+        guard let today = todayDayModel() else { return false }
+        return today.status == .expired
+    }
+
+    private func applyDefaultKillTime(hour: Int, minute: Int) {
+        settings.defaultKillTimeHour = hour
+        settings.defaultKillTimeMinute = minute
+    }
+
+    private func todayDayModel() -> DayModel? {
+        let dayId = Date().dayId
+        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func shouldWarnImmediateExpiryForToday(hour: Int, minute: Int) -> Bool {
+        guard let today = todayDayModel() else { return false }
+        guard today.status == .draft || today.status == .execute else { return false }
+        guard hasOpenTasks(today) else { return false }
+        guard let newKillDate = makeDate(for: today.date, hour: hour, minute: minute) else { return false }
+        return Date() >= newKillDate
+    }
+
+    private func applyKillTimeToTodayAndExpireIfNeeded(hour: Int, minute: Int, allowImmediateExpire: Bool) {
+        guard let today = todayDayModel() else { return }
+        guard today.status == .empty || today.status == .draft || today.status == .execute else { return }
+
+        today.killTimeHour = hour
+        today.killTimeMinute = minute
+        today.followsDefaultKillTime = true
+
+        guard let newKillDate = makeDate(for: today.date, hour: hour, minute: minute) else {
+            try? modelContext.save()
+            return
+        }
+
+        if allowImmediateExpire, Date() >= newKillDate, (today.status == .draft || today.status == .execute) {
+            let expiredCount = today.status == .draft ? 0 : ((today.focusTask == nil ? 0 : 1) + today.frozenTasks.count)
+            today.status = .expired
+            today.expiredCount = expiredCount
+            let toRemove = today.tasks.filter { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
+            today.tasks.removeAll { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
+            toRemove.forEach { modelContext.delete($0) }
+            NotificationService.shared.cancelKillTimeNotification(for: today)
+        }
+
+        try? modelContext.save()
+    }
+
+    private func hasOpenTasks(_ day: DayModel) -> Bool {
+        !day.sortedDraftTasks.isEmpty || day.focusTask != nil || !day.frozenTasks.isEmpty
+    }
+
+    private func makeDate(for dayDate: Date, hour: Int, minute: Int) -> Date? {
+        var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: dayDate)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        return Calendar(identifier: .iso8601).date(from: components)
     }
 }
 
@@ -521,4 +832,18 @@ private struct SeedOptions {
     let includeAttachments: Bool
     let includeDescriptions: Bool
     let allowExisting: Bool
+}
+
+struct SettingsIcon: View {
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: 28, height: 28)
+            .background(color)
+            .cornerRadius(7)
+    }
 }

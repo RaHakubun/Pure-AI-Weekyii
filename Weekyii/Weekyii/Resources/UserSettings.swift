@@ -19,6 +19,15 @@ final class UserSettings: ObservableObject {
     @Published var killTimeReminderMinutes: Int {
         didSet { save() }
     }
+    @Published var fixedReminderEnabled: Bool {
+        didSet { save() }
+    }
+    @Published var fixedReminderHour: Int {
+        didSet { save() }
+    }
+    @Published var fixedReminderMinute: Int {
+        didSet { save() }
+    }
     
     // Week Settings
     @Published var weekStartsOnMonday: Bool {
@@ -73,8 +82,8 @@ final class UserSettings: ObservableObject {
     
     init() {
         // Load saved values or use defaults
-        self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 20
-        self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 0
+        self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
+        self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
         
         if let rawTaskType = defaults.string(forKey: "defaultTaskType"),
            let taskType = TaskType(rawValue: rawTaskType) {
@@ -84,6 +93,9 @@ final class UserSettings: ObservableObject {
         }
         
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
+        self.fixedReminderEnabled = defaults.object(forKey: "fixedReminderEnabled") as? Bool ?? false
+        self.fixedReminderHour = defaults.object(forKey: "fixedReminderHour") as? Int ?? 21
+        self.fixedReminderMinute = defaults.object(forKey: "fixedReminderMinute") as? Int ?? 0
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
@@ -105,6 +117,9 @@ final class UserSettings: ObservableObject {
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
+        defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
+        defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
+        defaults.set(fixedReminderMinute, forKey: "fixedReminderMinute")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
@@ -129,6 +144,11 @@ final class UserSettings: ObservableObject {
     
     var isReminderValid: Bool {
         killTimeReminderMinutes >= 0 && killTimeReminderMinutes <= 120
+    }
+
+    var isFixedReminderValid: Bool {
+        fixedReminderHour >= 0 && fixedReminderHour <= 23 &&
+        fixedReminderMinute >= 0 && fixedReminderMinute <= 59
     }
 
     var selectedTheme: WeekTheme {

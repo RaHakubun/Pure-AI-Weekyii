@@ -13,4 +13,24 @@ final class ModelTests: XCTestCase {
         day.tasks.append(TaskItem(title: "B", order: 2, zone: .focus))
         XCTAssertFalse(day.hasSingleFocus)
     }
+
+    func test_startFlowCoordinator_transitionsFromWarningToRitual() {
+        var coordinator = TodayStartFlowCoordinator()
+        coordinator.present()
+        XCTAssertTrue(coordinator.isPresented)
+        XCTAssertEqual(coordinator.step, .warning)
+
+        coordinator.chooseDirectEnter()
+        XCTAssertEqual(coordinator.step, .ritual)
+    }
+
+    func test_startFlowCoordinator_cancelResetsFlow() {
+        var coordinator = TodayStartFlowCoordinator()
+        coordinator.present()
+        coordinator.chooseDirectEnter()
+        coordinator.cancel()
+
+        XCTAssertFalse(coordinator.isPresented)
+        XCTAssertEqual(coordinator.step, .warning)
+    }
 }

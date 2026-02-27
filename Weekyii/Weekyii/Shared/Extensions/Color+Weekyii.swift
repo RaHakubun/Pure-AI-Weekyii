@@ -5,6 +5,8 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case ocean
     case forest
     case rose
+    case lavender
+    case graphite
 
     var id: String { rawValue }
 
@@ -14,7 +16,21 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .ocean: return "海蓝"
         case .forest: return "森绿"
         case .rose: return "玫瑰"
+        case .lavender: return "薰紫"
+        case .graphite: return "石墨"
         }
+    }
+
+    var primaryColor: Color {
+        Color(hex: WeekThemePalette.forTheme(self).primary)
+    }
+
+    var accentColor: Color {
+        Color(hex: WeekThemePalette.forTheme(self).accentOrange)
+    }
+
+    var backgroundColor: Color {
+        Color(hex: WeekThemePalette.forTheme(self).backgroundSecondary)
     }
 }
 
@@ -133,6 +149,52 @@ private struct WeekThemePalette {
                 taskDDLBg: "#F9E5DF",
                 taskLeisure: "#8A69CB",
                 taskLeisureBg: "#EFE8FA"
+            )
+        case .lavender:
+            return WeekThemePalette(
+                primary: "#7C5295",
+                primaryLight: "#9E7BB5",
+                primaryDark: "#5A3870",
+                accentOrange: "#E68C55",
+                accentOrangeLight: "#F2B99C",
+                accentGreen: "#4B9A84",
+                accentGreenLight: "#7DC4B1",
+                accentPink: "#CF729C",
+                backgroundPrimary: "#F8F5FA",
+                backgroundSecondary: "#FEFDFE",
+                backgroundTertiary: "#EFEAF4",
+                textPrimary: "#291F2F",
+                textSecondary: "#605068",
+                textTertiary: "#8C7B94",
+                taskRegular: "#4B7C95",
+                taskRegularBg: "#E0EFF5",
+                taskDDL: "#C36154",
+                taskDDLBg: "#F8E6E3",
+                taskLeisure: "#9162CC",
+                taskLeisureBg: "#F2EBFC"
+            )
+        case .graphite:
+            return WeekThemePalette(
+                primary: "#444A52",
+                primaryLight: "#6B727A",
+                primaryDark: "#2B3036",
+                accentOrange: "#D48B4C",
+                accentOrangeLight: "#E8B78C",
+                accentGreen: "#449277",
+                accentGreenLight: "#77BB9F",
+                accentPink: "#C56877",
+                backgroundPrimary: "#F5F6F8",
+                backgroundSecondary: "#FFFFFF",
+                backgroundTertiary: "#EBECEF",
+                textPrimary: "#1C1F22",
+                textSecondary: "#565D65",
+                textTertiary: "#828991",
+                taskRegular: "#4A7885",
+                taskRegularBg: "#E2F0F4",
+                taskDDL: "#C55B51",
+                taskDDLBg: "#F7E6E5",
+                taskLeisure: "#7A6CB8",
+                taskLeisureBg: "#EDEAF6"
             )
         }
     }
