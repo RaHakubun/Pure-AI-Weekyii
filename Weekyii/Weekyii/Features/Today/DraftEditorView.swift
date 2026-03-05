@@ -5,6 +5,7 @@ struct DraftEditorView: View {
     let viewModel: TodayViewModel
     let onAddTask: () -> Void
     let onEditTask: (TaskItem) -> Void
+    let onPostponeTask: (TaskItem) -> Void
 
     @State private var errorMessage: String?
     @State private var editMode: EditMode = .inactive
@@ -92,6 +93,11 @@ struct DraftEditorView: View {
             }
             .buttonStyle(.plain)
             .disabled(!(day.status == .draft || day.status == .empty))
+            .contextMenu {
+                Button("后移任务", systemImage: "calendar.badge.clock") {
+                    onPostponeTask(task)
+                }
+            }
         }
         .padding(.vertical, 2)
     }

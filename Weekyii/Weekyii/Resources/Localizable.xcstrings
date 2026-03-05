@@ -44,6 +44,9 @@
     "%lld%%" : {
 
     },
+    "+%lld天" : {
+
+    },
     "~" : {
 
     },
@@ -421,6 +424,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "创建失败，请重试。"
+          }
+        }
+      }
+    },
+    "error.task_not_found" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Task not found."
           }
         }
       }
@@ -1329,6 +1343,73 @@
         }
       }
     },
+    "pending.timeline.empty_hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start adding tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始添加任务"
+          }
+        }
+      }
+    },
+    "pending.timeline.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Week Schedule"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本周日程"
+          }
+        }
+      }
+    },
+    "pending.timeline.view_all" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View all %d tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部 %d 个任务"
+          }
+        }
+      }
+    },
+    "pending.timeline.view_day" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看详情"
+          }
+        }
+      }
+    },
     "pending.title" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1412,6 +1493,7 @@
       }
     },
     "pending.week.draft_tasks_count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4320,7 +4402,16 @@
     "今日已过期" : {
 
     },
+    "今日思想钢印" : {
+
+    },
+    "任务后移" : {
+
+    },
     "你可以选择同步今日，或只让新默认值从明日开始生效。" : {
+
+    },
+    "创建并移动" : {
 
     },
     "取消更改" : {
@@ -4332,7 +4423,22 @@
     "同步至今日及以后" : {
 
     },
+    "后移" : {
+
+    },
+    "后移 %lld 天" : {
+
+    },
+    "后移任务" : {
+
+    },
+    "后移方式" : {
+
+    },
     "固定时刻提醒" : {
+
+    },
+    "将移动到" : {
 
     },
     "应用新的默认截止时间" : {
@@ -4344,7 +4450,13 @@
     "开始任务流风险提示" : {
 
     },
-    "开始你的一天吧！" : {
+    "当前仅可选择 23:59，请使用时间选择器确认。" : {
+
+    },
+    "快捷选择" : {
+
+    },
+    "思想钢印内容" : {
 
     },
     "手动输入" : {
@@ -4362,6 +4474,9 @@
     "新截止时间会导致今日任务立即过期" : {
 
     },
+    "明天" : {
+
+    },
     "是否开始今日任务流？" : {
 
     },
@@ -4377,7 +4492,19 @@
     "点击任务可编辑；进入编辑模式后可删除并拖拽排序。" : {
 
     },
+    "目标周尚未创建" : {
+
+    },
+    "目标日期" : {
+
+    },
     "确认" : {
+
+    },
+    "确认后移" : {
+
+    },
+    "确认后移任务" : {
 
     },
     "给自己一个清晰而坚定的开始。" : {

@@ -10,12 +10,27 @@ final class TodayViewModel {
         case immediateExpire(expiredCount: Int)
     }
 
+    struct PostponePreview {
+        let taskID: UUID
+        let taskTitle: String
+        let targetDate: Date
+        let targetDayId: String
+        let targetWeekId: String
+        let requiresWeekCreation: Bool
+    }
+
+    struct PostponeResult {
+        let targetDate: Date
+        let createdWeek: Bool
+    }
+
     private let modelContext: ModelContext
     private let timeProvider: TimeProviding
     private let notificationService: any NotificationScheduling
     private let appState: any AppStateStore
     private let userSettings: UserSettings
     private let randomMindStampProvider: () -> MindStampItem?
+    private let taskPostponeService: TaskPostponeService
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -35,6 +50,7 @@ final class TodayViewModel {
         self.notificationService = notificationService
         self.appState = appState
         self.userSettings = userSettings
+        self.taskPostponeService = TaskPostponeService(modelContext: modelContext)
         self.randomMindStampProvider = randomMindStampProvider ?? {
             let descriptor = FetchDescriptor<MindStampItem>()
             let stamps = (try? modelContext.fetch(descriptor)) ?? []
@@ -241,6 +257,45 @@ final class TodayViewModel {
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
+    }
+
+    func previewPostpone(taskID: UUID, taskTitle: String, targetDate: Date) throws -> PostponePreview {
+        let preview = try taskPostponeService.preview(taskID: taskID, targetDate: targetDate, today: timeProvider.today)
+        return PostponePreview(
+            taskID: preview.taskID,
+            taskTitle: taskTitle,
+            targetDate: preview.targetDate,
+            targetDayId: preview.targetDayId,
+            targetWeekId: preview.targetWeekId,
+            requiresWeekCreation: preview.requiresWeekCreation
+        )
+    }
+
+    func commitPostpone(_ preview: PostponePreview, allowWeekCreation: Bool) throws -> PostponeResult {
+        let internalPreview = TaskPostponeService.Preview(
+            taskID: preview.taskID,
+            targetDate: preview.targetDate,
+            targetDayId: preview.targetDayId,
+            targetWeekId: preview.targetWeekId,
+            requiresWeekCreation: preview.requiresWeekCreation
+        )
+        let execution = try taskPostponeService.execute(
+            preview: internalPreview,
+            allowCreateWeek: allowWeekCreation,
+            today: timeProvider.today,
+            now: timeProvider.now
+        )
+
+        if let sourceDay = fetchDay(by: execution.sourceDayId) {
+            updateNotificationSchedule(for: sourceDay)
+        }
+        if let targetDay = fetchDay(by: execution.targetDayId) {
+            updateNotificationSchedule(for: targetDay)
+        }
+
+        try modelContext.save()
+        syncToday()
+        return PostponeResult(targetDate: execution.targetDate, createdWeek: execution.createdWeek)
     }
 
     private func killDate(for day: DayModel) -> Date? {

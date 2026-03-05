@@ -11,13 +11,20 @@ protocol AppStateStore: AnyObject {
     func incrementDaysStarted()
 }
 
+protocol KillTimeSettings {
+    var defaultKillTimeHour: Int { get }
+    var defaultKillTimeMinute: Int { get }
+}
+
+extension UserSettings: KillTimeSettings {}
+
 @MainActor
 struct StateMachine {
     private let modelContainer: ModelContainer
     private let timeProvider: TimeProviding
     private let notificationService: NotificationService
     private let appState: any AppStateStore
-    private let userSettings: UserSettings
+    private let userSettings: any KillTimeSettings
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -26,7 +33,7 @@ struct StateMachine {
         timeProvider: TimeProviding,
         notificationService: NotificationService,
         appState: any AppStateStore,
-        userSettings: UserSettings
+        userSettings: any KillTimeSettings
     ) {
         self.modelContainer = modelContainer
         self.timeProvider = timeProvider

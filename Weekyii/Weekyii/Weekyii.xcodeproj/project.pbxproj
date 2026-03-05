@@ -13,8 +13,10 @@
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
 		9439FA4F2F378FC3000424BF /* ChartDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA4C2F378FC3000424BF /* ChartDataModels.swift */; };
 		9439FA502F378FC3000424BF /* WeekTrendChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA4E2F378FC3000424BF /* WeekTrendChart.swift */; };
-		9439FA512F378FC3000424BF /* ContributionHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA4D2F378FC3000424BF /* ContributionHeatmap.swift */; };
-		944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E583F2F2B593A00DB2DEE /* View+Modifiers.swift */; };
+			9439FA512F378FC3000424BF /* ContributionHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA4D2F378FC3000424BF /* ContributionHeatmap.swift */; };
+			A1B2C3D42F70000100ABCD01 /* PostponeTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */; };
+			A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */; };
+			944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E583F2F2B593A00DB2DEE /* View+Modifiers.swift */; };
 		944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581E2F2B593A00DB2DEE /* DayDetailView.swift */; };
 		944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58202F2B593A00DB2DEE /* WeekViewModel.swift */; };
 		944E58572F2B593A00DB2DEE /* KillTimeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58372F2B593A00DB2DEE /* KillTimeEditor.swift */; };
@@ -115,15 +117,17 @@
 
 /* Begin PBXFileReference section */
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
-		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
-		902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachment.swift; sourceTree = "<group>"; };
-		9439FA482F378923000424BF /* PastAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastAnalyticsService.swift; sourceTree = "<group>"; };
-		9439FA492F378923000424BF /* PastStatsOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastStatsOverview.swift; sourceTree = "<group>"; };
-		9439FA4C2F378FC3000424BF /* ChartDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataModels.swift; sourceTree = "<group>"; };
-		9439FA4D2F378FC3000424BF /* ContributionHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContributionHeatmap.swift; sourceTree = "<group>"; };
-		9439FA4E2F378FC3000424BF /* WeekTrendChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTrendChart.swift; sourceTree = "<group>"; };
-		944E57CF2F2B397D00DB2DEE /* Weekyii.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Weekyii.app; sourceTree = BUILT_PRODUCTS_DIR; };
+			35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
+			8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
+			902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachment.swift; sourceTree = "<group>"; };
+			9439FA482F378923000424BF /* PastAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastAnalyticsService.swift; sourceTree = "<group>"; };
+			9439FA492F378923000424BF /* PastStatsOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastStatsOverview.swift; sourceTree = "<group>"; };
+			9439FA4C2F378FC3000424BF /* ChartDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataModels.swift; sourceTree = "<group>"; };
+			9439FA4D2F378FC3000424BF /* ContributionHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContributionHeatmap.swift; sourceTree = "<group>"; };
+			9439FA4E2F378FC3000424BF /* WeekTrendChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTrendChart.swift; sourceTree = "<group>"; };
+			A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostponeTaskSheet.swift; sourceTree = "<group>"; };
+			A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPostponeService.swift; sourceTree = "<group>"; };
+			944E57CF2F2B397D00DB2DEE /* Weekyii.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Weekyii.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		944E57DE2F2B397E00DB2DEE /* WeekyiiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeekyiiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		944E57E82F2B397E00DB2DEE /* WeekyiiUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeekyiiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		944E58092F2B593A00DB2DEE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -296,19 +300,20 @@
 			path = Pending;
 			sourceTree = "<group>";
 		};
-		944E581C2F2B593A00DB2DEE /* Today */ = {
-			isa = PBXGroup;
-			children = (
-				945022912F433AB7000D67FF /* MindStampRitualView.swift */,
-				944E58162F2B593A00DB2DEE /* CompleteZoneView.swift */,
-				944E58172F2B593A00DB2DEE /* DraftEditorView.swift */,
-				944E58182F2B593A00DB2DEE /* FocusZoneView.swift */,
-				944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */,
-				944E581A2F2B593A00DB2DEE /* TodayView.swift */,
-				944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */,
-			);
-			path = Today;
-			sourceTree = "<group>";
+			944E581C2F2B593A00DB2DEE /* Today */ = {
+				isa = PBXGroup;
+				children = (
+					945022912F433AB7000D67FF /* MindStampRitualView.swift */,
+					944E58162F2B593A00DB2DEE /* CompleteZoneView.swift */,
+					944E58172F2B593A00DB2DEE /* DraftEditorView.swift */,
+					944E58182F2B593A00DB2DEE /* FocusZoneView.swift */,
+					944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */,
+					A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */,
+					944E581A2F2B593A00DB2DEE /* TodayView.swift */,
+					944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */,
+				);
+				path = Today;
+				sourceTree = "<group>";
 		};
 		944E58212F2B593A00DB2DEE /* Week */ = {
 			isa = PBXGroup;
@@ -376,16 +381,17 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		944E58352F2B593A00DB2DEE /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
-				944E58322F2B593A00DB2DEE /* StateMachine.swift */,
-				944E58332F2B593A00DB2DEE /* TimeProvider.swift */,
-				944E58342F2B593A00DB2DEE /* WeekCalculator.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
+			944E58352F2B593A00DB2DEE /* Services */ = {
+				isa = PBXGroup;
+				children = (
+					944E58312F2B593A00DB2DEE /* NotificationService.swift */,
+					944E58322F2B593A00DB2DEE /* StateMachine.swift */,
+					A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */,
+					944E58332F2B593A00DB2DEE /* TimeProvider.swift */,
+					944E58342F2B593A00DB2DEE /* WeekCalculator.swift */,
+				);
+				path = Services;
+				sourceTree = "<group>";
 		};
 		944E583A2F2B593A00DB2DEE /* Components */ = {
 			isa = PBXGroup;
@@ -666,9 +672,11 @@
 				944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */,
 				944E58692F2B593A00DB2DEE /* PendingView.swift in Sources */,
 				9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */,
-				944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */,
-				944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,
-				944E586C2F2B593A00DB2DEE /* Array+Move.swift in Sources */,
+					944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */,
+					A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */,
+					944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,
+					A1B2C3D42F70000100ABCD01 /* PostponeTaskSheet.swift in Sources */,
+					944E586C2F2B593A00DB2DEE /* Array+Move.swift in Sources */,
 				945022922F433AB7000D67FF /* MindStampRitualView.swift in Sources */,
 				944E586D2F2B593A00DB2DEE /* Date+Weekyii.swift in Sources */,
 				9439FA4F2F378FC3000424BF /* ChartDataModels.swift in Sources */,

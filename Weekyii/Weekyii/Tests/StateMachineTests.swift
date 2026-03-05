@@ -4,6 +4,8 @@ import SwiftData
 
 final class StateMachineTests: XCTestCase {
     private var container: ModelContainer!
+    private static let sharedViewModelSettings = UserSettings()
+    private static var retainedTodayViewModels: [TodayViewModel] = []
 
     private final class TestAppState: AppStateStore {
         var systemStartDate: Date?
@@ -25,6 +27,11 @@ final class StateMachineTests: XCTestCase {
     private struct TestNotificationService: NotificationScheduling {
         func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
         func cancelKillTimeNotification(for day: DayModel) {}
+    }
+
+    private struct TestSettings: KillTimeSettings {
+        var defaultKillTimeHour: Int = 23
+        var defaultKillTimeMinute: Int = 45
     }
 
     private static func makeContainer() throws -> ModelContainer {
@@ -56,6 +63,14 @@ final class StateMachineTests: XCTestCase {
         TestAppState()
     }
 
+    private func makeSettings(hour: Int = 23, minute: Int = 45) -> TestSettings {
+        TestSettings(defaultKillTimeHour: hour, defaultKillTimeMinute: minute)
+    }
+
+    private static func retainTodayViewModelForTestLifetime(_ viewModel: TodayViewModel) {
+        retainedTodayViewModels.append(viewModel)
+    }
+
     @MainActor
     func test_crossDay_executeToExpired() throws {
         let context = container.mainContext
@@ -73,13 +88,25 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: Date())
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
         appState.lastProcessedDate = calendar.startOfDay(for: yesterday)
 
         machine.processStateTransitions()
 
         XCTAssertEqual(day.status, .expired)
         XCTAssertEqual(day.expiredCount, 2)
+    }
+
+    @MainActor
+    func test_stateMachineLifecycle_withoutRun() {
+        let _ = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: Date()),
+            notificationService: .shared,
+            appState: makeAppState(),
+            userSettings: makeSettings()
+        )
+        XCTAssertTrue(true)
     }
 
     @MainActor
@@ -97,7 +124,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: Date())
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
         appState.lastProcessedDate = calendar.startOfDay(for: yesterday)
 
         machine.processStateTransitions()
@@ -118,7 +145,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: Date())
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
 
         machine.processStateTransitions()
 
@@ -140,7 +167,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: today)
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
 
         machine.processStateTransitions()
 
@@ -159,7 +186,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: today)
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
 
         machine.processStateTransitions()
 
@@ -186,7 +213,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: Date())
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
         appState.lastProcessedDate = today
 
         machine.processStateTransitions()
@@ -211,7 +238,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: Date())
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
         appState.lastProcessedDate = today
 
         machine.processStateTransitions()
@@ -243,7 +270,7 @@ final class StateMachineTests: XCTestCase {
         try context.save()
 
         let mockTime = MockTimeProvider(mockDate: today)
-        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: UserSettings())
+        let machine = StateMachine(modelContainer: container, timeProvider: mockTime, notificationService: .shared, appState: appState, userSettings: makeSettings())
 
         machine.processStateTransitions()
 
@@ -268,7 +295,7 @@ final class StateMachineTests: XCTestCase {
         day.followsDefaultKillTime = true
         try context.save()
 
-        let settings = UserSettings()
+        let settings = Self.sharedViewModelSettings
         settings.defaultKillTimeHour = 23
         settings.defaultKillTimeMinute = 45
 
@@ -279,6 +306,7 @@ final class StateMachineTests: XCTestCase {
             appState: makeAppState(),
             userSettings: settings
         )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
         viewModel.refresh()
 
         XCTAssertEqual(day.killTimeHour, 20)
@@ -301,7 +329,7 @@ final class StateMachineTests: XCTestCase {
         day.followsDefaultKillTime = false
         try context.save()
 
-        let settings = UserSettings()
+        let settings = Self.sharedViewModelSettings
         settings.defaultKillTimeHour = 23
         settings.defaultKillTimeMinute = 45
 
@@ -312,6 +340,7 @@ final class StateMachineTests: XCTestCase {
             appState: makeAppState(),
             userSettings: settings
         )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
         viewModel.refresh()
 
         XCTAssertEqual(day.killTimeHour, 21)
@@ -339,9 +368,7 @@ final class StateMachineTests: XCTestCase {
         day.followsDefaultKillTime = false
         try context.save()
 
-        let settings = UserSettings()
-        settings.defaultKillTimeHour = 23
-        settings.defaultKillTimeMinute = 59
+        let settings = makeSettings(hour: 23, minute: 59)
         appState.lastProcessedDate = yesterday
 
         let machine = StateMachine(
@@ -380,9 +407,7 @@ final class StateMachineTests: XCTestCase {
         day.followsDefaultKillTime = false
         try context.save()
 
-        let settings = UserSettings()
-        settings.defaultKillTimeHour = 23
-        settings.defaultKillTimeMinute = 59
+        let settings = makeSettings(hour: 23, minute: 59)
         appState.lastProcessedDate = yesterday
 
         let machine = StateMachine(

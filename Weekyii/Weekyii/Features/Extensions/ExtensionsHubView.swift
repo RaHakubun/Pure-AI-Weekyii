@@ -83,6 +83,7 @@ private struct ProjectsModulePreview: View {
             subtitle: String(localized: "extensions.module.projects.subtitle"),
             icon: "folder.fill",
             iconColor: .weekyiiPrimary,
+            seeAllAccessibilityID: "extensionsProjectsSeeAllButton",
             destination: {
                 ProjectsFullView(viewModel: viewModel)
             }
@@ -202,6 +203,7 @@ private struct MindStampsModulePreview: View {
             subtitle: String(localized: "extensions.module.mindstamps.subtitle"),
             icon: "seal.fill",
             iconColor: .accentPink,
+            seeAllAccessibilityID: "extensionsMindStampsSeeAllButton",
             destination: {
                 MindStampsFullView(viewModel: viewModel)
             }
@@ -306,6 +308,7 @@ private struct ModuleContainer<Content: View, Destination: View>: View {
     let subtitle: String
     let icon: String
     let iconColor: Color
+    let seeAllAccessibilityID: String?
     @ViewBuilder let destination: () -> Destination
     @ViewBuilder let content: () -> Content
 
@@ -331,6 +334,7 @@ private struct ModuleContainer<Content: View, Destination: View>: View {
                     }
                     .foregroundColor(.weekyiiPrimary)
                 }
+                .accessibilityIdentifier(seeAllAccessibilityID ?? "")
             }
 
             Text(subtitle)
@@ -380,24 +384,27 @@ private struct ProjectsFullView: View {
                     }
                 }
 
-                Button {
-                    showingCreateSheet = true
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 14))
-                        Text(String(localized: "project.add"))
-                            .font(.system(size: 14, weight: .semibold))
+                if shouldShowFooterCreateButton {
+                    Button {
+                        showingCreateSheet = true
+                    } label: {
+                        HStack(spacing: WeekSpacing.xs) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text(String(localized: "project.add"))
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, WeekSpacing.xl)
+                        .padding(.vertical, WeekSpacing.md)
+                        .background(Color.weekyiiGradient)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.xl)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(Color.weekyiiGradient)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .accessibilityIdentifier("projectsFooterCreateButton")
+                    .buttonStyle(ScaleButtonStyle())
+                    .padding(.bottom, WeekSpacing.lg)
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.bottom, WeekSpacing.lg)
             }
             .padding(.horizontal, WeekSpacing.base)
             .padding(.top, WeekSpacing.sm)
@@ -437,6 +444,10 @@ private struct ProjectsFullView: View {
         ]
     }
 
+    private var shouldShowFooterCreateButton: Bool {
+        !viewModel.projects.isEmpty
+    }
+
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
@@ -471,6 +482,7 @@ private struct ProjectsFullView: View {
                     .clipShape(Capsule())
                     .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
+                .accessibilityIdentifier("projectsEmptyCreateButton")
                 .buttonStyle(ScaleButtonStyle())
             }
             .frame(maxWidth: .infinity)
@@ -498,24 +510,27 @@ private struct MindStampsFullView: View {
                     MindStampListView(viewModel: viewModel)
                 }
 
-                Button {
-                    showingEditor = true
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 14))
-                        Text(String(localized: "mindstamp.add"))
-                            .font(.system(size: 14, weight: .semibold))
+                if shouldShowFooterCreateButton {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        HStack(spacing: WeekSpacing.xs) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text(String(localized: "mindstamp.add"))
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, WeekSpacing.xl)
+                        .padding(.vertical, WeekSpacing.md)
+                        .background(Color.accentPink)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.accentPink.opacity(0.3), radius: 6, x: 0, y: 3)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.xl)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(Color.accentPink)
-                    .clipShape(Capsule())
-                    .shadow(color: Color.accentPink.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .accessibilityIdentifier("mindstampsFooterCreateButton")
+                    .buttonStyle(ScaleButtonStyle())
+                    .padding(.bottom, WeekSpacing.lg)
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.bottom, WeekSpacing.lg)
             }
             .padding(.horizontal, WeekSpacing.base)
             .padding(.top, WeekSpacing.sm)
@@ -529,6 +544,10 @@ private struct MindStampsFullView: View {
         }) {
             MindStampEditorSheet(viewModel: viewModel)
         }
+    }
+
+    private var shouldShowFooterCreateButton: Bool {
+        !viewModel.stamps.isEmpty
     }
 
     private var emptyState: some View {
@@ -565,6 +584,7 @@ private struct MindStampsFullView: View {
                     .clipShape(Capsule())
                     .shadow(color: Color.accentPink.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
+                .accessibilityIdentifier("mindstampsEmptyCreateButton")
                 .buttonStyle(ScaleButtonStyle())
             }
             .frame(maxWidth: .infinity)
