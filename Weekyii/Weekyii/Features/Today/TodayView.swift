@@ -6,19 +6,77 @@ private enum TodaySection: Int {
     case week
 }
 
+private enum DraftTaskEditorMode: Identifiable {
+    case create
+    case edit(TaskItem)
+
+    var id: String {
+        switch self {
+        case .create:
+            return "create"
+        case .edit(let task):
+            return "edit-\(task.id.uuidString)"
+        }
+    }
+}
+
+enum TodayStartFlowStep: Equatable {
+    case warning
+    case ritual
+}
+
+struct TodayStartFlowCoordinator {
+    var isPresented = false
+    var step: TodayStartFlowStep = .warning
+
+    mutating func present() {
+        isPresented = true
+        step = .warning
+    }
+
+    mutating func chooseDirectEnter() {
+        step = .ritual
+    }
+
+    mutating func cancel() {
+        isPresented = false
+        step = .warning
+    }
+}
+
+private struct PendingPostponeRequest {
+    let taskID: UUID
+    let taskTitle: String
+    let targetDate: Date
+}
+
 struct TodayView: View {
+    private enum TodayKillTimeConfirmMode {
+        case normal
+        case immediateExpire(expiredCount: Int)
+    }
+    private let floatingStartOverlayReserveHeight: CGFloat = 120
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
 
     @State private var viewModel: TodayViewModel?
-    @State private var showingTaskCreator = false
     @State private var selectedTaskForDetail: TaskItem?
+    @State private var draftTaskEditorMode: DraftTaskEditorMode?
     @State private var errorMessage: String?
-    @State private var ritualStamp: MindStampItem?
-    @GestureState private var isInteractingWithKillTime = false
+    @State private var startFlowCoordinator = TodayStartFlowCoordinator()
+    @State private var startFlowStamp: MindStampItem?
+    @State private var pendingTodayKillTimeHour: Int?
+    @State private var pendingTodayKillTimeMinute: Int?
+    @State private var showingTodayKillTimeConfirm = false
+    @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
     @State private var selectedSection: TodaySection = .today
+    @State private var taskForPostpone: TaskItem?
+    @State private var pendingPostponeRequest: PendingPostponeRequest?
+    @State private var pendingPostponePreview: TodayViewModel.PostponePreview?
+    @State private var showingPostponeConfirm = false
+    @State private var showingPostponeWeekCreationConfirm = false
     
 
     var body: some View {
@@ -68,6 +126,12 @@ struct TodayView: View {
             viewModel?.refresh()
             viewModel?.seedDraftTasksForUITestsIfNeeded()
         }
+        .onChange(of: userSettings.defaultKillTimeHour) { _, _ in
+            viewModel?.refresh()
+        }
+        .onChange(of: userSettings.defaultKillTimeMinute) { _, _ in
+            viewModel?.refresh()
+        }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue {
                 errorMessage = newValue
@@ -85,29 +149,54 @@ struct TodayView: View {
                 onSave: { _, _, _, _, _ in }
             )
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { ritualStamp != nil },
-                set: { if !$0 { ritualStamp = nil } }
-            )
-        ) {
-            if let stamp = ritualStamp {
-                MindStampRitualView(stamp: stamp) {
-                    ritualStamp = nil
-                }
+        .sheet(item: $draftTaskEditorMode) { mode in
+            draftTaskEditorSheet(mode: mode)
+        }
+        .sheet(isPresented: $startFlowCoordinator.isPresented) {
+            if let viewModel {
+                startFlowSheet(viewModel: viewModel)
+                    .presentationDetents([.fraction(0.5), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Color.backgroundPrimary)
             }
+        }
+        .sheet(item: $taskForPostpone) { task in
+            PostponeTaskSheet(taskTitle: task.title) { targetDate in
+                stagePostponeRequest(for: task, targetDate: targetDate)
+            }
+        }
+        .alert("确认后移任务", isPresented: $showingPostponeConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                clearPendingPostponeContext()
+            }
+            Button("确认后移") {
+                guard let viewModel else { return }
+                confirmPostponeRequest(viewModel: viewModel)
+            }
+        } message: {
+            Text(postponeConfirmMessage)
+        }
+        .alert("目标周尚未创建", isPresented: $showingPostponeWeekCreationConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                clearPendingPostponeContext()
+            }
+            Button("创建并移动", role: .destructive) {
+                guard let viewModel else { return }
+                confirmPostponeWithWeekCreation(viewModel: viewModel)
+            }
+        } message: {
+            Text(postponeCreateWeekConfirmMessage)
         }
     }
 
     @ViewBuilder
     private func content(for day: DayModel, viewModel: TodayViewModel) -> some View {
-        TodayWeekSwitcher(
-            selectedSection: $selectedSection,
-            isPagingEnabled: !isInteractingWithKillTime,
-            todayContent: { todayContent(day: day, viewModel: viewModel) },
-            weekContent: { WeekOverviewContentView() }
-        )
-        .background(Color.backgroundPrimary)
+        TodayWeekSwitcher(selectedSection: $selectedSection, isPagingEnabled: false) {
+            todayContent(day: day, viewModel: viewModel)
+        } weekContent: {
+            WeekOverviewContentView()
+        }
+            .background(Color.backgroundPrimary)
     }
 
     private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
@@ -123,6 +212,12 @@ struct TodayView: View {
                 killTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
+            .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
+        }
+        .overlay(alignment: .bottom) {
+            if shouldShowFloatingStartButton(for: day) {
+                floatingStartButtonOverlay
+            }
         }
     }
 
@@ -185,6 +280,10 @@ struct TodayView: View {
 
     @ViewBuilder
     private func killTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
+        let displayedHour = pendingTodayKillTimeHour ?? day.killTimeHour
+        let displayedMinute = pendingTodayKillTimeMinute ?? day.killTimeMinute
+        let hasPendingChange = displayedHour != day.killTimeHour || displayedMinute != day.killTimeMinute
+
         WeekCard(accentColor: .accentOrange) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
@@ -196,25 +295,53 @@ struct TodayView: View {
                 }
                 
                 KillTimeEditor(
-                    hour: day.killTimeHour,
-                    minute: day.killTimeMinute,
+                    hour: displayedHour,
+                    minute: displayedMinute,
                     isEditable: day.status == .draft || day.status == .execute,
                     onChange: { hour, minute in
-                        do {
-                            try viewModel.changeKillTime(hour: hour, minute: minute)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
+                        pendingTodayKillTimeHour = hour
+                        pendingTodayKillTimeMinute = minute
                     }
                 )
+
+                if day.status == .draft || day.status == .execute, hasPendingChange {
+                    HStack(spacing: WeekSpacing.sm) {
+                        WeekButton("取消", style: .outline) {
+                            pendingTodayKillTimeHour = nil
+                            pendingTodayKillTimeMinute = nil
+                        }
+                        Spacer(minLength: 0)
+                        WeekButton("确认修改", style: .primary) {
+                            guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+                            do {
+                                let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
+                                switch impact {
+                                case .normal:
+                                    todayKillTimeConfirmMode = .normal
+                                case .immediateExpire(let expiredCount):
+                                    todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
+                                }
+                                showingTodayKillTimeConfirm = true
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isInteractingWithKillTime) { _, state, _ in
-                    state = true
-                }
-        )
+        .alert(
+            todayKillTimeConfirmTitle,
+            isPresented: $showingTodayKillTimeConfirm
+        ) {
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+            Button("确认") {
+                applyPendingTodayKillTime(viewModel: viewModel)
+            }
+        } message: {
+            Text(todayKillTimeConfirmMessage)
+        }
     }
     
     // MARK: - Empty State
@@ -243,22 +370,7 @@ struct TodayView: View {
         }
         
         WeekButton(String(localized: "action.create"), icon: "plus.circle.fill", style: .primary) {
-            showingTaskCreator = true
-        }
-        .sheet(isPresented: $showingTaskCreator, onDismiss: {
-            viewModel.refresh()
-        }) {
-            TaskEditorSheet(
-                title: String(localized: "draft.add_title"),
-                onSave: { title, description, type, steps, attachments in
-                    do {
-                        try viewModel.addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
-                        showingTaskCreator = false
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
+            draftTaskEditorMode = .create
         }
     }
     
@@ -268,20 +380,19 @@ struct TodayView: View {
     private func draftStateContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                DraftEditorView(day: day, viewModel: viewModel)
-            }
-        }
-        
-        WeekButton(
-            String(localized: "action.start"),
-            icon: "play.circle.fill",
-            style: .primary,
-            isEnabled: !day.sortedDraftTasks.isEmpty
-        ) {
-            do {
-                ritualStamp = try viewModel.startDay()
-            } catch {
-                errorMessage = error.localizedDescription
+                DraftEditorView(
+                    day: day,
+                    viewModel: viewModel,
+                    onAddTask: {
+                        draftTaskEditorMode = .create
+                    },
+                    onEditTask: { task in
+                        draftTaskEditorMode = .edit(task)
+                    },
+                    onPostponeTask: { task in
+                        taskForPostpone = task
+                    }
+                )
             }
         }
     }
@@ -322,6 +433,21 @@ struct TodayView: View {
                         
                         Spacer()
                         
+                        Button {
+                            taskForPostpone = focusTask
+                        } label: {
+                            HStack(spacing: WeekSpacing.xs) {
+                                Image(systemName: "calendar.badge.clock")
+                                Text("后移")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .padding(.vertical, WeekSpacing.xs)
+                            .padding(.horizontal, WeekSpacing.sm)
+                        }
+                        .foregroundColor(.white)
+                        .background(.white.opacity(0.2), in: Capsule())
+                        .buttonStyle(.plain)
+
                         Button {
                             do {
                                 try viewModel.doneFocus()
@@ -366,6 +492,8 @@ struct TodayView: View {
                     
                     FrozenZoneView(tasks: day.frozenTasks, onTapTask: { task in
                         selectedTaskForDetail = task
+                    }, onPostponeTask: { task in
+                        taskForPostpone = task
                     })
                 }
             }
@@ -516,6 +644,94 @@ struct TodayView: View {
         }
         .padding(WeekSpacing.base)
     }
+
+    private func shouldShowFloatingStartButton(for day: DayModel) -> Bool {
+        day.status == .draft && !day.sortedDraftTasks.isEmpty
+    }
+
+    @ViewBuilder
+    private var floatingStartButtonOverlay: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [
+                    Color.backgroundPrimary.opacity(0),
+                    Color.backgroundPrimary
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 32)
+            .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                WeekButton(
+                    "准备开始",
+                    icon: "play.circle.fill",
+                    style: .primary
+                ) {
+                    startFlowCoordinator.present()
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("todayFloatingStartButton")
+            }
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.top, WeekSpacing.sm)
+            .padding(.bottom, WeekSpacing.sm)
+            .background(Color.backgroundPrimary)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    @ViewBuilder
+    private func draftTaskEditorSheet(mode: DraftTaskEditorMode) -> some View {
+        switch mode {
+        case .create:
+            TaskEditorSheet(
+                title: String(localized: "draft.add_title"),
+                initialType: userSettings.defaultTaskType,
+                onSave: { title, description, type, steps, attachments in
+                    guard let viewModel else { return }
+                    do {
+                        try viewModel.addTask(
+                            title: title,
+                            description: description,
+                            type: type,
+                            steps: steps,
+                            attachments: attachments
+                        )
+                        draftTaskEditorMode = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            )
+        case .edit(let task):
+            TaskEditorSheet(
+                title: String(localized: "draft.edit_title"),
+                initialTitle: task.title,
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments,
+                onSave: { title, description, type, steps, attachments in
+                    guard let viewModel else { return }
+                    do {
+                        try viewModel.updateTask(
+                            task,
+                            title: title,
+                            description: description,
+                            type: type,
+                            steps: steps,
+                            attachments: attachments
+                        )
+                        draftTaskEditorMode = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            )
+        }
+    }
     
     private func formatDate(_ dayId: String) -> String {
         let formatter = DateFormatter()
@@ -531,6 +747,255 @@ struct TodayView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    private var postponeConfirmMessage: String {
+        guard let request = pendingPostponeRequest else { return "确认后移该任务？" }
+        return "确认将「\(request.taskTitle)」后移到 \(formatPostponeDate(request.targetDate)) 吗？"
+    }
+
+    private var postponeCreateWeekConfirmMessage: String {
+        guard let preview = pendingPostponePreview else {
+            return "目标周尚未创建，确认后会自动创建并完成任务后移。"
+        }
+        return "将创建 \(preview.targetWeekId) 后把任务移动到 \(formatPostponeDate(preview.targetDate))。是否继续？"
+    }
+
+    private func stagePostponeRequest(for task: TaskItem, targetDate: Date) {
+        taskForPostpone = nil
+        pendingPostponeRequest = PendingPostponeRequest(
+            taskID: task.id,
+            taskTitle: task.title,
+            targetDate: targetDate.startOfDay
+        )
+        showingPostponeConfirm = true
+    }
+
+    private func confirmPostponeRequest(viewModel: TodayViewModel) {
+        guard let request = pendingPostponeRequest else { return }
+        do {
+            let preview = try viewModel.previewPostpone(
+                taskID: request.taskID,
+                taskTitle: request.taskTitle,
+                targetDate: request.targetDate
+            )
+            pendingPostponePreview = preview
+            if preview.requiresWeekCreation {
+                showingPostponeWeekCreationConfirm = true
+            } else {
+                _ = try viewModel.commitPostpone(preview, allowWeekCreation: false)
+                clearPendingPostponeContext()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            clearPendingPostponeContext()
+        }
+    }
+
+    private func confirmPostponeWithWeekCreation(viewModel: TodayViewModel) {
+        guard let preview = pendingPostponePreview else { return }
+        do {
+            _ = try viewModel.commitPostpone(preview, allowWeekCreation: true)
+            clearPendingPostponeContext()
+        } catch {
+            errorMessage = error.localizedDescription
+            clearPendingPostponeContext()
+        }
+    }
+
+    private func clearPendingPostponeContext() {
+        showingPostponeConfirm = false
+        showingPostponeWeekCreationConfirm = false
+        taskForPostpone = nil
+        pendingPostponeRequest = nil
+        pendingPostponePreview = nil
+    }
+
+    private func formatPostponeDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private var todayKillTimeConfirmTitle: String {
+        switch todayKillTimeConfirmMode {
+        case .normal:
+            return "确认修改截止时间"
+        case .immediateExpire:
+            return "新时间会导致今日任务立即过期"
+        }
+    }
+
+    private var todayKillTimeConfirmMessage: String {
+        switch todayKillTimeConfirmMode {
+        case .normal:
+            return "确认后将更新今日截止时间。"
+        case .immediateExpire(let expiredCount):
+            return "确认后今日未完成内容将立即过期（\(expiredCount) 项）。"
+        }
+    }
+
+    private func applyPendingTodayKillTime(viewModel: TodayViewModel) {
+        guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+        do {
+            switch todayKillTimeConfirmMode {
+            case .normal:
+                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: false)
+            case .immediateExpire:
+                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: true)
+            }
+            pendingTodayKillTimeHour = nil
+            pendingTodayKillTimeMinute = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func startFlowSheet(viewModel: TodayViewModel) -> some View {
+        let day = viewModel.today
+        let draftCount = day?.sortedDraftTasks.count ?? 0
+        let killTimeHour = day?.killTimeHour ?? 20
+        let killTimeMinute = day?.killTimeMinute ?? 0
+
+        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+            if startFlowCoordinator.step == .warning {
+                HStack(alignment: .top, spacing: WeekSpacing.md) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.weekyiiPrimary.opacity(0.12))
+                            .frame(width: 42, height: 42)
+                        Image(systemName: "play.circle.fill")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(Color.weekyiiGradient)
+                    }
+
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text("是否开始今日任务流？")
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.textPrimary)
+
+                        Text("进入后将按任务顺序推进，直到完成或截止。")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("开始任务流头部信息")
+                .accessibilityIdentifier("startFlowSheetHeader")
+
+                HStack(spacing: WeekSpacing.sm) {
+                    startFlowSummaryItem(
+                        icon: "checklist",
+                        title: "草稿任务",
+                        value: "\(draftCount) 项"
+                    )
+                    startFlowSummaryItem(
+                        icon: "clock.fill",
+                        title: "截止时间",
+                        value: String(format: "%02d:%02d", killTimeHour, killTimeMinute)
+                    )
+                }
+
+                HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.bodyLarge)
+                        .foregroundColor(.accentOrange)
+
+                    Text("同意后无法撤回，需要在截止时间前完成，未完成项将被过期遗忘。")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(WeekSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                        .fill(Color.accentOrangeLight.opacity(0.14))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                        .stroke(Color.accentOrange.opacity(0.25), lineWidth: 1)
+                )
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("开始任务流风险提示")
+                .accessibilityIdentifier("startFlowWarningCard")
+
+                HStack(spacing: WeekSpacing.sm) {
+                    WeekButton("我再想想", style: .outline) {
+                        startFlowStamp = nil
+                        startFlowCoordinator.cancel()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowSecondaryButton")
+
+                    WeekButton("直接进入", style: .primary) {
+                        startFlowStamp = viewModel.pickStartRitualStamp()
+                        startFlowCoordinator.chooseDirectEnter()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowPrimaryButton")
+                }
+            } else {
+                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                    Text("今日思想钢印")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.textSecondary)
+
+                    if let quote = startFlowStamp?.text, quote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                        Text("“\(quote)”")
+                            .font(.bodyLarge.weight(.medium))
+                            .foregroundColor(.textPrimary)
+                            .multilineTextAlignment(.leading)
+                    } else {
+                        Text("给自己一个清晰而坚定的开始。")
+                            .font(.bodyLarge.weight(.medium))
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+                .padding(WeekSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.backgroundTertiary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("思想钢印内容")
+                .accessibilityIdentifier("startFlowRitualCard")
+
+                WeekButton("确认开始", style: .primary) {
+                    do {
+                        try viewModel.startDay()
+                        startFlowStamp = nil
+                        startFlowCoordinator.cancel()
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("startFlowPrimaryButton")
+            }
+        }
+        .padding(WeekSpacing.base)
+        .background(Color.backgroundPrimary)
+    }
+
+    private func startFlowSummaryItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Image(systemName: icon)
+                .font(.bodyMedium.weight(.semibold))
+                .foregroundStyle(Color.weekyiiGradient)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                Text(value)
+                    .font(.bodyLarge.weight(.semibold))
+                    .foregroundColor(.textPrimary)
+            }
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
     }
     
 }

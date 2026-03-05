@@ -11,12 +11,20 @@ protocol AppStateStore: AnyObject {
     func incrementDaysStarted()
 }
 
+protocol KillTimeSettings {
+    var defaultKillTimeHour: Int { get }
+    var defaultKillTimeMinute: Int { get }
+}
+
+extension UserSettings: KillTimeSettings {}
+
 @MainActor
 struct StateMachine {
     private let modelContainer: ModelContainer
     private let timeProvider: TimeProviding
     private let notificationService: NotificationService
     private let appState: any AppStateStore
+    private let userSettings: any KillTimeSettings
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -24,12 +32,14 @@ struct StateMachine {
         modelContainer: ModelContainer,
         timeProvider: TimeProviding,
         notificationService: NotificationService,
-        appState: any AppStateStore
+        appState: any AppStateStore,
+        userSettings: any KillTimeSettings
     ) {
         self.modelContainer = modelContainer
         self.timeProvider = timeProvider
         self.notificationService = notificationService
         self.appState = appState
+        self.userSettings = userSettings
     }
 
     private var modelContext: ModelContext {
@@ -37,10 +47,12 @@ struct StateMachine {
     }
 
     func processStateTransitions() {
+        let lastProcessedBeforeRun = appState.lastProcessedDate
         ensureSystemStartDate()
         processStaleOpenDaysBeforeToday()
         processCrossDay()
         processCrossWeek()
+        syncTodayDefaultKillTimeIfNeeded(lastProcessedBeforeRun: lastProcessedBeforeRun)
         processKillTime()
         refreshWeekSummaryMetrics()
         appState.markProcessed(at: timeProvider.now)
@@ -144,6 +156,22 @@ struct StateMachine {
         }
     }
 
+    private func syncTodayDefaultKillTimeIfNeeded(lastProcessedBeforeRun: Date?) {
+        let today = timeProvider.today
+        let shouldSyncTodayDefault: Bool
+        if let lastProcessedBeforeRun {
+            shouldSyncTodayDefault = today > lastProcessedBeforeRun
+        } else {
+            shouldSyncTodayDefault = true
+        }
+        guard shouldSyncTodayDefault else { return }
+        guard let todayDay = fetchOrCreateTodayDay() else { return }
+
+        todayDay.killTimeHour = userSettings.defaultKillTimeHour
+        todayDay.killTimeMinute = userSettings.defaultKillTimeMinute
+        todayDay.followsDefaultKillTime = true
+    }
+
     private func killDate(for day: DayModel) -> Date? {
         var components = calendar.dateComponents([.year, .month, .day], from: day.date)
         components.hour = day.killTimeHour
@@ -181,6 +209,21 @@ struct StateMachine {
     private func fetchDay(by dayId: String) -> DayModel? {
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
         return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchOrCreateTodayDay() -> DayModel? {
+        let dayId = timeProvider.today.dayId
+        if let existing = fetchDay(by: dayId) {
+            return existing
+        }
+
+        guard let presentWeek = fetchWeeks(status: .present).sorted(by: { $0.startDate < $1.startDate }).first else {
+            return nil
+        }
+
+        let day = DayModel(dayId: dayId, date: timeProvider.today, status: .empty)
+        presentWeek.days.append(day)
+        return day
     }
 
     private func fetchWeeks(status: WeekStatus) -> [WeekModel] {
