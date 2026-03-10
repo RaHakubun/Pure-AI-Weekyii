@@ -10,6 +10,7 @@ final class ExtensionsViewModel {
     private let calendar = Calendar(identifier: .iso8601)
 
     var projects: [ProjectModel] = []
+    var tileSnapshotsByProjectID: [UUID: ProjectTileSnapshot] = [:]
     var errorMessage: String?
 
     init(modelContext: ModelContext) {
@@ -24,6 +25,7 @@ final class ExtensionsViewModel {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         projects = (try? modelContext.fetch(descriptor)) ?? []
+        rebuildTileSnapshots()
     }
 
     // MARK: - Create Project
@@ -54,6 +56,8 @@ final class ExtensionsViewModel {
             startDate: startDate,
             endDate: endDate
         )
+        let maxOrder = projects.map(\.tileOrder).max() ?? -1
+        project.tileOrder = maxOrder + 1
         modelContext.insert(project)
 
         do {
@@ -144,8 +148,6 @@ final class ExtensionsViewModel {
             return nil
         }
     }
-
-    // MARK: - Delete Project
 
     // MARK: - Delete Project
     
@@ -249,6 +251,33 @@ final class ExtensionsViewModel {
         projects.filter { $0.status == .completed || $0.status == .archived }
     }
 
+    func sortedProjectsForBoard() -> [ProjectModel] {
+        projects.sorted { lhs, rhs in
+            if lhs.tileOrder != rhs.tileOrder {
+                return lhs.tileOrder < rhs.tileOrder
+            }
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    func cycleTileSize(for project: ProjectModel) {
+        project.tileSize = project.tileSize.next
+        saveBoardState()
+    }
+
+    func updateTileOrder(with orderedProjectIDs: [UUID]) {
+        let mapping = Dictionary(uniqueKeysWithValues: orderedProjectIDs.enumerated().map { ($1, $0) })
+        for project in projects {
+            if let order = mapping[project.id] {
+                project.tileOrder = order
+            }
+        }
+        saveBoardState()
+    }
+
     /// 按日期分组项目任务
     func tasksByDate(for project: ProjectModel) -> [(date: Date, tasks: [TaskItem])] {
         let grouped = Dictionary(grouping: project.tasks) { task in
@@ -256,4 +285,62 @@ final class ExtensionsViewModel {
         }
         return grouped.sorted { $0.key < $1.key }.map { (date: $0.key, tasks: $0.value.sorted { $0.order < $1.order }) }
     }
+
+    private func saveBoardState() {
+        do {
+            try modelContext.save()
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func rebuildTileSnapshots() {
+        var next: [UUID: ProjectTileSnapshot] = [:]
+        let today = calendar.startOfDay(for: Date())
+        for project in projects {
+            let sortedPending = project.tasks
+                .filter { $0.zone != .complete }
+                .sorted { lhs, rhs in
+                    let lhsDate = lhs.day?.date ?? .distantFuture
+                    let rhsDate = rhs.day?.date ?? .distantFuture
+                    if lhsDate != rhsDate { return lhsDate < rhsDate }
+                    return lhs.order < rhs.order
+                }
+
+            let preferredTask = sortedPending.first(where: { task in
+                guard let date = task.day?.date else { return false }
+                return calendar.startOfDay(for: date) >= today
+            }) ?? sortedPending.first
+
+            next[project.id] = ProjectTileSnapshot(
+                projectID: project.id,
+                name: project.name,
+                icon: project.icon,
+                colorHex: project.color,
+                progress: project.progress,
+                completedCount: project.completedTaskCount,
+                totalCount: project.totalTaskCount,
+                remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
+                expiredCount: project.expiredTaskCount,
+                nextTaskTitle: preferredTask?.title,
+                nextTaskDate: preferredTask?.day?.date
+            )
+        }
+        tileSnapshotsByProjectID = next
+    }
+}
+
+struct ProjectTileSnapshot: Equatable {
+    let projectID: UUID
+    let name: String
+    let icon: String
+    let colorHex: String
+    let progress: Double
+    let completedCount: Int
+    let totalCount: Int
+    let remainingCount: Int
+    let expiredCount: Int
+    let nextTaskTitle: String?
+    let nextTaskDate: Date?
 }

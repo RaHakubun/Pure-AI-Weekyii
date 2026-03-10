@@ -101,6 +101,22 @@
         }
       }
     },
+    "action.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
     "action.done_focus" : {
       "localizations" : {
         "en" : {
@@ -113,6 +129,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成专注"
+          }
+        }
+      }
+    },
+    "action.edit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
           }
         }
       }
@@ -2538,6 +2570,22 @@
         }
       }
     },
+    "project.tiles.edit_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag tiles to reorder, delete from the top-right, resize from the bottom-right."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖拽磁贴可重排，右上角删除，右下角改尺寸"
+          }
+        }
+      }
+    },
     "settings.about.days_started" : {
       "localizations" : {
         "en" : {
@@ -4469,6 +4517,9 @@
 
     },
     "提醒时刻" : {
+
+    },
+    "数据库不可用" : {
 
     },
     "新截止时间会导致今日任务立即过期" : {

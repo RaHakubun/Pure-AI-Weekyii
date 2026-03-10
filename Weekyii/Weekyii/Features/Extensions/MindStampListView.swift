@@ -121,7 +121,9 @@ struct MindStampListView: View {
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
                         .frame(height: 160)
+                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+                        .allowsHitTesting(false)
                 }
             }
         }

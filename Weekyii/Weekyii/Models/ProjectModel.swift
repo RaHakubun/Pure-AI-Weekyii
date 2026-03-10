@@ -13,6 +13,8 @@ final class ProjectModel {
     var startDate: Date
     var endDate: Date
     var createdAt: Date
+    var tileSizeRaw: String = ProjectTileSize.medium.rawValue
+    var tileOrder: Int = 0
 
     @Relationship(deleteRule: .nullify, inverse: \TaskItem.project)
     var tasks: [TaskItem] = []
@@ -61,5 +63,10 @@ final class ProjectModel {
 
     var isAllCompleted: Bool {
         totalTaskCount > 0 && completedTaskCount == totalTaskCount
+    }
+
+    var tileSize: ProjectTileSize {
+        get { ProjectTileSize(storedValue: tileSizeRaw) ?? .medium }
+        set { tileSizeRaw = newValue.rawValue }
     }
 }

@@ -203,7 +203,7 @@ struct ExtensionsView: View {
             if let mindStampViewModel {
                 VStack(spacing: WeekSpacing.md) {
                     MindStampListView(viewModel: mindStampViewModel)
-                        .padding(.horizontal, WeekSpacing.base)
+                        .padding(.horizontal, WeekSpacing.xl)
 
                     // Add stamp button
                     Button {

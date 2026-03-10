@@ -3,6 +3,122 @@ import SwiftData
 @testable import Weekyii
 
 final class ModelTests: XCTestCase {
+    @MainActor
+    func test_persistentContainer_migratesLegacyProjectTilesStore() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let legacySchema = Schema(versionedSchema: WeekyiiSchemaV1.self)
+        let legacyConfig = ModelConfiguration("Weekyii", schema: legacySchema, url: storeURL, allowsSave: true, cloudKitDatabase: .none)
+        let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfig)
+        let legacyContext = legacyContainer.mainContext
+
+        let older = WeekyiiSchemaV1.ProjectModel(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            name: "Older",
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+        let newer = WeekyiiSchemaV1.ProjectModel(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+            name: "Newer",
+            createdAt: Date(timeIntervalSince1970: 200)
+        )
+        legacyContext.insert(older)
+        legacyContext.insert(newer)
+        try legacyContext.save()
+
+        let migratedContainer = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let descriptor = FetchDescriptor<ProjectModel>(sortBy: [SortDescriptor(\ProjectModel.tileOrder)])
+        let projects: [ProjectModel] = try migratedContainer.mainContext.fetch(descriptor)
+
+        XCTAssertEqual(projects.map(\.name), ["Newer", "Older"])
+        XCTAssertEqual(projects.map(\.tileSize), [ProjectTileSize.medium, ProjectTileSize.medium])
+        XCTAssertEqual(projects.map(\.tileOrder), [0, 1])
+    }
+
+    func test_projectTileSize_defaultIsMedium() {
+        let project = ProjectModel(name: "P", startDate: Date(), endDate: Date())
+        XCTAssertEqual(project.tileSize, .medium)
+    }
+
+    func test_projectTileOrder_defaultIsZero() {
+        let project = ProjectModel(name: "P", startDate: Date(), endDate: Date())
+        XCTAssertEqual(project.tileOrder, 0)
+    }
+
+    func test_projectTileSize_cycleOrder() {
+        XCTAssertEqual(ProjectTileSize.mini.next, .small)
+        XCTAssertEqual(ProjectTileSize.small.next, .medium)
+        XCTAssertEqual(ProjectTileSize.medium.next, .wide)
+        XCTAssertEqual(ProjectTileSize.wide.next, .mini)
+    }
+
+    func test_projectTileSize_mapsLegacyStoredValue() {
+        XCTAssertEqual(ProjectTileSize(storedValue: "small"), .small)
+        XCTAssertEqual(ProjectTileSize(storedValue: "wide"), .wide)
+        XCTAssertEqual(ProjectTileSize(storedValue: "large"), .wide)
+    }
+
+    func test_projectTilePresentation_miniEditingStaysCompact() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
+            nextTaskTitle: "下一步"
+        )
+
+        let presentation = ProjectTilePresentation(
+            snapshot: snapshot,
+            size: .mini,
+            isEditing: true,
+            liveTick: 0
+        )
+
+        XCTAssertEqual(presentation.titleLineLimit, 1)
+        XCTAssertFalse(presentation.showsStatusChip)
+        XCTAssertFalse(presentation.showsNextTaskDate)
+        XCTAssertGreaterThan(presentation.contentInsets.trailing, presentation.contentInsets.leading)
+    }
+
+    func test_projectTilePresentation_wideCyclesAcrossNextTaskAndProgress() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000011")!,
+            nextTaskTitle: "明天交付"
+        )
+
+        let first = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: false, liveTick: 0)
+        let second = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: false, liveTick: 1)
+
+        XCTAssertEqual(Set([first.livePanel, second.livePanel]), Set([.nextTask, .progress]))
+        XCTAssertTrue(first.showsStatusChip)
+    }
+
+    func test_projectTilePresentation_wideWithoutUpcomingTaskDoesNotUseTaskPanel() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000012")!,
+            nextTaskTitle: nil
+        )
+
+        let first = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: false, liveTick: 0)
+        let second = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: false, liveTick: 1)
+
+        XCTAssertEqual(Set([first.livePanel, second.livePanel]), Set([.metrics, .progress]))
+    }
+
+    func test_projectTilePresentation_mediumUsesSquareContract() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000014")!,
+            nextTaskTitle: "整理材料"
+        )
+
+        let presentation = ProjectTilePresentation(
+            snapshot: snapshot,
+            size: .medium,
+            isEditing: true,
+            liveTick: 0
+        )
+
+        XCTAssertEqual(presentation.titleLineLimit, 2)
+        XCTAssertTrue(presentation.showsStatusChip)
+        XCTAssertTrue(presentation.showsNextTaskDate)
+    }
+
     func test_taskNumberFormatting() {
         let task = TaskItem(title: "Test", order: 3)
         XCTAssertEqual(task.taskNumber, "T03")
@@ -33,6 +149,32 @@ final class ModelTests: XCTestCase {
 
         XCTAssertFalse(coordinator.isPresented)
         XCTAssertEqual(coordinator.step, .warning)
+    }
+
+    private func makeTemporaryStoreURL() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        return directory.appendingPathComponent("Weekyii.store")
+    }
+
+    private func makeTileSnapshot(projectID: UUID, nextTaskTitle: String?) -> ProjectTileSnapshot {
+        ProjectTileSnapshot(
+            projectID: projectID,
+            name: "Project",
+            icon: "folder.fill",
+            colorHex: "#C46A1A",
+            progress: 0.4,
+            completedCount: 2,
+            totalCount: 5,
+            remainingCount: 3,
+            expiredCount: 1,
+            nextTaskTitle: nextTaskTitle,
+            nextTaskDate: nextTaskTitle == nil ? nil : Date(timeIntervalSince1970: 1_762_444_800)
+        )
     }
 }
 

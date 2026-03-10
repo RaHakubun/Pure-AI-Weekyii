@@ -4,8 +4,7 @@ import Combine
 
 @main
 struct WeekyiiApp: App {
-    let modelContainer: ModelContainer
-    let startupWarning: String?
+    let launchState: WeekyiiPersistence.LaunchState
     @StateObject private var appState = AppState()
     @StateObject private var userSettings = UserSettings()
     @State private var stateMachine: StateMachine?
@@ -14,64 +13,44 @@ struct WeekyiiApp: App {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     init() {
-        let schema = Schema([
-            WeekModel.self,
-            DayModel.self,
-            TaskItem.self,
-            TaskStep.self,
-            TaskAttachment.self,
-            ProjectModel.self,
-            MindStampItem.self
-        ])
-        let storeURL = Self.persistentStoreURL()
-        let config = ModelConfiguration("Weekyii", schema: schema, url: storeURL, allowsSave: true, cloudKitDatabase: .none)
-
-        do {
-            modelContainer = try ModelContainer(for: schema, configurations: config)
-            startupWarning = nil
-        } catch {
-            let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-            do {
-                modelContainer = try ModelContainer(for: schema, configurations: memoryConfig)
-                startupWarning = "本地数据暂时不可用，已进入只保启动模式。请尽快备份并重启。"
-            } catch {
-                fatalError("Failed to initialize ModelContainer: \(error)")
-            }
-        }
+        launchState = WeekyiiPersistence.bootstrapPersistentContainer()
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
-                .environmentObject(userSettings)
-                .modelContainer(modelContainer)
-                .preferredColorScheme(.light)
-                .onAppear {
-                    guard !Self.isRunningTests else { return }
-                    initializeStateMachine()
-                    Task { await NotificationService.shared.requestAuthorization() }
-                    if let startupWarning {
-                        appState.runtimeErrorMessage = startupWarning
-                    }
-                    stateMachine?.processStateTransitions()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    guard !Self.isRunningTests else { return }
-                    if newPhase == .active {
+            switch launchState {
+            case .ready(let modelContainer):
+                ContentView()
+                    .environmentObject(appState)
+                    .environmentObject(userSettings)
+                    .modelContainer(modelContainer)
+                    .preferredColorScheme(.light)
+                    .onAppear {
+                        guard !Self.isRunningTests else { return }
+                        initializeStateMachine(modelContainer: modelContainer)
+                        Task { await NotificationService.shared.requestAuthorization() }
                         stateMachine?.processStateTransitions()
                     }
-                }
-                .onReceive(minuteTimer) { _ in
-                    guard !Self.isRunningTests else { return }
-                    if scenePhase == .active {
-                        stateMachine?.processStateTransitions()
+                    .onChange(of: scenePhase) { _, newPhase in
+                        guard !Self.isRunningTests else { return }
+                        if newPhase == .active {
+                            stateMachine?.processStateTransitions()
+                        }
                     }
-                }
+                    .onReceive(minuteTimer) { _ in
+                        guard !Self.isRunningTests else { return }
+                        if scenePhase == .active {
+                            stateMachine?.processStateTransitions()
+                        }
+                    }
+            case .failed(let message):
+                PersistenceFailureView(message: message)
+                    .preferredColorScheme(.light)
+            }
         }
     }
 
-    private func initializeStateMachine() {
+    private func initializeStateMachine(modelContainer: ModelContainer) {
         stateMachine = StateMachine(
             modelContainer: modelContainer,
             timeProvider: TimeProvider(),
@@ -80,11 +59,34 @@ struct WeekyiiApp: App {
             userSettings: userSettings
         )
     }
+}
 
-    private static func persistentStoreURL() -> URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let folder = appSupport.appendingPathComponent("Weekyii", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("Weekyii.store")
+private struct PersistenceFailureView: View {
+    let message: String
+
+    var body: some View {
+        ZStack {
+            Color.backgroundPrimary
+                .ignoresSafeArea()
+
+            VStack(spacing: WeekSpacing.lg) {
+                Image(systemName: "externaldrive.badge.exclamationmark")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(Color.weekyiiPrimary)
+
+                Text("数据库不可用")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Color.textPrimary)
+
+                Text(message)
+                    .font(.body)
+                    .foregroundStyle(Color.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(WeekSpacing.xl)
+            .frame(maxWidth: 420)
+            .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
+            .padding(WeekSpacing.base)
+        }
     }
 }
