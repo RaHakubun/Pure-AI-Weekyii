@@ -2,7 +2,11 @@ import Foundation
 import SwiftData
 
 struct WeekCalculator {
-    private let calendar = Calendar(identifier: .iso8601)
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
 
     func weekId(for date: Date) -> String {
         date.weekId

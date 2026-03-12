@@ -27,7 +27,11 @@ struct StateMachine {
     private let notificationService: NotificationService
     private let appState: any AppStateStore
     private let userSettings: any KillTimeSettings
-    private let calendar = Calendar(identifier: .iso8601)
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
     private let weekCalculator = WeekCalculator()
 
     init(

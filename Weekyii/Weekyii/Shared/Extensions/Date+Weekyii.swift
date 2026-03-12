@@ -5,6 +5,7 @@ extension Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter.string(from: self)
     }
 
@@ -23,17 +24,22 @@ extension Date {
     }
 
     var startOfDay: Date {
-        Calendar(identifier: .iso8601).startOfDay(for: self)
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.startOfDay(for: self)
     }
 
     var startOfWeek: Date {
         var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
         calendar.firstWeekday = 2
         let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: self)
         return calendar.date(from: components) ?? self
     }
 
     func addingDays(_ days: Int) -> Date {
-        Calendar(identifier: .iso8601).date(byAdding: .day, value: days, to: self) ?? self
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.date(byAdding: .day, value: days, to: self) ?? self
     }
 }
