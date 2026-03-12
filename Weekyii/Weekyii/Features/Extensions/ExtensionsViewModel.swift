@@ -6,15 +6,18 @@ import SwiftData
 @Observable
 final class ExtensionsViewModel {
     private let modelContext: ModelContext
+    private let notificationService: any NotificationScheduling
     private let weekCalculator = WeekCalculator()
     private let calendar = Calendar(identifier: .iso8601)
 
     var projects: [ProjectModel] = []
+    var suspendedTasks: [SuspendedTaskItem] = []
     var tileSnapshotsByProjectID: [UUID: ProjectTileSnapshot] = [:]
     var errorMessage: String?
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext, notificationService: (any NotificationScheduling)? = nil) {
         self.modelContext = modelContext
+        self.notificationService = notificationService ?? NotificationService.shared
     }
 
     // MARK: - Refresh
@@ -25,6 +28,11 @@ final class ExtensionsViewModel {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         projects = (try? modelContext.fetch(descriptor)) ?? []
+        let suspendedDescriptor = FetchDescriptor<SuspendedTaskItem>(
+            sortBy: [SortDescriptor(\.decisionDeadline), SortDescriptor(\.createdAt)]
+        )
+        suspendedTasks = ((try? modelContext.fetch(suspendedDescriptor)) ?? [])
+            .filter { $0.status == .active }
         rebuildTileSnapshots()
     }
 
@@ -251,6 +259,108 @@ final class ExtensionsViewModel {
         projects.filter { $0.status == .completed || $0.status == .archived }
     }
 
+    func dueSoonSuspendedTasks(limit: Int = 3) -> [SuspendedTaskItem] {
+        Array(suspendedTasks.prefix(limit))
+    }
+
+    func suspendedTaskStats(referenceDate: Date = Date()) -> (total: Int, dueSoon: Int, dueToday: Int) {
+        let today = calendar.startOfDay(for: referenceDate)
+        let soonLimit = today.addingDays(7)
+        let dueSoon = suspendedTasks.filter { task in
+            let deadlineDay = calendar.startOfDay(for: task.decisionDeadline)
+            return deadlineDay >= today && deadlineDay <= soonLimit
+        }.count
+        let dueToday = suspendedTasks.filter { calendar.isDate($0.decisionDeadline, inSameDayAs: today) }.count
+        return (suspendedTasks.count, dueSoon, dueToday)
+    }
+
+    @discardableResult
+    func createSuspendedTask(
+        title: String,
+        description: String,
+        type: TaskType,
+        countdownDays: Int,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = [],
+        now: Date = Date()
+    ) -> SuspendedTaskItem? {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            let task = try service.createTask(
+                title: title,
+                description: description,
+                type: type,
+                countdownDays: countdownDays,
+                steps: steps,
+                attachments: attachments,
+                now: now
+            )
+            refresh()
+            return task
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func updateSuspendedTask(
+        _ task: SuspendedTaskItem,
+        title: String,
+        description: String,
+        type: TaskType,
+        countdownDays: Int,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = [],
+        now: Date = Date()
+    ) {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            try service.updateTask(
+                task,
+                title: title,
+                description: description,
+                type: type,
+                countdownDays: countdownDays,
+                steps: steps,
+                attachments: attachments,
+                now: now
+            )
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func extendSuspendedTask(_ task: SuspendedTaskItem, by additionalDays: Int, now: Date = Date()) {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            try service.extendTask(task, by: additionalDays, now: now)
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func assignSuspendedTask(_ task: SuspendedTaskItem, to targetDate: Date, today: Date = Date()) {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            try service.assignTask(task, to: targetDate, today: today)
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteSuspendedTask(_ task: SuspendedTaskItem) {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            try service.deleteTask(task)
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func sortedProjectsForBoard() -> [ProjectModel] {
         projects.sorted { lhs, rhs in
             if lhs.tileOrder != rhs.tileOrder {
@@ -343,4 +453,255 @@ struct ProjectTileSnapshot: Equatable {
     let expiredCount: Int
     let nextTaskTitle: String?
     let nextTaskDate: Date?
+}
+
+struct SuspendedTaskLifecycleService {
+    private let modelContext: ModelContext
+    private let notificationService: any NotificationScheduling
+    private let calendar = Calendar(identifier: .iso8601)
+    private let weekCalculator = WeekCalculator()
+
+    init(modelContext: ModelContext, notificationService: any NotificationScheduling) {
+        self.modelContext = modelContext
+        self.notificationService = notificationService
+    }
+
+    func createTask(
+        title: String,
+        description: String,
+        type: TaskType,
+        countdownDays: Int,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = [],
+        now: Date
+    ) throws -> SuspendedTaskItem {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else {
+            throw WeekyiiError.taskTitleEmpty
+        }
+        guard countdownDays > 0 else {
+            throw WeekyiiError.dateFormatInvalid
+        }
+
+        let task = SuspendedTaskItem(
+            title: normalizedTitle,
+            taskDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),
+            taskType: type,
+            createdAt: now,
+            decisionDeadline: endOfDecisionWindow(from: now, countdownDays: countdownDays),
+            preferredCountdownDays: countdownDays
+        )
+        replaceSteps(for: task, with: steps)
+        replaceAttachments(for: task, with: attachments)
+        modelContext.insert(task)
+        try modelContext.save()
+        notificationService.scheduleSuspendedTaskNotifications(for: task)
+        return task
+    }
+
+    func updateTask(
+        _ task: SuspendedTaskItem,
+        title: String,
+        description: String,
+        type: TaskType,
+        countdownDays: Int,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = [],
+        now: Date
+    ) throws {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else {
+            throw WeekyiiError.taskTitleEmpty
+        }
+        guard countdownDays > 0 else {
+            throw WeekyiiError.dateFormatInvalid
+        }
+
+        task.title = normalizedTitle
+        task.taskDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        task.taskType = type
+        task.preferredCountdownDays = countdownDays
+        task.decisionDeadline = endOfDecisionWindow(from: now, countdownDays: countdownDays)
+        replaceSteps(for: task, with: steps)
+        replaceAttachments(for: task, with: attachments)
+        try modelContext.save()
+        notificationService.scheduleSuspendedTaskNotifications(for: task)
+    }
+
+    func extendTask(_ task: SuspendedTaskItem, by additionalDays: Int, now: Date) throws {
+        guard additionalDays > 0 else { throw WeekyiiError.dateFormatInvalid }
+        let currentDeadlineDay = calendar.startOfDay(for: task.decisionDeadline)
+        let baselineDay = max(currentDeadlineDay, calendar.startOfDay(for: now))
+        guard let newDeadlineDay = calendar.date(byAdding: .day, value: additionalDays, to: baselineDay) else {
+            throw WeekyiiError.operationFailedRetry
+        }
+
+        task.decisionDeadline = endOfDay(for: newDeadlineDay)
+        task.preferredCountdownDays = additionalDays
+        task.snoozeCount += 1
+        try modelContext.save()
+        notificationService.scheduleSuspendedTaskNotifications(for: task)
+    }
+
+    func assignTask(_ task: SuspendedTaskItem, to targetDate: Date, today: Date) throws {
+        let todayStart = calendar.startOfDay(for: today)
+        let normalizedTargetDate = calendar.startOfDay(for: targetDate)
+        guard normalizedTargetDate >= todayStart else {
+            throw WeekyiiError.postponeTargetMustBeFuture
+        }
+
+        let resolution = try resolveTargetDay(for: normalizedTargetDate, today: todayStart)
+        let targetDay = resolution.day
+        guard targetDay.status == .empty || targetDay.status == .draft else {
+            throw WeekyiiError.postponeTargetDayUnavailable
+        }
+
+        let order = (targetDay.sortedDraftTasks.last?.order ?? 0) + 1
+        let taskItem = TaskItem(
+            title: task.title,
+            taskDescription: task.taskDescription,
+            taskType: task.taskType,
+            order: order,
+            zone: .draft
+        )
+        replaceSteps(for: taskItem, with: task.steps)
+        replaceAttachments(for: taskItem, with: task.attachments)
+        targetDay.tasks.append(taskItem)
+        if targetDay.status == .empty {
+            targetDay.status = .draft
+        }
+
+        task.status = .assigned
+        modelContext.delete(task)
+        try modelContext.save()
+        notificationService.cancelSuspendedTaskNotifications(for: task)
+    }
+
+    func deleteTask(_ task: SuspendedTaskItem) throws {
+        notificationService.cancelSuspendedTaskNotifications(for: task)
+        modelContext.delete(task)
+        try modelContext.save()
+    }
+
+    func sweepExpiredTasks(now: Date) throws -> Int {
+        let descriptor = FetchDescriptor<SuspendedTaskItem>()
+        let allTasks = try modelContext.fetch(descriptor)
+        let expired = allTasks.filter { $0.status == .active && $0.decisionDeadline <= now }
+
+        for task in expired {
+            notificationService.cancelSuspendedTaskNotifications(for: task)
+            modelContext.delete(task)
+        }
+
+        if !expired.isEmpty {
+            try modelContext.save()
+        }
+        return expired.count
+    }
+
+    private func resolveTargetDay(for date: Date, today: Date) throws -> (day: DayModel, createdWeek: Bool) {
+        let dayId = date.dayId
+        if let existingDay = fetchDay(by: dayId) {
+            return (existingDay, false)
+        }
+
+        let weekId = date.weekId
+        if let existingWeek = fetchWeek(by: weekId) {
+            guard let existingDay = existingWeek.days.first(where: { $0.dayId == dayId }) else {
+                throw WeekyiiError.dayNotFound(dayId)
+            }
+            return (existingDay, false)
+        }
+
+        let weekStatus: WeekStatus = date.startOfWeek == today.startOfWeek ? .present : .pending
+        let week = weekCalculator.makeWeek(for: date, status: weekStatus)
+        modelContext.insert(week)
+        guard let targetDay = week.days.first(where: { $0.dayId == dayId }) else {
+            throw WeekyiiError.dayNotFound(dayId)
+        }
+        return (targetDay, true)
+    }
+
+    private func fetchDay(by dayId: String) -> DayModel? {
+        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchWeek(by weekId: String) -> WeekModel? {
+        let descriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func endOfDecisionWindow(from now: Date, countdownDays: Int) -> Date {
+        let today = calendar.startOfDay(for: now)
+        let targetDay = calendar.date(byAdding: .day, value: countdownDays, to: today) ?? today
+        return endOfDay(for: targetDay)
+    }
+
+    private func replaceSteps(for task: SuspendedTaskItem, with steps: [TaskStep]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps.removeAll(keepingCapacity: true)
+        appendStepCopies(to: &task.steps, from: steps)
+    }
+
+    private func replaceAttachments(for task: SuspendedTaskItem, with attachments: [TaskAttachment]) {
+        task.attachments.forEach { modelContext.delete($0) }
+        task.attachments.removeAll(keepingCapacity: true)
+        appendAttachmentCopies(to: &task.attachments, from: attachments)
+    }
+
+    private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps.removeAll(keepingCapacity: true)
+        appendStepCopies(to: &task.steps, from: steps)
+    }
+
+    private func replaceAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
+        task.attachments.forEach { modelContext.delete($0) }
+        task.attachments.removeAll(keepingCapacity: true)
+        appendAttachmentCopies(to: &task.attachments, from: attachments)
+    }
+
+    private func appendStepCopies(to destination: inout [TaskStep], from steps: [TaskStep]) {
+        let ordered = steps
+            .enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.sortOrder != rhs.element.sortOrder {
+                    return lhs.element.sortOrder < rhs.element.sortOrder
+                }
+                if lhs.element.createdAt != rhs.element.createdAt {
+                    return lhs.element.createdAt < rhs.element.createdAt
+                }
+                // Keep caller order when sort keys collide to avoid unstable reordering.
+                return lhs.offset < rhs.offset
+            }
+            .enumerated()
+            .map { index, pair in
+                TaskStep(
+                    title: pair.element.title,
+                    isCompleted: pair.element.isCompleted,
+                    sortOrder: index
+                )
+            }
+        destination.append(contentsOf: ordered)
+    }
+
+    private func appendAttachmentCopies(to destination: inout [TaskAttachment], from attachments: [TaskAttachment]) {
+        let copies = attachments.map { attachment in
+            TaskAttachment(
+                data: attachment.data,
+                fileName: attachment.fileName,
+                fileType: attachment.fileType
+            )
+        }
+        destination.append(contentsOf: copies)
+    }
+
+    private func endOfDay(for date: Date) -> Date {
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = 23
+        components.minute = 59
+        components.second = 59
+        return calendar.date(from: components) ?? date
+    }
 }

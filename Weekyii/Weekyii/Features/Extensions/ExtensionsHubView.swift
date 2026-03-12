@@ -1,11 +1,13 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import PhotosUI
 
 // MARK: - Extensions Hub View (New Architecture)
 
 struct ExtensionsHubView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
     @State private var viewModel: ExtensionsViewModel?
     @State private var mindStampViewModel: MindStampViewModel?
     @State private var errorMessage: String?
@@ -14,14 +16,15 @@ struct ExtensionsHubView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: WeekSpacing.lg) {
-                    // Projects Module
-                    if let viewModel {
-                        ProjectsModulePreview(viewModel: viewModel)
-                    }
-
                     // Mind Stamps Module
                     if let mindStampViewModel {
                         MindStampsModulePreview(viewModel: mindStampViewModel)
+                    }
+
+                    // Suspended + Projects Modules
+                    if let viewModel {
+                        SuspendedTasksModulePreview(viewModel: viewModel)
+                        ProjectsModulePreview(viewModel: viewModel)
                     }
                 }
                 .padding(.horizontal, WeekSpacing.base)
@@ -45,6 +48,10 @@ struct ExtensionsHubView: View {
             viewModel?.refresh()
             mindStampViewModel?.refresh()
         }
+        .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh()
+            mindStampViewModel?.refresh()
+        }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue { errorMessage = newValue }
         }
@@ -57,6 +64,136 @@ struct ExtensionsHubView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+}
+
+// MARK: - Suspended Tasks Module Preview
+
+private struct SuspendedTasksModulePreview: View {
+    let viewModel: ExtensionsViewModel
+    @State private var showingEditor = false
+
+    private var previewTasks: [SuspendedTaskItem] {
+        viewModel.dueSoonSuspendedTasks()
+    }
+
+    private var stats: (total: Int, dueSoon: Int, dueToday: Int) {
+        viewModel.suspendedTaskStats()
+    }
+
+    var body: some View {
+        ModuleContainer(
+            title: "悬置箱",
+            subtitle: "期限内收纳未成型的任务",
+            icon: "hourglass.circle.fill",
+            iconColor: .accentOrange,
+            seeAllAccessibilityID: "extensionsSuspendedSeeAllButton",
+            destination: {
+                SuspendedTasksFullView(viewModel: viewModel)
+            }
+        ) {
+            if previewTasks.isEmpty {
+                moduleEmptyState
+            } else {
+                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                    HStack(spacing: WeekSpacing.sm) {
+                        suspendedStatPill(value: "\(stats.total)", label: "总数")
+                        suspendedStatPill(value: "\(stats.dueSoon)", label: "7天内到期")
+                        suspendedStatPill(value: "\(stats.dueToday)", label: "今日到期")
+                    }
+
+                    ForEach(previewTasks) { task in
+                        suspendedPreviewRow(task)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditor, onDismiss: {
+            viewModel.refresh()
+        }) {
+            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, countdownDays, steps, attachments in
+                _ = viewModel.createSuspendedTask(
+                    title: title,
+                    description: description,
+                    type: type,
+                    countdownDays: countdownDays,
+                    steps: steps,
+                    attachments: attachments
+                )
+            }
+        }
+    }
+
+    private var moduleEmptyState: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            Image(systemName: "hourglass.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(Color.accentOrange)
+
+            Text("先记下未决事项，再给它一个倒计时。")
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                showingEditor = true
+            } label: {
+                Text("新增悬置任务")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.vertical, WeekSpacing.sm)
+                    .background(Color.orangeGradient)
+                    .clipShape(Capsule())
+            }
+            .accessibilityIdentifier("suspendedEmptyCreateButton")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, WeekSpacing.lg)
+    }
+
+    private func suspendedPreviewRow(_ task: SuspendedTaskItem) -> some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Image(systemName: task.taskType.iconName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(task.taskType.color)
+                .frame(width: 28, height: 28)
+                .background(task.taskType.color.opacity(0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.textPrimary)
+                    .lineLimit(1)
+
+                Text(suspendedDeadlineLabel(for: task))
+                    .font(.caption)
+                    .foregroundColor(.textTertiary)
+            }
+
+            Spacer()
+
+            suspendedCountdownBadge(task)
+        }
+        .padding(WeekSpacing.sm)
+        .background(Color.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+    }
+
+    private func suspendedStatPill(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.accentOrange)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(WeekSpacing.sm)
+        .background(Color.backgroundTertiary)
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
     }
 }
 
@@ -185,6 +322,831 @@ private struct ProjectsModulePreview: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+// MARK: - Suspended Tasks Full View
+
+private struct SuspendedTasksFullView: View {
+    @State private var viewModel: ExtensionsViewModel
+    @State private var showingCreateSheet = false
+    @State private var editingTask: SuspendedTaskItem?
+    @State private var deletingTask: SuspendedTaskItem?
+    @State private var extendingTask: SuspendedTaskItem?
+    @State private var assigningTask: SuspendedTaskItem?
+    @State private var errorMessage: String?
+
+    init(viewModel: ExtensionsViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
+
+    private var stats: (total: Int, dueSoon: Int, dueToday: Int) {
+        viewModel.suspendedTaskStats()
+    }
+
+    private var dueSoonTasks: [SuspendedTaskItem] {
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let upperBound = today.addingDays(7)
+        return viewModel.suspendedTasks.filter { task in
+            let deadline = Calendar(identifier: .iso8601).startOfDay(for: task.decisionDeadline)
+            return deadline >= today && deadline <= upperBound
+        }
+    }
+
+    private var laterTasks: [SuspendedTaskItem] {
+        let dueSoonIds = Set(dueSoonTasks.map(\.id))
+        return viewModel.suspendedTasks.filter { !dueSoonIds.contains($0.id) }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: WeekSpacing.md) {
+                guidanceCard
+                statsCard
+
+                if viewModel.suspendedTasks.isEmpty {
+                    emptyState
+                } else {
+                    if !dueSoonTasks.isEmpty {
+                        section(title: "即将到期", tasks: dueSoonTasks)
+                    }
+                    if !laterTasks.isEmpty {
+                        section(title: "其他悬置", tasks: laterTasks)
+                    }
+
+                    footerCreateButton
+                }
+            }
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.vertical, WeekSpacing.md)
+        }
+        .background(Color.backgroundPrimary)
+        .navigationTitle("悬置箱")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("新增") {
+                    showingCreateSheet = true
+                }
+                .accessibilityIdentifier("suspendedCreateButton")
+            }
+        }
+        .onAppear {
+            viewModel.refresh()
+        }
+        .onChange(of: viewModel.errorMessage) { _, newValue in
+            if let newValue { errorMessage = newValue }
+        }
+        .sheet(isPresented: $showingCreateSheet, onDismiss: {
+            viewModel.refresh()
+        }) {
+            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, countdownDays, steps, attachments in
+                _ = viewModel.createSuspendedTask(
+                    title: title,
+                    description: description,
+                    type: type,
+                    countdownDays: countdownDays,
+                    steps: steps,
+                    attachments: attachments
+                )
+            }
+        }
+        .sheet(item: $editingTask, onDismiss: {
+            viewModel.refresh()
+        }) { task in
+            SuspendedTaskEditorSheet(
+                title: "编辑悬置任务",
+                initialTitle: task.title,
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialCountdownDays: task.preferredCountdownDays,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments
+            ) { title, description, type, countdownDays, steps, attachments in
+                viewModel.updateSuspendedTask(
+                    task,
+                    title: title,
+                    description: description,
+                    type: type,
+                    countdownDays: countdownDays,
+                    steps: steps,
+                    attachments: attachments
+                )
+            }
+        }
+        .sheet(item: $assigningTask, onDismiss: {
+            viewModel.refresh()
+        }) { task in
+            SuspendedTaskAssignSheet(taskTitle: task.title) { targetDate in
+                viewModel.assignSuspendedTask(task, to: targetDate)
+            }
+        }
+        .confirmationDialog(
+            "续期悬置任务",
+            isPresented: Binding(
+                get: { extendingTask != nil },
+                set: { if !$0 { extendingTask = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let task = extendingTask {
+                Button("续期 10 天") {
+                    viewModel.extendSuspendedTask(task, by: 10)
+                    extendingTask = nil
+                }
+                Button("续期 30 天") {
+                    viewModel.extendSuspendedTask(task, by: 30)
+                    extendingTask = nil
+                }
+            }
+            Button("取消", role: .cancel) {
+                extendingTask = nil
+            }
+        } message: {
+            Text("续期会重新计算倒计时，并重排提醒。")
+        }
+        .confirmationDialog(
+            "删除悬置任务",
+            isPresented: Binding(
+                get: { deletingTask != nil },
+                set: { if !$0 { deletingTask = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let task = deletingTask {
+                Button("删除", role: .destructive) {
+                    viewModel.deleteSuspendedTask(task)
+                    deletingTask = nil
+                }
+            }
+            Button("取消", role: .cancel) {
+                deletingTask = nil
+            }
+        } message: {
+            Text("悬置箱不是回收站。删除后不会保留后路。")
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(get: {
+            errorMessage != nil
+        }, set: { newValue in
+            if !newValue { errorMessage = nil }
+        })) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private var guidanceCard: some View {
+        WeekCard(accentColor: .accentOrange) {
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                Text("在这里记录任务思绪")
+                    .font(.titleSmall)
+                    .foregroundColor(.textPrimary)
+
+                Text("收置未分派在具体日期的任务,需要任务过期倒计时.\n到期前可以续期、分配到具体日期，或者删除.\n逾期后系统会主动清理。")
+                    .font(.bodySmall)
+                    .foregroundColor(.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var statsCard: some View {
+        WeekCard(accentColor: .accentOrange) {
+            HStack(spacing: WeekSpacing.sm) {
+                statColumn(value: "\(stats.total)", label: "总数")
+                statColumn(value: "\(stats.dueSoon)", label: "7天内到期")
+                statColumn(value: "\(stats.dueToday)", label: "今日到期")
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        WeekCard {
+            VStack(spacing: WeekSpacing.md) {
+                Image(systemName: "hourglass.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Color.accentOrange)
+
+                Text("把暂时无法承诺到特定日期的任务放这里。")
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                Button("新增悬置任务") {
+                    showingCreateSheet = true
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentOrange)
+                .accessibilityIdentifier("suspendedEmptyCreateButton")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, WeekSpacing.xl)
+        }
+    }
+
+    private var footerCreateButton: some View {
+        Button("新增悬置任务") {
+            showingCreateSheet = true
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.white)
+        .padding(.horizontal, WeekSpacing.xl)
+        .padding(.vertical, WeekSpacing.md)
+        .background(Color.orangeGradient)
+        .clipShape(Capsule())
+        .shadow(color: Color.accentOrange.opacity(0.25), radius: 6, x: 0, y: 3)
+        .accessibilityIdentifier("suspendedFooterCreateButton")
+        .padding(.top, WeekSpacing.md)
+        .padding(.bottom, WeekSpacing.xl)
+    }
+
+    private func statColumn(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.titleMedium)
+                .foregroundColor(.accentOrange)
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func section(title: String, tasks: [SuspendedTaskItem]) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            Text(title)
+                .font(.titleSmall)
+                .foregroundColor(.textPrimary)
+
+            ForEach(tasks) { task in
+                suspendedTaskCard(task)
+            }
+        }
+    }
+
+    private func suspendedTaskCard(_ task: SuspendedTaskItem) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                Image(systemName: task.taskType.iconName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(task.taskType.color)
+                    .frame(width: 32, height: 32)
+                    .background(task.taskType.color.opacity(0.12))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.headline)
+                        .foregroundColor(.textPrimary)
+                        .lineLimit(2)
+
+                    if !task.taskDescription.isEmpty {
+                        Text(task.taskDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.textSecondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer()
+
+                suspendedCountdownBadge(task)
+            }
+
+            HStack(spacing: WeekSpacing.xs) {
+                Text(task.taskType.displayName)
+                    .font(.captionBold)
+                    .foregroundColor(task.taskType.color)
+                    .padding(.horizontal, WeekSpacing.sm)
+                    .padding(.vertical, 6)
+                    .background(task.taskType.color.opacity(0.12))
+                    .clipShape(Capsule())
+
+                Text(suspendedDeadlineLabel(for: task))
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+            }
+
+            HStack(spacing: WeekSpacing.sm) {
+                Label("\(task.steps.count) 步骤", systemImage: "list.bullet")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                Label("\(task.attachments.count) 附件", systemImage: "paperclip")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                Spacer()
+            }
+
+            HStack(spacing: WeekSpacing.sm) {
+                Button("编辑") {
+                    editingTask = task
+                }
+                .buttonStyle(.bordered)
+
+                Button("续期") {
+                    extendingTask = task
+                }
+                .buttonStyle(.bordered)
+
+                Button("分配到某天") {
+                    assigningTask = task
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentOrange)
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    deletingTask = task
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("suspendedDeleteButton_\(task.id.uuidString)")
+            }
+        }
+        .padding(WeekSpacing.md)
+        .background(Color.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+    }
+}
+
+private struct SuspendedTaskEditorSheet: View {
+    let title: String
+    let initialTitle: String
+    let initialDescription: String
+    let initialType: TaskType
+    let initialCountdownDays: Int
+    let initialSteps: [TaskStep]
+    let initialAttachments: [TaskAttachment]
+    let onSave: (String, String, TaskType, Int, [TaskStep], [TaskAttachment]) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var taskTitle: String
+    @State private var taskDescription: String
+    @State private var taskType: TaskType
+    @State private var countdownDays: Int
+    @State private var stepDrafts: [SuspendedStepDraft]
+    @State private var attachments: [TaskAttachment]
+    @State private var newStepTitle: String = ""
+    @FocusState private var isStepInputFocused: Bool
+    @State private var selectedPhoto: PhotosPickerItem?
+
+    init(
+        title: String,
+        initialTitle: String = "",
+        initialDescription: String = "",
+        initialType: TaskType = .regular,
+        initialCountdownDays: Int = 10,
+        initialSteps: [TaskStep] = [],
+        initialAttachments: [TaskAttachment] = [],
+        onSave: @escaping (String, String, TaskType, Int, [TaskStep], [TaskAttachment]) -> Void
+    ) {
+        self.title = title
+        self.initialTitle = initialTitle
+        self.initialDescription = initialDescription
+        self.initialType = initialType
+        self.initialCountdownDays = initialCountdownDays
+        self.initialSteps = initialSteps
+        self.initialAttachments = initialAttachments
+        self.onSave = onSave
+        _taskTitle = State(initialValue: initialTitle)
+        _taskDescription = State(initialValue: initialDescription)
+        _taskType = State(initialValue: initialType)
+        _countdownDays = State(initialValue: initialCountdownDays)
+        _stepDrafts = State(
+            initialValue: initialSteps
+                .sorted {
+                    if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+                    return $0.createdAt < $1.createdAt
+                }
+                .enumerated()
+                .map { index, step in
+                    SuspendedStepDraft(
+                        id: UUID(),
+                        title: step.title,
+                        isCompleted: step.isCompleted,
+                        sortOrder: index
+                    )
+                }
+        )
+        _attachments = State(initialValue: initialAttachments)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: WeekSpacing.lg) {
+                    WeekCard(accentColor: .accentOrange) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                            Text("在这里记录未决定具体时限的任务")
+                                .font(.titleSmall)
+                                .foregroundColor(.textPrimary)
+                            Text("暂时不属于任何一天、须在倒计时内再次决策。")
+                                .font(.bodySmall)
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+
+                    WeekCard(accentColor: taskType.color) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                            TextField("输入任务名称", text: $taskTitle)
+                                .font(.titleSmall)
+                                .padding(WeekSpacing.md)
+                                .background(Color.backgroundTertiary)
+                                .cornerRadius(WeekRadius.medium)
+                                .accessibilityIdentifier("suspendedTaskTitleField")
+
+                            TextField("输入任务描述", text: $taskDescription, axis: .vertical)
+                                .font(.bodyMedium)
+                                .lineLimit(3...5)
+                                .padding(WeekSpacing.md)
+                                .background(Color.backgroundTertiary)
+                                .cornerRadius(WeekRadius.medium)
+
+                            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                                Text("任务类型")
+                                    .font(.captionBold)
+                                    .foregroundColor(.textSecondary)
+                                HStack(spacing: WeekSpacing.sm) {
+                                    ForEach(TaskType.allCases, id: \.self) { type in
+                                        suspendedTypeChip(type)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    WeekCard {
+                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                            Text("步骤")
+                                .font(.titleSmall)
+                                .foregroundColor(.textPrimary)
+
+                            if stepDrafts.isEmpty {
+                                Text("暂无步骤")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                            } else {
+                                VStack(spacing: WeekSpacing.sm) {
+                                    ForEach(stepDrafts) { draft in
+                                        stepRow(for: draft.id)
+                                    }
+                                }
+                            }
+
+                            HStack(spacing: WeekSpacing.sm) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.accentGreen)
+                                TextField("新增步骤", text: $newStepTitle)
+                                    .focused($isStepInputFocused)
+                                    .onSubmit { addNewStep() }
+                                if !newStepTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Button("添加") {
+                                        addNewStep()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.accentGreen)
+                                }
+                            }
+                        }
+                    }
+
+                    WeekCard {
+                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                            Text("附件")
+                                .font(.titleSmall)
+                                .foregroundColor(.textPrimary)
+
+                            let columns = [
+                                GridItem(.adaptive(minimum: 92), spacing: WeekSpacing.sm)
+                            ]
+                            LazyVGrid(columns: columns, spacing: WeekSpacing.sm) {
+                                ForEach(attachments, id: \.id) { attachment in
+                                    attachmentTile(attachment)
+                                }
+                                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                        .fill(Color.accentOrangeLight.opacity(0.22))
+                                        .frame(height: 96)
+                                        .overlay {
+                                            VStack(spacing: 6) {
+                                                Image(systemName: "plus.square.fill")
+                                                    .font(.title2)
+                                                    .foregroundColor(.accentOrange)
+                                                Text("添加")
+                                                    .font(.captionBold)
+                                                    .foregroundColor(.accentOrange)
+                                            }
+                                        }
+                                }
+                                .onChange(of: selectedPhoto) { _, newItem in
+                                    loadPhoto(newItem)
+                                }
+                            }
+                        }
+                    }
+
+                    WeekCard(accentColor: .accentOrange) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                            Text("倒计时")
+                                .font(.titleSmall)
+                                .foregroundColor(.textPrimary)
+
+                            HStack(spacing: WeekSpacing.sm) {
+                                presetChip(label: "10天", days: 10)
+                                presetChip(label: "30天", days: 30)
+                                presetChip(label: "自定义", days: countdownDays)
+                            }
+
+                            Stepper(value: $countdownDays, in: 1...120) {
+                                Text("倒计时 \(countdownDays) 天")
+                                    .font(.bodyMedium)
+                                    .foregroundColor(.textSecondary)
+                            }
+                        }
+                    }
+                }
+                .padding(WeekSpacing.base)
+            }
+            .background(Color.backgroundPrimary)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        normalizeStepOrder()
+                        let normalizedSteps = stepDrafts
+                            .sorted { $0.sortOrder < $1.sortOrder }
+                            .map { draft in
+                                TaskStep(
+                                    title: draft.title,
+                                    isCompleted: draft.isCompleted,
+                                    sortOrder: draft.sortOrder
+                                )
+                            }
+                        onSave(
+                            taskTitle,
+                            taskDescription,
+                            taskType,
+                            countdownDays,
+                            normalizedSteps,
+                            attachments
+                        )
+                        dismiss()
+                    }
+                    .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || countdownDays <= 0)
+                    .accessibilityIdentifier("suspendedTaskSaveButton")
+                }
+            }
+        }
+    }
+
+    private func suspendedTypeChip(_ type: TaskType) -> some View {
+        let isSelected = taskType == type
+        return Button {
+            taskType = type
+        } label: {
+            HStack(spacing: WeekSpacing.xs) {
+                Image(systemName: type.iconName)
+                Text(type.displayName)
+                    .font(.captionBold)
+            }
+            .foregroundColor(isSelected ? type.color : .textSecondary)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(isSelected ? type.color.opacity(0.15) : Color.backgroundTertiary)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? type.color : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func presetChip(label: String, days: Int) -> some View {
+        let isSelected = countdownDays == days
+        return Button(label) {
+            countdownDays = days
+        }
+        .font(.captionBold)
+        .foregroundColor(isSelected ? .white : .accentOrange)
+        .padding(.horizontal, WeekSpacing.md)
+        .padding(.vertical, WeekSpacing.sm)
+        .background(isSelected ? Color.accentOrange : Color.accentOrange.opacity(0.12))
+        .clipShape(Capsule())
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func stepRow(for stepID: UUID) -> some View {
+        if let index = stepDrafts.firstIndex(where: { $0.id == stepID }) {
+            let binding = $stepDrafts[index]
+            HStack(spacing: WeekSpacing.sm) {
+                Button {
+                    binding.isCompleted.wrappedValue.toggle()
+                } label: {
+                    Image(systemName: binding.isCompleted.wrappedValue ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(binding.isCompleted.wrappedValue ? .accentGreen : .textTertiary)
+                }
+                .buttonStyle(.plain)
+
+                TextField("步骤内容", text: binding.title, axis: .vertical)
+                    .font(.bodyMedium)
+                    .lineLimit(1...6)
+
+                Spacer()
+
+                HStack(spacing: WeekSpacing.xs) {
+                    Button {
+                        guard index > 0 else { return }
+                        stepDrafts.swapAt(index, index - 1)
+                        normalizeStepOrder()
+                    } label: {
+                        Image(systemName: "arrow.up")
+                    }
+                    .disabled(index == 0)
+
+                    Button {
+                        guard index < stepDrafts.count - 1 else { return }
+                        stepDrafts.swapAt(index, index + 1)
+                        normalizeStepOrder()
+                    } label: {
+                        Image(systemName: "arrow.down")
+                    }
+                    .disabled(index == stepDrafts.count - 1)
+
+                    Button {
+                        stepDrafts.remove(at: index)
+                        normalizeStepOrder()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .foregroundColor(.accentOrange)
+                }
+                .font(.caption)
+            }
+            .padding(WeekSpacing.sm)
+            .background(Color.backgroundTertiary)
+            .cornerRadius(WeekRadius.medium)
+        }
+    }
+
+    private func addNewStep() {
+        let normalized = newStepTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        let step = SuspendedStepDraft(id: UUID(), title: normalized, isCompleted: false, sortOrder: stepDrafts.count)
+        stepDrafts.append(step)
+        normalizeStepOrder()
+        newStepTitle = ""
+        isStepInputFocused = true
+    }
+
+    private func normalizeStepOrder() {
+        for index in stepDrafts.indices {
+            stepDrafts[index].sortOrder = index
+        }
+    }
+
+    private func loadPhoto(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        item.loadTransferable(type: Data.self) { result in
+            guard case .success(let data) = result, let data else { return }
+            let attachment = TaskAttachment(data: data, fileName: "image.jpg", fileType: "image/jpeg")
+            DispatchQueue.main.async {
+                attachments.append(attachment)
+            }
+        }
+    }
+
+    private func deleteAttachment(_ attachment: TaskAttachment) {
+        if let index = attachments.firstIndex(where: { $0.id == attachment.id }) {
+            attachments.remove(at: index)
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentTile(_ attachment: TaskAttachment) -> some View {
+        let fileLabel = attachment.fileName.isEmpty ? "附件" : attachment.fileName
+
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .fill(Color.accentOrangeLight.opacity(0.16))
+                .frame(height: 96)
+                .overlay(alignment: .bottomLeading) {
+                    Text(fileLabel)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(2)
+                        .foregroundColor(.textPrimary)
+                        .padding(8)
+                }
+
+            if let data = attachment.data, let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+            }
+
+            Button {
+                deleteAttachment(attachment)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.white)
+                    .background(Circle().fill(.black.opacity(0.45)))
+            }
+            .offset(x: 6, y: -6)
+        }
+    }
+}
+
+private struct SuspendedStepDraft: Identifiable {
+    let id: UUID
+    var title: String
+    var isCompleted: Bool
+    var sortOrder: Int
+}
+
+private struct SuspendedTaskAssignSheet: View {
+    let taskTitle: String
+    let onAssign: (Date) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var targetDate = Date()
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: WeekSpacing.lg) {
+                WeekCard(accentColor: .accentOrange) {
+                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                        Text(taskTitle)
+                            .font(.titleSmall)
+                            .foregroundColor(.textPrimary)
+                        Text("把这项悬置任务真正落到某一天。若那一天或所属周不存在，系统会自动补齐。")
+                            .font(.bodySmall)
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+
+                DatePicker(
+                    "目标日期",
+                    selection: $targetDate,
+                    in: Date()...,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+                .background(Color.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+
+                Spacer()
+            }
+            .padding(WeekSpacing.base)
+            .background(Color.backgroundPrimary)
+            .navigationTitle("分配到某天")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("确认分配") {
+                        onAssign(targetDate)
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private func suspendedDeadlineLabel(for task: SuspendedTaskItem) -> String {
+    let remainingDays = task.remainingDays()
+    if remainingDays <= 0 {
+        return "今日到期"
+    }
+    return "\(remainingDays) 天后到期"
+}
+
+private func suspendedCountdownBadge(_ task: SuspendedTaskItem) -> some View {
+    let days = task.remainingDays()
+    let color: Color = days <= 1 ? .red : (days <= 7 ? .accentOrange : .accentGreen)
+
+    return Text(days <= 0 ? "到期" : "D-\(days)")
+        .font(.captionBold)
+        .foregroundColor(color)
+        .padding(.horizontal, WeekSpacing.sm)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.12))
+        .clipShape(Capsule())
 }
 
 // MARK: - Mind Stamps Module Preview
@@ -363,13 +1325,11 @@ private struct ProjectsFullView: View {
     }
 
     @State private var viewModel: ExtensionsViewModel
-    @Environment(\.scenePhase) private var scenePhase
     @State private var showingCreateSheet = false
     @State private var tileProjects: [ProjectModel] = []
     @State private var isEditingTiles = false
     @State private var draggingProjectID: UUID?
     @State private var deletingProject: ProjectModel?
-    @State private var liveTick: Int = 0
     @State private var errorMessage: String?
 
     init(viewModel: ExtensionsViewModel) {
@@ -392,16 +1352,6 @@ private struct ProjectsFullView: View {
             }
             .onChange(of: viewModel.projects.map(\.id)) { _, _ in
                 syncTileProjectsFromModel(force: draggingProjectID == nil)
-            }
-            .task(id: tickerTaskKey) {
-                guard scenePhase == .active, !isEditingTiles else { return }
-                while !Task.isCancelled, scenePhase == .active, !isEditingTiles {
-                    try? await Task.sleep(for: .seconds(5))
-                    guard !Task.isCancelled, scenePhase == .active, !isEditingTiles else { break }
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        liveTick &+= 1
-                    }
-                }
             }
             .confirmationDialog(
                 String(localized: "project.delete.confirm"),
@@ -460,9 +1410,7 @@ private struct ProjectsFullView: View {
                             transaction.animation = nil
                         }
                     }
-                }
 
-                if shouldShowFooterCreateButton {
                     Button {
                         showingCreateSheet = true
                     } label: {
@@ -524,14 +1472,6 @@ private struct ProjectsFullView: View {
         }
     }
 
-    private var shouldShowFooterCreateButton: Bool {
-        !viewModel.projects.isEmpty
-    }
-
-    private var tickerTaskKey: String {
-        "\(scenePhase == .active)-\(isEditingTiles)"
-    }
-
     private func syncTileProjectsFromModel(force: Bool) {
         guard force else { return }
         tileProjects = viewModel.sortedProjectsForBoard()
@@ -552,7 +1492,6 @@ private struct ProjectsFullView: View {
                 snapshot: snapshot,
                 tileSize: project.tileSize,
                 statusText: project.status.displayName,
-                liveTick: liveTick,
                 isEditing: true,
                 isDragging: isDraggingTile
             )
@@ -615,7 +1554,6 @@ private struct ProjectsFullView: View {
                     snapshot: snapshot,
                     tileSize: project.tileSize,
                     statusText: project.status.displayName,
-                    liveTick: liveTick,
                     isEditing: false,
                     isDragging: false
                 )
@@ -691,14 +1629,11 @@ private struct ProjectsFullView: View {
 }
 
 private struct ProjectMetroTileView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let snapshot: ProjectTileSnapshot
     let tileSize: ProjectTileSize
     let statusText: String
-    let liveTick: Int
     let isEditing: Bool
     let isDragging: Bool
-    @State private var breathing = false
 
     private var projectColor: Color { Color(hex: snapshot.colorHex) }
 
@@ -707,7 +1642,7 @@ private struct ProjectMetroTileView: View {
             snapshot: snapshot,
             size: tileSize,
             isEditing: isEditing,
-            liveTick: liveTick
+            liveTick: 0
         )
 
         tileContent(presentation: presentation)
@@ -729,15 +1664,6 @@ private struct ProjectMetroTileView: View {
             y: isDragging ? 4 : 3
         )
         .scaleEffect(scaleValue)
-        .onAppear {
-            if !reduceMotion {
-                breathing = true
-            }
-        }
-        .animation(
-            reduceMotion || isEditing ? .default : .easeInOut(duration: 1.9).repeatForever(autoreverses: true),
-            value: breathing
-        )
     }
 
     @ViewBuilder
@@ -767,7 +1693,7 @@ private struct ProjectMetroTileView: View {
 
             LinearGradient(
                 colors: [
-                    .white.opacity(breathing && !isEditing ? 0.18 : 0.08),
+                    .white.opacity(isEditing ? 0.10 : 0.14),
                     .white.opacity(0.02),
                     .black.opacity(0.10)
                 ],
@@ -789,7 +1715,7 @@ private struct ProjectMetroTileView: View {
 
             miniPrimaryPanel(for: presentation.livePanel)
 
-            if !isEditing {
+            if presentation.showsTitle {
                 Text(snapshot.name)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.92))
@@ -800,34 +1726,45 @@ private struct ProjectMetroTileView: View {
     }
 
     private func smallTileBody(presentation: ProjectTilePresentation) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: WeekSpacing.xs) {
                 tileIconBadge(size: 9)
 
-                Spacer(minLength: 0)
-
-                if !isEditing {
+                if presentation.showsTitle {
                     Text(snapshot.name)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                smallPrimaryPanel(for: presentation.livePanel)
             }
 
             Spacer(minLength: 0)
 
-            smallPrimaryPanel(for: presentation.livePanel)
+            if presentation.secondaryContent == .microStatsStrip {
+                smallStatsStrip
+            }
         }
     }
 
     private func mediumTileBody(presentation: ProjectTilePresentation) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            tileHeader(presentation: presentation, titleFontSize: 17, titleWeight: .bold)
+            tileHeader(
+                presentation: presentation,
+                titleFontSize: isEditing ? 15 : 17,
+                titleWeight: .bold
+            )
 
             Spacer(minLength: 0)
 
-            mediumPrimaryPanel(for: presentation.livePanel)
+            mediumPrimaryPanel(
+                for: presentation.livePanel,
+                secondaryContent: presentation.secondaryContent,
+                showsDate: presentation.showsNextTaskDate
+            )
                 .foregroundStyle(.white)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.28), value: presentation.livePanel)
@@ -836,11 +1773,15 @@ private struct ProjectMetroTileView: View {
 
     private func wideTileBody(presentation: ProjectTilePresentation) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            tileHeader(presentation: presentation, titleFontSize: 16, titleWeight: .bold)
+            tileHeader(
+                presentation: presentation,
+                titleFontSize: isEditing ? 15 : 16,
+                titleWeight: .bold
+            )
 
             Spacer(minLength: 0)
 
-            widePrimaryPanel(for: presentation.livePanel)
+            widePrimaryPanel(for: presentation.livePanel, secondaryContent: presentation.secondaryContent)
                 .foregroundStyle(.white)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.28), value: presentation.livePanel)
@@ -855,12 +1796,14 @@ private struct ProjectMetroTileView: View {
         HStack(alignment: .top, spacing: WeekSpacing.xs) {
             tileIconBadge(size: 11)
 
-            Text(snapshot.name)
-                .font(.system(size: titleFontSize, weight: titleWeight, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(presentation.titleLineLimit)
-                .minimumScaleFactor(0.72)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if presentation.showsTitle {
+                Text(snapshot.name)
+                    .font(.system(size: titleFontSize, weight: titleWeight, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(presentation.titleLineLimit)
+                    .minimumScaleFactor(0.72)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             if presentation.showsStatusChip {
                 Text(statusText)
@@ -911,33 +1854,31 @@ private struct ProjectMetroTileView: View {
     private func smallPrimaryPanel(for panel: ProjectTileLivePanel) -> some View {
         switch panel {
         case .progress:
-            VStack(alignment: .trailing, spacing: 2) {
-                Spacer(minLength: 0)
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
-                    Text("\(Int(snapshot.progress * 100))")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                    Text("%")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .foregroundStyle(.white)
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text("\(Int(snapshot.progress * 100))")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                Text("%")
+                    .font(.system(size: 10, weight: .semibold))
             }
+            .foregroundStyle(.white)
         case .metrics, .nextTask:
-            VStack(alignment: .trailing, spacing: 2) {
-                Spacer(minLength: 0)
-                HStack(spacing: 4) {
-                    Image(systemName: snapshot.remainingCount > 0 ? "clock.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(snapshot.remainingCount > 0 ? .white.opacity(0.9) : Color.accentGreen)
-                    Text("\(snapshot.remainingCount > 0 ? snapshot.remainingCount : snapshot.completedCount)")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                }
+            HStack(spacing: 4) {
+                Image(systemName: snapshot.remainingCount > 0 ? "clock.fill" : "checkmark.circle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(snapshot.remainingCount > 0 ? .white.opacity(0.9) : Color.accentGreen)
+                Text("\(snapshot.remainingCount > 0 ? snapshot.remainingCount : snapshot.completedCount)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
             }
         }
     }
 
     @ViewBuilder
-    private func mediumPrimaryPanel(for panel: ProjectTileLivePanel) -> some View {
+    private func mediumPrimaryPanel(
+        for panel: ProjectTileLivePanel,
+        secondaryContent: ProjectTileSecondaryContent,
+        showsDate: Bool
+    ) -> some View {
         switch panel {
         case .progress:
             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
@@ -948,48 +1889,102 @@ private struct ProjectMetroTileView: View {
                         .font(.system(size: 18, weight: .semibold))
                 }
 
-                HStack(spacing: WeekSpacing.sm) {
-                    metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
-                    metricCard(title: String(localized: "project.stat.total"), value: snapshot.totalCount, tint: .white)
+                switch secondaryContent {
+                case .metricCards:
+                    HStack(spacing: WeekSpacing.sm) {
+                        metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
+                        metricCard(title: String(localized: "project.stat.total"), value: snapshot.totalCount, tint: .white)
+                    }
+                case .compactPills:
+                    HStack(spacing: WeekSpacing.sm) {
+                        metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: .accentGreen)
+                        metricPill(icon: "list.bullet", value: snapshot.totalCount, tint: .white)
+                    }
+                case .none, .microStatsStrip:
+                    EmptyView()
                 }
             }
         case .metrics:
-            HStack(spacing: WeekSpacing.sm) {
-                metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
-                metricCard(title: String(localized: "project.stat.remaining"), value: snapshot.remainingCount, tint: .white)
+            switch secondaryContent {
+            case .metricCards:
+                HStack(spacing: WeekSpacing.sm) {
+                    metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
+                    metricCard(title: String(localized: "project.stat.remaining"), value: snapshot.remainingCount, tint: .white)
+                }
+            case .compactPills:
+                HStack(spacing: WeekSpacing.sm) {
+                    metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: .accentGreen)
+                    metricPill(icon: "clock.fill", value: snapshot.remainingCount, tint: .white)
+                }
+            case .none, .microStatsStrip:
+                EmptyView()
             }
         case .nextTask:
-            nextTaskPanel(showsDate: true, titleFontSize: 17, secondaryFontSize: 12)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                nextTaskPanel(
+                    showsDate: showsDate,
+                    titleFontSize: 17,
+                    secondaryFontSize: 12
+                )
+                if secondaryContent == .compactPills {
+                    HStack(spacing: WeekSpacing.sm) {
+                        metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: .accentGreen)
+                        metricPill(icon: "clock.fill", value: snapshot.remainingCount, tint: .white)
+                    }
+                } else if secondaryContent == .metricCards {
+                    HStack(spacing: WeekSpacing.sm) {
+                        metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
+                        metricCard(title: String(localized: "project.stat.remaining"), value: snapshot.remainingCount, tint: .white)
+                    }
+                }
+            }
         }
     }
 
     @ViewBuilder
-    private func widePrimaryPanel(for panel: ProjectTileLivePanel) -> some View {
+    private func widePrimaryPanel(for panel: ProjectTileLivePanel, secondaryContent: ProjectTileSecondaryContent) -> some View {
         switch panel {
         case .progress:
-            HStack(alignment: .bottom, spacing: WeekSpacing.lg) {
-                HStack(alignment: .lastTextBaseline, spacing: 3) {
-                    Text("\(Int(snapshot.progress * 100))")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                    Text("%")
-                        .font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HStack(alignment: .bottom, spacing: WeekSpacing.lg) {
+                    HStack(alignment: .lastTextBaseline, spacing: 3) {
+                        Text("\(Int(snapshot.progress * 100))")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                        Text("%")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        compactStatLabel(String(localized: "project.stat.completed"), value: snapshot.completedCount)
+                        compactStatLabel(String(localized: "project.stat.remaining"), value: snapshot.remainingCount)
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    compactStatLabel(String(localized: "project.stat.completed"), value: snapshot.completedCount)
-                    compactStatLabel(String(localized: "project.stat.remaining"), value: snapshot.remainingCount)
+                if secondaryContent == .compactPills {
+                    wideStatsStrip
                 }
             }
         case .metrics:
-            HStack(spacing: WeekSpacing.sm) {
-                metricCard(title: String(localized: "project.stat.completed"), value: snapshot.completedCount, tint: .accentGreen)
-                metricCard(title: String(localized: "project.stat.remaining"), value: snapshot.remainingCount, tint: .white)
-                if snapshot.expiredCount > 0 {
-                    metricCard(title: String(localized: "project.stat.expired"), value: snapshot.expiredCount, tint: .taskDDL)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                if snapshot.totalCount == 0 {
+                    Text(String(localized: "project.tasks.empty"))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                }
+                if secondaryContent == .compactPills {
+                    wideStatsStrip
                 }
             }
         case .nextTask:
-            nextTaskPanel(showsDate: true, titleFontSize: 18, secondaryFontSize: 12)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                nextTaskPanel(
+                    showsDate: isEditing ? false : true,
+                    titleFontSize: 18,
+                    secondaryFontSize: 12
+                )
+                if secondaryContent == .compactPills {
+                    wideStatsStrip
+                }
+            }
         }
     }
 
@@ -1015,6 +2010,23 @@ private struct ProjectMetroTileView: View {
             Text("\(value)")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+        }
+    }
+
+    private var smallStatsStrip: some View {
+        HStack(spacing: WeekSpacing.xs) {
+            metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: .accentGreen)
+            metricPill(icon: "list.bullet", value: snapshot.totalCount, tint: .white)
+        }
+    }
+
+    private var wideStatsStrip: some View {
+        HStack(spacing: WeekSpacing.xs) {
+            metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: .accentGreen)
+            metricPill(icon: "clock.fill", value: snapshot.remainingCount, tint: .white)
+            if snapshot.expiredCount > 0 {
+                metricPill(icon: "exclamationmark.triangle.fill", value: snapshot.expiredCount, tint: .taskDDL)
+            }
         }
     }
 
@@ -1203,9 +2215,7 @@ private struct MindStampsFullView: View {
                     emptyState
                 } else {
                     MindStampListView(viewModel: viewModel)
-                }
 
-                if shouldShowFooterCreateButton {
                     Button {
                         showingEditor = true
                     } label: {
@@ -1239,10 +2249,6 @@ private struct MindStampsFullView: View {
         }) {
             MindStampEditorSheet(viewModel: viewModel)
         }
-    }
-
-    private var shouldShowFooterCreateButton: Bool {
-        !viewModel.stamps.isEmpty
     }
 
     private var emptyState: some View {

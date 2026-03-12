@@ -1,10 +1,21 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - PendingWeekDetailView - 未来周详情页
 
 struct PendingWeekDetailView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.editMode) private var editMode
+
     let week: WeekModel
+
     @State private var selectedDayId: String = ""
+    @State private var viewModel: PendingViewModel?
+    @State private var showingAddSheet = false
+    @State private var editingTask: TaskItem?
+    @State private var deletingTask: TaskItem?
+    @State private var errorMessage: String?
+
     private let calendar = Calendar(identifier: .iso8601)
 
     private static let monthDayFormatter: DateFormatter = {
@@ -26,6 +37,15 @@ struct PendingWeekDetailView: View {
         sortedDays.first(where: { $0.dayId == selectedDayId }) ?? sortedDays.first
     }
 
+    private var isSelectedDayEditable: Bool {
+        guard let selectedDay, let viewModel else { return false }
+        return viewModel.canEdit(selectedDay)
+    }
+
+    private var isEditingDraft: Bool {
+        (editMode?.wrappedValue.isEditing ?? false) && isSelectedDayEditable
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
@@ -40,8 +60,112 @@ struct PendingWeekDetailView: View {
         .background(Color.backgroundPrimary)
         .navigationTitle(week.relativeWeekLabel())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { draftToolbar }
         .onAppear {
+            if viewModel == nil {
+                viewModel = PendingViewModel(modelContext: modelContext)
+            }
             initializeDaySelectionIfNeeded()
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            if let selectedDay {
+                TaskEditorSheet(
+                    title: String(localized: "draft.add_title"),
+                    onSave: { title, description, type, steps, attachments in
+                        guard let viewModel else { return }
+                        do {
+                            try viewModel.addDraftTask(
+                                to: selectedDay,
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                            showingAddSheet = false
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+        }
+        .sheet(item: $editingTask) { task in
+            if let selectedDay {
+                TaskEditorSheet(
+                    title: String(localized: "draft.edit_title"),
+                    initialTitle: task.title,
+                    initialDescription: task.taskDescription,
+                    initialType: task.taskType,
+                    initialSteps: task.steps,
+                    initialAttachments: task.attachments,
+                    onSave: { title, description, type, steps, attachments in
+                        guard let viewModel else { return }
+                        do {
+                            try viewModel.updateDraftTask(
+                                task,
+                                in: selectedDay,
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                            editingTask = nil
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+        }
+        .confirmationDialog(
+            String(localized: "project.task.delete.confirm"),
+            isPresented: Binding(
+                get: { deletingTask != nil },
+                set: { if !$0 { deletingTask = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "project.task.delete.action"), role: .destructive) {
+                confirmDeleteSelectedTask()
+            }
+
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                deletingTask = nil
+            }
+        } message: {
+            Text(String(localized: "project.task.delete.message"))
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(get: {
+            errorMessage != nil
+        }, set: { newValue in
+            if !newValue { errorMessage = nil }
+        })) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var draftToolbar: some ToolbarContent {
+        if isSelectedDayEditable {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(isEditingDraft ? String(localized: "action.done") : String(localized: "action.edit")) {
+                    editMode?.wrappedValue = isEditingDraft ? .inactive : .active
+                }
+                .accessibilityIdentifier("pendingDraftEditButton")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus.circle")
+                }
+                .accessibilityIdentifier("pendingDraftAddButton")
+            }
         }
     }
 
@@ -100,8 +224,6 @@ struct PendingWeekDetailView: View {
         }
     }
 
-    // MARK: - Helper Views
-
     private func statBlock(title: String, value: Int, color: Color) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
             Text(title)
@@ -138,6 +260,9 @@ struct PendingWeekDetailView: View {
         return Button {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
                 selectedDayId = day.dayId
+                if isEditingDraft {
+                    editMode?.wrappedValue = .inactive
+                }
             }
         } label: {
             VStack(spacing: WeekSpacing.xxs) {
@@ -189,21 +314,69 @@ struct PendingWeekDetailView: View {
                 }
 
                 if displayTasks.isEmpty {
-                    Text(String(localized: "pending.week.add_tasks"))
-                        .font(.bodyMedium)
-                        .foregroundColor(.textTertiary)
-                } else {
-                    VStack(spacing: WeekSpacing.sm) {
-                        ForEach(displayTasks) { task in
-                            TaskRowView(task: task)
+                    emptyDraftState
+                } else if isSelectedDayEditable {
+                    PendingEditableDraftTaskList(
+                        tasks: displayTasks,
+                        isEditingDraft: isEditingDraft,
+                        onTaskTap: { task in
+                            if !isEditingDraft {
+                                editingTask = task
+                            }
+                        },
+                        onMoveUp: { index in
+                            do {
+                                try viewModel?.moveDraftTasks(in: day, from: IndexSet(integer: index), to: index - 1)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        },
+                        onMoveDown: { index in
+                            do {
+                                try viewModel?.moveDraftTasks(in: day, from: IndexSet(integer: index), to: index + 2)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        },
+                        onDelete: { index in
+                            guard displayTasks.indices.contains(index) else { return }
+                            deletingTask = displayTasks[index]
                         }
-                    }
+                    )
+                } else {
+                    readOnlyTaskList(displayTasks)
                 }
             }
         }
     }
 
-    // MARK: - Computed Properties
+    private var emptyDraftState: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            Text(String(localized: "pending.week.add_tasks"))
+                .font(.bodyMedium)
+                .foregroundColor(.textTertiary)
+
+            if isSelectedDayEditable {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Label(String(localized: "action.add"), systemImage: "plus.circle.fill")
+                        .font(.bodyMedium.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.weekyiiPrimary)
+                .accessibilityIdentifier("pendingDraftInlineAddButton")
+            }
+        }
+    }
+
+    private func readOnlyTaskList(_ tasks: [TaskItem]) -> some View {
+        VStack(spacing: WeekSpacing.sm) {
+            ForEach(tasks, id: \.id) { task in
+                TaskRowView(task: task)
+            }
+        }
+    }
 
     private var draftDaysCount: Int {
         week.days.filter { $0.status == .draft }.count
@@ -212,8 +385,6 @@ struct PendingWeekDetailView: View {
     private var emptyDaysCount: Int {
         week.days.filter { $0.status == .empty }.count
     }
-
-    // MARK: - Formatting
 
     private func formatDateRange() -> String {
         let start = Self.monthDayFormatter.string(from: week.startDate)
@@ -262,9 +433,104 @@ struct PendingWeekDetailView: View {
         case .complete: return 3
         }
     }
+
+    private func confirmDeleteSelectedTask() {
+        guard let deletingTask, let selectedDay else { return }
+        let currentDraftTasks = selectedDay.sortedDraftTasks
+        guard let index = currentDraftTasks.firstIndex(where: { $0.id == deletingTask.id }) else {
+            self.deletingTask = nil
+            return
+        }
+
+        do {
+            try viewModel?.deleteDraftTasks(in: selectedDay, at: IndexSet(integer: index))
+            self.deletingTask = nil
+        } catch {
+            self.deletingTask = nil
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
-// MARK: - Preview
+private struct PendingEditableDraftTaskList: View {
+    let tasks: [TaskItem]
+    let isEditingDraft: Bool
+    let onTaskTap: (TaskItem) -> Void
+    let onMoveUp: (Int) -> Void
+    let onMoveDown: (Int) -> Void
+    let onDelete: (Int) -> Void
+
+    var body: some View {
+        let indices = Array(tasks.indices)
+        VStack(spacing: WeekSpacing.sm) {
+            SwiftUI.ForEach<[Int], Int, PendingEditableDraftTaskRow>(indices, id: \.self) { index in
+                PendingEditableDraftTaskRow(
+                    index: index,
+                    task: tasks[index],
+                    taskCount: tasks.count,
+                    isEditingDraft: isEditingDraft,
+                    onTaskTap: { onTaskTap(tasks[index]) },
+                    onMoveUp: { onMoveUp(index) },
+                    onMoveDown: { onMoveDown(index) },
+                    onDelete: { onDelete(index) }
+                )
+            }
+        }
+    }
+}
+
+private struct PendingEditableDraftTaskRow: View {
+    let index: Int
+    let task: TaskItem
+    let taskCount: Int
+    let isEditingDraft: Bool
+    let onTaskTap: () -> Void
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Button {
+                onTaskTap()
+            } label: {
+                TaskRowView(task: task)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(isEditingDraft)
+            .accessibilityIdentifier("pendingDraftTask_\(index)")
+
+            if isEditingDraft {
+                HStack(spacing: WeekSpacing.xs) {
+                    Button {
+                        onMoveUp()
+                    } label: {
+                        Image(systemName: "arrow.up")
+                    }
+                    .disabled(index == 0)
+
+                    Button {
+                        onMoveDown()
+                    } label: {
+                        Image(systemName: "arrow.down")
+                    }
+                    .disabled(index == taskCount - 1)
+
+                    Button(role: .destructive) {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .accessibilityIdentifier("pendingDraftDeleteButton_\(index)")
+                }
+                .foregroundStyle(Color.accentOrange)
+                .font(.caption)
+                .padding(.trailing, WeekSpacing.sm)
+            }
+        }
+    }
+}
 
 #Preview {
     let calendar = Calendar.current

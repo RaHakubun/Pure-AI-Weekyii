@@ -7,6 +7,8 @@ enum WeekyiiError: LocalizedError {
     case cannotEditStartedDay
     case killTimePassed
     case dateFormatInvalid
+    case taskTitleEmpty
+    case operationFailedRetry
     case postponeTargetMustBeFuture
     case postponeSourceTaskNotInToday
     case cannotPostponeCompletedTask
@@ -26,6 +28,10 @@ enum WeekyiiError: LocalizedError {
             return String(localized: "error.kill_time_passed", defaultValue: "Kill time has passed.")
         case .dateFormatInvalid:
             return String(localized: "error.date_format_invalid", defaultValue: "Invalid date format.")
+        case .taskTitleEmpty:
+            return String(localized: "project.error.task_title_empty", defaultValue: "Task title cannot be empty.")
+        case .operationFailedRetry:
+            return String(localized: "error.operation_failed_retry", defaultValue: "Operation failed, please try again.")
         case .postponeTargetMustBeFuture:
             return "只能后移到未来日期。"
         case .postponeSourceTaskNotInToday:

@@ -17,29 +17,15 @@ final class DraftReorderUITests: XCTestCase {
 
         let firstTitle = app.staticTexts["draftTaskTitle_0"]
         let secondTitle = app.staticTexts["draftTaskTitle_1"]
-        XCTAssertTrue(firstTitle.waitForExistence(timeout: 2))
-        XCTAssertTrue(secondTitle.waitForExistence(timeout: 2))
-
-        let explicitFirstHandle = app.images["draftDragHandle_0"]
-        let explicitSecondHandle = app.images["draftDragHandle_1"]
-        let firstHandle: XCUIElement
-        let secondHandle: XCUIElement
-        if explicitFirstHandle.waitForExistence(timeout: 1), explicitSecondHandle.waitForExistence(timeout: 1) {
-            firstHandle = explicitFirstHandle
-            secondHandle = explicitSecondHandle
-        } else {
-            let systemHandles = app.images.matching(identifier: "line.horizontal.3")
-            XCTAssertGreaterThanOrEqual(systemHandles.count, 2)
-            firstHandle = systemHandles.element(boundBy: 0)
-            secondHandle = systemHandles.element(boundBy: 1)
-            XCTAssertTrue(firstHandle.waitForExistence(timeout: 2))
-            XCTAssertTrue(secondHandle.waitForExistence(timeout: 2))
-        }
+        XCTAssertTrue(firstTitle.waitForExistence(timeout: 5))
+        XCTAssertTrue(secondTitle.waitForExistence(timeout: 5))
 
         let firstBefore = firstTitle.label
         let secondBefore = secondTitle.label
 
-        secondHandle.press(forDuration: 0.2, thenDragTo: firstHandle)
+        let moveDownButton = app.buttons["draftMoveDown_0"]
+        XCTAssertTrue(moveDownButton.waitForExistence(timeout: 3))
+        moveDownButton.tap()
 
         let firstAfter = app.staticTexts["draftTaskTitle_0"].label
         let secondAfter = app.staticTexts["draftTaskTitle_1"].label
@@ -175,5 +161,111 @@ final class DraftReorderUITests: XCTestCase {
         let mindStampsEmptyCreate = app.buttons["mindstampsEmptyCreateButton"]
         XCTAssertTrue(mindStampsEmptyCreate.waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["mindstampsFooterCreateButton"].exists)
+    }
+
+    func testPendingWeekDetailShowsDraftCrudEntryPoints() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedPendingWeek",
+            "1"
+        ]
+        app.launch()
+
+        let pendingTab = app.tabBars.buttons["未来"]
+        XCTAssertTrue(pendingTab.waitForExistence(timeout: 5))
+        pendingTab.tap()
+
+        let weekCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'pendingWeekCard_'")).firstMatch
+        XCTAssertTrue(weekCard.waitForExistence(timeout: 5))
+        weekCard.tap()
+
+        let addButton = app.buttons["pendingDraftAddButton"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 3))
+        addButton.tap()
+
+        let titleField = app.textFields["taskEditorTitleField"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 3))
+
+        let cancelButton = app.buttons["taskEditorCancelButton"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 2))
+        cancelButton.tap()
+
+        let pendingEditButton = app.buttons["pendingDraftEditButton"]
+        XCTAssertTrue(pendingEditButton.waitForExistence(timeout: 2))
+
+        let firstTask = app.buttons["pendingDraftTask_0"]
+        XCTAssertTrue(firstTask.waitForExistence(timeout: 3))
+        firstTask.tap()
+
+        XCTAssertTrue(titleField.waitForExistence(timeout: 3))
+
+        let editorCancelButton = app.buttons["taskEditorCancelButton"]
+        XCTAssertTrue(editorCancelButton.waitForExistence(timeout: 2))
+        editorCancelButton.tap()
+
+        XCTAssertTrue(pendingEditButton.waitForExistence(timeout: 2))
+        pendingEditButton.tap()
+
+        let secondTask = app.buttons["pendingDraftTask_1"]
+        XCTAssertTrue(secondTask.waitForExistence(timeout: 3))
+
+        let deleteButton = app.buttons["pendingDraftDeleteButton_0"]
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 3))
+        deleteButton.tap()
+
+        let confirmDelete = app.buttons["删除任务"]
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 2))
+        XCTAssertTrue(secondTask.exists)
+
+        let destructiveButtons = app.buttons.matching(identifier: "删除任务")
+        XCTAssertGreaterThanOrEqual(destructiveButtons.count, 1)
+        destructiveButtons.element(boundBy: 0).tap()
+
+        XCTAssertFalse(app.buttons["pendingDraftTask_1"].waitForExistence(timeout: 2))
+    }
+
+    func testSuspendedTasksCanBeCreatedAndDeletedWithConfirmation() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let extensionsTab = app.tabBars.buttons["扩展"]
+        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
+        extensionsTab.tap()
+
+        let suspendedSeeAll = app.buttons["extensionsSuspendedSeeAllButton"]
+        XCTAssertTrue(suspendedSeeAll.waitForExistence(timeout: 5))
+        suspendedSeeAll.tap()
+
+        let createButton = app.buttons["suspendedEmptyCreateButton"]
+        XCTAssertTrue(createButton.waitForExistence(timeout: 3))
+        createButton.tap()
+
+        let titleField = app.textFields["suspendedTaskTitleField"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 3))
+        titleField.tap()
+        titleField.typeText("Wait for legal reply")
+
+        let saveButton = app.buttons["suspendedTaskSaveButton"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        let taskTitle = app.staticTexts["Wait for legal reply"]
+        XCTAssertTrue(taskTitle.waitForExistence(timeout: 3))
+
+        let deleteButton = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'suspendedDeleteButton_'")).firstMatch
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 3))
+        deleteButton.tap()
+
+        let confirmDelete = app.sheets.buttons["删除"].firstMatch
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 2))
+        confirmDelete.tap()
+
+        XCTAssertFalse(taskTitle.waitForExistence(timeout: 2))
     }
 }

@@ -50,14 +50,17 @@ struct AddProjectTaskSheet: View {
                                                 .font(.bodyMedium)
                                         }
                                         .foregroundColor(taskType == type ? .white : type.color)
+                                        .frame(maxWidth: .infinity)
                                         .padding(.horizontal, WeekSpacing.md)
                                         .padding(.vertical, WeekSpacing.sm)
                                         .background(taskType == type ? type.color : type.color.opacity(0.1))
                                         .cornerRadius(WeekRadius.small)
                                     }
                                     .buttonStyle(.plain)
+                                    .frame(maxWidth: .infinity)
                                 }
                             }
+                            .frame(maxWidth: .infinity)
                         }
                     }
 

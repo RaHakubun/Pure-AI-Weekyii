@@ -65,6 +65,7 @@ struct PendingWeekCard: View {
             }
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("pendingWeekCard_\(week.weekId)")
     }
     
     private func formatDateRange() -> String {

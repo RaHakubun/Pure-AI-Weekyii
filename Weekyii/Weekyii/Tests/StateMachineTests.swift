@@ -12,6 +12,7 @@ final class StateMachineTests: XCTestCase {
         var lastProcessedDate: Date?
         var lastRolloverAt: Date?
         var runtimeErrorMessage: String?
+        var stateTransitionRevision: Int = 0
 
         func save() {}
 
@@ -22,16 +23,43 @@ final class StateMachineTests: XCTestCase {
         }
 
         func incrementDaysStarted() {}
+
+        func bumpStateTransitionRevision() {
+            stateTransitionRevision += 1
+        }
     }
 
     private struct TestNotificationService: NotificationScheduling {
         func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
         func cancelKillTimeNotification(for day: DayModel) {}
+        func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
+        func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
     }
 
     private struct TestSettings: KillTimeSettings {
         var defaultKillTimeHour: Int = 23
         var defaultKillTimeMinute: Int = 45
+    }
+
+    private final class MutableTimeProvider: TimeProviding {
+        private let iso8601Calendar = Calendar(identifier: .iso8601)
+        var mockDate: Date
+
+        init(mockDate: Date) {
+            self.mockDate = mockDate
+        }
+
+        var now: Date { mockDate }
+
+        var today: Date {
+            iso8601Calendar.startOfDay(for: mockDate)
+        }
+
+        var currentWeekId: String {
+            let week = iso8601Calendar.component(.weekOfYear, from: mockDate)
+            let year = iso8601Calendar.component(.yearForWeekOfYear, from: mockDate)
+            return String(format: "%04d-W%02d", year, week)
+        }
     }
 
     private static func makeContainer() throws -> ModelContainer {
@@ -41,7 +69,8 @@ final class StateMachineTests: XCTestCase {
             TaskItem.self,
             TaskStep.self,
             TaskAttachment.self,
-            ProjectModel.self
+            ProjectModel.self,
+            SuspendedTaskItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: config)
@@ -430,6 +459,70 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(day.killTimeHour, 23)
         XCTAssertEqual(day.killTimeMinute, 0)
         XCTAssertFalse(day.followsDefaultKillTime)
+    }
+
+    @MainActor
+    func test_stateMachine_processTransitionsBumpsTransitionRevision() throws {
+        let appState = makeAppState()
+        let machine = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: Date()),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: makeSettings()
+        )
+
+        XCTAssertEqual(appState.stateTransitionRevision, 0)
+
+        machine.processStateTransitions()
+
+        XCTAssertEqual(appState.stateTransitionRevision, 1)
+    }
+
+    @MainActor
+    func test_todayViewModel_refreshLoadsNewDayAfterCrossDayStateTransition() throws {
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        let appState = makeAppState()
+
+        let presentWeek = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(presentWeek)
+        guard let todayDay = presentWeek.days.first(where: { $0.dayId == today.dayId }) else {
+            XCTFail("Failed to resolve today day")
+            return
+        }
+        todayDay.status = .draft
+        try context.save()
+
+        let todayTime = MutableTimeProvider(mockDate: today.addingTimeInterval(10 * 60 * 60))
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: todayTime,
+            notificationService: TestNotificationService(),
+            appState: appState,
+            userSettings: Self.sharedViewModelSettings
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+        XCTAssertEqual(viewModel.today?.dayId, today.dayId)
+
+        let transitionMachine = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: tomorrow.addingTimeInterval(9 * 60 * 60)),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: makeSettings()
+        )
+        appState.lastProcessedDate = today
+
+        transitionMachine.processStateTransitions()
+
+        todayTime.mockDate = tomorrow.addingTimeInterval(9 * 60 * 60)
+        viewModel.refresh()
+
+        XCTAssertEqual(viewModel.today?.dayId, tomorrow.dayId)
     }
 
 }

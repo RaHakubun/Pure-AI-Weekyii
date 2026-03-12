@@ -98,7 +98,40 @@ struct DraftEditorView: View {
                     onPostponeTask(task)
                 }
             }
+
+            if editMode == .active {
+                VStack(spacing: WeekSpacing.xs) {
+                    Button {
+                        moveTask(from: index, to: max(index - 1, 0))
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.caption.bold())
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index == 0)
+                    .accessibilityIdentifier("draftMoveUp_\(index)")
+
+                    Button {
+                        moveTask(from: index, to: index + 2)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.caption.bold())
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index >= day.sortedDraftTasks.count - 1)
+                    .accessibilityIdentifier("draftMoveDown_\(index)")
+                }
+                .foregroundColor(.weekyiiPrimary)
+            }
         }
         .padding(.vertical, 2)
+    }
+
+    private func moveTask(from sourceIndex: Int, to destination: Int) {
+        do {
+            try viewModel.moveDraftTasks(from: IndexSet(integer: sourceIndex), to: destination)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

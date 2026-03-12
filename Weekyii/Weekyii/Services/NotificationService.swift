@@ -4,6 +4,8 @@ import UserNotifications
 protocol NotificationScheduling {
     func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?)
     func cancelKillTimeNotification(for day: DayModel)
+    func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem)
+    func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem)
 }
 
 final class NotificationService: NotificationScheduling {
@@ -97,6 +99,36 @@ final class NotificationService: NotificationScheduling {
         )
     }
 
+    func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {
+        cancelSuspendedTaskNotifications(for: task)
+
+        let now = Date()
+        let checkpoints = suspendedReminderDates(for: task)
+
+        for (index, reminderDate) in checkpoints.enumerated() where reminderDate > now {
+            let content = UNMutableNotificationContent()
+            content.title = "悬置箱提醒"
+            content.body = "这不是普通 Inbox。请在到期前续期、分配到具体某一天，或删除。"
+            content.sound = .default
+
+            let trigger = UNCalendarNotificationTrigger(
+                dateMatching: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminderDate),
+                repeats: false
+            )
+            let request = UNNotificationRequest(
+                identifier: suspendedReminderIdentifier(for: task, index: index),
+                content: content,
+                trigger: trigger
+            )
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
+
+    func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {
+        let identifiers = (0..<3).map { suspendedReminderIdentifier(for: task, index: $0) }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
     private func killDate(for day: DayModel) -> Date? {
         var components = calendar.dateComponents([.year, .month, .day], from: day.date)
         components.hour = day.killTimeHour
@@ -130,5 +162,24 @@ final class NotificationService: NotificationScheduling {
     private func minuteKey(for date: Date) -> String {
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
         return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)-\(parts.hour ?? 0)-\(parts.minute ?? 0)"
+    }
+
+    private func suspendedReminderIdentifier(for task: SuspendedTaskItem, index: Int) -> String {
+        "suspended-\(task.id.uuidString)-\(index)"
+    }
+
+    private func suspendedReminderDates(for task: SuspendedTaskItem) -> [Date] {
+        let dueDay = calendar.startOfDay(for: task.decisionDeadline)
+        let offsets = [-3, -1, 0]
+        return offsets.compactMap { offset in
+            guard let reminderDay = calendar.date(byAdding: .day, value: offset, to: dueDay) else {
+                return nil
+            }
+            var components = calendar.dateComponents([.year, .month, .day], from: reminderDay)
+            components.hour = 9
+            components.minute = 0
+            components.second = 0
+            return calendar.date(from: components)
+        }
     }
 }

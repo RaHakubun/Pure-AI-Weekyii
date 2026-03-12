@@ -3,6 +3,7 @@ import SwiftData
 
 struct PendingView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
     @State private var viewModel: PendingViewModel?
     @State private var selectedMonth = Date()
     @State private var showingCreateSheet = false
@@ -51,6 +52,10 @@ struct PendingView: View {
             if viewModel == nil {
                 viewModel = PendingViewModel(modelContext: modelContext)
             }
+            viewModel?.refresh()
+            viewModel?.seedPendingWeekForUITestsIfNeeded()
+        }
+        .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in

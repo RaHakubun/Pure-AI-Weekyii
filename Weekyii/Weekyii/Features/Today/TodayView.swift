@@ -132,6 +132,9 @@ struct TodayView: View {
         .onChange(of: userSettings.defaultKillTimeMinute) { _, _ in
             viewModel?.refresh()
         }
+        .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh()
+        }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue {
                 errorMessage = newValue

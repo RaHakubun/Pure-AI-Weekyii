@@ -11,9 +11,18 @@ struct WeekyiiApp: App {
     @Environment(\.scenePhase) private var scenePhase
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
 
     init() {
-        launchState = WeekyiiPersistence.bootstrapPersistentContainer()
+        if Self.isUITesting {
+            do {
+                launchState = .ready(try WeekyiiPersistence.makeModelContainer(inMemory: true))
+            } catch {
+                launchState = .failed("UI 测试容器初始化失败：\(error.localizedDescription)")
+            }
+        } else {
+            launchState = WeekyiiPersistence.bootstrapPersistentContainer()
+        }
     }
 
     var body: some Scene {

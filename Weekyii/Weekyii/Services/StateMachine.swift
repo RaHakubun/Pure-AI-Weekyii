@@ -6,9 +6,11 @@ protocol AppStateStore: AnyObject {
     var lastProcessedDate: Date? { get set }
     var lastRolloverAt: Date? { get set }
     var runtimeErrorMessage: String? { get set }
+    var stateTransitionRevision: Int { get set }
     func save()
     func markProcessed(at date: Date)
     func incrementDaysStarted()
+    func bumpStateTransitionRevision()
 }
 
 protocol KillTimeSettings {
@@ -54,8 +56,10 @@ struct StateMachine {
         processCrossWeek()
         syncTodayDefaultKillTimeIfNeeded(lastProcessedBeforeRun: lastProcessedBeforeRun)
         processKillTime()
+        processExpiredSuspendedTasks()
         refreshWeekSummaryMetrics()
         appState.markProcessed(at: timeProvider.now)
+        appState.bumpStateTransitionRevision()
         persist()
     }
 
@@ -240,6 +244,15 @@ struct StateMachine {
         let weeks = fetchWeeks(status: .past) + fetchWeeks(status: .present) + fetchWeeks(status: .pending)
         for week in weeks {
             updateMetrics(for: week)
+        }
+    }
+
+    private func processExpiredSuspendedTasks() {
+        let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
+        do {
+            _ = try service.sweepExpiredTasks(now: timeProvider.now)
+        } catch {
+            appState.runtimeErrorMessage = error.localizedDescription
         }
     }
 

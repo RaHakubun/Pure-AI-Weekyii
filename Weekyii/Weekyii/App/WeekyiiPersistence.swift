@@ -7,7 +7,7 @@ enum WeekyiiPersistence {
         case failed(String)
     }
 
-    static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV2.self)
+    static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV4.self)
 
     static func bootstrapPersistentContainer() -> LaunchState {
         let storeURL = persistentStoreURL()
@@ -266,6 +266,8 @@ enum WeekyiiMigrationPlan: SchemaMigrationPlan {
         [
             WeekyiiSchemaV1.self,
             WeekyiiSchemaV2.self,
+            WeekyiiSchemaV3.self,
+            WeekyiiSchemaV4.self,
         ]
     }
 
@@ -278,7 +280,9 @@ enum WeekyiiMigrationPlan: SchemaMigrationPlan {
                 didMigrate: { context in
                     try normalizeProjectTiles(in: context)
                 }
-            )
+            ),
+            .lightweight(fromVersion: WeekyiiSchemaV2.self, toVersion: WeekyiiSchemaV3.self),
+            .lightweight(fromVersion: WeekyiiSchemaV3.self, toVersion: WeekyiiSchemaV4.self),
         ]
     }
 
@@ -303,5 +307,73 @@ enum WeekyiiMigrationPlan: SchemaMigrationPlan {
         if context.hasChanges {
             try context.save()
         }
+    }
+}
+
+enum WeekyiiSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(3, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self,
+            SuspendedTaskItem.self,
+        ]
+    }
+
+    @Model
+    final class SuspendedTaskItem {
+        @Attribute(.unique) var id: UUID = UUID()
+
+        var title: String
+        var taskDescription: String
+        var taskType: TaskType
+        var createdAt: Date
+        var decisionDeadline: Date
+        var preferredCountdownDays: Int
+        var snoozeCount: Int
+        var statusRaw: String
+
+        init(
+            title: String,
+            taskDescription: String = "",
+            taskType: TaskType = .regular,
+            createdAt: Date = Date(),
+            decisionDeadline: Date,
+            preferredCountdownDays: Int,
+            snoozeCount: Int = 0,
+            statusRaw: String = SuspendedTaskStatus.active.rawValue
+        ) {
+            self.title = title
+            self.taskDescription = taskDescription
+            self.taskType = taskType
+            self.createdAt = createdAt
+            self.decisionDeadline = decisionDeadline
+            self.preferredCountdownDays = preferredCountdownDays
+            self.snoozeCount = snoozeCount
+            self.statusRaw = statusRaw
+        }
+    }
+}
+
+enum WeekyiiSchemaV4: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(4, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self,
+            SuspendedTaskItem.self,
+        ]
     }
 }

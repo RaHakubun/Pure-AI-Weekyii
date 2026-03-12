@@ -7,6 +7,20 @@ enum ProjectTileLivePanel: Hashable {
     case nextTask
 }
 
+enum ProjectTileLayoutStyle: Equatable {
+    case badge
+    case compactSummary
+    case dashboard
+    case timeline
+}
+
+enum ProjectTileSecondaryContent: Equatable {
+    case none
+    case microStatsStrip
+    case metricCards
+    case compactPills
+}
+
 struct ProjectTileContentInsets: Equatable {
     let top: CGFloat
     let leading: CGFloat
@@ -15,20 +29,26 @@ struct ProjectTileContentInsets: Equatable {
 }
 
 struct ProjectTilePresentation: Equatable {
+    let layoutStyle: ProjectTileLayoutStyle
+    let showsTitle: Bool
     let titleLineLimit: Int
     let showsStatusChip: Bool
     let showsNextTaskDate: Bool
+    let secondaryContent: ProjectTileSecondaryContent
     let contentInsets: ProjectTileContentInsets
     let livePanel: ProjectTileLivePanel
 
-    init(snapshot: ProjectTileSnapshot, size: ProjectTileSize, isEditing: Bool, liveTick: Int) {
+    init(snapshot: ProjectTileSnapshot, size: ProjectTileSize, isEditing: Bool, liveTick _: Int) {
         let hasNextTask = snapshot.hasUpcomingTask
 
         switch size {
         case .mini:
+            layoutStyle = .badge
+            showsTitle = !isEditing
             titleLineLimit = 1
             showsStatusChip = false
             showsNextTaskDate = false
+            secondaryContent = .none
             contentInsets = ProjectTileContentInsets(
                 top: 6,
                 leading: 6,
@@ -36,9 +56,12 @@ struct ProjectTilePresentation: Equatable {
                 trailing: isEditing ? 16 : 6
             )
         case .small:
+            layoutStyle = .compactSummary
+            showsTitle = true
             titleLineLimit = 1
             showsStatusChip = false
             showsNextTaskDate = false
+            secondaryContent = isEditing ? .none : .microStatsStrip
             contentInsets = ProjectTileContentInsets(
                 top: 6,
                 leading: 8,
@@ -46,9 +69,12 @@ struct ProjectTilePresentation: Equatable {
                 trailing: isEditing ? 20 : 8
             )
         case .medium:
-            titleLineLimit = 2
+            layoutStyle = .dashboard
+            showsTitle = true
+            titleLineLimit = isEditing ? 1 : 2
             showsStatusChip = true
-            showsNextTaskDate = true
+            showsNextTaskDate = !isEditing
+            secondaryContent = isEditing ? .compactPills : .metricCards
             contentInsets = ProjectTileContentInsets(
                 top: 12,
                 leading: 12,
@@ -56,9 +82,12 @@ struct ProjectTilePresentation: Equatable {
                 trailing: isEditing ? 30 : 14
             )
         case .wide:
+            layoutStyle = .timeline
+            showsTitle = true
             titleLineLimit = 1
-            showsStatusChip = !isEditing
-            showsNextTaskDate = true
+            showsStatusChip = true
+            showsNextTaskDate = !isEditing
+            secondaryContent = .compactPills
             contentInsets = ProjectTileContentInsets(
                 top: 10,
                 leading: 10,
@@ -67,29 +96,29 @@ struct ProjectTilePresentation: Equatable {
             )
         }
 
-        let panels = Self.panelSequence(for: size, hasNextTask: hasNextTask, totalCount: snapshot.totalCount)
-        let index = (Self.stableSeed(for: snapshot.projectID) + max(liveTick, 0)) % panels.count
-        livePanel = panels[index]
+        livePanel = Self.preferredPanel(
+            for: size,
+            hasNextTask: hasNextTask,
+            totalCount: snapshot.totalCount,
+            remainingCount: snapshot.remainingCount
+        )
     }
 
-    private static func panelSequence(for size: ProjectTileSize, hasNextTask: Bool, totalCount: Int) -> [ProjectTileLivePanel] {
+    private static func preferredPanel(
+        for size: ProjectTileSize,
+        hasNextTask: Bool,
+        totalCount: Int,
+        remainingCount: Int
+    ) -> ProjectTileLivePanel {
         switch size {
         case .mini:
-            return totalCount == 0 ? [.metrics] : [.progress, .metrics]
+            return remainingCount > 0 ? .metrics : (totalCount > 0 ? .progress : .metrics)
         case .small:
-            return totalCount == 0 ? [.metrics] : [.progress, .metrics]
+            return totalCount > 0 ? .progress : .metrics
         case .medium:
-            return hasNextTask ? [.nextTask, .progress] : [.progress, .metrics]
+            return totalCount > 0 ? .progress : (hasNextTask ? .nextTask : .metrics)
         case .wide:
-            return hasNextTask ? [.nextTask, .progress] : [.progress, .metrics]
-        }
-    }
-
-    private static func stableSeed(for id: UUID) -> Int {
-        withUnsafeBytes(of: id.uuid) { rawBuffer in
-            rawBuffer.reduce(0) { partialResult, byte in
-                (partialResult * 31 + Int(byte)) & 0x7fffffff
-            }
+            return hasNextTask ? .nextTask : (totalCount > 0 ? .progress : .metrics)
         }
     }
 }
