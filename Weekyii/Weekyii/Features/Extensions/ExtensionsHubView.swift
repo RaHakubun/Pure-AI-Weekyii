@@ -86,7 +86,7 @@ private struct SuspendedTasksModulePreview: View {
             title: "悬置箱",
             subtitle: "期限内收纳未成型的任务",
             icon: "hourglass.circle.fill",
-            iconColor: .accentOrange,
+            iconColor: .suspendedModuleTint,
             seeAllAccessibilityID: "extensionsSuspendedSeeAllButton",
             destination: {
                 SuspendedTasksFullView(viewModel: viewModel)
@@ -128,7 +128,7 @@ private struct SuspendedTasksModulePreview: View {
         VStack(spacing: WeekSpacing.sm) {
             Image(systemName: "hourglass.circle.fill")
                 .font(.system(size: 32))
-                .foregroundStyle(Color.accentOrange)
+                .foregroundStyle(Color.suspendedModuleTint)
 
             Text("先记下未决事项，再给它一个倒计时。")
                 .font(.subheadline)
@@ -143,7 +143,7 @@ private struct SuspendedTasksModulePreview: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, WeekSpacing.md)
                     .padding(.vertical, WeekSpacing.sm)
-                    .background(Color.orangeGradient)
+                    .background(Color.suspendedModuleGradient)
                     .clipShape(Capsule())
             }
             .accessibilityIdentifier("suspendedEmptyCreateButton")
@@ -185,7 +185,7 @@ private struct SuspendedTasksModulePreview: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.accentOrange)
+                .foregroundColor(.suspendedModuleTint)
             Text(label)
                 .font(.caption2)
                 .foregroundColor(.textSecondary)
@@ -496,7 +496,7 @@ private struct SuspendedTasksFullView: View {
     }
 
     private var guidanceCard: some View {
-        WeekCard(accentColor: .accentOrange) {
+        WeekCard(accentColor: .suspendedModuleTint) {
             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                 Text("在这里记录任务思绪")
                     .font(.titleSmall)
@@ -511,7 +511,7 @@ private struct SuspendedTasksFullView: View {
     }
 
     private var statsCard: some View {
-        WeekCard(accentColor: .accentOrange) {
+        WeekCard(accentColor: .suspendedModuleTint) {
             HStack(spacing: WeekSpacing.sm) {
                 statColumn(value: "\(stats.total)", label: "总数")
                 statColumn(value: "\(stats.dueSoon)", label: "7天内到期")
@@ -525,7 +525,7 @@ private struct SuspendedTasksFullView: View {
             VStack(spacing: WeekSpacing.md) {
                 Image(systemName: "hourglass.circle.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(Color.accentOrange)
+                    .foregroundStyle(Color.suspendedModuleTint)
 
                 Text("把暂时无法承诺到特定日期的任务放这里。")
                     .font(.bodyMedium)
@@ -536,7 +536,7 @@ private struct SuspendedTasksFullView: View {
                     showingCreateSheet = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentOrange)
+                .tint(.suspendedModuleTint)
                 .accessibilityIdentifier("suspendedEmptyCreateButton")
             }
             .frame(maxWidth: .infinity)
@@ -552,9 +552,9 @@ private struct SuspendedTasksFullView: View {
         .foregroundColor(.white)
         .padding(.horizontal, WeekSpacing.xl)
         .padding(.vertical, WeekSpacing.md)
-        .background(Color.orangeGradient)
+        .background(Color.suspendedModuleGradient)
         .clipShape(Capsule())
-        .shadow(color: Color.accentOrange.opacity(0.25), radius: 6, x: 0, y: 3)
+        .shadow(color: Color.suspendedModuleTint.opacity(0.25), radius: 6, x: 0, y: 3)
         .accessibilityIdentifier("suspendedFooterCreateButton")
         .padding(.top, WeekSpacing.md)
         .padding(.bottom, WeekSpacing.xl)
@@ -564,7 +564,7 @@ private struct SuspendedTasksFullView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(.titleMedium)
-                .foregroundColor(.accentOrange)
+                .foregroundColor(.suspendedModuleTint)
             Text(label)
                 .font(.caption)
                 .foregroundColor(.textSecondary)
@@ -652,7 +652,7 @@ private struct SuspendedTasksFullView: View {
                     assigningTask = task
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentOrange)
+                .tint(.suspendedModuleTint)
 
                 Spacer()
 
@@ -737,7 +737,7 @@ private struct SuspendedTaskEditorSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: WeekSpacing.lg) {
-                    WeekCard(accentColor: .accentOrange) {
+                    WeekCard(accentColor: .suspendedModuleTint) {
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                             Text("在这里记录未决定具体时限的任务")
                                 .font(.titleSmall)
@@ -827,16 +827,16 @@ private struct SuspendedTaskEditorSheet: View {
                                 }
                                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                                     RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                        .fill(Color.accentOrangeLight.opacity(0.22))
+                                        .fill(Color.suspendedModuleTintLight.opacity(0.22))
                                         .frame(height: 96)
                                         .overlay {
                                             VStack(spacing: 6) {
                                                 Image(systemName: "plus.square.fill")
                                                     .font(.title2)
-                                                    .foregroundColor(.accentOrange)
+                                                    .foregroundColor(.suspendedModuleTint)
                                                 Text("添加")
                                                     .font(.captionBold)
-                                                    .foregroundColor(.accentOrange)
+                                                    .foregroundColor(.suspendedModuleTint)
                                             }
                                         }
                                 }
@@ -847,7 +847,7 @@ private struct SuspendedTaskEditorSheet: View {
                         }
                     }
 
-                    WeekCard(accentColor: .accentOrange) {
+                    WeekCard(accentColor: .suspendedModuleTint) {
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
                             Text("倒计时")
                                 .font(.titleSmall)
@@ -936,10 +936,10 @@ private struct SuspendedTaskEditorSheet: View {
             countdownDays = days
         }
         .font(.captionBold)
-        .foregroundColor(isSelected ? .white : .accentOrange)
+        .foregroundColor(isSelected ? .white : .suspendedModuleTint)
         .padding(.horizontal, WeekSpacing.md)
         .padding(.vertical, WeekSpacing.sm)
-        .background(isSelected ? Color.accentOrange : Color.accentOrange.opacity(0.12))
+        .background(isSelected ? Color.suspendedModuleTint : Color.suspendedModuleTint.opacity(0.12))
         .clipShape(Capsule())
         .buttonStyle(.plain)
     }
@@ -988,7 +988,7 @@ private struct SuspendedTaskEditorSheet: View {
                     } label: {
                         Image(systemName: "trash")
                     }
-                    .foregroundColor(.accentOrange)
+                    .foregroundColor(.suspendedModuleTint)
                 }
                 .font(.caption)
             }
@@ -1037,7 +1037,7 @@ private struct SuspendedTaskEditorSheet: View {
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .fill(Color.accentOrangeLight.opacity(0.16))
+                .fill(Color.suspendedModuleTintLight.opacity(0.16))
                 .frame(height: 96)
                 .overlay(alignment: .bottomLeading) {
                     Text(fileLabel)
@@ -1085,7 +1085,7 @@ private struct SuspendedTaskAssignSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: WeekSpacing.lg) {
-                WeekCard(accentColor: .accentOrange) {
+                WeekCard(accentColor: .suspendedModuleTint) {
                     VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                         Text(taskTitle)
                             .font(.titleSmall)

@@ -32,6 +32,26 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     var backgroundColor: Color {
         Color(hex: WeekThemePalette.forTheme(self).backgroundSecondary)
     }
+
+    var primaryThemeHex: String {
+        WeekThemePalette.forTheme(self).primary
+    }
+
+    var primaryThemeLightHex: String {
+        WeekThemePalette.forTheme(self).primaryLight
+    }
+
+    var suspendedModulePalette: SemanticModulePalette {
+        SemanticModulePalette(
+            tintHex: primaryThemeHex,
+            tintLightHex: primaryThemeLightHex
+        )
+    }
+}
+
+struct SemanticModulePalette: Equatable {
+    let tintHex: String
+    let tintLightHex: String
 }
 
 private struct WeekThemePalette {
@@ -227,6 +247,12 @@ extension Color {
     
     /// 深琥珀 - 主品牌色(深色)
     static var weekyiiPrimaryDark: Color { Color(hex: WeekThemeRuntime.palette().primaryDark) }
+
+    /// 悬置箱模块主色，跟随应用主题主色切换
+    static var suspendedModuleTint: Color { .weekyiiPrimary }
+
+    /// 悬置箱模块浅色停靠点
+    static var suspendedModuleTintLight: Color { .weekyiiPrimaryLight }
     
     // MARK: Accent Colors - 强调色
     
@@ -305,6 +331,15 @@ extension Color {
     static var greenGradient: LinearGradient {
         LinearGradient(
             colors: [Color.accentGreen, Color.accentGreenLight],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    /// 悬置箱模块渐变，跟随应用主题主色切换
+    static var suspendedModuleGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.suspendedModuleTint, Color.suspendedModuleTintLight],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

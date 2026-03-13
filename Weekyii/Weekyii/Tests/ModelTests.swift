@@ -57,6 +57,20 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(ProjectTileSize(storedValue: "large"), .wide)
     }
 
+    func test_suspendedModulePalette_usesPrimaryThemeTint() {
+        for theme in WeekTheme.allCases {
+            let palette = theme.suspendedModulePalette
+            XCTAssertEqual(palette.tintHex, theme.primaryThemeHex)
+        }
+    }
+
+    func test_suspendedModulePalette_usesPrimaryThemeGradientLightStop() {
+        for theme in WeekTheme.allCases {
+            let palette = theme.suspendedModulePalette
+            XCTAssertEqual(palette.tintLightHex, theme.primaryThemeLightHex)
+        }
+    }
+
     func test_projectTilePresentation_miniEditingStaysCompact() {
         let snapshot = makeTileSnapshot(
             projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
