@@ -2,6 +2,22 @@ import Foundation
 import Observation
 import SwiftData
 
+private struct PendingSystemTimeProvider: TimeProviding {
+    private let iso8601Calendar = Calendar(identifier: .iso8601)
+
+    var now: Date { Date() }
+
+    var today: Date {
+        iso8601Calendar.startOfDay(for: now)
+    }
+
+    var currentWeekId: String {
+        let week = iso8601Calendar.component(.weekOfYear, from: now)
+        let year = iso8601Calendar.component(.yearForWeekOfYear, from: now)
+        return String(format: "%04d-W%02d", year, week)
+    }
+}
+
 @MainActor
 @Observable
 final class PendingViewModel {
@@ -18,12 +34,14 @@ final class PendingViewModel {
     @ObservationIgnored private let modelContext: ModelContext
     @ObservationIgnored private let weekCalculator = WeekCalculator()
     @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
+    @ObservationIgnored private let timeProvider: TimeProviding
 
     var pendingWeeks: [WeekModel] = []
     var errorMessage: String?
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext, timeProvider: TimeProviding = PendingSystemTimeProvider()) {
         self.modelContext = modelContext
+        self.timeProvider = timeProvider
     }
 
     func refresh() {
@@ -41,7 +59,7 @@ final class PendingViewModel {
         refresh()
         guard pendingWeeks.isEmpty else { return }
 
-        let seedDate = calendar.startOfDay(for: Date()).addingDays(7)
+        let seedDate = timeProvider.today.addingDays(7)
         let week = weekCalculator.makeWeek(for: seedDate, status: .pending)
         modelContext.insert(week)
 
@@ -65,7 +83,7 @@ final class PendingViewModel {
 
     @discardableResult
     func createWeek(containing date: Date) -> WeekModel? {
-        let today = calendar.startOfDay(for: Date())
+        let today = timeProvider.today
         guard calendar.startOfDay(for: date) >= today else {
             errorMessage = "只能创建今天或未来的周"
             return nil
@@ -101,7 +119,7 @@ final class PendingViewModel {
             return nil
         }
 
-        let today = calendar.startOfDay(for: Date())
+        let today = timeProvider.today
         guard startDate >= today else {
             errorMessage = "只能创建今天或未来的周"
             return nil
@@ -163,7 +181,7 @@ final class PendingViewModel {
     }
 
     func canEdit(_ day: DayModel) -> Bool {
-        let today = calendar.startOfDay(for: Date())
+        let today = timeProvider.today
         let targetDay = calendar.startOfDay(for: day.date)
         return targetDay >= today && (day.status == .empty || day.status == .draft)
     }
@@ -234,8 +252,13 @@ final class PendingViewModel {
 
     func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws {
         guard canEdit(day) else { throw WeekyiiError.cannotEditStartedDay }
+        let count = day.sortedDraftTasks.count
+        let validSource = IndexSet(source.filter { $0 >= 0 && $0 < count })
+        guard validSource.isEmpty == false else { return }
+        let validDestination = min(max(destination, 0), count)
+
         var tasks = day.sortedDraftTasks
-        tasks.move(fromOffsets: source, toOffset: destination)
+        tasks.move(fromOffsets: validSource, toOffset: validDestination)
         for (index, task) in tasks.enumerated() {
             task.order = index + 1
         }
@@ -245,7 +268,7 @@ final class PendingViewModel {
     func weekOptions(in month: Date) -> [WeekSelectionOption] {
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) ?? month
         let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
-        let today = calendar.startOfDay(for: Date())
+        let today = timeProvider.today
 
         var options: [WeekSelectionOption] = []
         var cursor = monthStart.startOfWeek

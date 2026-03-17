@@ -152,19 +152,19 @@ struct PendingWeekDetailView: View {
     private var draftToolbar: some ToolbarContent {
         if isSelectedDayEditable {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(isEditingDraft ? String(localized: "action.done") : String(localized: "action.edit")) {
-                    editMode?.wrappedValue = isEditingDraft ? .inactive : .active
-                }
-                .accessibilityIdentifier("pendingDraftEditButton")
-            }
-
-            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showingAddSheet = true
                 } label: {
                     Image(systemName: "plus.circle")
                 }
                 .accessibilityIdentifier("pendingDraftAddButton")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(isEditingDraft ? String(localized: "action.done") : String(localized: "action.edit")) {
+                    editMode?.wrappedValue = isEditingDraft ? .inactive : .active
+                }
+                .accessibilityIdentifier("pendingDraftEditButton")
             }
         }
     }

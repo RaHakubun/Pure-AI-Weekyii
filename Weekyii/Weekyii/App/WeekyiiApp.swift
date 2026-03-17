@@ -33,28 +33,43 @@ struct WeekyiiApp: App {
                     .environmentObject(appState)
                     .environmentObject(userSettings)
                     .modelContainer(modelContainer)
-                    .preferredColorScheme(.light)
+                    .preferredColorScheme(userSettings.effectiveColorScheme)
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeStateMachine(modelContainer: modelContainer)
                         Task { await NotificationService.shared.requestAuthorization() }
                         stateMachine?.processStateTransitions()
+                        refreshWidgetSnapshot(modelContainer: modelContainer)
                     }
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
                             stateMachine?.processStateTransitions()
+                            refreshWidgetSnapshot(modelContainer: modelContainer)
                         }
+                    }
+                    .onChange(of: userSettings.selectedThemeRaw) { _, _ in
+                        guard !Self.isRunningTests else { return }
+                        refreshWidgetSnapshot(modelContainer: modelContainer)
+                    }
+                    .onChange(of: userSettings.appearanceModeRaw) { _, _ in
+                        guard !Self.isRunningTests else { return }
+                        refreshWidgetSnapshot(modelContainer: modelContainer)
+                    }
+                    .onChange(of: appState.dataRevision) { _, _ in
+                        guard !Self.isRunningTests else { return }
+                        refreshWidgetSnapshot(modelContainer: modelContainer)
                     }
                     .onReceive(minuteTimer) { _ in
                         guard !Self.isRunningTests else { return }
                         if scenePhase == .active {
                             stateMachine?.processStateTransitions()
+                            refreshWidgetSnapshot(modelContainer: modelContainer)
                         }
                     }
             case .failed(let message):
                 PersistenceFailureView(message: message)
-                    .preferredColorScheme(.light)
+                    .preferredColorScheme(userSettings.effectiveColorScheme)
             }
         }
     }
@@ -66,6 +81,16 @@ struct WeekyiiApp: App {
             notificationService: .shared,
             appState: appState,
             userSettings: userSettings
+        )
+    }
+
+    private func refreshWidgetSnapshot(modelContainer: ModelContainer) {
+        WidgetSnapshotComposer.syncFromModelContext(
+            modelContext: modelContainer.mainContext,
+            now: Date(),
+            todayDate: Date(),
+            selectedThemeRaw: userSettings.selectedThemeRaw,
+            appearanceModeRaw: userSettings.appearanceModeRaw
         )
     }
 }

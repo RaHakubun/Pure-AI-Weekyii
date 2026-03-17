@@ -3,6 +3,10 @@ import SwiftData
 import UniformTypeIdentifiers
 import PhotosUI
 
+struct SuspendedCountdownPreset {
+    static let defaultOptions = [1, 2, 3, 5, 7, 10, 30]
+}
+
 // MARK: - Extensions Hub View (New Architecture)
 
 struct ExtensionsHubView: View {
@@ -331,7 +335,6 @@ private struct SuspendedTasksFullView: View {
     @State private var showingCreateSheet = false
     @State private var editingTask: SuspendedTaskItem?
     @State private var deletingTask: SuspendedTaskItem?
-    @State private var extendingTask: SuspendedTaskItem?
     @State private var assigningTask: SuspendedTaskItem?
     @State private var errorMessage: String?
 
@@ -441,30 +444,6 @@ private struct SuspendedTasksFullView: View {
             }
         }
         .confirmationDialog(
-            "续期悬置任务",
-            isPresented: Binding(
-                get: { extendingTask != nil },
-                set: { if !$0 { extendingTask = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let task = extendingTask {
-                Button("续期 10 天") {
-                    viewModel.extendSuspendedTask(task, by: 10)
-                    extendingTask = nil
-                }
-                Button("续期 30 天") {
-                    viewModel.extendSuspendedTask(task, by: 30)
-                    extendingTask = nil
-                }
-            }
-            Button("取消", role: .cancel) {
-                extendingTask = nil
-            }
-        } message: {
-            Text("续期会重新计算倒计时，并重排提醒。")
-        }
-        .confirmationDialog(
             "删除悬置任务",
             isPresented: Binding(
                 get: { deletingTask != nil },
@@ -499,13 +478,13 @@ private struct SuspendedTasksFullView: View {
         WeekCard(accentColor: .suspendedModuleTint) {
             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                 Text("在这里记录任务思绪")
-                    .font(.titleSmall)
+                    .font(.headline)
                     .foregroundColor(.textPrimary)
 
-                Text("收置未分派在具体日期的任务,需要任务过期倒计时.\n到期前可以续期、分配到具体日期，或者删除.\n逾期后系统会主动清理。")
-                    .font(.bodySmall)
+                Text("暂存未分配日期的任务。到期前可续期、分配或删除。")
+                    .font(.caption)
                     .foregroundColor(.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
             }
         }
     }
@@ -561,12 +540,12 @@ private struct SuspendedTasksFullView: View {
     }
 
     private func statColumn(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.titleMedium)
+                .font(.title3.weight(.semibold))
                 .foregroundColor(.suspendedModuleTint)
             Text(label)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundColor(.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -613,61 +592,79 @@ private struct SuspendedTasksFullView: View {
                 suspendedCountdownBadge(task)
             }
 
-            HStack(spacing: WeekSpacing.xs) {
-                Text(task.taskType.displayName)
-                    .font(.captionBold)
-                    .foregroundColor(task.taskType.color)
-                    .padding(.horizontal, WeekSpacing.sm)
-                    .padding(.vertical, 6)
-                    .background(task.taskType.color.opacity(0.12))
-                    .clipShape(Capsule())
-
-                Text(suspendedDeadlineLabel(for: task))
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-            }
+            suspendedMetaRow(task)
 
             HStack(spacing: WeekSpacing.sm) {
-                Label("\(task.steps.count) 步骤", systemImage: "list.bullet")
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                Label("\(task.attachments.count) 附件", systemImage: "paperclip")
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                Spacer()
-            }
-
-            HStack(spacing: WeekSpacing.sm) {
-                Button("编辑") {
-                    editingTask = task
-                }
-                .buttonStyle(.bordered)
-
-                Button("续期") {
-                    extendingTask = task
-                }
-                .buttonStyle(.bordered)
-
-                Button("分配到某天") {
-                    assigningTask = task
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.suspendedModuleTint)
-
                 Spacer()
 
-                Button(role: .destructive) {
-                    deletingTask = task
+                Menu {
+                    Button("分配到某天", systemImage: "calendar.badge.plus") {
+                        assigningTask = task
+                    }
+                    Button("编辑", systemImage: "pencil") {
+                        editingTask = task
+                    }
+                    Button("续期 10 天", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
+                        viewModel.extendSuspendedTask(task, by: 10)
+                    }
+                    Button("续期 30 天", systemImage: "clock.badge") {
+                        viewModel.extendSuspendedTask(task, by: 30)
+                    }
+                    Divider()
+                    Button("删除", systemImage: "trash", role: .destructive) {
+                        deletingTask = task
+                    }
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundColor(.textSecondary)
                 }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("suspendedDeleteButton_\(task.id.uuidString)")
+                .accessibilityIdentifier("suspendedTaskMenuButton_\(task.id.uuidString)")
             }
         }
         .padding(WeekSpacing.md)
         .background(Color.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+    }
+
+    private func suspendedMetaRow(_ task: SuspendedTaskItem) -> some View {
+        HStack(spacing: 6) {
+            Text(task.taskType.displayName)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(task.taskType.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(task.taskType.color.opacity(0.12))
+                .clipShape(Capsule())
+
+            Text("·")
+                .font(.caption)
+                .foregroundColor(.textTertiary)
+
+            Text(SuspendedTaskMetaFormatter.deadlineText(remainingDays: task.remainingDays()))
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+
+            Text("·")
+                .font(.caption)
+                .foregroundColor(.textTertiary)
+
+            Label(SuspendedTaskMetaFormatter.stepsText(count: task.steps.count), systemImage: "list.bullet")
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+
+            Text("·")
+                .font(.caption)
+                .foregroundColor(.textTertiary)
+
+            Label(SuspendedTaskMetaFormatter.attachmentsText(count: task.attachments.count), systemImage: "paperclip")
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 0)
+        }
     }
 }
 
@@ -691,6 +688,7 @@ private struct SuspendedTaskEditorSheet: View {
     @State private var newStepTitle: String = ""
     @FocusState private var isStepInputFocused: Bool
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var imagePreviewItem: ImagePreviewItem?
 
     init(
         title: String,
@@ -853,10 +851,12 @@ private struct SuspendedTaskEditorSheet: View {
                                 .font(.titleSmall)
                                 .foregroundColor(.textPrimary)
 
-                            HStack(spacing: WeekSpacing.sm) {
-                                presetChip(label: "10天", days: 10)
-                                presetChip(label: "30天", days: 30)
-                                presetChip(label: "自定义", days: countdownDays)
+                            let presets = SuspendedCountdownPreset.defaultOptions
+                            let columns = [GridItem(.adaptive(minimum: 62), spacing: WeekSpacing.sm)]
+                            LazyVGrid(columns: columns, spacing: WeekSpacing.sm) {
+                                ForEach(presets, id: \.self) { value in
+                                    presetChip(label: "\(value)天", days: value)
+                                }
                             }
 
                             Stepper(value: $countdownDays, in: 1...120) {
@@ -904,6 +904,9 @@ private struct SuspendedTaskEditorSheet: View {
                     .accessibilityIdentifier("suspendedTaskSaveButton")
                 }
             }
+        }
+        .fullScreenCover(item: $imagePreviewItem) { item in
+            ImageViewerScreen(image: item.image)
         }
     }
 
@@ -1034,6 +1037,7 @@ private struct SuspendedTaskEditorSheet: View {
     @ViewBuilder
     private func attachmentTile(_ attachment: TaskAttachment) -> some View {
         let fileLabel = attachment.fileName.isEmpty ? "附件" : attachment.fileName
+        let previewImage = attachment.data.flatMap { UIImage(data: $0) }
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
@@ -1064,6 +1068,11 @@ private struct SuspendedTaskEditorSheet: View {
                     .background(Circle().fill(.black.opacity(0.45)))
             }
             .offset(x: 6, y: -6)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let previewImage else { return }
+            imagePreviewItem = ImagePreviewItem(image: previewImage)
         }
     }
 }
@@ -1129,11 +1138,7 @@ private struct SuspendedTaskAssignSheet: View {
 }
 
 private func suspendedDeadlineLabel(for task: SuspendedTaskItem) -> String {
-    let remainingDays = task.remainingDays()
-    if remainingDays <= 0 {
-        return "今日到期"
-    }
-    return "\(remainingDays) 天后到期"
+    SuspendedTaskMetaFormatter.deadlineText(remainingDays: task.remainingDays())
 }
 
 private func suspendedCountdownBadge(_ task: SuspendedTaskItem) -> some View {
@@ -1147,6 +1152,23 @@ private func suspendedCountdownBadge(_ task: SuspendedTaskItem) -> some View {
         .padding(.vertical, 6)
         .background(color.opacity(0.12))
         .clipShape(Capsule())
+}
+
+enum SuspendedTaskMetaFormatter {
+    static func deadlineText(remainingDays: Int) -> String {
+        if remainingDays <= 0 {
+            return "今日到期"
+        }
+        return "\(remainingDays) 天后到期"
+    }
+
+    static func stepsText(count: Int) -> String {
+        "\(count) 步骤"
+    }
+
+    static func attachmentsText(count: Int) -> String {
+        "\(count) 附件"
+    }
 }
 
 // MARK: - Mind Stamps Module Preview

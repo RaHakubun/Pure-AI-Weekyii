@@ -16,16 +16,20 @@
     "%" : {
 
     },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
     "%lld" : {
 
     },
     "%lld 分钟" : {
-
-    },
-    "%lld 步骤" : {
-
-    },
-    "%lld 附件" : {
 
     },
     "%lld/%lld" : {
@@ -2659,6 +2663,70 @@
         }
       }
     },
+    "settings.appearance.dark" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        }
+      }
+    },
+    "settings.appearance.light" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        }
+      }
+    },
+    "settings.appearance.mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示模式"
+          }
+        }
+      }
+    },
+    "settings.appearance.system" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        }
+      }
+    },
     "settings.data.export" : {
       "localizations" : {
         "en" : {
@@ -3431,6 +3499,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "周与统计"
+          }
+        }
+      }
+    },
+    "settings.theme.color" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题色"
+          }
+        }
+      }
+    },
+    "settings.theme.preview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme Preview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题预览"
           }
         }
       }
@@ -4441,13 +4541,13 @@
         }
       }
     },
+    "七天详情已折叠" : {
+
+    },
+    "上方时间线仍然保留；需要展开时，切回“当前状态”或“信息横条”。" : {
+
+    },
     "临近截止" : {
-
-    },
-    "主题色" : {
-
-    },
-    "主题预览" : {
 
     },
     "仅对明日以后生效" : {
@@ -4462,9 +4562,6 @@
     "今日思想钢印" : {
 
     },
-    "任务后移" : {
-
-    },
     "任务类型" : {
 
     },
@@ -4472,6 +4569,12 @@
 
     },
     "保存" : {
+
+    },
+    "保存到相册" : {
+
+    },
+    "保存图片" : {
 
     },
     "倒计时" : {
@@ -4531,6 +4634,12 @@
     "在这里记录未决定具体时限的任务" : {
 
     },
+    "完成" : {
+
+    },
+    "完成编辑" : {
+
+    },
     "将移动到" : {
 
     },
@@ -4576,13 +4685,13 @@
     "提醒时刻" : {
 
     },
-    "收置未分派在具体日期的任务,需要任务过期倒计时.\n到期前可以续期、分配到具体日期，或者删除.\n逾期后系统会主动清理。" : {
-
-    },
     "数据库不可用" : {
 
     },
     "新增" : {
+
+    },
+    "新增任务" : {
 
     },
     "新增悬置任务" : {
@@ -4600,6 +4709,9 @@
     "是否开始今日任务流？" : {
 
     },
+    "暂存未分配日期的任务。到期前可续期、分配或删除。" : {
+
+    },
     "暂无步骤" : {
 
     },
@@ -4610,6 +4722,9 @@
 
     },
     "本周时间线" : {
+
+    },
+    "本周详情" : {
 
     },
     "步骤" : {
@@ -4648,22 +4763,19 @@
     "给自己一个清晰而坚定的开始。" : {
 
     },
-    "续期" : {
-
-    },
     "续期 10 天" : {
 
     },
     "续期 30 天" : {
 
     },
-    "续期会重新计算倒计时，并重排提醒。" : {
-
-    },
-    "续期悬置任务" : {
-
-    },
     "编辑" : {
+
+    },
+    "编辑草稿" : {
+
+    },
+    "草稿全屏" : {
 
     },
     "输入任务名称" : {
@@ -4673,6 +4785,9 @@
 
     },
     "进入后将按任务顺序推进，直到完成或截止。" : {
+
+    },
+    "退出全屏" : {
 
     },
     "附件" : {

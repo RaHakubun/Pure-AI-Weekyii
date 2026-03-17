@@ -195,7 +195,7 @@ struct AddProjectTaskSheet: View {
         var days: [CalDay] = []
         if leadingOffset > 0 {
             for i in (1...leadingOffset).reversed() {
-                let d = calendar.date(byAdding: .day, value: -i, to: monthStart)!
+                guard let d = calendar.date(byAdding: .day, value: -i, to: monthStart) else { continue }
                 days.append(CalDay(date: d, isCurrent: false))
             }
         }
@@ -207,7 +207,7 @@ struct AddProjectTaskSheet: View {
         let remainder = days.count % 7
         if remainder > 0 {
             for i in 0..<(7 - remainder) {
-                let d = calendar.date(byAdding: .day, value: i, to: monthEnd)!
+                guard let d = calendar.date(byAdding: .day, value: i, to: monthEnd) else { continue }
                 days.append(CalDay(date: d, isCurrent: false))
             }
         }
@@ -233,7 +233,7 @@ struct AddProjectTaskSheet: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .disabled(monthStart <= calendar.date(from: calendar.dateComponents([.year, .month], from: project.startDate))!)
+                    .disabled(monthStart <= (calendar.date(from: calendar.dateComponents([.year, .month], from: project.startDate)) ?? project.startDate))
 
                     Button {
                         withAnimation { currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth }
@@ -243,7 +243,7 @@ struct AddProjectTaskSheet: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .disabled(monthStart >= calendar.date(from: calendar.dateComponents([.year, .month], from: project.endDate))!)
+                    .disabled(monthStart >= (calendar.date(from: calendar.dateComponents([.year, .month], from: project.endDate)) ?? project.endDate))
                 }
             }
 

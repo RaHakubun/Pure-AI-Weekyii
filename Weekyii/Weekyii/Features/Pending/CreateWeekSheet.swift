@@ -239,7 +239,7 @@ private struct CustomCalendarView: View {
         // 前置填充（上个月的尾数日期）
         if leadingOffset > 0 {
             for i in (1...leadingOffset).reversed() {
-                let date = calendar.date(byAdding: .day, value: -i, to: monthStart)!
+                guard let date = calendar.date(byAdding: .day, value: -i, to: monthStart) else { continue }
                 days.append(CalendarDay(date: date, isCurrentMonth: false))
             }
         }
@@ -256,7 +256,7 @@ private struct CustomCalendarView: View {
         if remainder > 0 {
             let trailingCount = 7 - remainder
             for i in 0..<trailingCount {
-                let date = calendar.date(byAdding: .day, value: i, to: monthEnd)!
+                guard let date = calendar.date(byAdding: .day, value: i, to: monthEnd) else { continue }
                 days.append(CalendarDay(date: date, isCurrentMonth: false))
             }
         }

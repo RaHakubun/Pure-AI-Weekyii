@@ -1,5 +1,9 @@
 import Foundation
 import Combine
+import SwiftUI
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 final class UserSettings: ObservableObject {
     // Default Kill Time
@@ -41,6 +45,9 @@ final class UserSettings: ObservableObject {
 
     // Theme Settings
     @Published var selectedThemeRaw: String {
+        didSet { save() }
+    }
+    @Published var appearanceModeRaw: String {
         didSet { save() }
     }
     
@@ -99,6 +106,7 @@ final class UserSettings: ObservableObject {
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
         
         self.seedPastWeeks = defaults.object(forKey: "seedPastWeeks") as? Int ?? 8
@@ -110,6 +118,10 @@ final class UserSettings: ObservableObject {
         self.seedIncludeAttachments = defaults.object(forKey: "seedIncludeAttachments") as? Bool ?? false
         self.seedIncludeDescriptions = defaults.object(forKey: "seedIncludeDescriptions") as? Bool ?? true
         self.seedAllowExisting = defaults.object(forKey: "seedAllowExisting") as? Bool ?? false
+
+        let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
+        sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
+        sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
     }
     
     func save() {
@@ -123,6 +135,7 @@ final class UserSettings: ObservableObject {
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
+        defaults.set(appearanceModeRaw, forKey: "appearanceMode")
         defaults.set(developerSettingsEnabled, forKey: "developerSettingsEnabled")
         
         defaults.set(seedPastWeeks, forKey: "seedPastWeeks")
@@ -134,6 +147,14 @@ final class UserSettings: ObservableObject {
         defaults.set(seedIncludeAttachments, forKey: "seedIncludeAttachments")
         defaults.set(seedIncludeDescriptions, forKey: "seedIncludeDescriptions")
         defaults.set(seedAllowExisting, forKey: "seedAllowExisting")
+
+        let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
+        sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
+        sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
+
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
     
     // Validation helpers
@@ -154,5 +175,21 @@ final class UserSettings: ObservableObject {
     var selectedTheme: WeekTheme {
         get { WeekTheme(rawValue: selectedThemeRaw) ?? .amber }
         set { selectedThemeRaw = newValue.rawValue }
+    }
+
+    var appearanceMode: AppearanceMode {
+        get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
+        set { appearanceModeRaw = newValue.rawValue }
+    }
+
+    var effectiveColorScheme: ColorScheme? {
+        switch appearanceMode {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
     }
 }

@@ -73,6 +73,8 @@ struct TodayView: View {
     @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
     @State private var selectedSection: TodaySection = .today
     @State private var taskForPostpone: TaskItem?
+    @State private var isDraftFullscreenPresented = false
+    @State private var draftFullscreenSourceRect: CGRect = .zero
     @State private var pendingPostponeRequest: PendingPostponeRequest?
     @State private var pendingPostponePreview: TodayViewModel.PostponePreview?
     @State private var showingPostponeConfirm = false
@@ -164,8 +166,48 @@ struct TodayView: View {
             }
         }
         .sheet(item: $taskForPostpone) { task in
-            PostponeTaskSheet(taskTitle: task.title) { targetDate in
-                stagePostponeRequest(for: task, targetDate: targetDate)
+            PostponeTaskSheet(
+                taskTitle: task.title,
+                onSubmit: { targetDate in
+                    stagePostponeRequest(for: task, targetDate: targetDate)
+                },
+                presentationStyle: .sheet,
+                onCancel: {
+                    taskForPostpone = nil
+                }
+            )
+            .presentationDetents([.fraction(0.58), .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.backgroundPrimary)
+            .presentationCornerRadius(26)
+        }
+        .fullScreenCover(isPresented: $isDraftFullscreenPresented) {
+            if let viewModel, let day = viewModel.today {
+                DraftFullscreenEditorView(
+                    day: day,
+                    viewModel: viewModel,
+                    sourceRect: draftFullscreenSourceRect,
+                    onAddTask: {
+                        draftTaskEditorMode = .create
+                    },
+                    onEditTask: { task in
+                        draftTaskEditorMode = .edit(task)
+                    },
+                    onPostponeTask: { task in
+                        taskForPostpone = task
+                    },
+                    onClose: {
+                        isDraftFullscreenPresented = false
+                    }
+                )
+                .interactiveDismissDisabled(false)
+            }
+        }
+        .onChange(of: viewModel?.today?.status.rawValue) { _, newValue in
+            guard isDraftFullscreenPresented else { return }
+            let isStillDraftEditable = newValue == DayStatus.draft.rawValue || newValue == DayStatus.empty.rawValue
+            if !isStillDraftEditable {
+                isDraftFullscreenPresented = false
             }
         }
         .alert("确认后移任务", isPresented: $showingPostponeConfirm) {
@@ -394,7 +436,8 @@ struct TodayView: View {
                     },
                     onPostponeTask: { task in
                         taskForPostpone = task
-                    }
+                    },
+                    showsFullscreenButton: false
                 )
             }
         }
@@ -964,6 +1007,8 @@ struct TodayView: View {
                 .accessibilityLabel("思想钢印内容")
                 .accessibilityIdentifier("startFlowRitualCard")
 
+                Spacer(minLength: WeekSpacing.sm)
+
                 WeekButton("确认开始", style: .primary) {
                     do {
                         try viewModel.startDay()
@@ -1123,6 +1168,7 @@ private struct SectionToggleView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("todaySectionTodayButton")
             
             // 本周 按钮
             Button {
@@ -1140,6 +1186,7 @@ private struct SectionToggleView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("todaySectionWeekButton")
         }
         .background(
             GeometryReader { geo in
@@ -1224,3 +1271,170 @@ private struct SectionToggleView: View {
 }
 
 // MARK: - Task Creator Sheet
+private struct DraftFullscreenEditorView: View {
+    let day: DayModel
+    let viewModel: TodayViewModel
+    let sourceRect: CGRect
+    let onAddTask: () -> Void
+    let onEditTask: (TaskItem) -> Void
+    let onPostponeTask: (TaskItem) -> Void
+    let onClose: () -> Void
+
+    @State private var revealProgress: CGFloat = 0
+    @State private var appearOffsetY: CGFloat = 44
+    @State private var dragOffsetY: CGFloat = 0
+    @State private var topEditMode: EditMode = .inactive
+
+    var body: some View {
+        GeometryReader { proxy in
+            let origin = animationOrigin(in: proxy)
+            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let entryOffsetX = (origin.x - center.x) * (1 - revealProgress)
+            let offsetY = appearOffsetY + dragOffsetY
+            let scale = 0.94 + 0.06 * revealProgress
+
+            ZStack(alignment: .top) {
+                Color.backgroundPrimary
+                    .opacity(Double(0.88 + 0.12 * revealProgress))
+                    .ignoresSafeArea()
+
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: WeekSpacing.base) {
+                            daySummaryCard
+                            DraftEditorView(
+                                day: day,
+                                viewModel: viewModel,
+                                onAddTask: onAddTask,
+                                onEditTask: onEditTask,
+                                onPostponeTask: onPostponeTask,
+                                showsFullscreenButton: false,
+                                onFullscreenTap: nil,
+                                showsHeaderControls: false,
+                                showsDraftHint: false,
+                                externalEditMode: $topEditMode
+                            )
+                        }
+                        .padding(.horizontal, WeekSpacing.base)
+                        .padding(.bottom, proxy.safeAreaInsets.bottom + WeekSpacing.xl)
+                    }
+                    .background(Color.backgroundPrimary)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                dismissAnimated()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(Color.textPrimary)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.backgroundSecondary, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("draftFullscreenExitButton")
+                            .accessibilityLabel("退出全屏")
+                        }
+
+                        ToolbarItem(placement: .principal) {
+                            Text(day.dayId)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(Color.textPrimary)
+                        }
+
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            Button {
+                                onAddTask()
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .font(.title3.weight(.semibold))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.weekyiiPrimary)
+                            .accessibilityIdentifier("draftFullscreenAddButton")
+
+                            Button(topEditMode == .active ? "完成" : "编辑") {
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                                    topEditMode = topEditMode == .active ? .inactive : .active
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.weekyiiPrimary)
+                            .accessibilityIdentifier("draftFullscreenEditButton")
+                        }
+                    }
+                }
+                .environment(\.editMode, $topEditMode)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .scaleEffect(scale)
+                .offset(x: entryOffsetX, y: offsetY)
+                .opacity(Double(revealProgress))
+                .shadow(color: WeekShadow.medium.color.opacity(0.22), radius: 16, x: 0, y: 8)
+            }
+            .gesture(dismissGesture)
+            .onAppear {
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.84)) {
+                    revealProgress = 1
+                    appearOffsetY = 0
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private var daySummaryCard: some View {
+        WeekCard {
+            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                Text("\(day.date, format: Date.FormatStyle().year().month().day()) \(weekdayText(for: day.date))")
+                    .font(.titleSmall)
+                    .foregroundStyle(Color.textPrimary)
+                StatusBadge(status: day.status)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func weekdayText(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return formatter.string(from: date)
+    }
+
+    private var dismissGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard value.translation.height > 0 else { return }
+                dragOffsetY = value.translation.height
+                revealProgress = max(0.82, 1 - value.translation.height / 1200)
+            }
+            .onEnded { value in
+                if value.translation.height > 140 || value.predictedEndTranslation.height > 220 {
+                    dismissAnimated()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+                        dragOffsetY = 0
+                        revealProgress = 1
+                    }
+                }
+            }
+    }
+
+    private func dismissAnimated() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            dragOffsetY = 520
+            revealProgress = 0.96
+            appearOffsetY = 28
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            onClose()
+        }
+    }
+
+    private func animationOrigin(in proxy: GeometryProxy) -> CGPoint {
+        guard sourceRect != .zero else {
+            return CGPoint(x: proxy.size.width * 0.82, y: proxy.size.height * 0.18)
+        }
+        return CGPoint(x: sourceRect.midX, y: sourceRect.midY)
+    }
+}

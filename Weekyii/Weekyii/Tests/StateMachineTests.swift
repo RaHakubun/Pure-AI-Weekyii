@@ -6,6 +6,7 @@ final class StateMachineTests: XCTestCase {
     private var container: ModelContainer!
     private static let sharedViewModelSettings = UserSettings()
     private static var retainedTodayViewModels: [TodayViewModel] = []
+    private static var retainedWeekViewModels: [WeekViewModel] = []
 
     private final class TestAppState: AppStateStore {
         var systemStartDate: Date?
@@ -100,6 +101,10 @@ final class StateMachineTests: XCTestCase {
         retainedTodayViewModels.append(viewModel)
     }
 
+    private static func retainWeekViewModelForTestLifetime(_ viewModel: WeekViewModel) {
+        retainedWeekViewModels.append(viewModel)
+    }
+
     @MainActor
     func test_crossDay_executeToExpired() throws {
         let context = container.mainContext
@@ -179,6 +184,48 @@ final class StateMachineTests: XCTestCase {
         machine.processStateTransitions()
 
         XCTAssertEqual(week.status, .past)
+    }
+
+    @MainActor
+    func test_weekViewModel_refresh_promotesCurrentPendingWeekToPresent() throws {
+        let context = container.mainContext
+        let now = Date()
+        let currentWeekId = now.weekId
+        let pendingWeek = WeekCalculator().makeWeek(for: now, status: .pending)
+        context.insert(pendingWeek)
+        try context.save()
+
+        let viewModel = WeekViewModel(modelContext: context, timeProvider: MockTimeProvider(mockDate: now))
+        Self.retainWeekViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+
+        let weeks = try context.fetch(FetchDescriptor<WeekModel>())
+        XCTAssertEqual(weeks.filter { $0.weekId == currentWeekId }.count, 1)
+        XCTAssertEqual(weeks.first { $0.weekId == currentWeekId }?.status, .present)
+    }
+
+    @MainActor
+    func test_todayViewModel_refresh_promotesCurrentPendingWeekToPresent() throws {
+        let context = container.mainContext
+        let now = Date()
+        let currentWeekId = now.weekId
+        let pendingWeek = WeekCalculator().makeWeek(for: now, status: .pending)
+        context.insert(pendingWeek)
+        try context.save()
+
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: TestNotificationService(),
+            appState: makeAppState(),
+            userSettings: Self.sharedViewModelSettings
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+
+        let weeks = try context.fetch(FetchDescriptor<WeekModel>())
+        XCTAssertEqual(weeks.filter { $0.weekId == currentWeekId }.count, 1)
+        XCTAssertEqual(weeks.first { $0.weekId == currentWeekId }?.status, .present)
     }
 
     @MainActor

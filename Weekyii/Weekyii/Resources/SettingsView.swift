@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: UserSettings
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
     @State private var pendingDefaultKillTimeHour = 0
@@ -28,6 +29,20 @@ struct SettingsView: View {
                 
                 // MARK: - Week & Stats
                 Section {
+                    Picker(
+                        String(localized: "settings.appearance.mode", defaultValue: "显示模式"),
+                        selection: Binding(
+                            get: { settings.appearanceModeRaw },
+                            set: { settings.appearanceModeRaw = $0 }
+                        )
+                    ) {
+                        ForEach(AppearanceMode.allCases) { mode in
+                            Text(appearanceDisplayName(for: mode))
+                                .tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
                     Picker(selection: Binding(
                         get: { settings.selectedThemeRaw },
                         set: { settings.selectedThemeRaw = $0 }
@@ -47,7 +62,7 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: 12) {
                             SettingsIcon(icon: "paintpalette.fill", color: .purple)
-                            Text("主题色")
+                            Text(String(localized: "settings.theme.color", defaultValue: "主题色"))
                         }
                     }
 
@@ -502,30 +517,46 @@ struct SettingsView: View {
     }
 
     private var themePalettePreview: some View {
-        HStack(spacing: 12) {
+        let palette = settings.selectedTheme.palette(
+            for: settings.appearanceMode,
+            systemIsDark: colorScheme == .dark
+        )
+
+        return HStack(spacing: 12) {
             Color.clear
                 .frame(width: 28, height: 28) // Placeholder padding
-            Text("主题预览")
+            Text(String(localized: "settings.theme.preview", defaultValue: "主题预览"))
                 .foregroundStyle(.secondary)
             Spacer()
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(settings.selectedTheme.primaryColor)
+                    .fill(Color(hex: palette.primary))
                     .frame(width: 28, height: 28)
-                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.1), radius: 2, y: 1)
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(settings.selectedTheme.accentColor)
+                    .fill(Color(hex: palette.accentOrange))
                     .frame(width: 28, height: 28)
-                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.1), radius: 2, y: 1)
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(settings.selectedTheme.backgroundColor)
+                    .fill(Color(hex: palette.backgroundSecondary))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(settings.selectedTheme.primaryColor.opacity(0.35), lineWidth: 1)
+                            .stroke(Color(hex: palette.primary).opacity(0.35), lineWidth: 1)
                     )
                     .frame(width: 28, height: 28)
-                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.1), radius: 2, y: 1)
             }
+        }
+    }
+
+    private func appearanceDisplayName(for mode: AppearanceMode) -> String {
+        switch mode {
+        case .system:
+            return String(localized: "settings.appearance.system", defaultValue: "自动")
+        case .light:
+            return String(localized: "settings.appearance.light", defaultValue: "浅色")
+        case .dark:
+            return String(localized: "settings.appearance.dark", defaultValue: "深色")
         }
     }
 

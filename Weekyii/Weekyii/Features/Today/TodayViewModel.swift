@@ -78,6 +78,8 @@ final class TodayViewModel {
         if shouldPersist {
             persistOrRecordError()
         }
+
+        refreshWidgetSnapshot()
     }
 
     func seedDraftTasksForUITestsIfNeeded() {
@@ -387,9 +389,35 @@ final class TodayViewModel {
     }
 
     private func ensurePresentWeek() {
+        let currentWeekId = timeProvider.currentWeekId
         let descriptor = FetchDescriptor<WeekModel>()
-        let presentWeeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .present }
-        if presentWeeks.isEmpty == false { return }
+        let allWeeks = (try? modelContext.fetch(descriptor)) ?? []
+        let presentWeeks = allWeeks.filter { $0.status == .present }
+
+        if let currentPresent = presentWeeks.first(where: { $0.weekId == currentWeekId }) {
+            var changed = false
+            for extra in presentWeeks where extra.id != currentPresent.id {
+                extra.status = .past
+                changed = true
+            }
+            if changed {
+                persistOrRecordError()
+            }
+            return
+        }
+
+        if let existingCurrent = allWeeks.first(where: { $0.weekId == currentWeekId }) {
+            existingCurrent.status = .present
+            for week in presentWeeks where week.id != existingCurrent.id {
+                week.status = .past
+            }
+            persistOrRecordError()
+            return
+        }
+
+        for week in presentWeeks {
+            week.status = .past
+        }
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
         persistOrRecordError()
@@ -398,7 +426,10 @@ final class TodayViewModel {
     private func createMissingDay(for date: Date) -> DayModel? {
         // Locate present week; if absent, bail (caller already called ensurePresentWeek)
         let descriptor = FetchDescriptor<WeekModel>()
-        guard let week = try? modelContext.fetch(descriptor).first(where: { $0.status == .present }) else { return nil }
+        let weeks = (try? modelContext.fetch(descriptor)) ?? []
+        let targetWeek = weeks.first(where: { $0.status == .present && $0.weekId == date.weekId })
+            ?? weeks.first(where: { $0.status == .present })
+        guard let week = targetWeek else { return nil }
         let day = DayModel(dayId: date.dayId, date: date, status: .empty)
         week.days.append(day)
         persistOrRecordError()
@@ -437,6 +468,17 @@ final class TodayViewModel {
 
     private func syncToday() {
         today = fetchDay(by: timeProvider.today.dayId)
+        refreshWidgetSnapshot()
+    }
+
+    private func refreshWidgetSnapshot() {
+        WidgetSnapshotComposer.syncFromModelContext(
+            modelContext: modelContext,
+            now: timeProvider.now,
+            todayDate: timeProvider.today,
+            selectedThemeRaw: userSettings.selectedThemeRaw,
+            appearanceModeRaw: userSettings.appearanceModeRaw
+        )
     }
 }
 

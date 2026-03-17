@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - WeekCard - 增强版卡片组件
 
 struct WeekCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let content: Content
     let useGradient: Bool
     let accentColor: Color?
@@ -40,12 +41,20 @@ struct WeekCard<Content: View>: View {
         if useGradient {
             Color.weekyiiGradient
         } else {
-            Color.backgroundSecondary
+            ZStack {
+                Color.backgroundSecondary
+                if colorScheme == .dark {
+                    Color.backgroundTertiary.opacity(0.28)
+                }
+            }
         }
     }
 
     private var borderColor: Color {
-        useGradient ? Color.white.opacity(0.18) : Color.backgroundTertiary
+        if useGradient {
+            return Color.white.opacity(colorScheme == .dark ? 0.24 : 0.18)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.12) : Color.backgroundTertiary
     }
     
     @ViewBuilder

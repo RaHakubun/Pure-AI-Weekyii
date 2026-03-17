@@ -80,13 +80,13 @@ struct PendingView: View {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.orangeGradient)
-                    .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
+                    .fill(Color.weekyiiGradient)
+                    .shadow(color: WeekShadow.medium.color, radius: 6, x: 0, y: 3)
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                    .stroke(Color.weekyiiPrimary.opacity(0.22), lineWidth: 1)
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.backgroundSecondary)
             }
             .frame(width: 36, height: 36)
         }

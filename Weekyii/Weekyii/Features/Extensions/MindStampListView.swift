@@ -4,6 +4,7 @@ struct MindStampListView: View {
     let viewModel: MindStampViewModel
     @State private var editingItem: MindStampItem?
     @State private var deletingItem: MindStampItem?
+    @State private var imagePreviewItem: ImagePreviewItem?
 
     var body: some View {
         Group {
@@ -33,6 +34,9 @@ struct MindStampListView: View {
             }
         } message: {
             Text(String(localized: "mindstamp.delete.message"))
+        }
+        .fullScreenCover(item: $imagePreviewItem) { item in
+            ImageViewerScreen(image: item.image)
         }
     }
 
@@ -116,14 +120,18 @@ struct MindStampListView: View {
 
                 // Image
                 if let blob = stamp.imageBlob, let uiImage = UIImage(data: blob) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 160)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                        .allowsHitTesting(false)
+                    Button {
+                        imagePreviewItem = ImagePreviewItem(image: uiImage)
+                    } label: {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 160)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Photos
 import SwiftData
 
 struct TaskEditorSheet: View {
@@ -24,6 +25,7 @@ struct TaskEditorSheet: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showingStepFullText = false
     @State private var selectedStepFullText = ""
+    @State private var imagePreviewItem: ImagePreviewItem?
     
     init(
         title: String,
@@ -213,11 +215,14 @@ struct TaskEditorSheet: View {
                     .accessibilityIdentifier("taskEditorCancelButton")
                 }
             }
-        }
+    }
         .alert("步骤全文", isPresented: $showingStepFullText) {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
             Text(selectedStepFullText)
+        }
+        .fullScreenCover(item: $imagePreviewItem) { item in
+            ImageViewerScreen(image: item.image)
         }
     }
 
@@ -376,6 +381,7 @@ struct TaskEditorSheet: View {
     @ViewBuilder
     private func attachmentTile(_ attachment: TaskAttachment) -> some View {
         let fileLabel = attachment.fileName.isEmpty ? "Attachment" : attachment.fileName
+        let previewImage = attachment.data.flatMap { UIImage(data: $0) }
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
@@ -421,6 +427,11 @@ struct TaskEditorSheet: View {
                 .offset(x: 6, y: -6)
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let previewImage else { return }
+            imagePreviewItem = ImagePreviewItem(image: previewImage)
+        }
     }
 }
 
@@ -429,4 +440,140 @@ private struct TaskStepDraft: Identifiable {
     var title: String
     var isCompleted: Bool
     var sortOrder: Int
+}
+
+struct ImagePreviewItem: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+struct ImageViewerScreen: View {
+    let image: UIImage
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var showingSaveAction = false
+    @State private var saveAlert: PhotoSaveAlert?
+    @State private var imageSaver: ImageSaver?
+
+    private let minScale: CGFloat = 1
+    private let maxScale: CGFloat = 4
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let updated = lastScale * value
+                            scale = min(max(updated, minScale), maxScale)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.white)
+                    .background(Circle().fill(.black.opacity(0.5)))
+            }
+            .padding(WeekSpacing.base)
+        }
+        .onLongPressGesture(minimumDuration: 0.4) {
+            showingSaveAction = true
+        }
+        .confirmationDialog("保存图片", isPresented: $showingSaveAction) {
+            Button("保存到相册") {
+                saveToPhotos()
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+        }
+        .alert(item: $saveAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text(String(localized: "action.ok")))
+            )
+        }
+    }
+
+    private func saveToPhotos() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if PhotoLibraryAccess.canSave(status: status) {
+            performSave()
+            return
+        }
+
+        if status == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                DispatchQueue.main.async {
+                    if PhotoLibraryAccess.canSave(status: newStatus) {
+                        performSave()
+                    } else {
+                        presentDeniedAlert()
+                    }
+                }
+            }
+            return
+        }
+
+        presentDeniedAlert()
+    }
+
+    private func performSave() {
+        let saver = ImageSaver { error in
+            if let error {
+                saveAlert = PhotoSaveAlert(title: "保存失败", message: error.localizedDescription)
+            } else {
+                saveAlert = PhotoSaveAlert(title: "已保存", message: "图片已保存到相册")
+            }
+        }
+        imageSaver = saver
+        saver.save(image)
+    }
+
+    private func presentDeniedAlert() {
+        saveAlert = PhotoSaveAlert(title: "无法保存", message: "请在系统设置中允许添加照片。")
+    }
+}
+
+struct PhotoSaveAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+enum PhotoLibraryAccess {
+    static func canSave(status: PHAuthorizationStatus) -> Bool {
+        status == .authorized || status == .limited
+    }
+}
+
+final class ImageSaver: NSObject {
+    private let onComplete: (Error?) -> Void
+
+    init(onComplete: @escaping (Error?) -> Void) {
+        self.onComplete = onComplete
+    }
+
+    func save(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        DispatchQueue.main.async {
+            self.onComplete(error)
+        }
+    }
 }

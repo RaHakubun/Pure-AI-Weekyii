@@ -268,4 +268,41 @@ final class DraftReorderUITests: XCTestCase {
 
         XCTAssertFalse(taskTitle.waitForExistence(timeout: 2))
     }
+
+    func testWeekOverviewSupportsCardsStripsAndCollapsedModes() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let weekButton = app.buttons["todaySectionWeekButton"]
+        XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
+        weekButton.tap()
+
+        let cardsGrid = app.descendants(matching: .any)["weekOverviewCardsGrid"]
+        XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))
+
+        let stripsButton = app.buttons["weekOverviewMode_strips"]
+        XCTAssertTrue(stripsButton.waitForExistence(timeout: 3))
+        stripsButton.tap()
+
+        let stripList = app.descendants(matching: .any)["weekOverviewStripList"]
+        XCTAssertTrue(stripList.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["weekStripRow_0"].waitForExistence(timeout: 3))
+
+        let collapsedButton = app.buttons["weekOverviewMode_collapsed"]
+        XCTAssertTrue(collapsedButton.waitForExistence(timeout: 3))
+        collapsedButton.tap()
+
+        let collapsedState = app.descendants(matching: .any)["weekOverviewCollapsedState"]
+        XCTAssertTrue(collapsedState.waitForExistence(timeout: 3))
+
+        let cardsButton = app.buttons["weekOverviewMode_cards"]
+        XCTAssertTrue(cardsButton.waitForExistence(timeout: 3))
+        cardsButton.tap()
+
+        XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))
+    }
 }

@@ -16,9 +16,16 @@ private enum PostponeMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum PostponePresentationStyle {
+    case sheet
+    case centeredSquare
+}
+
 struct PostponeTaskSheet: View {
     let taskTitle: String
     let onSubmit: (Date) -> Void
+    var presentationStyle: PostponePresentationStyle = .sheet
+    var onCancel: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -53,102 +60,176 @@ struct PostponeTaskSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    Text("后移任务")
-                        .font(.title3.weight(.bold))
-                        .foregroundColor(.textPrimary)
-                    Text(taskTitle)
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                        .lineLimit(2)
-                }
+        Group {
+            if presentationStyle == .sheet {
+                content
+                    .background(Color.backgroundPrimary)
+            } else {
+                content
+                    .background(Color.backgroundPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.large))
+            }
+        }
+    }
 
-                Picker("后移方式", selection: $mode) {
-                    ForEach(PostponeMode.allCases) { item in
-                        Text(item.title).tag(item)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                if mode == .relative {
-                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                        Text("快捷选择")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.textSecondary)
-
-                        HStack(spacing: WeekSpacing.sm) {
-                            ForEach(quickRelativeOptions, id: \.self) { value in
-                                Button {
-                                    relativeDays = value
-                                } label: {
-                                    Text(value == 1 ? "明天" : "+\(value)天")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(relativeDays == value ? .white : .weekyiiPrimary)
-                                        .padding(.vertical, WeekSpacing.xs)
-                                        .padding(.horizontal, WeekSpacing.sm)
-                                        .background(
-                                            Capsule()
-                                                .fill(relativeDays == value ? Color.weekyiiPrimary : Color.weekyiiPrimary.opacity(0.12))
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        Stepper(value: $relativeDays, in: 1...365) {
-                            Text("后移 \(relativeDays) 天")
-                                .font(.bodyMedium)
+    private var content: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                            Text("后移任务")
+                                .font(.title2.weight(.bold))
                                 .foregroundColor(.textPrimary)
+                            Text(taskTitle)
+                                .font(.bodyLarge)
+                                .foregroundColor(.textSecondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        if presentationStyle == .centeredSquare {
+                            Button {
+                                dismissAction()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.textSecondary)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                } else {
-                    DatePicker(
-                        "目标日期",
-                        selection: $absoluteDate,
-                        in: minimumDate...,
-                        displayedComponents: .date
+
+                    Picker("后移方式", selection: $mode) {
+                        ForEach(PostponeMode.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .font(.bodyMedium.weight(.semibold))
+                    .frame(height: 44)
+
+                    if mode == .relative {
+                        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                            Text("快捷选择")
+                                .font(.bodySmall.weight(.semibold))
+                                .foregroundColor(.textSecondary)
+
+                            HStack(spacing: WeekSpacing.sm) {
+                                ForEach(quickRelativeOptions, id: \.self) { value in
+                                    Button {
+                                        relativeDays = value
+                                    } label: {
+                                        Text(value == 1 ? "明天" : "+\(value)天")
+                                            .font(.bodySmall.weight(.semibold))
+                                            .foregroundColor(relativeDays == value ? .white : .weekyiiPrimary)
+                                            .padding(.vertical, WeekSpacing.sm)
+                                            .padding(.horizontal, WeekSpacing.md)
+                                            .background(
+                                                Capsule()
+                                                    .fill(relativeDays == value ? Color.weekyiiPrimary : Color.weekyiiPrimary.opacity(0.12))
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                            Stepper(value: $relativeDays, in: 1...365) {
+                                Text("后移 \(relativeDays) 天")
+                                    .font(.titleSmall.weight(.semibold))
+                                    .foregroundColor(.textPrimary)
+                            }
+                            .controlSize(.large)
+                        }
+                    } else {
+                        DatePicker(
+                            "目标日期",
+                            selection: $absoluteDate,
+                            in: minimumDate...,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                        .tint(.weekyiiPrimary)
+                    }
+
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text("将移动到")
+                            .font(.bodySmall.weight(.semibold))
+                            .foregroundColor(.textSecondary)
+                        Text(resolvedTargetDateText)
+                            .font(.titleSmall.weight(.semibold))
+                            .foregroundColor(.textPrimary)
+                    }
+                    .padding(WeekSpacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium)
+                            .fill(Color.backgroundSecondary)
                     )
-                    .datePickerStyle(.graphical)
-                    .tint(.weekyiiPrimary)
                 }
+                .padding(.horizontal, WeekSpacing.lg)
+                .padding(.top, WeekSpacing.lg)
+                .padding(.bottom, WeekSpacing.base)
+            }
 
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    Text("将移动到")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.textSecondary)
-                    Text(resolvedTargetDateText)
-                        .font(.bodyLarge.weight(.semibold))
-                        .foregroundColor(.textPrimary)
-                }
-                .padding(WeekSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: WeekRadius.medium)
-                        .fill(Color.backgroundSecondary)
-                )
-
-                Spacer(minLength: 0)
-
+            VStack(spacing: 0) {
+                Divider()
                 HStack(spacing: WeekSpacing.sm) {
                     WeekButton("取消", style: .outline) {
-                        dismiss()
+                        dismissAction()
                     }
                     .frame(maxWidth: .infinity)
+                    .frame(height: 52)
 
                     WeekButton("继续", style: .primary) {
                         onSubmit(resolvedTargetDate)
-                        dismiss()
+                        dismissAction()
                     }
                     .frame(maxWidth: .infinity)
+                    .frame(height: 52)
                 }
+                .padding(.horizontal, WeekSpacing.lg)
+                .padding(.top, WeekSpacing.md)
+                .padding(.bottom, WeekSpacing.lg)
+                .background(Color.backgroundPrimary)
             }
-            .padding(WeekSpacing.base)
-            .navigationTitle("任务后移")
-            .navigationBarTitleDisplayMode(.inline)
-            .background(Color.backgroundPrimary)
         }
-        .presentationDragIndicator(.visible)
+    }
+
+    private func dismissAction() {
+        if let onCancel {
+            onCancel()
+        } else {
+            dismiss()
+        }
+    }
+}
+
+struct CenteredSquareSizing {
+    static func squareSide(for size: CGSize, scale: CGFloat = 0.7) -> CGFloat {
+        min(size.width, size.height) * scale
+    }
+}
+
+struct CenteredSquareModal<Content: View>: View {
+    let onDismiss: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = CenteredSquareSizing.squareSide(for: proxy.size, scale: 0.7)
+            ZStack {
+                Button(action: onDismiss) {
+                    Color.black.opacity(0.45)
+                }
+                .buttonStyle(.plain)
+                .ignoresSafeArea()
+
+                content()
+                    .frame(width: side, height: side)
+                    .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 10)
+            }
+        }
     }
 }

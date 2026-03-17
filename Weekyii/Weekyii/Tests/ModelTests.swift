@@ -1,5 +1,7 @@
 import XCTest
 import SwiftData
+import Photos
+import SwiftUI
 @testable import Weekyii
 
 final class ModelTests: XCTestCase {
@@ -242,6 +244,192 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(coordinator.step, .warning)
     }
 
+    func test_weekOverviewDisplayMode_cycleOrder() {
+        XCTAssertEqual(WeekOverviewDisplayMode.cards.next, .strips)
+        XCTAssertEqual(WeekOverviewDisplayMode.strips.next, .collapsed)
+        XCTAssertEqual(WeekOverviewDisplayMode.collapsed.next, .cards)
+    }
+
+    func test_weekOverviewDayStripSummary_prefersFocusTask() {
+        let day = DayModel(dayId: "2026-03-15", date: makeDate(2026, 3, 15, 9, 0), status: .execute)
+        day.tasks.append(TaskItem(title: "Write outline", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Backlog follow-up", order: 2, zone: .draft))
+
+        let summary = WeekOverviewDayStripSummary(day: day)
+
+        XCTAssertEqual(summary.highlight, .focus("Write outline"))
+    }
+
+    func test_weekOverviewDayStripSummary_fallsBackToDraftTask() {
+        let day = DayModel(dayId: "2026-03-16", date: makeDate(2026, 3, 16, 9, 0), status: .draft)
+        day.tasks.append(TaskItem(title: "Draft landing copy", order: 2, zone: .draft))
+        day.tasks.append(TaskItem(title: "Review assets", order: 1, zone: .draft))
+
+        let summary = WeekOverviewDayStripSummary(day: day)
+
+        XCTAssertEqual(summary.highlight, .draft("Review assets"))
+    }
+
+    func test_weekOverviewDayStripSummary_usesCompletedFallbackWhenNoActiveTasks() {
+        let day = DayModel(dayId: "2026-03-17", date: makeDate(2026, 3, 17, 9, 0), status: .completed)
+        let task = TaskItem(title: "Ship build", order: 1, zone: .complete)
+        task.completedOrder = 1
+        day.tasks.append(task)
+
+        let summary = WeekOverviewDayStripSummary(day: day)
+
+        XCTAssertEqual(summary.highlight, .completed("1 项已完成"))
+    }
+
+    func test_suspendedCountdownPreset_defaults() {
+        XCTAssertEqual(SuspendedCountdownPreset.defaultOptions, [1, 2, 3, 5, 7, 10, 30])
+    }
+
+    func test_centeredSquareSizing_usesMinDimension() {
+        let size = CenteredSquareSizing.squareSide(for: CGSize(width: 390, height: 844), scale: 0.7)
+        XCTAssertEqual(size, 273, accuracy: 0.01)
+    }
+
+    func test_photoLibraryAccess_canSave_onlyWhenAuthorizedOrLimited() {
+        XCTAssertTrue(PhotoLibraryAccess.canSave(status: .authorized))
+        XCTAssertTrue(PhotoLibraryAccess.canSave(status: .limited))
+        XCTAssertFalse(PhotoLibraryAccess.canSave(status: .denied))
+        XCTAssertFalse(PhotoLibraryAccess.canSave(status: .restricted))
+        XCTAssertFalse(PhotoLibraryAccess.canSave(status: .notDetermined))
+    }
+
+    func test_suspendedTaskMetaFormatter_buildsDeadlineAndCounters() {
+        XCTAssertEqual(SuspendedTaskMetaFormatter.deadlineText(remainingDays: 0), "今日到期")
+        XCTAssertEqual(SuspendedTaskMetaFormatter.deadlineText(remainingDays: 10), "10 天后到期")
+        XCTAssertEqual(SuspendedTaskMetaFormatter.stepsText(count: 3), "3 步骤")
+        XCTAssertEqual(SuspendedTaskMetaFormatter.attachmentsText(count: 2), "2 附件")
+    }
+
+    func test_arrayMove_ignoresOutOfRangeInputs() {
+        var values = ["A", "B", "C"]
+        values.move(fromOffsets: IndexSet(integer: 4), toOffset: 10)
+        XCTAssertEqual(values, ["A", "B", "C"])
+
+        values.move(fromOffsets: IndexSet(integer: 1), toOffset: -1)
+        XCTAssertEqual(values, ["B", "A", "C"])
+    }
+
+    func test_widgetSnapshotComposer_buildsPriorityOrderedPreviewAndTheme() {
+        let now = makeDate(2026, 3, 16, 9, 30)
+        let day = DayModel(dayId: "2026-03-16", date: now, status: .execute)
+        day.killTimeHour = 23
+        day.killTimeMinute = 45
+
+        day.tasks.append(TaskItem(title: "Focus task", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Frozen task", order: 2, zone: .frozen))
+        day.tasks.append(TaskItem(title: "Draft task", order: 3, zone: .draft))
+        let completed = TaskItem(title: "Done task", order: 4, zone: .complete)
+        completed.completedOrder = 1
+        day.tasks.append(completed)
+
+        let week = WeekModel(
+            weekId: now.weekId,
+            startDate: now.startOfWeek,
+            endDate: now.startOfWeek.addingDays(6),
+            status: .present
+        )
+        week.days = [day]
+
+        let snapshot = WidgetSnapshotComposer.makeSnapshot(
+            now: now,
+            selectedTheme: WeekTheme.rose,
+            appearanceMode: .dark,
+            today: day,
+            presentWeek: week
+        )
+
+        XCTAssertEqual(snapshot.today.totalCount, 4)
+        XCTAssertEqual(snapshot.today.completedCount, 1)
+        XCTAssertEqual(snapshot.today.completionPercent, 25)
+        XCTAssertEqual(snapshot.today.focusTitle, "Focus task")
+        XCTAssertEqual(snapshot.today.previewTasks.map(\.title), ["Focus task", "Frozen task", "Draft task"])
+        XCTAssertEqual(snapshot.theme.primaryHex, WeekTheme.rose.primaryThemeHex)
+        XCTAssertEqual(snapshot.theme.appearanceMode, .dark)
+        XCTAssertEqual(snapshot.weekDays.count, 7)
+    }
+
+    func test_widgetThemeSnapshot_decodesLegacyPayloadWithoutDarkFields() throws {
+        let legacyJSON = """
+        {
+          "primaryHex":"#111111",
+          "primaryLightHex":"#222222",
+          "accentHex":"#333333",
+          "backgroundHex":"#444444",
+          "textPrimaryHex":"#555555",
+          "textSecondaryHex":"#666666"
+        }
+        """
+
+        let data = try XCTUnwrap(legacyJSON.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(WidgetThemeSnapshot.self, from: data)
+
+        XCTAssertEqual(decoded.darkPrimaryHex, "#111111")
+        XCTAssertEqual(decoded.darkBackgroundHex, "#444444")
+        XCTAssertEqual(decoded.appearanceMode, .system)
+    }
+
+    func test_widgetThemeSnapshot_resolvesPaletteForForcedDarkMode() {
+        let theme = WidgetThemeSnapshot(
+            primaryHex: "#101010",
+            primaryLightHex: "#202020",
+            accentHex: "#303030",
+            backgroundHex: "#404040",
+            textPrimaryHex: "#505050",
+            textSecondaryHex: "#606060",
+            darkPrimaryHex: "#AAAAAA",
+            darkPrimaryLightHex: "#BBBBBB",
+            darkAccentHex: "#CCCCCC",
+            darkBackgroundHex: "#DDDDDD",
+            darkTextPrimaryHex: "#EEEEEE",
+            darkTextSecondaryHex: "#FFFFFF",
+            appearanceModeRaw: AppearanceMode.dark.rawValue
+        )
+
+        let palette = theme.resolvedPalette(isDarkSystem: false)
+
+        XCTAssertEqual(palette.primaryHex, "#AAAAAA")
+        XCTAssertEqual(palette.backgroundHex, "#DDDDDD")
+    }
+
+    func test_widgetSnapshotStore_roundTrip() throws {
+        let snapshot = WidgetSnapshot(
+            generatedAt: makeDate(2026, 3, 16, 10, 0),
+            theme: .init(primaryHex: "#111111", primaryLightHex: "#222222", accentHex: "#333333", backgroundHex: "#444444", textPrimaryHex: "#555555", textSecondaryHex: "#666666"),
+            today: .init(
+                dayId: "2026-03-16",
+                weekdaySymbol: "Mon",
+                statusRaw: DayStatus.execute.rawValue,
+                killTimeText: "23:45",
+                focusTitle: "Ship widget",
+                totalCount: 5,
+                completedCount: 2,
+                draftCount: 1,
+                frozenCount: 2,
+                completionPercent: 40,
+                previewTasks: [
+                    .init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000111")!, title: "Ship widget", taskTypeRaw: TaskType.regular.rawValue, zoneRaw: TaskZone.focus.rawValue)
+                ]
+            ),
+            weekDays: []
+        )
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+
+        let store = WidgetSnapshotStore(directoryURL: dir)
+        try store.save(snapshot)
+        let loaded = try XCTUnwrap(store.load())
+
+        XCTAssertEqual(loaded, snapshot)
+    }
+
     private func makeTemporaryStoreURL() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -250,6 +438,18 @@ final class ModelTests: XCTestCase {
             try? FileManager.default.removeItem(at: directory)
         }
         return directory.appendingPathComponent("Weekyii.store")
+    }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 9, _ minute: Int = 0) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .iso8601)
+        components.timeZone = TimeZone(secondsFromGMT: 8 * 3600)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return components.date ?? Date()
     }
 
     private func makeTileSnapshot(projectID: UUID, nextTaskTitle: String?) -> ProjectTileSnapshot {
