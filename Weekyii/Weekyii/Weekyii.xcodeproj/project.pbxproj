@@ -8,12 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
-		B10000012F90000000AAA001 /* WeekyiiWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B20000012F90000000AAA001 /* WeekyiiWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		B10000022F90000000AAA001 /* WeekyiiWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000022F90000000AAA001 /* WeekyiiWidgetBundle.swift */; };
-		B10000032F90000000AAA001 /* WeekyiiWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000032F90000000AAA001 /* WeekyiiWidget.swift */; };
-		B10000042F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
-		B10000052F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
-		B10000062F90000000AAA001 /* WidgetSnapshotComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
@@ -68,9 +62,7 @@
 		9450228F2F433AA7000D67FF /* MindStampViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228D2F433AA7000D67FF /* MindStampViewModel.swift */; };
 		945022902F433AA7000D67FF /* MindStampEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */; };
 		945022922F433AB7000D67FF /* MindStampRitualView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945022912F433AB7000D67FF /* MindStampRitualView.swift */; };
-		F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A100102F6A000100AAA001 /* ProjectTileSize.swift */; };
-		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
-		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
+		9466DE502F69868200EF5E24 /* KillTimeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9466DE4F2F69868200EF5E24 /* KillTimeSlider.swift */; };
 		94982D712F2BB70700CE8621 /* UserSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982D702F2BB70700CE8621 /* UserSettings.swift */; };
 		94982D732F2BB71F00CE8621 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982D722F2BB71F00CE8621 /* SettingsView.swift */; };
 		94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */; };
@@ -99,12 +91,22 @@
 		94E266502F2E5D180083581A /* PendingWeekDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */; };
 		A1B2C3D42F70000100ABCD01 /* PostponeTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */; };
 		A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */; };
+		B10000012F90000000AAA001 /* WeekyiiWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B20000012F90000000AAA001 /* WeekyiiWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B10000022F90000000AAA001 /* WeekyiiWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000022F90000000AAA001 /* WeekyiiWidgetBundle.swift */; };
+		B10000032F90000000AAA001 /* WeekyiiWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000032F90000000AAA001 /* WeekyiiWidget.swift */; };
+		B10000042F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
+		B10000052F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
+		B10000062F90000000AAA001 /* WidgetSnapshotComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */; };
 		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
 		DF3C2419516E4D6FB1ABAE0F /* DraftReorderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */; };
 		E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7A6CE6657A22194F5108AB /* TaskStep.swift */; };
 		F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
 		F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58432F2B593A00DB2DEE /* StateMachineTests.swift */; };
 		F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */; };
+		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
+		F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A100102F6A000100AAA001 /* ProjectTileSize.swift */; };
+		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
+		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,14 +150,6 @@
 /* Begin PBXFileReference section */
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
-		B20000012F90000000AAA001 /* WeekyiiWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeekyiiWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		B20000022F90000000AAA001 /* WeekyiiWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidgetBundle.swift; sourceTree = "<group>"; };
-		B20000032F90000000AAA001 /* WeekyiiWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidget.swift; sourceTree = "<group>"; };
-		B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidgetSupport.swift; sourceTree = "<group>"; };
-		B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotComposer.swift; sourceTree = "<group>"; };
-		B20000062F90000000AAA001 /* WeekyiiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeekyiiWidget.entitlements; sourceTree = "<group>"; };
-		B20000072F90000000AAA001 /* Weekyii.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Weekyii.entitlements; sourceTree = "<group>"; };
-		B20000082F90000000AAA001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
 		902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachment.swift; sourceTree = "<group>"; };
 		9439FA482F378923000424BF /* PastAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastAnalyticsService.swift; sourceTree = "<group>"; };
@@ -212,15 +206,14 @@
 		944E58422F2B593A00DB2DEE /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		944E58432F2B593A00DB2DEE /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
 		944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalculatorTests.swift; sourceTree = "<group>"; };
+		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		944E584B2F2B593A00DB2DEE /* Weekyii.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = Weekyii.xcodeproj; sourceTree = "<group>"; };
 		945022892F433A83000D67FF /* MindStampItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampItem.swift; sourceTree = "<group>"; };
 		9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampEditorSheet.swift; sourceTree = "<group>"; };
 		9450228C2F433AA7000D67FF /* MindStampListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampListView.swift; sourceTree = "<group>"; };
 		9450228D2F433AA7000D67FF /* MindStampViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampViewModel.swift; sourceTree = "<group>"; };
 		945022912F433AB7000D67FF /* MindStampRitualView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampRitualView.swift; sourceTree = "<group>"; };
-		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
-		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
-		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
+		9466DE4F2F69868200EF5E24 /* KillTimeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillTimeSlider.swift; sourceTree = "<group>"; };
 		94982D702F2BB70700CE8621 /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
 		94982D722F2BB71F00CE8621 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
@@ -249,7 +242,18 @@
 		94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingWeekDetailView.swift; sourceTree = "<group>"; };
 		A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostponeTaskSheet.swift; sourceTree = "<group>"; };
 		A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPostponeService.swift; sourceTree = "<group>"; };
+		B20000012F90000000AAA001 /* WeekyiiWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeekyiiWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000022F90000000AAA001 /* WeekyiiWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidgetBundle.swift; sourceTree = "<group>"; };
+		B20000032F90000000AAA001 /* WeekyiiWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidget.swift; sourceTree = "<group>"; };
+		B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiWidgetSupport.swift; sourceTree = "<group>"; };
+		B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotComposer.swift; sourceTree = "<group>"; };
+		B20000062F90000000AAA001 /* WeekyiiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeekyiiWidget.entitlements; sourceTree = "<group>"; };
+		B20000072F90000000AAA001 /* Weekyii.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Weekyii.entitlements; sourceTree = "<group>"; };
+		B20000082F90000000AAA001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
+		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
+		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -450,6 +454,7 @@
 		944E583A2F2B593A00DB2DEE /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				9466DE4F2F69868200EF5E24 /* KillTimeSlider.swift */,
 				94982DBB2F2BBCF800CE8621 /* TaskZoneBadge.swift */,
 				94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */,
 				94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */,
@@ -496,6 +501,7 @@
 			isa = PBXGroup;
 			children = (
 				944E58422F2B593A00DB2DEE /* ModelTests.swift */,
+				F7A100102F70000100AAA001 /* NotificationServiceTests.swift */,
 				944E58432F2B593A00DB2DEE /* StateMachineTests.swift */,
 				944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */,
 			);
@@ -523,6 +529,23 @@
 			path = Styles;
 			sourceTree = "<group>";
 		};
+		94C1D0EC2F3F64DC00AA8E13 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */,
+				9450228C2F433AA7000D67FF /* MindStampListView.swift */,
+				9450228D2F433AA7000D67FF /* MindStampViewModel.swift */,
+				94C1D0E72F3F64DC00AA8E13 /* AddProjectTaskSheet.swift */,
+				94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */,
+				94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */,
+				94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
+				94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */,
+				F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */,
+				94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
 		B30000012F90000000AAA001 /* WeekyiiWidget */ = {
 			isa = PBXGroup;
 			children = (
@@ -540,23 +563,6 @@
 				B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */,
 			);
 			path = WidgetSupport;
-			sourceTree = "<group>";
-		};
-		94C1D0EC2F3F64DC00AA8E13 /* Extensions */ = {
-			isa = PBXGroup;
-			children = (
-				9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */,
-				9450228C2F433AA7000D67FF /* MindStampListView.swift */,
-				9450228D2F433AA7000D67FF /* MindStampViewModel.swift */,
-				94C1D0E72F3F64DC00AA8E13 /* AddProjectTaskSheet.swift */,
-				94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */,
-				94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */,
-				94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
-				94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */,
-				F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */,
-				94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */,
-			);
-			path = Extensions;
 			sourceTree = "<group>";
 		};
 		DAA08CFC5F5D48F18CB037DC /* WeekyiiUITests */ = {
@@ -590,25 +596,6 @@
 			productName = Weekyii;
 			productReference = 944E57CF2F2B397D00DB2DEE /* Weekyii.app */;
 			productType = "com.apple.product-type.application";
-		};
-		B40000012F90000000AAA001 /* WeekyiiWidget */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B80000012F90000000AAA001 /* Build configuration list for PBXNativeTarget "WeekyiiWidget" */;
-			buildPhases = (
-				B50000022F90000000AAA001 /* Sources */,
-				B50000032F90000000AAA001 /* Frameworks */,
-				B50000042F90000000AAA001 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = WeekyiiWidget;
-			packageProductDependencies = (
-			);
-			productName = WeekyiiWidget;
-			productReference = B20000012F90000000AAA001 /* WeekyiiWidget.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 		944E57DD2F2B397E00DB2DEE /* WeekyiiTests */ = {
 			isa = PBXNativeTarget;
@@ -649,6 +636,25 @@
 			productName = WeekyiiUITests;
 			productReference = 944E57E82F2B397E00DB2DEE /* WeekyiiUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B40000012F90000000AAA001 /* WeekyiiWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B80000012F90000000AAA001 /* Build configuration list for PBXNativeTarget "WeekyiiWidget" */;
+			buildPhases = (
+				B50000022F90000000AAA001 /* Sources */,
+				B50000032F90000000AAA001 /* Frameworks */,
+				B50000042F90000000AAA001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WeekyiiWidget;
+			packageProductDependencies = (
+			);
+			productName = WeekyiiWidget;
+			productReference = B20000012F90000000AAA001 /* WeekyiiWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -780,6 +786,7 @@
 				944E58692F2B593A00DB2DEE /* PendingView.swift in Sources */,
 				9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */,
 				944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */,
+				9466DE502F69868200EF5E24 /* KillTimeSlider.swift in Sources */,
 				A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */,
 				944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,
 				A1B2C3D42F70000100ABCD01 /* PostponeTaskSheet.swift in Sources */,
@@ -838,6 +845,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */,
+				F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */,
 				F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */,
 				F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */,
 			);
@@ -1006,8 +1014,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K89PH8PTJW;
 				ENABLE_PREVIEWS = YES;
@@ -1040,8 +1048,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K89PH8PTJW;
 				ENABLE_PREVIEWS = YES;

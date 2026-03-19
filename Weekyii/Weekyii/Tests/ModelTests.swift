@@ -73,6 +73,22 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_weekThemeIncludesLotrPremiumCase() {
+        XCTAssertTrue(WeekTheme.allCases.contains(.lotr))
+        XCTAssertTrue(WeekTheme.lotr.isPremiumTheme)
+    }
+
+    func test_lotrThemeRequiresUnlockBeforeUse() {
+        XCTAssertEqual(
+            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: false),
+            .amber
+        )
+        XCTAssertEqual(
+            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: true),
+            .lotr
+        )
+    }
+
     func test_projectTilePresentation_miniEditingStaysCompact() {
         let snapshot = makeTileSnapshot(
             projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
@@ -314,6 +330,85 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(values, ["B", "A", "C"])
     }
 
+    @MainActor
+    func test_projectDetailSnapshot_countsAndNextTaskFromUpcomingDate() throws {
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let project = ProjectModel(name: "Launch", startDate: yesterday, endDate: tomorrow.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .draft)
+        let todayDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        let tomorrowDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        let completed = TaskItem(title: "Done", order: 1, zone: .complete)
+        completed.day = pastDay
+        completed.project = project
+
+        let pastPending = TaskItem(title: "Past pending", order: 2, zone: .draft)
+        pastPending.day = pastDay
+        pastPending.project = project
+
+        let nextTask = TaskItem(title: "Ship release", order: 3, zone: .draft)
+        nextTask.day = tomorrowDay
+        nextTask.project = project
+
+        let todayTask = TaskItem(title: "Review docs", order: 1, zone: .draft)
+        todayTask.day = todayDay
+        todayTask.project = project
+
+        project.tasks = [completed, pastPending, nextTask, todayTask]
+
+        let snapshot = ProjectDetailComposer.projectDetailSnapshot(
+            project: project,
+            calendar: Calendar(identifier: .iso8601),
+            referenceDate: today
+        )
+
+        XCTAssertEqual(snapshot.totalCount, 4)
+        XCTAssertEqual(snapshot.completedCount, 1)
+        XCTAssertEqual(snapshot.remainingCount, 3)
+        XCTAssertEqual(snapshot.nextTaskTitle, "Review docs")
+        XCTAssertEqual(snapshot.nextTaskDate?.dayId, today.dayId)
+    }
+
+    @MainActor
+    func test_projectTaskLedgerSections_expandsTodayAndFutureByDefault() throws {
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let project = ProjectModel(name: "Ledger", startDate: yesterday, endDate: tomorrow.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .draft)
+        let todayDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        let tomorrowDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        let pastTask = TaskItem(title: "Past", order: 1, zone: .draft)
+        pastTask.day = pastDay
+        let todayTask = TaskItem(title: "Today", order: 1, zone: .draft)
+        todayTask.day = todayDay
+        let futureTask = TaskItem(title: "Future", order: 1, zone: .draft)
+        futureTask.day = tomorrowDay
+
+        project.tasks = [pastTask, todayTask, futureTask]
+
+        let sections = ProjectDetailComposer.projectTaskLedgerSections(
+            project: project,
+            calendar: Calendar(identifier: .iso8601),
+            referenceDate: today
+        )
+
+        XCTAssertEqual(sections.count, 3)
+        XCTAssertEqual(sections[0].date.dayId, yesterday.dayId)
+        XCTAssertEqual(sections[1].date.dayId, today.dayId)
+        XCTAssertEqual(sections[2].date.dayId, tomorrow.dayId)
+        XCTAssertFalse(sections[0].isExpandedByDefault)
+        XCTAssertTrue(sections[1].isExpandedByDefault)
+        XCTAssertTrue(sections[2].isExpandedByDefault)
+    }
+
     func test_widgetSnapshotComposer_buildsPriorityOrderedPreviewAndTheme() {
         let now = makeDate(2026, 3, 16, 9, 30)
         let day = DayModel(dayId: "2026-03-16", date: now, status: .execute)
@@ -394,6 +489,14 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(palette.primaryHex, "#AAAAAA")
         XCTAssertEqual(palette.backgroundHex, "#DDDDDD")
+    }
+
+    func test_lotrWidgetThemeSnapshot_usesPremiumPalette() {
+        let snapshot = WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system)
+
+        XCTAssertEqual(snapshot.primaryHex, WeekTheme.lotr.primaryThemeHex)
+        XCTAssertEqual(snapshot.darkBackgroundHex, "#12110D")
+        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#F1E8D8")
     }
 
     func test_widgetSnapshotStore_roundTrip() throws {

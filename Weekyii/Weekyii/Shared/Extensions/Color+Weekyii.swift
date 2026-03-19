@@ -10,6 +10,10 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case rose
     case lavender
     case graphite
+    case sunset
+    case mint
+    case midnight
+    case lotr
 
     var id: String { rawValue }
 
@@ -21,7 +25,15 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .rose: return "玫瑰"
         case .lavender: return "薰紫"
         case .graphite: return "石墨"
+        case .sunset: return "落日"
+        case .mint: return "薄荷"
+        case .midnight: return "极夜"
+        case .lotr: return "魔戒"
         }
+    }
+
+    var isPremiumTheme: Bool {
+        self == .lotr
     }
 
     var primaryColor: Color {
@@ -98,6 +110,22 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
 
     private var palettePair: WeekThemePalettePair {
         WeekThemePalettePair.forTheme(self)
+    }
+
+    static func resolvedTheme(rawValue: String?, premiumThemeUnlocked: Bool) -> WeekTheme {
+        let requestedTheme = WeekTheme(rawValue: rawValue ?? "") ?? .amber
+        guard requestedTheme.isPremiumTheme, !premiumThemeUnlocked else {
+            return requestedTheme
+        }
+        return .amber
+    }
+
+    static var activeTheme: WeekTheme {
+        let defaults = WeekyiiWidgetBridge.sharedDefaults()
+        return resolvedTheme(
+            rawValue: defaults.string(forKey: WeekyiiWidgetBridge.selectedThemeKey),
+            premiumThemeUnlocked: defaults.bool(forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
+        )
     }
 }
 
@@ -417,6 +445,194 @@ private struct WeekThemePalettePair {
                     taskLeisureBg: "#2B2840"
                 )
             )
+        case .sunset:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#C8643A",
+                    primaryLight: "#E49368",
+                    primaryDark: "#8E4227",
+                    accentOrange: "#F0974E",
+                    accentOrangeLight: "#F7BE89",
+                    accentGreen: "#4C9B7C",
+                    accentGreenLight: "#7CC3A7",
+                    accentPink: "#D86F7D",
+                    backgroundPrimary: "#FFF4ED",
+                    backgroundSecondary: "#FFFDFC",
+                    backgroundTertiary: "#F8E9E0",
+                    textPrimary: "#311F19",
+                    textSecondary: "#71584D",
+                    textTertiary: "#9D8376",
+                    taskRegular: "#327F8A",
+                    taskRegularBg: "#DDF0F3",
+                    taskDDL: "#D56244",
+                    taskDDLBg: "#FAE4DC",
+                    taskLeisure: "#8D66CC",
+                    taskLeisureBg: "#F0E9FB"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#E49368",
+                    primaryLight: "#F1B189",
+                    primaryDark: "#8E4227",
+                    accentOrange: "#F7BE89",
+                    accentOrangeLight: "#F9CFAD",
+                    accentGreen: "#76C8A6",
+                    accentGreenLight: "#9CDBBD",
+                    accentPink: "#E7A2AD",
+                    backgroundPrimary: "#1A120F",
+                    backgroundSecondary: "#241915",
+                    backgroundTertiary: "#32221D",
+                    textPrimary: "#F8ECE6",
+                    textSecondary: "#D8BEB2",
+                    textTertiary: "#AC8F82",
+                    taskRegular: "#7BC8D7",
+                    taskRegularBg: "#1B3640",
+                    taskDDL: "#F09579",
+                    taskDDLBg: "#3B2520",
+                    taskLeisure: "#B79BEF",
+                    taskLeisureBg: "#2E2746"
+                )
+            )
+        case .mint:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#2E8F84",
+                    primaryLight: "#61B6A8",
+                    primaryDark: "#1F5F58",
+                    accentOrange: "#DF8D48",
+                    accentOrangeLight: "#EDB987",
+                    accentGreen: "#349F79",
+                    accentGreenLight: "#6FCAA5",
+                    accentPink: "#CC718A",
+                    backgroundPrimary: "#F2FBF8",
+                    backgroundSecondary: "#FCFFFE",
+                    backgroundTertiary: "#E5F3EF",
+                    textPrimary: "#1B2D2A",
+                    textSecondary: "#4A6A64",
+                    textTertiary: "#79968F",
+                    taskRegular: "#2E7E93",
+                    taskRegularBg: "#D8EEF4",
+                    taskDDL: "#C9644B",
+                    taskDDLBg: "#F8E4DE",
+                    taskLeisure: "#7A6ED0",
+                    taskLeisureBg: "#ECE9FB"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#61B6A8",
+                    primaryLight: "#8BD0C4",
+                    primaryDark: "#1F5F58",
+                    accentOrange: "#EDB987",
+                    accentOrangeLight: "#F2CAA6",
+                    accentGreen: "#65CEAB",
+                    accentGreenLight: "#8FE0C1",
+                    accentPink: "#E2A6B8",
+                    backgroundPrimary: "#0F1917",
+                    backgroundSecondary: "#162421",
+                    backgroundTertiary: "#20332E",
+                    textPrimary: "#E8F6F2",
+                    textSecondary: "#BCD9D1",
+                    textTertiary: "#8EA9A2",
+                    taskRegular: "#7CCBE0",
+                    taskRegularBg: "#183542",
+                    taskDDL: "#EA8D78",
+                    taskDDLBg: "#392522",
+                    taskLeisure: "#AA9CEE",
+                    taskLeisureBg: "#282643"
+                )
+            )
+        case .midnight:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#33558C",
+                    primaryLight: "#678BC6",
+                    primaryDark: "#223A60",
+                    accentOrange: "#D98A49",
+                    accentOrangeLight: "#EAB88D",
+                    accentGreen: "#3F8F79",
+                    accentGreenLight: "#73BDA4",
+                    accentPink: "#B76C8D",
+                    backgroundPrimary: "#F2F5FB",
+                    backgroundSecondary: "#FCFDFF",
+                    backgroundTertiary: "#E6EBF5",
+                    textPrimary: "#1A2334",
+                    textSecondary: "#4B5D79",
+                    textTertiary: "#7688A4",
+                    taskRegular: "#3B7894",
+                    taskRegularBg: "#DCECF4",
+                    taskDDL: "#C45D4C",
+                    taskDDLBg: "#F8E5E1",
+                    taskLeisure: "#7668C7",
+                    taskLeisureBg: "#EBE8FA"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#7DA2DF",
+                    primaryLight: "#A2BDEB",
+                    primaryDark: "#223A60",
+                    accentOrange: "#EAB88D",
+                    accentOrangeLight: "#F0CAAA",
+                    accentGreen: "#73C2A8",
+                    accentGreenLight: "#98D7BF",
+                    accentPink: "#DAA1B8",
+                    backgroundPrimary: "#070C14",
+                    backgroundSecondary: "#0E1521",
+                    backgroundTertiary: "#172235",
+                    textPrimary: "#E8F0FF",
+                    textSecondary: "#BDCCE6",
+                    textTertiary: "#8999B5",
+                    taskRegular: "#7FBFDC",
+                    taskRegularBg: "#173243",
+                    taskDDL: "#E38E7E",
+                    taskDDLBg: "#372422",
+                    taskLeisure: "#A99BE9",
+                    taskLeisureBg: "#272543"
+                )
+            )
+        case .lotr:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#8A6A2A",
+                    primaryLight: "#C7A55E",
+                    primaryDark: "#5D4520",
+                    accentOrange: "#B86A2D",
+                    accentOrangeLight: "#D99A63",
+                    accentGreen: "#6C7852",
+                    accentGreenLight: "#A4B28A",
+                    accentPink: "#A67B67",
+                    backgroundPrimary: "#F3EBDE",
+                    backgroundSecondary: "#FBF7F0",
+                    backgroundTertiary: "#E8DDCF",
+                    textPrimary: "#261F17",
+                    textSecondary: "#5B4A3D",
+                    textTertiary: "#8E7D6C",
+                    taskRegular: "#6B7C54",
+                    taskRegularBg: "#E4EAD9",
+                    taskDDL: "#A95A2C",
+                    taskDDLBg: "#F5DFD0",
+                    taskLeisure: "#7B5B9D",
+                    taskLeisureBg: "#ECE5F7"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#C7A55E",
+                    primaryLight: "#E0BE84",
+                    primaryDark: "#6E5225",
+                    accentOrange: "#D28A4D",
+                    accentOrangeLight: "#E1AE79",
+                    accentGreen: "#7A8C62",
+                    accentGreenLight: "#A4B38C",
+                    accentPink: "#AA7C6A",
+                    backgroundPrimary: "#090806",
+                    backgroundSecondary: "#12110D",
+                    backgroundTertiary: "#1A1712",
+                    textPrimary: "#F1E8D8",
+                    textSecondary: "#C9B79E",
+                    textTertiary: "#927D64",
+                    taskRegular: "#8BB07A",
+                    taskRegularBg: "#182119",
+                    taskDDL: "#E29A68",
+                    taskDDLBg: "#2C1D15",
+                    taskLeisure: "#B29BD9",
+                    taskLeisureBg: "#221E31"
+                )
+            )
         }
     }
 }
@@ -425,22 +641,25 @@ private enum WeekThemeRuntime {
     private static var cachedThemeRaw = ""
     private static var cachedPalettePair = WeekThemePalettePair.forTheme(.amber)
 
-    private static var selectedTheme: WeekTheme {
-        let raw = UserDefaults.standard.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
-        if raw != cachedThemeRaw {
-            cachedThemeRaw = raw
-            cachedPalettePair = WeekThemePalettePair.forTheme(WeekTheme(rawValue: raw) ?? .amber)
+    private static func resolvedTheme() -> WeekTheme {
+        let defaults = WeekyiiWidgetBridge.sharedDefaults()
+        let raw = defaults.string(forKey: WeekyiiWidgetBridge.selectedThemeKey) ?? WeekTheme.amber.rawValue
+        let premiumThemeUnlocked = defaults.bool(forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
+        let theme = WeekTheme.resolvedTheme(rawValue: raw, premiumThemeUnlocked: premiumThemeUnlocked)
+        if theme.rawValue != cachedThemeRaw {
+            cachedThemeRaw = theme.rawValue
+            cachedPalettePair = WeekThemePalettePair.forTheme(theme)
         }
-        return WeekTheme(rawValue: raw) ?? .amber
+        return theme
     }
 
     private static var appearanceMode: AppearanceMode {
-        let raw = UserDefaults.standard.string(forKey: WeekyiiWidgetBridge.appearanceModeKey) ?? AppearanceMode.system.rawValue
+        let raw = WeekyiiWidgetBridge.sharedDefaults().string(forKey: WeekyiiWidgetBridge.appearanceModeKey) ?? AppearanceMode.system.rawValue
         return AppearanceMode(rawValue: raw) ?? .system
     }
 
     private static var palettePair: WeekThemePalettePair {
-        _ = selectedTheme
+        _ = resolvedTheme()
         return cachedPalettePair
     }
 

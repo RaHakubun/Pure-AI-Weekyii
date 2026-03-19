@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: UserSettings
@@ -14,6 +15,7 @@ struct SettingsView: View {
     @State private var showingDefaultKillTimeApplyConfirm = false
     @State private var showingDefaultKillTimeRiskConfirm = false
     @State private var showingCannotSyncExpiredTodayAlert = false
+    @State private var showingRestoreBackupConfirm = false
     
     var body: some View {
         NavigationStack {
@@ -43,32 +45,33 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    Picker(selection: Binding(
-                        get: { settings.selectedThemeRaw },
-                        set: { settings.selectedThemeRaw = $0 }
-                    )) {
+                    Picker(selection: selectedThemeBinding) {
                         ForEach(WeekTheme.allCases) { theme in
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(theme.primaryColor)
-                                    .frame(width: 10, height: 10)
-                                Circle()
-                                    .fill(theme.accentColor)
-                                    .frame(width: 10, height: 10)
-                                Text(theme.displayName)
-                            }
-                            .tag(theme.rawValue)
+                            themeOptionRow(theme)
+                                .tag(theme.rawValue)
+                                .disabled(theme.isPremiumTheme && !settings.premiumThemeUnlocked)
                         }
                     } label: {
                         HStack(spacing: 12) {
                             SettingsIcon(icon: "paintpalette.fill", color: .purple)
-                            Text(String(localized: "settings.theme.color", defaultValue: "主题色"))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "settings.theme.color", defaultValue: "主题色"))
+                                if !settings.premiumThemeUnlocked {
+                                    Text(String(localized: "settings.theme.premium.locked", defaultValue: "魔戒 为 Premium 主题"))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
 
                     themePalettePreview
                 } header: {
                     Text(String(localized: "settings.section.week"))
+                } footer: {
+                    if !settings.premiumThemeUnlocked {
+                        Text(String(localized: "settings.theme.premium.footer", defaultValue: "解锁后可切换到魔戒主题；当前会回落到普通主题。"))
+                    }
                 }
                 
                 // MARK: - Data & Privacy
@@ -115,6 +118,18 @@ struct SettingsView: View {
                     }
                     
                     if settings.developerSettingsEnabled {
+                        Toggle(isOn: Binding(
+                            get: { settings.premiumThemeUnlocked },
+                            set: { settings.premiumThemeUnlocked = $0 }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
+                                Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
                         Stepper(value: Binding(
                             get: { settings.seedPastWeeks },
                             set: { settings.seedPastWeeks = $0 }
@@ -204,6 +219,38 @@ struct SettingsView: View {
                         } label: {
                             Text(String(localized: "settings.debug.clear"))
                         }
+
+                        Button("立即重算状态") {
+                            let coordinator = makeHealthCoordinator()
+                            let report = coordinator.reconcile(trigger: .manualResync, force: true)
+                            appState.bumpDataRevision()
+                            seedAlertMessage = "重算完成：过期\(report.crossDayExpiredCount + report.staleDaysExpiredCount + report.killTimeExpiredCount)项，修复\(report.totalRepairCount)项。"
+                        }
+
+                        Button("导出状态诊断") {
+                            let coordinator = makeHealthCoordinator()
+                            UIPasteboard.general.string = coordinator.diagnosticsSnapshot()
+                            seedAlertMessage = "状态诊断已复制到剪贴板。"
+                        }
+
+                        Button("列出最近备份摘要") {
+                            let storeURL = WeekyiiPersistence.persistentStoreURL()
+                            let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL).prefix(5)
+                            if snapshots.isEmpty {
+                                seedAlertMessage = "当前没有可用备份。"
+                            } else {
+                                let lines = snapshots.map { summary in
+                                    "\(summary.folderName) | valid=\(summary.isValid ? "yes" : "no") | files=\(summary.fileCount)"
+                                }
+                                seedAlertMessage = lines.joined(separator: "\n")
+                            }
+                        }
+
+                        Button(role: .destructive) {
+                            showingRestoreBackupConfirm = true
+                        } label: {
+                            Text("回滚到最新备份（危险）")
+                        }
                     }
                 } header: {
                     Text(String(localized: "settings.developer.header"))
@@ -250,6 +297,18 @@ struct SettingsView: View {
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
+        }
+        .onChange(of: settings.killTimeReminderMinutes) { _, _ in
+            rescheduleTodayKillTimeReminderIfNeeded()
+        }
+        .onChange(of: settings.fixedReminderEnabled) { _, _ in
+            rescheduleTodayKillTimeReminderIfNeeded()
+        }
+        .onChange(of: settings.fixedReminderHour) { _, _ in
+            rescheduleTodayKillTimeReminderIfNeeded()
+        }
+        .onChange(of: settings.fixedReminderMinute) { _, _ in
+            rescheduleTodayKillTimeReminderIfNeeded()
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             seedAlertMessage != nil
@@ -309,6 +368,25 @@ struct SettingsView: View {
         } message: {
             Text("今日任务流已过期，无法同步到今天。本次提交已取消。")
         }
+        .alert("回滚到最新备份", isPresented: $showingRestoreBackupConfirm) {
+            Button("取消", role: .cancel) { }
+            Button("确认回滚", role: .destructive) {
+                let storeURL = WeekyiiPersistence.persistentStoreURL()
+                let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL)
+                guard let latest = snapshots.first else {
+                    seedAlertMessage = "没有找到可回滚备份。"
+                    return
+                }
+                do {
+                    try BackupRecoveryService.restoreSnapshot(named: latest.folderName, to: storeURL)
+                    seedAlertMessage = "已回滚到 \(latest.folderName)。请立即重启应用。"
+                } catch {
+                    seedAlertMessage = "回滚失败：\(error.localizedDescription)"
+                }
+            }
+        } message: {
+            Text("将直接替换当前数据库文件，可能丢失最新数据。")
+        }
     }
     
     // MARK: - Kill Time Settings
@@ -352,6 +430,15 @@ struct SettingsView: View {
             .padding(.vertical, 2)
             .background(Color(uiColor: .tertiarySystemFill))
             .cornerRadius(8)
+        }
+
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 28, height: 28)
+            Text(String(localized: "settings.default_kill_time.guidance", defaultValue: "一天的任务将在截止时间结算"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
 
         HStack(spacing: 12) {
@@ -427,6 +514,8 @@ struct SettingsView: View {
             Text(String(localized: "settings.reminder.15min")).tag(15)
             Text(String(localized: "settings.reminder.30min")).tag(30)
             Text(String(localized: "settings.reminder.60min")).tag(60)
+            Text("提前 90 分钟").tag(90)
+            Text("提前 120 分钟").tag(120)
         } label: {
             HStack(spacing: 12) {
                 SettingsIcon(icon: "bell.fill", color: .red)
@@ -438,6 +527,10 @@ struct SettingsView: View {
                 }
             }
         }
+        Text("系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 40)
 
         Toggle(isOn: Binding(
             get: { settings.fixedReminderEnabled },
@@ -549,6 +642,56 @@ struct SettingsView: View {
         }
     }
 
+    private var selectedThemeBinding: Binding<String> {
+        Binding(
+            get: { settings.selectedTheme.rawValue },
+            set: { newValue in
+                let theme = WeekTheme(rawValue: newValue) ?? .amber
+                guard canSelect(theme) else { return }
+                settings.selectedThemeRaw = theme.rawValue
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func themeOptionRow(_ theme: WeekTheme) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(theme.primaryColor)
+                .frame(width: 10, height: 10)
+            Circle()
+                .fill(theme.accentColor)
+                .frame(width: 10, height: 10)
+
+            Text(theme.displayName)
+                .foregroundStyle(theme.isPremiumTheme && !settings.premiumThemeUnlocked ? .secondary : .primary)
+
+            Spacer(minLength: 8)
+
+            if theme.isPremiumTheme {
+                if settings.premiumThemeUnlocked {
+                    Text(String(localized: "settings.theme.premium.badge", defaultValue: "Premium"))
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.weekyiiPrimary.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Label(String(localized: "settings.theme.premium.locked_short", defaultValue: "锁定"), systemImage: "lock.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            } else if settings.selectedTheme == theme {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func canSelect(_ theme: WeekTheme) -> Bool {
+        !theme.isPremiumTheme || settings.premiumThemeUnlocked
+    }
+
     private func appearanceDisplayName(for mode: AppearanceMode) -> String {
         switch mode {
         case .system:
@@ -617,6 +760,21 @@ struct SettingsView: View {
         settings.defaultKillTimeMinute = minute
     }
 
+    private func rescheduleTodayKillTimeReminderIfNeeded() {
+        guard let today = todayDayModel() else { return }
+        guard today.status == .draft || today.status == .execute else {
+            NotificationService.shared.cancelKillTimeNotification(for: today)
+            return
+        }
+        NotificationService.shared.scheduleKillTimeNotification(
+            for: today,
+            reminderMinutes: settings.killTimeReminderMinutes,
+            fixedReminder: settings.fixedReminderEnabled
+                ? DateComponents(hour: settings.fixedReminderHour, minute: settings.fixedReminderMinute)
+                : nil
+        )
+    }
+
     private func todayDayModel() -> DayModel? {
         let dayId = Date().dayId
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
@@ -667,6 +825,16 @@ struct SettingsView: View {
         components.minute = minute
         components.second = 0
         return Calendar(identifier: .iso8601).date(from: components)
+    }
+
+    private func makeHealthCoordinator() -> AppHealthCoordinator {
+        AppHealthCoordinator(
+            modelContainer: modelContext.container,
+            timeProvider: TimeProvider(),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: settings
+        )
     }
 }
 

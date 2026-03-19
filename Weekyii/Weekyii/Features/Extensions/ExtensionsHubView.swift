@@ -610,16 +610,22 @@ private struct SuspendedTasksFullView: View {
                     Button("续期 30 天", systemImage: "clock.badge") {
                         viewModel.extendSuspendedTask(task, by: 30)
                     }
-                    Divider()
-                    Button("删除", systemImage: "trash", role: .destructive) {
-                        deletingTask = task
-                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
                         .foregroundColor(.textSecondary)
                 }
                 .accessibilityIdentifier("suspendedTaskMenuButton_\(task.id.uuidString)")
+
+                Button {
+                    deletingTask = task
+                } label: {
+                    Image(systemName: "trash.circle")
+                        .font(.title3)
+                        .foregroundColor(.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("suspendedDeleteButton_\(task.id.uuidString)")
             }
         }
         .padding(WeekSpacing.md)

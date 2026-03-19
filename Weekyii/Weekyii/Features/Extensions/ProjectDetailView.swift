@@ -7,43 +7,51 @@ struct ProjectDetailView: View {
     @State private var showingAddTaskSheet = false
     @State private var showingDeleteAlert = false
     @State private var deletingTask: TaskItem?
+    @State private var editingTask: TaskItem?
     @State private var animateProgress = false
+    @State private var expandedSectionIDs: Set<String> = []
+    @State private var seenSectionIDs: Set<String> = []
+    @State private var expandedTaskIDs: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
 
     private var projectColor: Color { Color(hex: project.color) }
+    private var snapshot: ProjectDetailSnapshot { viewModel.projectDetailSnapshot(for: project) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                // Hero section
-                heroSection
-
-                // Action buttons
-                actionButtons
-
-                // Task list (grouped by date)
-                taskListSection
+                identitySection
+                summarySection
+                ledgerSection
             }
             .weekPadding(WeekSpacing.base)
         }
         .background(Color.backgroundPrimary)
-        .navigationTitle(project.name)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingAddTaskSheet = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(projectColor)
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddTaskSheet, onDismiss: {
-            viewModel.refresh()
-        }) {
+        .navigationTitle(snapshot.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { toolbarContent }
+        .sheet(isPresented: $showingAddTaskSheet, onDismiss: { viewModel.refresh() }) {
             AddProjectTaskSheet(project: project, viewModel: viewModel)
+        }
+        .sheet(item: $editingTask, onDismiss: { viewModel.refresh() }) { task in
+            TaskEditorSheet(
+                title: String(localized: "draft.edit_title"),
+                initialTitle: task.title,
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments
+            ) { title, description, type, steps, attachments in
+                viewModel.updateProjectTask(
+                    task,
+                    title: title,
+                    description: description,
+                    type: type,
+                    steps: steps,
+                    attachments: attachments
+                )
+                editingTask = nil
+            }
         }
         .confirmationDialog(
             String(localized: "project.delete.confirm"),
@@ -54,12 +62,10 @@ struct ProjectDetailView: View {
                 viewModel.deleteProject(project, includeTasks: false)
                 dismiss()
             }
-            
             Button(String(localized: "project.delete.choice.with_tasks"), role: .destructive) {
                 viewModel.deleteProject(project, includeTasks: true)
                 dismiss()
             }
-            
             Button(String(localized: "action.cancel"), role: .cancel) { }
         } message: {
             Text(String(localized: "project.delete.choice.message"))
@@ -85,330 +91,233 @@ struct ProjectDetailView: View {
             Text(String(localized: "project.task.delete.message"))
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                    animateProgress = true
+            syncExpandedSections(with: snapshot.sections)
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                animateProgress = true
+            }
+        }
+        .onChange(of: snapshot.sections.map(\.id)) { _, _ in
+            syncExpandedSections(with: snapshot.sections)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button {
+                showingAddTaskSheet = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(projectColor)
+            }
+
+            Menu {
+                if project.status == .active && project.isAllCompleted {
+                    Button(String(localized: "project.action.complete")) {
+                        viewModel.updateStatus(project, to: .completed)
+                    }
+                }
+                if project.status == .completed {
+                    Button(String(localized: "project.action.archive")) {
+                        viewModel.updateStatus(project, to: .archived)
+                    }
+                }
+                Divider()
+                Button(String(localized: "project.action.delete"), role: .destructive) {
+                    showingDeleteAlert = true
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundStyle(Color.textPrimary)
+            }
+        }
+    }
+
+    private var identitySection: some View {
+        WeekCard(useGradient: true, accentColor: projectColor, shadow: .medium) {
+            HStack(alignment: .top, spacing: WeekSpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 54, height: 54)
+                    Image(systemName: snapshot.icon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                    Text(snapshot.name)
+                        .font(.titleLarge)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+
+                    HStack(spacing: WeekSpacing.sm) {
+                        Text(snapshot.status.displayName)
+                            .font(.captionBold)
+                            .foregroundStyle(projectColor)
+                            .padding(.horizontal, WeekSpacing.sm)
+                            .padding(.vertical, WeekSpacing.xs)
+                            .background(Capsule().fill(Color.white))
+
+                        Text(dateRangeText)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.88))
+                    }
+
+                    if !snapshot.projectDescription.isEmpty {
+                        Text(snapshot.projectDescription)
+                            .font(.bodyMedium)
+                            .foregroundStyle(.white.opacity(0.86))
+                            .lineLimit(3)
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Hero Section
+    private var summarySection: some View {
+        WeekCard(accentColor: projectColor) {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                Text("项目概览")
+                    .font(.titleSmall)
+                    .foregroundStyle(Color.textPrimary)
 
-    private var heroSection: some View {
-        VStack(spacing: 0) {
-            // Gradient banner with icon
-            ZStack {
-                LinearGradient(
-                    colors: [projectColor, projectColor.opacity(0.7)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                HStack(spacing: WeekSpacing.lg) {
+                    progressRing
 
-                // Decorative circles
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 120, height: 120)
-                    .offset(x: -80, y: -30)
-
-                Circle()
-                    .fill(Color.white.opacity(0.05))
-                    .frame(width: 80, height: 80)
-                    .offset(x: 100, y: 20)
-
-                VStack(spacing: WeekSpacing.sm) {
-                    // Large icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 64, height: 64)
-                        Image(systemName: project.icon)
-                            .font(.system(size: 28))
-                            .foregroundColor(.white)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: WeekSpacing.sm) {
+                        metricChip(title: String(localized: "project.stat.total"), value: "\(snapshot.totalCount)", tint: .textPrimary)
+                        metricChip(title: String(localized: "project.stat.completed"), value: "\(snapshot.completedCount)", tint: .accentGreen)
+                        metricChip(title: String(localized: "project.stat.remaining"), value: "\(snapshot.remainingCount)", tint: projectColor)
+                        metricChip(title: String(localized: "project.stat.expired"), value: "\(snapshot.expiredCount)", tint: .taskDDL)
                     }
-
-                    // Status badge
-                    Text(project.status.displayName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(projectColor)
-                        .padding(.horizontal, WeekSpacing.md)
-                        .padding(.vertical, WeekSpacing.xxs)
-                        .background(
-                            Capsule()
-                                .fill(Color.white)
-                        )
-
-                    // Date range
-                    Text(dateRangeText)
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            }
-            .frame(height: 180)
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
-
-            // Description + Progress card (overlapping the banner)
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                if !project.projectDescription.isEmpty {
-                    Text(project.projectDescription)
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
                 }
 
-                // Progress ring + Stats row
-                HStack(spacing: WeekSpacing.xl) {
-                    // Ring progress chart
-                    ZStack {
-                        Circle()
-                            .stroke(projectColor.opacity(0.1), lineWidth: 8)
-                            .frame(width: 80, height: 80)
+                Divider()
 
-                        Circle()
-                            .trim(from: 0, to: animateProgress ? CGFloat(min(project.progress, 1.0)) : 0)
-                            .stroke(
-                                projectColor,
-                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: 80, height: 80)
-
-                        VStack(spacing: 0) {
-                            Text("\(Int(project.progress * 100))")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundColor(projectColor)
-                                .contentTransition(.numericText())
-                            Text("%")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.textTertiary)
-                        }
-                    }
-
-                    // Stats
-                    VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                        statRow(
-                            icon: "list.bullet",
-                            label: String(localized: "project.stat.total"),
-                            value: "\(project.totalTaskCount)",
-                            color: .textPrimary
-                        )
-                        statRow(
-                            icon: "checkmark.circle.fill",
-                            label: String(localized: "project.stat.completed"),
-                            value: "\(project.completedTaskCount)",
-                            color: .accentGreen
-                        )
-
-                        let remaining = project.totalTaskCount - project.completedTaskCount
-                        statRow(
-                            icon: "clock",
-                            label: String(localized: "project.stat.remaining"),
-                            value: "\(remaining)",
-                            color: projectColor
-                        )
-
-                        if project.expiredTaskCount > 0 {
-                            statRow(
-                                icon: "exclamationmark.triangle.fill",
-                                label: String(localized: "project.stat.expired"),
-                                value: "\(project.expiredTaskCount)",
-                                color: .taskDDL
-                            )
+                HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(projectColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("下一步")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                        if let title = snapshot.nextTaskTitle {
+                            Text(title)
+                                .font(.bodyMedium)
+                                .foregroundStyle(Color.textPrimary)
+                                .lineLimit(2)
+                            if let date = snapshot.nextTaskDate {
+                                Text(date, format: .dateTime.month().day().weekday(.abbreviated))
+                                    .font(.caption)
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                        } else {
+                            Text("项目暂无待办")
+                                .font(.bodyMedium)
+                                .foregroundStyle(Color.textSecondary)
                         }
                     }
                 }
             }
-            .padding(WeekSpacing.lg)
-            .background(Color.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous)
-                    .stroke(Color.backgroundTertiary, lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-            .padding(.horizontal, WeekSpacing.sm)
-            .offset(y: -24)
         }
     }
 
-    private func statRow(icon: String, label: String, value: String, color: Color) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(color)
-                .frame(width: 18)
+    private var progressRing: some View {
+        ZStack {
+            Circle()
+                .stroke(projectColor.opacity(0.2), lineWidth: 8)
+                .frame(width: 82, height: 82)
 
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundColor(.textSecondary)
+            Circle()
+                .trim(from: 0, to: animateProgress ? CGFloat(min(snapshot.progress, 1.0)) : 0)
+                .stroke(projectColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 82, height: 82)
 
-            Spacer()
+            VStack(spacing: 0) {
+                Text("\(Int(snapshot.progress * 100))")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(projectColor)
+                    .contentTransition(.numericText())
+                Text("%")
+                    .font(.caption2)
+                    .foregroundStyle(Color.textSecondary)
+            }
+        }
+    }
 
+    private func metricChip(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(color)
+                .font(.titleSmall)
+                .foregroundStyle(tint)
                 .contentTransition(.numericText())
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, WeekSpacing.xs)
+        .padding(.horizontal, WeekSpacing.sm)
+        .background(tint.opacity(0.08))
+        .clipShape(.rect(cornerRadius: WeekRadius.small))
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        HStack(spacing: WeekSpacing.sm) {
-            if project.status == .active && project.isAllCompleted {
-                Button {
-                    viewModel.updateStatus(project, to: .completed)
-                } label: {
-                    Label(String(localized: "project.action.complete"), systemImage: "checkmark.circle")
-                        .font(.bodyMedium)
-                        .foregroundColor(.accentGreen)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.accentGreen.opacity(0.1))
-                        .cornerRadius(WeekRadius.small)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if project.status == .completed {
-                Button {
-                    viewModel.updateStatus(project, to: .archived)
-                } label: {
-                    Label(String(localized: "project.action.archive"), systemImage: "archivebox")
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.backgroundTertiary)
-                        .cornerRadius(WeekRadius.small)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button {
-                showingDeleteAlert = true
-            } label: {
-                Label(String(localized: "project.action.delete"), systemImage: "trash")
-                    .font(.bodyMedium)
-                    .foregroundColor(.taskDDL)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(Color.taskDDL.opacity(0.1))
-                    .cornerRadius(WeekRadius.small)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Task List
-
-    private var taskListSection: some View {
+    private var ledgerSection: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
             Text(String(localized: "project.tasks.title"))
                 .font(.titleMedium)
-                .foregroundColor(.textPrimary)
+                .foregroundStyle(Color.textPrimary)
 
-            let grouped = viewModel.tasksByDate(for: project)
-
-            if grouped.isEmpty {
+            if snapshot.sections.isEmpty {
                 WeekCard {
                     VStack(spacing: WeekSpacing.md) {
                         Image(systemName: "tray")
                             .font(.system(size: 36))
-                            .foregroundColor(.textTertiary)
+                            .foregroundStyle(Color.textTertiary)
                         Text(String(localized: "project.tasks.empty"))
                             .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
+                            .foregroundStyle(Color.textSecondary)
                         Button {
                             showingAddTaskSheet = true
                         } label: {
                             Text(String(localized: "project.tasks.add_first"))
                                 .font(.bodyMedium)
-                                .foregroundColor(projectColor)
+                                .foregroundStyle(projectColor)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .weekPaddingVertical(WeekSpacing.lg)
                 }
             } else {
-                ForEach(grouped, id: \.date) { group in
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        // Date header
-                        Text(group.date, format: .dateTime.month().day().weekday(.wide))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-                            .padding(.leading, WeekSpacing.xs)
+                ForEach(snapshot.sections) { section in
+                    WeekCard {
+                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                            Button {
+                                toggleSection(section.id)
+                            } label: {
+                                HStack {
+                                    Text(section.date, format: .dateTime.month().day().weekday(.wide))
+                                        .font(.titleSmall)
+                                        .foregroundStyle(Color.textPrimary)
+                                    Spacer()
+                                    Text("\(section.tasks.count)")
+                                        .font(.captionBold)
+                                        .foregroundStyle(Color.textSecondary)
+                                    Image(systemName: expandedSectionIDs.contains(section.id) ? "chevron.up" : "chevron.down")
+                                        .font(.captionBold)
+                                        .foregroundStyle(Color.textSecondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
 
-                        WeekCard {
-                            VStack(spacing: WeekSpacing.xs) {
-                                ForEach(group.tasks) { task in
-                                    let isExpired = isTaskExpired(task)
-
-                                    HStack(spacing: WeekSpacing.sm) {
-                                        // Status dot
-                                        ZStack {
-                                            Circle()
-                                                .fill(
-                                                    task.zone == .complete ? Color.accentGreen :
-                                                    isExpired ? Color.taskDDL :
-                                                    projectColor.opacity(0.3)
-                                                )
-                                                .frame(width: 8, height: 8)
-
-                                            if task.zone == .complete {
-                                                Circle()
-                                                    .stroke(Color.accentGreen.opacity(0.3), lineWidth: 3)
-                                                    .frame(width: 14, height: 14)
-                                            }
-                                        }
-
-                                        Text(task.title)
-                                            .font(.bodyMedium)
-                                            .foregroundColor(
-                                                task.zone == .complete ? .textTertiary :
-                                                isExpired ? .taskDDL :
-                                                .textPrimary
-                                            )
-                                            .strikethrough(task.zone == .complete)
-
-                                        Spacer()
-
-                                        if task.taskType == .ddl {
-                                            Image(systemName: "flame.fill")
-                                                .font(.caption2)
-                                                .foregroundColor(.taskDDL)
-                                        }
-
-                                        if isExpired && task.zone != .complete {
-                                            Text(String(localized: "status.expired"))
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.taskDDL)
-                                                .clipShape(Capsule())
-                                        } else {
-                                            Text(task.zone == .complete ?
-                                                String(localized: "status.completed") :
-                                                String(localized: "status.draft"))
-                                                .font(.caption2)
-                                                .foregroundColor(task.zone == .complete ? .accentGreen : .textTertiary)
-                                        }
-
-                                        Button {
-                                            deletingTask = task
-                                        } label: {
-                                            Image(systemName: "trash")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundColor(.taskDDL)
-                                                .frame(width: 22, height: 22)
-                                                .background(Color.taskDDL.opacity(0.1))
-                                                .clipShape(Circle())
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-
-                                    if task.id != group.tasks.last?.id {
-                                        Divider()
+                            if expandedSectionIDs.contains(section.id) {
+                                VStack(spacing: WeekSpacing.sm) {
+                                    ForEach(section.tasks) { task in
+                                        taskRow(task)
                                     }
                                 }
                             }
@@ -419,13 +328,132 @@ struct ProjectDetailView: View {
         }
     }
 
-    private func isTaskExpired(_ task: TaskItem) -> Bool {
-        guard let taskDate = task.day?.date else { return false }
-        let today = Calendar.current.startOfDay(for: Date())
-        return taskDate < today && task.zone != .complete
+    private func taskRow(_ task: TaskItem) -> some View {
+        let isExpired = isTaskExpired(task)
+
+        return VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                Button {
+                    toggleTaskExpansion(task.id)
+                } label: {
+                    TaskRowView(task: task)
+                }
+                .buttonStyle(.plain)
+
+                Menu {
+                    Button(String(localized: "action.edit")) {
+                        editingTask = task
+                    }
+                    Button(String(localized: "project.task.delete.action"), role: .destructive) {
+                        deletingTask = task
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: 32, height: 32)
+                }
+            }
+
+            HStack(spacing: WeekSpacing.sm) {
+                Text(task.taskNumber)
+                    .font(.captionBold)
+                    .foregroundStyle(Color.textSecondary)
+
+                TaskZoneBadge(zone: task.zone)
+
+                if task.taskType == .ddl {
+                    Image(systemName: "flame.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.taskDDL)
+                }
+
+                if isExpired {
+                    Text(String(localized: "status.expired"))
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, WeekSpacing.xs)
+                        .padding(.vertical, 2)
+                        .background(Color.taskDDL)
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+
+            if expandedTaskIDs.contains(task.id) {
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    if !task.steps.isEmpty {
+                        HStack(spacing: WeekSpacing.xs) {
+                            Image(systemName: "checklist")
+                                .foregroundStyle(Color.textSecondary)
+                            Text("步骤 \(task.steps.count)")
+                                .font(.caption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                    }
+
+                    if !task.attachments.isEmpty {
+                        HStack(spacing: WeekSpacing.xs) {
+                            Image(systemName: "paperclip")
+                                .foregroundStyle(Color.textSecondary)
+                            Text("附件 \(task.attachments.count)")
+                                .font(.caption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                    }
+
+                    if let startedAt = task.startedAt {
+                        Text("开始 \(startedAt, format: .dateTime.month().day().hour().minute())")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+
+                    if let endedAt = task.endedAt {
+                        Text("结束 \(endedAt, format: .dateTime.month().day().hour().minute())")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, WeekSpacing.sm)
+                .padding(.bottom, WeekSpacing.xs)
+            }
+        }
     }
 
     private var dateRangeText: String {
-        "\(project.startDate.formatted(date: .numeric, time: .omitted)) - \(project.endDate.formatted(date: .numeric, time: .omitted))"
+        "\(snapshot.startDate.formatted(date: .abbreviated, time: .omitted)) - \(snapshot.endDate.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func syncExpandedSections(with sections: [ProjectTaskLedgerSection]) {
+        let valid = Set(sections.map(\.id))
+        expandedSectionIDs = expandedSectionIDs.intersection(valid)
+        for section in sections where section.isExpandedByDefault && !seenSectionIDs.contains(section.id) {
+            expandedSectionIDs.insert(section.id)
+        }
+        seenSectionIDs = valid
+    }
+
+    private func toggleSection(_ id: String) {
+        if expandedSectionIDs.contains(id) {
+            expandedSectionIDs.remove(id)
+        } else {
+            expandedSectionIDs.insert(id)
+        }
+    }
+
+    private func toggleTaskExpansion(_ id: UUID) {
+        if expandedTaskIDs.contains(id) {
+            expandedTaskIDs.remove(id)
+        } else {
+            expandedTaskIDs.insert(id)
+        }
+    }
+
+    private func isTaskExpired(_ task: TaskItem) -> Bool {
+        guard let taskDate = task.day?.date else { return false }
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        return Calendar(identifier: .iso8601).startOfDay(for: taskDate) < today && task.zone != .complete
     }
 }

@@ -6,10 +6,14 @@ struct AddProjectTaskSheet: View {
     let viewModel: ExtensionsViewModel
 
     @State private var title = ""
+    @State private var description = ""
     @State private var taskType: TaskType = .regular
+    @State private var steps: [TaskStep] = []
+    @State private var attachments: [TaskAttachment] = []
     @State private var selectedDates: Set<DateComponents> = []
     @State private var currentMonth = Date()
     @State private var errorMessage: String?
+    @State private var showingTaskDetailEditor = false
 
     private let calendar = Calendar(identifier: .iso8601)
 
@@ -25,6 +29,13 @@ struct AddProjectTaskSheet: View {
                                 .foregroundColor(.textSecondary)
                             TextField(String(localized: "project.task.name.placeholder"), text: $title)
                                 .font(.bodyLarge)
+                                .padding(WeekSpacing.md)
+                                .background(Color.backgroundTertiary)
+                                .cornerRadius(WeekRadius.small)
+
+                            TextField(String(localized: "task.description.placeholder"), text: $description, axis: .vertical)
+                                .font(.bodyMedium)
+                                .lineLimit(2...5)
                                 .padding(WeekSpacing.md)
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.small)
@@ -61,6 +72,30 @@ struct AddProjectTaskSheet: View {
                                 }
                             }
                             .frame(maxWidth: .infinity)
+                        }
+                    }
+
+                    WeekCard {
+                        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                            HStack {
+                                Text(String(localized: "task.basic_info"))
+                                    .font(.bodyMedium)
+                                    .foregroundColor(.textSecondary)
+                                Spacer()
+                                Button(String(localized: "action.edit")) {
+                                    showingTaskDetailEditor = true
+                                }
+                                .font(.captionBold)
+                            }
+
+                            HStack(spacing: WeekSpacing.md) {
+                                Label("\(steps.count)", systemImage: "list.bullet")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                Label("\(attachments.count)", systemImage: "paperclip")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                            }
                         }
                     }
 
@@ -137,6 +172,23 @@ struct AddProjectTaskSheet: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .sheet(isPresented: $showingTaskDetailEditor) {
+                TaskEditorSheet(
+                    title: String(localized: "task.basic_info"),
+                    initialTitle: title,
+                    initialDescription: description,
+                    initialType: taskType,
+                    initialSteps: steps,
+                    initialAttachments: attachments
+                ) { newTitle, newDescription, newType, newSteps, newAttachments in
+                    title = newTitle
+                    description = newDescription
+                    taskType = newType
+                    steps = newSteps
+                    attachments = newAttachments
+                    showingTaskDetailEditor = false
+                }
+            }
         }
     }
 
@@ -155,7 +207,10 @@ struct AddProjectTaskSheet: View {
             let result = viewModel.addTask(
                 to: project,
                 title: title.trimmingCharacters(in: .whitespaces),
+                description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 taskType: taskType,
+                steps: steps,
+                attachments: attachments,
                 on: date
             )
             if result == nil, firstFailureMessage == nil {

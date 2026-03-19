@@ -7,6 +7,7 @@ import SwiftData
 final class ExtensionsViewModel {
     private let modelContext: ModelContext
     private let notificationService: any NotificationScheduling
+    private let taskMutationService: TaskMutationService
     private let weekCalculator = WeekCalculator()
     private let calendar = Calendar(identifier: .iso8601)
 
@@ -18,6 +19,7 @@ final class ExtensionsViewModel {
     init(modelContext: ModelContext, notificationService: (any NotificationScheduling)? = nil) {
         self.modelContext = modelContext
         self.notificationService = notificationService ?? NotificationService.shared
+        self.taskMutationService = TaskMutationService(modelContext: modelContext)
     }
 
     // MARK: - Refresh
@@ -84,7 +86,10 @@ final class ExtensionsViewModel {
     func addTask(
         to project: ProjectModel,
         title: String,
+        description: String = "",
         taskType: TaskType,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = [],
         on date: Date
     ) -> TaskItem? {
         guard !title.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -123,19 +128,20 @@ final class ExtensionsViewModel {
         }
 
         // 2. 计算 order（在该天所有任务之后）
-        let maxOrder = day.tasks.map(\.order).max() ?? 0
-        let newOrder = maxOrder + 1
-
-        // 3. 创建 TaskItem
-        let task = TaskItem(
+        let payload = TaskDraftPayload(
             title: title.trimmingCharacters(in: .whitespaces),
-            taskType: taskType,
-            order: newOrder,
-            zone: .draft
+            description: description.trimmingCharacters(in: .whitespacesAndNewlines),
+            type: taskType,
+            steps: steps,
+            attachments: attachments
         )
-        task.day = day
-        task.project = project
-        modelContext.insert(task)
+        let task: TaskItem
+        do {
+            task = try taskMutationService.createTask(in: day, payload: payload, zone: .draft, project: project)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
 
         // 4. 更新天的状态
         if day.status == .empty {
@@ -390,10 +396,53 @@ final class ExtensionsViewModel {
 
     /// 按日期分组项目任务
     func tasksByDate(for project: ProjectModel) -> [(date: Date, tasks: [TaskItem])] {
-        let grouped = Dictionary(grouping: project.tasks) { task in
-            calendar.startOfDay(for: task.day?.date ?? Date())
+        projectTaskLedgerSections(for: project).map { (date: $0.date, tasks: $0.tasks) }
+    }
+
+    func projectTaskLedgerSections(for project: ProjectModel, referenceDate: Date = Date()) -> [ProjectTaskLedgerSection] {
+        ProjectDetailComposer.projectTaskLedgerSections(
+            project: project,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+    }
+
+    func projectDetailSnapshot(for project: ProjectModel, referenceDate: Date = Date()) -> ProjectDetailSnapshot {
+        ProjectDetailComposer.projectDetailSnapshot(
+            project: project,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+    }
+
+    func updateProjectTask(
+        _ task: TaskItem,
+        title: String,
+        description: String,
+        type: TaskType,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = []
+    ) {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else {
+            errorMessage = String(localized: "project.error.task_title_empty")
+            return
         }
-        return grouped.sorted { $0.key < $1.key }.map { (date: $0.key, tasks: $0.value.sorted { $0.order < $1.order }) }
+
+        let payload = TaskDraftPayload(
+            title: normalizedTitle,
+            description: description.trimmingCharacters(in: .whitespacesAndNewlines),
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        do {
+            try taskMutationService.updateTask(task, payload: payload)
+            try modelContext.save()
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func saveBoardState() {
@@ -403,6 +452,40 @@ final class ExtensionsViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func replaceProjectTaskSteps(for task: TaskItem, with steps: [TaskStep]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps.removeAll(keepingCapacity: true)
+        let ordered = steps
+            .sorted { lhs, rhs in
+                if lhs.sortOrder != rhs.sortOrder {
+                    return lhs.sortOrder < rhs.sortOrder
+                }
+                return lhs.createdAt < rhs.createdAt
+            }
+            .enumerated()
+            .map { index, step in
+                TaskStep(
+                    title: step.title,
+                    isCompleted: step.isCompleted,
+                    sortOrder: index
+                )
+            }
+        task.steps.append(contentsOf: ordered)
+    }
+
+    private func replaceProjectTaskAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
+        task.attachments.forEach { modelContext.delete($0) }
+        task.attachments.removeAll(keepingCapacity: true)
+        let copies = attachments.map { attachment in
+            TaskAttachment(
+                data: attachment.data,
+                fileName: attachment.fileName,
+                fileType: attachment.fileType
+            )
+        }
+        task.attachments.append(contentsOf: copies)
     }
 
     private func rebuildTileSnapshots() {
@@ -455,15 +538,120 @@ struct ProjectTileSnapshot: Equatable {
     let nextTaskDate: Date?
 }
 
+struct ProjectTaskLedgerSection: Identifiable {
+    let date: Date
+    let tasks: [TaskItem]
+    let isExpandedByDefault: Bool
+
+    var id: String {
+        date.dayId
+    }
+}
+
+struct ProjectDetailSnapshot {
+    let projectID: UUID
+    let name: String
+    let icon: String
+    let colorHex: String
+    let status: ProjectStatus
+    let startDate: Date
+    let endDate: Date
+    let projectDescription: String
+    let progress: Double
+    let totalCount: Int
+    let completedCount: Int
+    let remainingCount: Int
+    let expiredCount: Int
+    let nextTaskTitle: String?
+    let nextTaskDate: Date?
+    let sections: [ProjectTaskLedgerSection]
+}
+
+enum ProjectDetailComposer {
+    static func projectTaskLedgerSections(
+        project: ProjectModel,
+        calendar: Calendar,
+        referenceDate: Date
+    ) -> [ProjectTaskLedgerSection] {
+        let today = calendar.startOfDay(for: referenceDate)
+        let grouped = Dictionary(grouping: project.tasks) { task in
+            calendar.startOfDay(for: task.day?.date ?? today)
+        }
+
+        return grouped
+            .map { date, tasks in
+                let sortedTasks = tasks.sorted { lhs, rhs in
+                    if lhs.order != rhs.order {
+                        return lhs.order < rhs.order
+                    }
+                    return lhs.id.uuidString < rhs.id.uuidString
+                }
+                return ProjectTaskLedgerSection(
+                    date: date,
+                    tasks: sortedTasks,
+                    isExpandedByDefault: date >= today
+                )
+            }
+            .sorted { $0.date < $1.date }
+    }
+
+    static func projectDetailSnapshot(
+        project: ProjectModel,
+        calendar: Calendar,
+        referenceDate: Date
+    ) -> ProjectDetailSnapshot {
+        let today = calendar.startOfDay(for: referenceDate)
+        let pending = project.tasks
+            .filter { $0.zone != .complete }
+            .sorted { lhs, rhs in
+                let lhsDate = calendar.startOfDay(for: lhs.day?.date ?? .distantFuture)
+                let rhsDate = calendar.startOfDay(for: rhs.day?.date ?? .distantFuture)
+                if lhsDate != rhsDate {
+                    return lhsDate < rhsDate
+                }
+                if lhs.order != rhs.order {
+                    return lhs.order < rhs.order
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+
+        let nextTask = pending.first { task in
+            guard let taskDay = task.day?.date else { return false }
+            return calendar.startOfDay(for: taskDay) >= today
+        } ?? pending.first
+
+        return ProjectDetailSnapshot(
+            projectID: project.id,
+            name: project.name,
+            icon: project.icon,
+            colorHex: project.color,
+            status: project.status,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            projectDescription: project.projectDescription,
+            progress: project.progress,
+            totalCount: project.totalTaskCount,
+            completedCount: project.completedTaskCount,
+            remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
+            expiredCount: project.expiredTaskCount,
+            nextTaskTitle: nextTask?.title,
+            nextTaskDate: nextTask?.day?.date,
+            sections: projectTaskLedgerSections(project: project, calendar: calendar, referenceDate: referenceDate)
+        )
+    }
+}
+
 struct SuspendedTaskLifecycleService {
     private let modelContext: ModelContext
     private let notificationService: any NotificationScheduling
+    private let taskMutationService: TaskMutationService
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
     init(modelContext: ModelContext, notificationService: any NotificationScheduling) {
         self.modelContext = modelContext
         self.notificationService = notificationService
+        self.taskMutationService = TaskMutationService(modelContext: modelContext)
     }
 
     func createTask(
@@ -639,62 +827,19 @@ struct SuspendedTaskLifecycleService {
     }
 
     private func replaceSteps(for task: SuspendedTaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        appendStepCopies(to: &task.steps, from: steps)
+        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
     }
 
     private func replaceAttachments(for task: SuspendedTaskItem, with attachments: [TaskAttachment]) {
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        appendAttachmentCopies(to: &task.attachments, from: attachments)
+        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
     }
 
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        appendStepCopies(to: &task.steps, from: steps)
+        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
     }
 
     private func replaceAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        appendAttachmentCopies(to: &task.attachments, from: attachments)
-    }
-
-    private func appendStepCopies(to destination: inout [TaskStep], from steps: [TaskStep]) {
-        let ordered = steps
-            .enumerated()
-            .sorted { lhs, rhs in
-                if lhs.element.sortOrder != rhs.element.sortOrder {
-                    return lhs.element.sortOrder < rhs.element.sortOrder
-                }
-                if lhs.element.createdAt != rhs.element.createdAt {
-                    return lhs.element.createdAt < rhs.element.createdAt
-                }
-                // Keep caller order when sort keys collide to avoid unstable reordering.
-                return lhs.offset < rhs.offset
-            }
-            .enumerated()
-            .map { index, pair in
-                TaskStep(
-                    title: pair.element.title,
-                    isCompleted: pair.element.isCompleted,
-                    sortOrder: index
-                )
-            }
-        destination.append(contentsOf: ordered)
-    }
-
-    private func appendAttachmentCopies(to destination: inout [TaskAttachment], from attachments: [TaskAttachment]) {
-        let copies = attachments.map { attachment in
-            TaskAttachment(
-                data: attachment.data,
-                fileName: attachment.fileName,
-                fileType: attachment.fileType
-            )
-        }
-        destination.append(contentsOf: copies)
+        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
     }
 
     private func endOfDay(for date: Date) -> Date {

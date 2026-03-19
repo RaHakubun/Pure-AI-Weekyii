@@ -1,6 +1,180 @@
 import Foundation
 import SwiftData
 
+struct TaskDraftPayload: Equatable {
+    let title: String
+    let description: String
+    let type: TaskType
+    let steps: [TaskStep]
+    let attachments: [TaskAttachment]
+
+    init(
+        title: String,
+        description: String,
+        type: TaskType,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = []
+    ) {
+        self.title = title
+        self.description = description
+        self.type = type
+        self.steps = steps
+        self.attachments = attachments
+    }
+}
+
+enum TaskMutationResult: Equatable {
+    case created(UUID)
+    case updated(UUID)
+    case deleted(UUID)
+    case moved
+}
+
+protocol TaskMutating {
+    @discardableResult
+    func createTask(in day: DayModel, payload: TaskDraftPayload, zone: TaskZone, project: ProjectModel?) throws -> TaskItem
+    func updateTask(_ task: TaskItem, payload: TaskDraftPayload) throws
+    @discardableResult
+    func deleteDraftTasks(in day: DayModel, at offsets: IndexSet) throws -> [TaskItem]
+    func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws
+}
+
+struct TaskMutationService: TaskMutating {
+    private let modelContext: ModelContext
+
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+
+    @discardableResult
+    func createTask(in day: DayModel, payload: TaskDraftPayload, zone: TaskZone = .draft, project: ProjectModel? = nil) throws -> TaskItem {
+        let normalizedTitle = payload.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else { throw WeekyiiError.taskTitleEmpty }
+
+        let nextOrder: Int
+        switch zone {
+        case .draft:
+            nextOrder = (day.sortedDraftTasks.last?.order ?? 0) + 1
+        case .focus:
+            nextOrder = 1
+        case .frozen:
+            nextOrder = (day.frozenTasks.last?.order ?? 0) + (day.focusTask == nil ? 1 : 2)
+        case .complete:
+            nextOrder = (day.completedTasks.last?.order ?? 0) + 1
+        }
+
+        let task = TaskItem(
+            title: normalizedTitle,
+            taskDescription: payload.description.trimmingCharacters(in: .whitespacesAndNewlines),
+            taskType: payload.type,
+            order: nextOrder,
+            zone: zone
+        )
+        task.day = day
+        task.project = project
+        replaceTaskResources(for: task, steps: payload.steps, attachments: payload.attachments)
+        day.tasks.append(task)
+
+        if day.status == .empty, zone == .draft {
+            day.status = .draft
+        }
+        if let project, project.status == .planning {
+            project.status = .active
+        }
+        return task
+    }
+
+    func updateTask(_ task: TaskItem, payload: TaskDraftPayload) throws {
+        let normalizedTitle = payload.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else { throw WeekyiiError.taskTitleEmpty }
+        task.title = normalizedTitle
+        task.taskDescription = payload.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        task.taskType = payload.type
+        replaceTaskResources(for: task, steps: payload.steps, attachments: payload.attachments)
+    }
+
+    @discardableResult
+    func deleteDraftTasks(in day: DayModel, at offsets: IndexSet) throws -> [TaskItem] {
+        let tasks = day.sortedDraftTasks
+        let tasksToDelete = offsets.compactMap { index in
+            tasks.indices.contains(index) ? tasks[index] : nil
+        }
+        day.tasks.removeAll { task in tasksToDelete.contains(where: { $0.id == task.id }) }
+        for task in tasksToDelete {
+            modelContext.delete(task)
+        }
+        renumberDraftTasks(in: day)
+        if day.sortedDraftTasks.isEmpty, day.status == .draft {
+            day.status = .empty
+        }
+        return tasksToDelete
+    }
+
+    func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws {
+        let count = day.sortedDraftTasks.count
+        guard source.isEmpty == false, destination >= 0, destination <= count else { return }
+        var tasks = day.sortedDraftTasks
+        tasks.move(fromOffsets: source, toOffset: destination)
+        for (index, task) in tasks.enumerated() {
+            task.order = index + 1
+        }
+    }
+
+    func replaceTaskResources(for task: TaskItem, steps: [TaskStep], attachments: [TaskAttachment]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps.removeAll(keepingCapacity: true)
+        task.steps.append(contentsOf: Self.normalizedStepCopies(from: steps))
+
+        task.attachments.forEach { modelContext.delete($0) }
+        task.attachments.removeAll(keepingCapacity: true)
+        task.attachments.append(contentsOf: Self.attachmentCopies(from: attachments))
+    }
+
+    func replaceTaskResources(for task: SuspendedTaskItem, steps: [TaskStep], attachments: [TaskAttachment]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps.removeAll(keepingCapacity: true)
+        task.steps.append(contentsOf: Self.normalizedStepCopies(from: steps))
+
+        task.attachments.forEach { modelContext.delete($0) }
+        task.attachments.removeAll(keepingCapacity: true)
+        task.attachments.append(contentsOf: Self.attachmentCopies(from: attachments))
+    }
+
+    static func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
+        steps
+            .sorted {
+                if $0.sortOrder != $1.sortOrder {
+                    return $0.sortOrder < $1.sortOrder
+                }
+                return $0.createdAt < $1.createdAt
+            }
+            .enumerated()
+            .map { index, step in
+                TaskStep(
+                    title: step.title,
+                    isCompleted: step.isCompleted,
+                    sortOrder: index
+                )
+            }
+    }
+
+    static func attachmentCopies(from attachments: [TaskAttachment]) -> [TaskAttachment] {
+        attachments.map { attachment in
+            TaskAttachment(
+                data: attachment.data,
+                fileName: attachment.fileName,
+                fileType: attachment.fileType
+            )
+        }
+    }
+
+    private func renumberDraftTasks(in day: DayModel) {
+        for (index, task) in day.sortedDraftTasks.enumerated() {
+            task.order = index + 1
+        }
+    }
+}
+
 struct TaskPostponeService {
     struct Preview {
         let taskID: UUID

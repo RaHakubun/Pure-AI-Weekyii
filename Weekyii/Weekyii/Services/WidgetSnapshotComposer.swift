@@ -26,9 +26,10 @@ enum WidgetSnapshotComposer {
         now: Date,
         todayDate: Date,
         selectedThemeRaw: String,
-        appearanceModeRaw: String
+        appearanceModeRaw: String,
+        premiumThemeUnlocked: Bool
     ) {
-        let theme = WeekTheme(rawValue: selectedThemeRaw) ?? .amber
+        let theme = WeekTheme.resolvedTheme(rawValue: selectedThemeRaw, premiumThemeUnlocked: premiumThemeUnlocked)
         let appearanceMode = AppearanceMode(rawValue: appearanceModeRaw) ?? .system
 
         let today = fetchDay(modelContext: modelContext, dayID: todayDate.dayId)

@@ -572,4 +572,80 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(viewModel.today?.dayId, tomorrow.dayId)
     }
 
+    @MainActor
+    func test_reconcile_isIdempotentWithinSameMinute() throws {
+        let context = container.mainContext
+        let appState = makeAppState()
+        let now = Date().startOfDay.addingTimeInterval(9 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        try context.save()
+
+        let machine = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: makeSettings()
+        )
+
+        let first = machine.reconcile(now: now, force: false)
+        let second = machine.reconcile(now: now.addingTimeInterval(20), force: false)
+
+        XCTAssertFalse(first.skipped)
+        XCTAssertTrue(second.skipped)
+        XCTAssertEqual(appState.stateTransitionRevision, 1)
+    }
+
+    @MainActor
+    func test_dataInvariantRepair_normalizesMultipleFocus() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(11 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == now.dayId }) else {
+            XCTFail("Failed to build today")
+            return
+        }
+        day.status = .execute
+        day.tasks.append(TaskItem(title: "A", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "B", order: 2, zone: .focus))
+        try context.save()
+
+        let report = DataInvariantRepairService(modelContainer: container).repair(referenceDate: now)
+
+        XCTAssertGreaterThanOrEqual(report.repairedFocusCount, 1)
+        XCTAssertEqual(day.tasks.filter { $0.zone == .focus }.count, 1)
+    }
+
+    @MainActor
+    func test_taskMutationService_createPreservesPayloadFields() throws {
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == today.dayId }) else {
+            XCTFail("Missing day")
+            return
+        }
+
+        let service = TaskMutationService(modelContext: context)
+        let payload = TaskDraftPayload(
+            title: "Task A",
+            description: "Desc",
+            type: .ddl,
+            steps: [TaskStep(title: "S1"), TaskStep(title: "S2")],
+            attachments: [TaskAttachment(data: Data([1, 2]), fileName: "a.txt", fileType: "text/plain")]
+        )
+
+        let task = try service.createTask(in: day, payload: payload, zone: .draft, project: nil)
+        try context.save()
+
+        XCTAssertEqual(task.title, "Task A")
+        XCTAssertEqual(task.taskDescription, "Desc")
+        XCTAssertEqual(task.taskType, .ddl)
+        XCTAssertEqual(task.steps.count, 2)
+        XCTAssertEqual(task.attachments.count, 1)
+    }
+
 }

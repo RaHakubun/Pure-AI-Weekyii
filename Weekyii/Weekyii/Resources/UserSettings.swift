@@ -50,6 +50,9 @@ final class UserSettings: ObservableObject {
     @Published var appearanceModeRaw: String {
         didSet { save() }
     }
+    @Published var premiumThemeUnlocked: Bool {
+        didSet { save() }
+    }
     
     // Developer Settings
     @Published var developerSettingsEnabled: Bool {
@@ -107,6 +110,7 @@ final class UserSettings: ObservableObject {
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
+        self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
         
         self.seedPastWeeks = defaults.object(forKey: "seedPastWeeks") as? Int ?? 8
@@ -122,6 +126,7 @@ final class UserSettings: ObservableObject {
         let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
         sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
         sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
+        sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
     }
     
     func save() {
@@ -136,6 +141,7 @@ final class UserSettings: ObservableObject {
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(appearanceModeRaw, forKey: "appearanceMode")
+        defaults.set(premiumThemeUnlocked, forKey: "premiumThemeUnlocked")
         defaults.set(developerSettingsEnabled, forKey: "developerSettingsEnabled")
         
         defaults.set(seedPastWeeks, forKey: "seedPastWeeks")
@@ -151,6 +157,7 @@ final class UserSettings: ObservableObject {
         let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
         sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
         sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
+        sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
 
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadAllTimelines()
@@ -173,7 +180,7 @@ final class UserSettings: ObservableObject {
     }
 
     var selectedTheme: WeekTheme {
-        get { WeekTheme(rawValue: selectedThemeRaw) ?? .amber }
+        get { WeekTheme.resolvedTheme(rawValue: selectedThemeRaw, premiumThemeUnlocked: premiumThemeUnlocked) }
         set { selectedThemeRaw = newValue.rawValue }
     }
 

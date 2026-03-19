@@ -14,6 +14,7 @@ enum WeekyiiWidgetBridge {
     static let snapshotFileName = "weekyii-widget-snapshot.json"
     static let selectedThemeKey = "selectedTheme"
     static let appearanceModeKey = "appearanceMode"
+    static let premiumThemeUnlockedKey = "premiumThemeUnlocked"
 
     static func sharedDefaults() -> UserDefaults {
         UserDefaults(suiteName: appGroupIdentifier) ?? .standard

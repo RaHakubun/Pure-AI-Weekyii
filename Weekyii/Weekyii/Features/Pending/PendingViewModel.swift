@@ -35,13 +35,15 @@ final class PendingViewModel {
     @ObservationIgnored private let weekCalculator = WeekCalculator()
     @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
     @ObservationIgnored private let timeProvider: TimeProviding
+    @ObservationIgnored private let taskMutationService: TaskMutationService
 
     var pendingWeeks: [WeekModel] = []
     var errorMessage: String?
 
-    init(modelContext: ModelContext, timeProvider: TimeProviding = PendingSystemTimeProvider()) {
+    init(modelContext: ModelContext, timeProvider: TimeProviding? = nil) {
         self.modelContext = modelContext
-        self.timeProvider = timeProvider
+        self.timeProvider = timeProvider ?? PendingSystemTimeProvider()
+        self.taskMutationService = TaskMutationService(modelContext: modelContext)
     }
 
     func refresh() {
@@ -195,21 +197,14 @@ final class PendingViewModel {
         attachments: [TaskAttachment]
     ) throws {
         guard canEdit(day) else { throw WeekyiiError.cannotEditStartedDay }
-        if day.status == .empty {
-            day.status = .draft
-        }
-
-        let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
-        let task = TaskItem(
+        let payload = TaskDraftPayload(
             title: title,
-            taskDescription: description,
-            taskType: type,
-            order: order,
-            zone: .draft
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
         )
-        appendStepCopies(to: task, from: steps)
-        appendAttachmentCopies(to: task, from: attachments)
-        day.tasks.append(task)
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft, project: nil)
         try modelContext.save()
     }
 
@@ -223,45 +218,26 @@ final class PendingViewModel {
         attachments: [TaskAttachment]
     ) throws {
         guard canEdit(day), task.zone == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        task.title = title
-        task.taskDescription = description
-        task.taskType = type
-        replaceSteps(for: task, with: steps)
-        replaceAttachments(for: task, with: attachments)
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        try taskMutationService.updateTask(task, payload: payload)
         try modelContext.save()
     }
 
     func deleteDraftTasks(in day: DayModel, at offsets: IndexSet) throws {
         guard canEdit(day) else { throw WeekyiiError.cannotEditStartedDay }
-        let tasks = day.sortedDraftTasks
-        let tasksToDelete = offsets.compactMap { index in
-            tasks.indices.contains(index) ? tasks[index] : nil
-        }
-        day.tasks.removeAll { task in
-            tasksToDelete.contains { $0.id == task.id }
-        }
-        for task in tasksToDelete {
-            modelContext.delete(task)
-        }
-        renumberDraftTasks(in: day)
-        if day.sortedDraftTasks.isEmpty {
-            day.status = .empty
-        }
+        _ = try taskMutationService.deleteDraftTasks(in: day, at: offsets)
         try modelContext.save()
     }
 
     func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws {
         guard canEdit(day) else { throw WeekyiiError.cannotEditStartedDay }
-        let count = day.sortedDraftTasks.count
-        let validSource = IndexSet(source.filter { $0 >= 0 && $0 < count })
-        guard validSource.isEmpty == false else { return }
-        let validDestination = min(max(destination, 0), count)
-
-        var tasks = day.sortedDraftTasks
-        tasks.move(fromOffsets: validSource, toOffset: validDestination)
-        for (index, task) in tasks.enumerated() {
-            task.order = index + 1
-        }
+        try taskMutationService.moveDraftTasks(in: day, from: source, to: destination)
         try modelContext.save()
     }
 

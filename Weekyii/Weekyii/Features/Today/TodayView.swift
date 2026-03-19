@@ -73,8 +73,6 @@ struct TodayView: View {
     @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
     @State private var selectedSection: TodaySection = .today
     @State private var taskForPostpone: TaskItem?
-    @State private var isDraftFullscreenPresented = false
-    @State private var draftFullscreenSourceRect: CGRect = .zero
     @State private var pendingPostponeRequest: PendingPostponeRequest?
     @State private var pendingPostponePreview: TodayViewModel.PostponePreview?
     @State private var showingPostponeConfirm = false
@@ -114,6 +112,7 @@ struct TodayView: View {
                 Text(errorMessage ?? "")
             }
         }
+        .background(todaySceneBackground)
         .onAppear {
             if viewModel == nil {
                 let model = TodayViewModel(
@@ -181,35 +180,6 @@ struct TodayView: View {
             .presentationBackground(Color.backgroundPrimary)
             .presentationCornerRadius(26)
         }
-        .fullScreenCover(isPresented: $isDraftFullscreenPresented) {
-            if let viewModel, let day = viewModel.today {
-                DraftFullscreenEditorView(
-                    day: day,
-                    viewModel: viewModel,
-                    sourceRect: draftFullscreenSourceRect,
-                    onAddTask: {
-                        draftTaskEditorMode = .create
-                    },
-                    onEditTask: { task in
-                        draftTaskEditorMode = .edit(task)
-                    },
-                    onPostponeTask: { task in
-                        taskForPostpone = task
-                    },
-                    onClose: {
-                        isDraftFullscreenPresented = false
-                    }
-                )
-                .interactiveDismissDisabled(false)
-            }
-        }
-        .onChange(of: viewModel?.today?.status.rawValue) { _, newValue in
-            guard isDraftFullscreenPresented else { return }
-            let isStillDraftEditable = newValue == DayStatus.draft.rawValue || newValue == DayStatus.empty.rawValue
-            if !isStillDraftEditable {
-                isDraftFullscreenPresented = false
-            }
-        }
         .alert("确认后移任务", isPresented: $showingPostponeConfirm) {
             Button(String(localized: "action.cancel"), role: .cancel) {
                 clearPendingPostponeContext()
@@ -241,7 +211,7 @@ struct TodayView: View {
         } weekContent: {
             WeekOverviewContentView()
         }
-            .background(Color.backgroundPrimary)
+            .background(Color.clear)
     }
 
     private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
@@ -314,7 +284,18 @@ struct TodayView: View {
                             .foregroundColor(.weekyiiPrimary)
                     }
                 }
-                
+
+                if userSettings.selectedTheme == .sunset {
+                    SunsetStatusIllustration()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+                        )
+                }
+
                 // 日期显示
                 Text(formatDate(day.dayId))
                     .font(.bodyMedium)
@@ -436,8 +417,7 @@ struct TodayView: View {
                     },
                     onPostponeTask: { task in
                         taskForPostpone = task
-                    },
-                    showsFullscreenButton: false
+                    }
                 )
             }
         }
@@ -1045,6 +1025,18 @@ struct TodayView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
     }
+
+    @ViewBuilder
+    private var todaySceneBackground: some View {
+        ZStack {
+            Color.backgroundPrimary
+            if userSettings.selectedTheme == .sunset {
+                SunsetWaterReflectionBackground()
+                    .transition(.opacity)
+            }
+        }
+        .ignoresSafeArea()
+    }
     
 }
 
@@ -1270,171 +1262,330 @@ private struct SectionToggleView: View {
     }
 }
 
-// MARK: - Task Creator Sheet
-private struct DraftFullscreenEditorView: View {
-    let day: DayModel
-    let viewModel: TodayViewModel
-    let sourceRect: CGRect
-    let onAddTask: () -> Void
-    let onEditTask: (TaskItem) -> Void
-    let onPostponeTask: (TaskItem) -> Void
-    let onClose: () -> Void
-
-    @State private var revealProgress: CGFloat = 0
-    @State private var appearOffsetY: CGFloat = 44
-    @State private var dragOffsetY: CGFloat = 0
-    @State private var topEditMode: EditMode = .inactive
+/// Lightweight animated scene used only by the Sunset theme on Today page.
+private struct SunsetWaterReflectionBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var sunDrift = false
 
     var body: some View {
         GeometryReader { proxy in
-            let origin = animationOrigin(in: proxy)
-            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            let entryOffsetX = (origin.x - center.x) * (1 - revealProgress)
-            let offsetY = appearOffsetY + dragOffsetY
-            let scale = 0.94 + 0.06 * revealProgress
+            let size = proxy.size
+            let sunY = sunCenterY(for: size)
+            let waterlineY = waterline(for: size)
 
-            ZStack(alignment: .top) {
-                Color.backgroundPrimary
-                    .opacity(Double(0.88 + 0.12 * revealProgress))
-                    .ignoresSafeArea()
+            ZStack {
+                LinearGradient(
+                    colors: skyGradientColors,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-                NavigationStack {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: WeekSpacing.base) {
-                            daySummaryCard
-                            DraftEditorView(
-                                day: day,
-                                viewModel: viewModel,
-                                onAddTask: onAddTask,
-                                onEditTask: onEditTask,
-                                onPostponeTask: onPostponeTask,
-                                showsFullscreenButton: false,
-                                onFullscreenTap: nil,
-                                showsHeaderControls: false,
-                                showsDraftHint: false,
-                                externalEditMode: $topEditMode
-                            )
-                        }
-                        .padding(.horizontal, WeekSpacing.base)
-                        .padding(.bottom, proxy.safeAreaInsets.bottom + WeekSpacing.xl)
-                    }
-                    .background(Color.backgroundPrimary)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                dismissAnimated()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(Color.textPrimary)
-                                    .frame(width: 36, height: 36)
-                                    .background(Color.backgroundSecondary, in: Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("draftFullscreenExitButton")
-                            .accessibilityLabel("退出全屏")
-                        }
-
-                        ToolbarItem(placement: .principal) {
-                            Text(day.dayId)
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(Color.textPrimary)
-                        }
-
-                        ToolbarItemGroup(placement: .topBarTrailing) {
-                            Button {
-                                onAddTask()
-                            } label: {
-                                Image(systemName: "plus.circle")
-                                    .font(.title3.weight(.semibold))
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(Color.weekyiiPrimary)
-                            .accessibilityIdentifier("draftFullscreenAddButton")
-
-                            Button(topEditMode == .active ? "完成" : "编辑") {
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                                    topEditMode = topEditMode == .active ? .inactive : .active
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(Color.weekyiiPrimary)
-                            .accessibilityIdentifier("draftFullscreenEditButton")
-                        }
-                    }
-                }
-                .environment(\.editMode, $topEditMode)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .scaleEffect(scale)
-                .offset(x: entryOffsetX, y: offsetY)
-                .opacity(Double(revealProgress))
-                .shadow(color: WeekShadow.medium.color.opacity(0.22), radius: 16, x: 0, y: 8)
+                horizonGlow(y: waterlineY, size: size)
+                sunDisk(y: sunY, size: size)
+                reflectedSun(y: sunY, waterlineY: waterlineY, size: size)
+                reflectionRipples(size: size, waterlineY: waterlineY)
             }
-            .gesture(dismissGesture)
+            .drawingGroup(opaque: false, colorMode: .linear)
             .onAppear {
-                withAnimation(.spring(response: 0.36, dampingFraction: 0.84)) {
-                    revealProgress = 1
-                    appearOffsetY = 0
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
+                    sunDrift = true
                 }
             }
         }
         .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    private var daySummaryCard: some View {
-        WeekCard {
-            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                Text("\(day.date, format: Date.FormatStyle().year().month().day()) \(weekdayText(for: day.date))")
-                    .font(.titleSmall)
-                    .foregroundStyle(Color.textPrimary)
-                StatusBadge(status: day.status)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var skyGradientColors: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color(hex: "#2A1713"),
+                Color(hex: "#3A211A"),
+                Color(hex: "#1E1614"),
+                Color(hex: "#141316")
+            ]
         }
+        return [
+            Color(hex: "#FFE7D2"),
+            Color(hex: "#FFD3B0"),
+            Color(hex: "#E8B08B"),
+            Color(hex: "#D19A86")
+        ]
     }
 
-    private func weekdayText(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_Hans_CN")
-        formatter.setLocalizedDateFormatFromTemplate("EEEE")
-        return formatter.string(from: date)
+    private func waterline(for size: CGSize) -> CGFloat {
+        size.height * (colorScheme == .dark ? 0.52 : 0.56)
     }
 
-    private var dismissGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { value in
-                guard value.translation.height > 0 else { return }
-                dragOffsetY = value.translation.height
-                revealProgress = max(0.82, 1 - value.translation.height / 1200)
-            }
-            .onEnded { value in
-                if value.translation.height > 140 || value.predictedEndTranslation.height > 220 {
-                    dismissAnimated()
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
-                        dragOffsetY = 0
-                        revealProgress = 1
-                    }
+    private func sunCenterY(for size: CGSize) -> CGFloat {
+        let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
+        guard !reduceMotion else { return base }
+        return base + (sunDrift ? 5 : -5)
+    }
+
+    private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.16),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(height: 120)
+            .position(x: size.width / 2, y: y)
+    }
+
+    private func sunDisk(y: CGFloat, size: CGSize) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(hex: colorScheme == .dark ? "#FFD3A6" : "#FFE8CA"),
+                            Color(hex: colorScheme == .dark ? "#F7A76D" : "#F7BA83"),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 6,
+                        endRadius: 88
+                    )
+                )
+                .frame(width: 180, height: 180)
+                .blur(radius: 1.5)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: colorScheme == .dark ? "#FFD9B3" : "#FFF1D8"),
+                            Color(hex: colorScheme == .dark ? "#F4A66D" : "#F5B57A")
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 86, height: 86)
+                .shadow(color: Color(hex: "#F4A66D").opacity(0.35), radius: 20, x: 0, y: 10)
+        }
+        .position(x: size.width * 0.5, y: y)
+    }
+
+    private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
+        let height: CGFloat = colorScheme == .dark ? 230 : 250
+        let reflectionTop = max(y + 28, waterlineY - 8)
+        return RoundedRectangle(cornerRadius: 70, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#FFD8A8").opacity(colorScheme == .dark ? 0.22 : 0.34),
+                        Color(hex: "#F7A86B").opacity(colorScheme == .dark ? 0.16 : 0.26),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 120, height: height)
+            .blur(radius: 4)
+            .scaleEffect(x: 1.12, y: 1.0, anchor: .top)
+            .position(x: size.width * 0.5, y: reflectionTop + height / 2)
+    }
+
+    private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 30.0)) { timeline in
+            Canvas { context, canvasSize in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let lineCount = 13
+                let leftX = canvasSize.width * 0.06
+                let rightX = canvasSize.width * 0.94
+                let laneHeight = max((canvasSize.height - waterlineY) / CGFloat(lineCount + 2), 8)
+                let waveAmplitude: CGFloat = reduceMotion ? 0.8 : 3.8
+
+                for idx in 0..<lineCount {
+                    let progress = CGFloat(idx) / CGFloat(lineCount)
+                    let baseY = waterlineY + CGFloat(idx + 1) * laneHeight
+                    let phase = Double(idx) * 0.76
+                    let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
+                    let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
+                    let lineWidth = max(0.7, 2.1 - progress * 1.2)
+                    let alpha = max(0.025, 0.16 - Double(progress) * 0.12)
+
+                    var path = Path()
+                    path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
+                    path.addQuadCurve(
+                        to: CGPoint(x: rightX - xWave, y: baseY - yWave * 0.35),
+                        control: CGPoint(
+                            x: canvasSize.width * 0.5 + CGFloat(sin(t * 0.4 + phase * 1.4)) * 26,
+                            y: baseY + CGFloat(cos(t * 0.3 + phase)) * (waveAmplitude * 0.9)
+                        )
+                    )
+
+                    context.stroke(
+                        path,
+                        with: .color(Color.white.opacity(alpha)),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
                 }
             }
-    }
-
-    private func dismissAnimated() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-            dragOffsetY = 520
-            revealProgress = 0.96
-            appearOffsetY = 28
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            onClose()
+            .frame(width: size.width, height: size.height)
+            .blendMode(.screen)
         }
     }
+}
 
-    private func animationOrigin(in proxy: GeometryProxy) -> CGPoint {
-        guard sourceRect != .zero else {
-            return CGPoint(x: proxy.size.width * 0.82, y: proxy.size.height * 0.18)
+private struct SunsetStatusIllustration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var drift = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let sunX = size.width * 0.382
+            let sunY = size.height * 0.31 + (drift ? 1.3 : -1.3)
+            let horizonY = size.height * 0.58
+
+            ZStack {
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color(hex: "#3E201E"), Color(hex: "#562922"), Color(hex: "#6A2F27")]
+                        : [Color(hex: "#F8D0BA"), Color(hex: "#F19F79"), Color(hex: "#E0715D")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: colorScheme == .dark ? "#1D2937" : "#8FB2CA"),
+                                Color(hex: colorScheme == .dark ? "#111C2A" : "#5E88A6")
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: size.height * 0.42)
+                    .offset(y: horizonY)
+
+                // 水平线
+                Rectangle()
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.24))
+                    .frame(height: 1.0)
+                    .position(x: size.width * 0.5, y: horizonY)
+
+                // 不对称地平线体块（右侧）
+                UnevenRoundedRectangle(cornerRadii: .init(topLeading: 20, bottomLeading: 2, bottomTrailing: 0, topTrailing: 0))
+                    .fill(Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16))
+                    .frame(width: size.width * 0.34, height: size.height * 0.22)
+                    .position(x: size.width * 0.84, y: horizonY - 2)
+                    .overlay(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.white.opacity(colorScheme == .dark ? 0.06 : 0.12))
+                            .frame(width: size.width * 0.20, height: 1)
+                            .offset(x: -10, y: 0)
+                    }
+
+                // 太阳本体（偏红，扁平拟物，无漫反射光晕）
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: colorScheme == .dark ? "#F46A5F" : "#EE5A4E"),
+                                Color(hex: colorScheme == .dark ? "#D8473F" : "#C63B35")
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                    )
+                    .overlay(
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.26), Color.clear],
+                                    startPoint: .top,
+                                    endPoint: .center
+                                )
+                            )
+                            .scaleEffect(0.68)
+                            .offset(y: -8)
+                    )
+                    .frame(width: 44, height: 44)
+                    .position(x: sunX, y: sunY)
+
+                // 主倒影体块（不居中，略向右偏）
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#F36A5D").opacity(colorScheme == .dark ? 0.46 : 0.54),
+                                Color(hex: "#D64A42").opacity(colorScheme == .dark ? 0.34 : 0.42),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 64, height: size.height * 0.52)
+                    .scaleEffect(x: 1.05, y: 1.0, anchor: .top)
+                    .position(x: sunX + 12, y: size.height * 0.77)
+
+                // 非对称水纹
+                stylizedRipples(size: size, horizonY: horizonY, sunX: sunX)
+            }
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 5.8).repeatForever(autoreverses: true)) {
+                    drift = true
+                }
+            }
         }
-        return CGPoint(x: sourceRect.midX, y: sourceRect.midY)
+        .accessibilityHidden(true)
+    }
+
+    private func stylizedRipples(size: CGSize, horizonY: CGFloat, sunX: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 20.0)) { timeline in
+            Canvas { context, canvasSize in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let bandCount = 8
+                let verticalStep = max((canvasSize.height - horizonY) / CGFloat(bandCount + 1), 6.0)
+
+                for i in 0..<bandCount {
+                    let p = CGFloat(i) / CGFloat(max(bandCount - 1, 1))
+                    let y = horizonY + CGFloat(i + 1) * verticalStep + CGFloat(i % 2 == 0 ? -1.5 : 0.8)
+                    let baseWidth = canvasSize.width * (0.14 + p * 0.44)
+                    let wobble = CGFloat(sin(t * 0.52 + Double(i) * 0.95)) * (reduceMotion ? 0.8 : 2.6)
+                    let centerX = sunX + 10 + wobble + CGFloat(i) * 0.7
+                    let height = max(0.9, 1.8 - p * 0.9)
+                    let alpha = max(0.05, 0.27 - Double(p) * 0.17)
+
+                    let rect = CGRect(
+                        x: centerX - baseWidth / 2,
+                        y: y,
+                        width: baseWidth,
+                        height: height
+                    )
+                    let path = Path(roundedRect: rect, cornerRadius: height)
+                    context.fill(path, with: .color(Color(hex: "#FFD2AE").opacity(alpha)))
+                    context.stroke(
+                        path,
+                        with: .color(Color.white.opacity(alpha * 0.42)),
+                        style: StrokeStyle(lineWidth: 0.45)
+                    )
+                }
+            }
+            .blendMode(.screen)
+        }
     }
 }

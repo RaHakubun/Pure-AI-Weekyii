@@ -16,16 +16,6 @@
     "%" : {
 
     },
-    "%@ %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ %2$@"
-          }
-        }
-      }
-    },
     "%lld" : {
 
     },
@@ -3145,6 +3135,17 @@
         }
       }
     },
+    "settings.default_kill_time.guidance" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一天的任务将在截止时间结算"
+          }
+        }
+      }
+    },
     "settings.default_task_type" : {
       "localizations" : {
         "en" : {
@@ -3255,6 +3256,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "包含数据填充与清空等高级选项。"
+          }
+        }
+      }
+    },
+    "settings.developer.unlock_lotr" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "解锁魔戒主题"
+          }
+        }
+      }
+    },
+    "settings.developer.unlock_lotr.subtitle" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "本地调试用，不代表真实购买状态"
           }
         }
       }
@@ -3515,6 +3538,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主题色"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.badge" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Premium"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.footer" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "解锁后可切换到魔戒主题；当前会回落到普通主题。"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.locked" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "魔戒 为 Premium 主题"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.locked_short" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "锁定"
           }
         }
       }
@@ -4547,6 +4614,9 @@
     "上方时间线仍然保留；需要展开时，切回“当前状态”或“信息横条”。" : {
 
     },
+    "下一步" : {
+
+    },
     "临近截止" : {
 
     },
@@ -4589,6 +4659,9 @@
     "分配到某天" : {
 
     },
+    "列出最近备份摘要" : {
+
+    },
     "创建并移动" : {
 
     },
@@ -4625,6 +4698,12 @@
     "后移方式" : {
 
     },
+    "回滚到最新备份" : {
+
+    },
+    "回滚到最新备份（危险）" : {
+
+    },
     "固定时刻提醒" : {
 
     },
@@ -4634,16 +4713,25 @@
     "在这里记录未决定具体时限的任务" : {
 
     },
-    "完成" : {
+    "完成编辑" : {
 
     },
-    "完成编辑" : {
+    "导出状态诊断" : {
+
+    },
+    "导出诊断信息" : {
+
+    },
+    "将直接替换当前数据库文件，可能丢失最新数据。" : {
 
     },
     "将移动到" : {
 
     },
     "应用新的默认截止时间" : {
+
+    },
+    "开始 %@" : {
 
     },
     "开始任务流头部信息" : {
@@ -4680,6 +4768,12 @@
 
     },
     "提交后今日未完成内容会立即过期，是否继续？" : {
+
+    },
+    "提前 90 分钟" : {
+
+    },
+    "提前 120 分钟" : {
 
     },
     "提醒时刻" : {
@@ -4730,6 +4824,9 @@
     "步骤" : {
 
     },
+    "步骤 %lld" : {
+
+    },
     "步骤全文" : {
 
     },
@@ -4760,6 +4857,18 @@
     "确认后移任务" : {
 
     },
+    "确认回滚" : {
+
+    },
+    "立即重算状态" : {
+
+    },
+    "系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。" : {
+
+    },
+    "结束 %@" : {
+
+    },
     "给自己一个清晰而坚定的开始。" : {
 
     },
@@ -4775,7 +4884,7 @@
     "编辑草稿" : {
 
     },
-    "草稿全屏" : {
+    "诊断信息已复制到剪贴板" : {
 
     },
     "输入任务名称" : {
@@ -4787,10 +4896,16 @@
     "进入后将按任务顺序推进，直到完成或截止。" : {
 
     },
-    "退出全屏" : {
+    "附件" : {
 
     },
-    "附件" : {
+    "附件 %lld" : {
+
+    },
+    "项目暂无待办" : {
+
+    },
+    "项目概览" : {
 
     }
   },

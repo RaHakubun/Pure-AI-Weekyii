@@ -31,6 +31,7 @@ final class TodayViewModel {
     private let userSettings: UserSettings
     private let randomMindStampProvider: () -> MindStampItem?
     private let taskPostponeService: TaskPostponeService
+    private let taskMutationService: TaskMutationService
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -51,6 +52,7 @@ final class TodayViewModel {
         self.appState = appState
         self.userSettings = userSettings
         self.taskPostponeService = TaskPostponeService(modelContext: modelContext)
+        self.taskMutationService = TaskMutationService(modelContext: modelContext)
         self.randomMindStampProvider = randomMindStampProvider ?? {
             let descriptor = FetchDescriptor<MindStampItem>()
             let stamps = (try? modelContext.fetch(descriptor)) ?? []
@@ -109,15 +111,14 @@ final class TodayViewModel {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
 
-        if day.status == .empty {
-            day.status = .draft
-        }
-
-        let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
-        let task = TaskItem(title: title, taskDescription: description, taskType: type, order: order, zone: .draft)
-        task.steps = normalizedStepCopies(from: steps)
-        task.attachments = attachments
-        day.tasks.append(task)
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft, project: nil)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -126,11 +127,14 @@ final class TodayViewModel {
     func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        task.title = title
-        task.taskDescription = description
-        task.taskType = type
-        replaceSteps(for: task, with: steps)
-        task.attachments = attachments
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        try taskMutationService.updateTask(task, payload: payload)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -139,20 +143,7 @@ final class TodayViewModel {
     func deleteTasks(at offsets: IndexSet) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        let tasks = day.sortedDraftTasks
-        let tasksToDelete = offsets.compactMap { index in
-            tasks.indices.contains(index) ? tasks[index] : nil
-        }
-        day.tasks.removeAll { task in
-            tasksToDelete.contains { $0.id == task.id }
-        }
-        for task in tasksToDelete {
-            modelContext.delete(task)
-        }
-        renumberDraftTasks(for: day)
-        if day.sortedDraftTasks.isEmpty {
-            day.status = .empty
-        }
+        _ = try taskMutationService.deleteDraftTasks(in: day, at: offsets)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -161,13 +152,7 @@ final class TodayViewModel {
     func moveDraftTasks(from source: IndexSet, to destination: Int) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        let count = day.sortedDraftTasks.count
-        guard source.isEmpty == false, destination >= 0, destination <= count else { return }
-        var tasks = day.sortedDraftTasks
-        tasks.move(fromOffsets: source, toOffset: destination)
-        for (index, task) in tasks.enumerated() {
-            task.order = index + 1
-        }
+        try taskMutationService.moveDraftTasks(in: day, from: source, to: destination)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -477,7 +462,8 @@ final class TodayViewModel {
             now: timeProvider.now,
             todayDate: timeProvider.today,
             selectedThemeRaw: userSettings.selectedThemeRaw,
-            appearanceModeRaw: userSettings.appearanceModeRaw
+            appearanceModeRaw: userSettings.appearanceModeRaw,
+            premiumThemeUnlocked: userSettings.premiumThemeUnlocked
         )
     }
 }

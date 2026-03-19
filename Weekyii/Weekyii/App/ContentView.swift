@@ -45,7 +45,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.settings)
         }
-        .id("\(appState.dataRevision)-\(userSettings.selectedThemeRaw)-\(userSettings.appearanceModeRaw)")
+        .id("\(appState.dataRevision)-\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)")
         .tint(.weekyiiPrimary)
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { appState.runtimeErrorMessage != nil },
