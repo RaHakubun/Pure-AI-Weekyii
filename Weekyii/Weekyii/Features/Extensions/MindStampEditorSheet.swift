@@ -40,6 +40,7 @@ struct MindStampEditorSheet: View {
                             .padding(WeekSpacing.md)
                             .background(Color.backgroundTertiary)
                             .cornerRadius(WeekRadius.small)
+                            .accessibilityIdentifier("mindstampEditorTextField")
                         }
                     }
 
@@ -106,6 +107,7 @@ struct MindStampEditorSheet: View {
                         save()
                     }
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageData == nil)
+                    .accessibilityIdentifier("mindstampEditorSaveButton")
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "action.cancel")) {

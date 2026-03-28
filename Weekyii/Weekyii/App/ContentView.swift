@@ -9,6 +9,7 @@ private enum MainTab: Hashable {
 }
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
     @State private var selectedTab: MainTab = .today
@@ -56,6 +57,16 @@ struct ContentView: View {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
             Text(appState.runtimeErrorMessage ?? "")
+        }
+        .onOpenURL { url in
+            guard LiveActivityAction.parse(url: url) != nil else { return }
+            selectedTab = .today
+            LiveActivityActionRouter.handle(
+                url: url,
+                modelContext: modelContext,
+                appState: appState,
+                userSettings: userSettings
+            )
         }
     }
 }

@@ -33,6 +33,7 @@ struct WeekCard<Content: View>: View {
         .overlay(
             RoundedRectangle(cornerRadius: WeekRadius.large)
                 .stroke(borderColor(isPremiumTheme: isPremiumTheme), lineWidth: 1)
+                .allowsHitTesting(false)
         )
         .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
         .overlay(accentBar(isPremiumTheme: isPremiumTheme), alignment: .top)
@@ -110,6 +111,7 @@ struct WeekCard<Content: View>: View {
                     .padding(.top, WeekSpacing.md)
                 Spacer()
             }
+            .allowsHitTesting(false)
         }
     }
 }

@@ -5,5 +5,6 @@ import SwiftUI
 struct WeekyiiWidgetBundle: WidgetBundle {
     var body: some Widget {
         WeekyiiWidget()
+        WeekyiiLiveActivityWidget()
     }
 }

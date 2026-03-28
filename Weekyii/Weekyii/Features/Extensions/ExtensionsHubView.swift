@@ -2243,26 +2243,6 @@ private struct MindStampsFullView: View {
                     emptyState
                 } else {
                     MindStampListView(viewModel: viewModel)
-
-                    Button {
-                        showingEditor = true
-                    } label: {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 14))
-                            Text(String(localized: "mindstamp.add"))
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, WeekSpacing.xl)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.accentPink)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.accentPink.opacity(0.3), radius: 6, x: 0, y: 3)
-                    }
-                    .accessibilityIdentifier("mindstampsFooterCreateButton")
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.bottom, WeekSpacing.lg)
                 }
             }
             .padding(.horizontal, WeekSpacing.base)
@@ -2272,6 +2252,20 @@ private struct MindStampsFullView: View {
         .background(Color.backgroundPrimary.ignoresSafeArea())
         .navigationTitle(String(localized: "extensions.tab.mindstamps"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingEditor = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.accentPink)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(String(localized: "mindstamp.add"))
+                .accessibilityIdentifier("mindstampsToolbarCreateButton")
+            }
+        }
         .sheet(isPresented: $showingEditor, onDismiss: {
             viewModel.refresh()
         }) {
@@ -2297,24 +2291,14 @@ private struct MindStampsFullView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Button {
-                    showingEditor = true
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 16))
-                        Text(String(localized: "mindstamp.add"))
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.xl)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(Color.accentPink)
+                Text("右上角点 + 新建思想钢印")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.textTertiary)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.vertical, WeekSpacing.xs)
+                    .background(Color.backgroundTertiary)
                     .clipShape(Capsule())
-                    .shadow(color: Color.accentPink.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .accessibilityIdentifier("mindstampsEmptyCreateButton")
-                .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("mindstampEmptyCreateHint")
             }
             .frame(maxWidth: .infinity)
             .weekPaddingVertical(WeekSpacing.xl)

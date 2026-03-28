@@ -5,6 +5,8 @@ struct MindStampListView: View {
     @State private var editingItem: MindStampItem?
     @State private var deletingItem: MindStampItem?
     @State private var imagePreviewItem: ImagePreviewItem?
+    private let actionButtonSize: CGFloat = 44
+    private let actionIconFont: Font = .system(size: 17, weight: .semibold)
 
     var body: some View {
         Group {
@@ -59,6 +61,15 @@ struct MindStampListView: View {
                         .foregroundColor(.textSecondary)
                         .multilineTextAlignment(.center)
                 }
+
+                Text("右上角点 + 新建思想钢印")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.textTertiary)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.vertical, WeekSpacing.xs)
+                    .background(Color.backgroundTertiary)
+                    .clipShape(Capsule())
+                    .accessibilityIdentifier("mindstampEmptyCreateHint")
             }
             .frame(maxWidth: .infinity)
             .weekPaddingVertical(WeekSpacing.xl)
@@ -69,13 +80,13 @@ struct MindStampListView: View {
 
     private var stampList: some View {
         VStack(spacing: WeekSpacing.md) {
-            ForEach(viewModel.stamps) { stamp in
-                stampCard(stamp)
+            ForEach(Array(viewModel.stamps.enumerated()), id: \.element.id) { index, stamp in
+                stampCard(stamp, index: index)
             }
         }
     }
 
-    private func stampCard(_ stamp: MindStampItem) -> some View {
+    private func stampCard(_ stamp: MindStampItem, index: Int) -> some View {
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                 // Header: date + actions
@@ -86,54 +97,82 @@ struct MindStampListView: View {
 
                     Spacer()
 
-                    Button {
+                    actionButton(
+                        systemImage: "pencil",
+                        foreground: .textSecondary,
+                        background: Color.backgroundTertiary,
+                        accessibilityID: "mindstampEditButton_\(index)"
+                    ) {
                         editingItem = stamp
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 14))
-                            .foregroundColor(.textSecondary)
-                            .frame(width: 28, height: 28)
-                            .background(Color.backgroundTertiary)
-                            .clipShape(Circle())
                     }
-                    .buttonStyle(.plain)
 
-                    Button {
+                    actionButton(
+                        systemImage: "trash",
+                        foreground: .taskDDL,
+                        background: Color.taskDDL.opacity(0.1),
+                        accessibilityID: "mindstampDeleteButton_\(index)"
+                    ) {
                         deletingItem = stamp
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 13))
-                            .foregroundColor(.taskDDL)
-                            .frame(width: 28, height: 28)
-                            .background(Color.taskDDL.opacity(0.1))
-                            .clipShape(Circle())
                     }
-                    .buttonStyle(.plain)
                 }
+                .zIndex(2)
 
                 // Text content
                 if !stamp.text.isEmpty {
-                    Text(stamp.text)
-                        .font(.bodyMedium)
-                        .foregroundColor(.textPrimary)
+                    HStack(alignment: .top, spacing: 0) {
+                        Text(stamp.text)
+                            .font(.bodyMedium)
+                            .foregroundColor(.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    // Swallow taps on the full text band so they do not fall through to the image preview area.
+                    .onTapGesture { }
                 }
 
                 // Image
                 if let blob = stamp.imageBlob, let uiImage = UIImage(data: blob) {
-                    Button {
-                        imagePreviewItem = ImagePreviewItem(image: uiImage)
-                    } label: {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 160)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                    }
-                    .buttonStyle(.plain)
+                    imagePreview(uiImage)
+                        .onTapGesture {
+                            imagePreviewItem = ImagePreviewItem(image: uiImage)
+                        }
+                        .zIndex(0)
                 }
             }
         }
+    }
+
+    private func actionButton(
+        systemImage: String,
+        foreground: Color,
+        background: Color,
+        accessibilityID: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(actionIconFont)
+                .foregroundColor(foreground)
+                .frame(width: actionButtonSize, height: actionButtonSize)
+                .background(background)
+                .clipShape(Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(accessibilityID)
+    }
+
+    private func imagePreview(_ image: UIImage) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+            .contentShape(RoundedRectangle(cornerRadius: WeekRadius.small))
     }
 }

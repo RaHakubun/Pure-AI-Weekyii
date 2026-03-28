@@ -294,6 +294,15 @@ struct TodayView: View {
                             RoundedRectangle(cornerRadius: WeekRadius.medium)
                                 .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
                         )
+                } else if userSettings.selectedTheme == .lotr {
+                    LotrStatusIllustration()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 90)
+                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+                        )
                 }
 
                 // 日期显示
@@ -1033,6 +1042,9 @@ struct TodayView: View {
             if userSettings.selectedTheme == .sunset {
                 SunsetWaterReflectionBackground()
                     .transition(.opacity)
+            } else if userSettings.selectedTheme == .lotr {
+                LotrRainNightBackground()
+                    .transition(.opacity)
             }
         }
         .ignoresSafeArea()
@@ -1302,17 +1314,17 @@ private struct SunsetWaterReflectionBackground: View {
     private var skyGradientColors: [Color] {
         if colorScheme == .dark {
             return [
-                Color(hex: "#2A1713"),
-                Color(hex: "#3A211A"),
-                Color(hex: "#1E1614"),
-                Color(hex: "#141316")
+                Color(hex: "#251414"),
+                Color(hex: "#3A1D1A"),
+                Color(hex: "#221917"),
+                Color(hex: "#141317")
             ]
         }
         return [
-            Color(hex: "#FFE7D2"),
-            Color(hex: "#FFD3B0"),
-            Color(hex: "#E8B08B"),
-            Color(hex: "#D19A86")
+            Color(hex: "#FFE5D1"),
+            Color(hex: "#F9C39E"),
+            Color(hex: "#DF896B"),
+            Color(hex: "#B86A5C")
         ]
     }
 
@@ -1326,19 +1338,24 @@ private struct SunsetWaterReflectionBackground: View {
         return base + (sunDrift ? 5 : -5)
     }
 
+    private func sunCenterX(for size: CGSize) -> CGFloat {
+        size.width * 0.382
+    }
+
     private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
         Rectangle()
             .fill(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.16),
+                        Color(hex: colorScheme == .dark ? "#E5B099" : "#F2B28F")
+                            .opacity(colorScheme == .dark ? 0.08 : 0.13),
                         Color.clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .frame(height: 120)
+            .frame(height: 86)
             .position(x: size.width / 2, y: y)
     }
 
@@ -1346,56 +1363,58 @@ private struct SunsetWaterReflectionBackground: View {
         ZStack {
             Circle()
                 .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(hex: colorScheme == .dark ? "#FFD3A6" : "#FFE8CA"),
-                            Color(hex: colorScheme == .dark ? "#F7A76D" : "#F7BA83"),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: 6,
-                        endRadius: 88
-                    )
-                )
-                .frame(width: 180, height: 180)
-                .blur(radius: 1.5)
-
-            Circle()
-                .fill(
                     LinearGradient(
                         colors: [
-                            Color(hex: colorScheme == .dark ? "#FFD9B3" : "#FFF1D8"),
-                            Color(hex: colorScheme == .dark ? "#F4A66D" : "#F5B57A")
+                            Color(hex: colorScheme == .dark ? "#FA6D5B" : "#F16250"),
+                            Color(hex: colorScheme == .dark ? "#D84A3E" : "#C83D36")
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
-                .frame(width: 86, height: 86)
-                .shadow(color: Color(hex: "#F4A66D").opacity(0.35), radius: 20, x: 0, y: 10)
+                .frame(width: 74, height: 74)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.2 : 0.24),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                )
+                .frame(width: 40, height: 40)
+                .offset(y: -9)
         }
-        .position(x: size.width * 0.5, y: y)
+        .overlay(
+            Circle()
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                .frame(width: 74, height: 74)
+        )
+        .position(x: sunCenterX(for: size), y: y)
     }
 
     private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
-        let height: CGFloat = colorScheme == .dark ? 230 : 250
-        let reflectionTop = max(y + 28, waterlineY - 8)
+        let height: CGFloat = colorScheme == .dark ? 212 : 230
+        let reflectionTop = max(y + 24, waterlineY - 10)
         return RoundedRectangle(cornerRadius: 70, style: .continuous)
             .fill(
                 LinearGradient(
                     colors: [
-                        Color(hex: "#FFD8A8").opacity(colorScheme == .dark ? 0.22 : 0.34),
-                        Color(hex: "#F7A86B").opacity(colorScheme == .dark ? 0.16 : 0.26),
+                        Color(hex: "#F06B58").opacity(colorScheme == .dark ? 0.2 : 0.3),
+                        Color(hex: "#D34A3F").opacity(colorScheme == .dark ? 0.14 : 0.24),
                         Color.clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .frame(width: 120, height: height)
+            .frame(width: 84, height: height)
             .blur(radius: 4)
-            .scaleEffect(x: 1.12, y: 1.0, anchor: .top)
-            .position(x: size.width * 0.5, y: reflectionTop + height / 2)
+            .scaleEffect(x: 1.04, y: 1.0, anchor: .top)
+            .position(x: sunCenterX(for: size) + 10, y: reflectionTop + height / 2)
     }
 
     private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
@@ -1415,7 +1434,7 @@ private struct SunsetWaterReflectionBackground: View {
                     let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
                     let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
                     let lineWidth = max(0.7, 2.1 - progress * 1.2)
-                    let alpha = max(0.025, 0.16 - Double(progress) * 0.12)
+                    let alpha = max(0.02, 0.11 - Double(progress) * 0.08)
 
                     var path = Path()
                     path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
@@ -1429,13 +1448,13 @@ private struct SunsetWaterReflectionBackground: View {
 
                     context.stroke(
                         path,
-                        with: .color(Color.white.opacity(alpha)),
+                        with: .color(Color(hex: "#FFD6B9").opacity(alpha)),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                     )
                 }
             }
             .frame(width: size.width, height: size.height)
-            .blendMode(.screen)
+            .blendMode(.plusLighter)
         }
     }
 }
@@ -1521,7 +1540,7 @@ private struct SunsetStatusIllustration: View {
                             .scaleEffect(0.68)
                             .offset(y: -8)
                     )
-                    .frame(width: 44, height: 44)
+                    .frame(width: 52, height: 52)
                     .position(x: sunX, y: sunY)
 
                 // 主倒影体块（不居中，略向右偏）
@@ -1587,5 +1606,172 @@ private struct SunsetStatusIllustration: View {
             }
             .blendMode(.screen)
         }
+    }
+}
+
+private struct LotrRainNightBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var rainDrift = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let horizonY = size.height * 0.6
+
+            ZStack {
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color(hex: "#070808"), Color(hex: "#0D0F12"), Color(hex: "#13161A"), Color(hex: "#1A1D22")]
+                        : [Color(hex: "#E6E7EA"), Color(hex: "#D6D8DD"), Color(hex: "#C1C4CB"), Color(hex: "#ADB1BA")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // starless night: no stars, only layered mountain silhouettes
+                mountainLayer(size: size, y: horizonY - 34, opacity: colorScheme == .dark ? 0.7 : 0.34, offset: 0)
+                mountainLayer(size: size, y: horizonY - 12, opacity: colorScheme == .dark ? 0.86 : 0.46, offset: 24)
+
+                // distant call: a tiny warm beacon near golden-left valley
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color(hex: colorScheme == .dark ? "#D1A261" : "#AF7D47"))
+                    .frame(width: 3, height: 12)
+                    .blur(radius: 0.4)
+                    .position(x: size.width * 0.362, y: horizonY - 8)
+
+                coldRain(size: size, fromY: horizonY - 120)
+            }
+            .drawingGroup(opaque: false, colorMode: .linear)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.linear(duration: 5.8).repeatForever(autoreverses: false)) {
+                    rainDrift = true
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: -20, y: size.height))
+            path.addLine(to: CGPoint(x: -20, y: y + 40))
+            path.addCurve(
+                to: CGPoint(x: size.width * 0.28, y: y - 22),
+                control1: CGPoint(x: size.width * 0.05, y: y + 10),
+                control2: CGPoint(x: size.width * 0.18, y: y - 26)
+            )
+            path.addCurve(
+                to: CGPoint(x: size.width * 0.58, y: y + 6),
+                control1: CGPoint(x: size.width * 0.36, y: y - 16),
+                control2: CGPoint(x: size.width * 0.46, y: y + 14)
+            )
+            path.addCurve(
+                to: CGPoint(x: size.width + 20, y: y - 12),
+                control1: CGPoint(x: size.width * 0.71, y: y - 14),
+                control2: CGPoint(x: size.width * 0.89, y: y - 20)
+            )
+            path.addLine(to: CGPoint(x: size.width + 20, y: size.height))
+            path.closeSubpath()
+        }
+        .fill(Color.black.opacity(opacity))
+        .offset(x: offset)
+    }
+
+    private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 24.0)) { timeline in
+            Canvas { context, canvas in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let columns = 24
+                for idx in 0..<columns {
+                    let x = (CGFloat(idx) + 0.5) / CGFloat(columns) * canvas.width
+                    let phase = Double(idx) * 0.37
+                    let drift = CGFloat(sin(t * 0.65 + phase)) * (reduceMotion ? 0.5 : 2.3)
+                    let dropTop = fromY + CGFloat((idx % 4) * 6) + CGFloat((t * 38 + phase * 30).truncatingRemainder(dividingBy: 16))
+                    let dropHeight: CGFloat = 14 + CGFloat(idx % 3) * 2
+                    let rect = CGRect(x: x + drift, y: dropTop, width: 1.0, height: dropHeight)
+                    let path = Path(roundedRect: rect, cornerRadius: 1)
+                    context.fill(path, with: .color(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.1)))
+                }
+            }
+        }
+    }
+}
+
+private struct LotrStatusIllustration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var pulse = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let horizonY = size.height * 0.62
+            let beaconX = size.width * 0.382
+
+            ZStack {
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color(hex: "#0B0D10"), Color(hex: "#14171C"), Color(hex: "#1E232A")]
+                        : [Color(hex: "#D9DBE0"), Color(hex: "#C9CCD3"), Color(hex: "#BABEC7")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: colorScheme == .dark ? "#1A1E24" : "#A3A8B1"),
+                                Color(hex: colorScheme == .dark ? "#10141A" : "#8E949F")
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: size.height * 0.42)
+                    .offset(y: horizonY)
+
+                Path { path in
+                    path.move(to: CGPoint(x: -12, y: horizonY + 10))
+                    path.addLine(to: CGPoint(x: size.width * 0.24, y: horizonY - 22))
+                    path.addLine(to: CGPoint(x: size.width * 0.46, y: horizonY + 6))
+                    path.addLine(to: CGPoint(x: size.width * 0.66, y: horizonY - 18))
+                    path.addLine(to: CGPoint(x: size.width + 12, y: horizonY + 14))
+                    path.addLine(to: CGPoint(x: size.width + 12, y: size.height + 20))
+                    path.addLine(to: CGPoint(x: -12, y: size.height + 20))
+                    path.closeSubpath()
+                }
+                .fill(Color.black.opacity(colorScheme == .dark ? 0.66 : 0.34))
+
+                Capsule()
+                    .fill(Color(hex: colorScheme == .dark ? "#D5A56A" : "#A67943").opacity(pulse ? 0.88 : 0.64))
+                    .frame(width: 4, height: 16)
+                    .position(x: beaconX, y: horizonY - 6)
+
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#C99A65").opacity(colorScheme == .dark ? 0.34 : 0.24),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 26, height: 44)
+                    .position(x: beaconX + 5, y: horizonY + 14)
+            }
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

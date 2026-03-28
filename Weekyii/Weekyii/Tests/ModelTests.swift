@@ -495,8 +495,50 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system)
 
         XCTAssertEqual(snapshot.primaryHex, WeekTheme.lotr.primaryThemeHex)
-        XCTAssertEqual(snapshot.darkBackgroundHex, "#12110D")
-        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#F1E8D8")
+        XCTAssertEqual(snapshot.darkBackgroundHex, "#101411")
+        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#E6DECf")
+    }
+
+    func test_liveActivityThemeSnapshot_resolvesLockPaletteForForcedDarkMode() {
+        let theme = LiveActivityThemeSnapshot(
+            islandTextPrimaryHex: "#111111",
+            islandTextSecondaryHex: "#222222",
+            islandAccentHex: "#333333",
+            islandWarningHex: "#444444",
+            islandSuccessHex: "#555555",
+            islandChipPrimaryHex: "#666666",
+            islandChipSecondaryHex: "#777777",
+            islandKeylineHex: "#888888",
+            lockBackgroundHex: "#AAAAAA",
+            lockSurfaceHex: "#BBBBBB",
+            lockTextPrimaryHex: "#CCCCCC",
+            lockTextSecondaryHex: "#DDDDDD",
+            lockAccentHex: "#EEEEEE",
+            lockProgressTrackHex: "#999999",
+            darkLockBackgroundHex: "#101010",
+            darkLockSurfaceHex: "#202020",
+            darkLockTextPrimaryHex: "#EFEFEF",
+            darkLockTextSecondaryHex: "#DFDFDF",
+            darkLockAccentHex: "#CFCFCF",
+            darkLockProgressTrackHex: "#303030",
+            appearanceModeRaw: AppearanceMode.dark.rawValue
+        )
+
+        let palette = theme.resolvedLockPalette(isDarkSystem: false)
+
+        XCTAssertEqual(palette.backgroundHex, "#101010")
+        XCTAssertEqual(palette.textPrimaryHex, "#EFEFEF")
+        XCTAssertEqual(palette.progressTrackHex, "#303030")
+    }
+
+    func test_lotrLiveActivityThemeSnapshot_usesDarkIslandContrastAndResolvedLockPalette() {
+        let snapshot = WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system)
+        let darkLockPalette = snapshot.resolvedLockPalette(isDarkSystem: true)
+
+        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E6DECf")
+        XCTAssertEqual(snapshot.islandKeylineHex, "#C6AA79")
+        XCTAssertEqual(darkLockPalette.backgroundHex, "#101411")
+        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#E6DECf")
     }
 
     func test_widgetSnapshotStore_roundTrip() throws {
@@ -533,6 +575,94 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(loaded, snapshot)
     }
 
+    @MainActor
+    func test_pendingWeekOutlook_relaxedTone() {
+        let week = makeOutlookWeek(
+            regular: [1, 1, 1, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.tone, .relaxed)
+        XCTAssertEqual(outlook.typeCounts.regular, 3)
+        XCTAssertEqual(outlook.dayLoadSeries.count, 7)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_overloadByPeakThreshold() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [4, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.tone, .overloadWarning)
+        XCTAssertEqual(outlook.typeCounts.ddl, 4)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_belowPeakThresholdDoesNotTriggerOverload() {
+        let week = makeOutlookWeek(
+            regular: [7, 0, 0, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [1, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.tone, .steady)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_deadlineRushRequiresTwoDayCluster() {
+        let clusteredWeek = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [2, 2, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+        let distributedWeek = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [1, 0, 1, 0, 1, 0, 1],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let clusteredOutlook = PendingViewModel.buildWeekOutlook(for: clusteredWeek)
+        let distributedOutlook = PendingViewModel.buildWeekOutlook(for: distributedWeek)
+
+        XCTAssertEqual(clusteredOutlook.tone, .deadlineRush)
+        XCTAssertEqual(distributedOutlook.tone, .steady)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_midweekCongestionTone() {
+        let week = makeOutlookWeek(
+            regular: [1, 0, 5, 5, 4, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.tone, .midweekCongestion)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_frontLooseBackTightTone() {
+        let week = makeOutlookWeek(
+            regular: [1, 1, 1, 2, 2, 2, 2],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.tone, .frontLooseBackTight)
+    }
+
     private func makeTemporaryStoreURL() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -553,6 +683,40 @@ final class ModelTests: XCTestCase {
         components.hour = hour
         components.minute = minute
         return components.date ?? Date()
+    }
+
+    private func makeOutlookWeek(regular: [Int], ddl: [Int], leisure: [Int]) -> WeekModel {
+        precondition(regular.count == 7 && ddl.count == 7 && leisure.count == 7)
+        let start = makeDate(2026, 3, 30)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .pending
+        )
+
+        for index in 0..<7 {
+            let dayDate = start.addingDays(index)
+            let day = DayModel(dayId: dayDate.dayId, date: dayDate, status: .draft)
+            day.week = week
+
+            var order = 1
+            for _ in 0..<regular[index] {
+                day.tasks.append(TaskItem(title: "R\(order)", taskType: .regular, order: order, zone: .draft))
+                order += 1
+            }
+            for _ in 0..<ddl[index] {
+                day.tasks.append(TaskItem(title: "D\(order)", taskType: .ddl, order: order, zone: .draft))
+                order += 1
+            }
+            for _ in 0..<leisure[index] {
+                day.tasks.append(TaskItem(title: "L\(order)", taskType: .leisure, order: order, zone: .draft))
+                order += 1
+            }
+
+            week.days.append(day)
+        }
+        return week
     }
 
     private func makeTileSnapshot(projectID: UUID, nextTaskTitle: String?) -> ProjectTileSnapshot {

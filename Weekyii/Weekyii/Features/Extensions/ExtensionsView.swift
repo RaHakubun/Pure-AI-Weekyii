@@ -53,6 +53,21 @@ struct ExtensionsView: View {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .small, animated: false)
                 }
+
+                if selectedTab == .mindStamps {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showingMindStampEditor = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.weekyiiPrimary)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityLabel(String(localized: "mindstamp.add"))
+                        .accessibilityIdentifier("mindstampsToolbarCreateButton")
+                    }
+                }
             }
             .sheet(isPresented: $showingCreateSheet, onDismiss: {
                 viewModel?.refresh()
@@ -201,30 +216,8 @@ struct ExtensionsView: View {
     private var mindStampsContent: some View {
         Group {
             if let mindStampViewModel {
-                VStack(spacing: WeekSpacing.md) {
-                    MindStampListView(viewModel: mindStampViewModel)
-                        .padding(.horizontal, WeekSpacing.xl)
-
-                    // Add stamp button
-                    Button {
-                        showingMindStampEditor = true
-                    } label: {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 14))
-                            Text(String(localized: "mindstamp.add"))
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, WeekSpacing.xl)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.weekyiiGradient)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.bottom, WeekSpacing.lg)
-                }
+                MindStampListView(viewModel: mindStampViewModel)
+                    .padding(.horizontal, WeekSpacing.xl)
                 .padding(.top, WeekSpacing.sm)
             } else {
                 ProgressView()

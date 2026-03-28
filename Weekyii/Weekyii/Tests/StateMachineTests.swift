@@ -42,6 +42,19 @@ final class StateMachineTests: XCTestCase {
         var defaultKillTimeMinute: Int = 45
     }
 
+    @MainActor
+    private struct NoopLiveActivityService: LiveActivityManaging {
+        func reconcile(
+            modelContext: ModelContext,
+            now: Date,
+            selectedThemeRaw: String,
+            appearanceModeRaw: String,
+            premiumThemeUnlocked: Bool
+        ) {}
+
+        func endAll() {}
+    }
+
     private final class MutableTimeProvider: TimeProviding {
         private let iso8601Calendar = Calendar(identifier: .iso8601)
         var mockDate: Date
@@ -646,6 +659,137 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(task.taskType, .ddl)
         XCTAssertEqual(task.steps.count, 2)
         XCTAssertEqual(task.attachments.count, 1)
+    }
+
+    @MainActor
+    func test_todayActivitySnapshotBuilder_mapsExecuteDay() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == now.dayId }) else {
+            XCTFail("Missing today")
+            return
+        }
+        day.status = .execute
+        day.killTimeHour = 23
+        day.killTimeMinute = 45
+        day.tasks.append(TaskItem(title: "Focus A", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Frozen B", order: 2, zone: .frozen))
+        day.tasks.append(TaskItem(title: "Done C", order: 3, zone: .complete))
+        try context.save()
+
+        let snapshot = TodayActivitySnapshotBuilder.build(
+            modelContext: context,
+            now: now,
+            selectedThemeRaw: WeekTheme.amber.rawValue,
+            appearanceModeRaw: AppearanceMode.dark.rawValue,
+            premiumThemeUnlocked: false
+        )
+
+        XCTAssertNotNil(snapshot)
+        XCTAssertEqual(snapshot?.dayId, now.dayId)
+        XCTAssertEqual(snapshot?.focusTitle, "Focus A")
+        XCTAssertEqual(snapshot?.frozenCount, 1)
+        XCTAssertEqual(snapshot?.completedCount, 1)
+        XCTAssertEqual(snapshot?.totalCount, 3)
+    }
+
+    @MainActor
+    func test_todayActivitySnapshotBuilder_returnsNilWhenNotExecuting() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == now.dayId }) else {
+            XCTFail("Missing today")
+            return
+        }
+        day.status = .draft
+        day.tasks.append(TaskItem(title: "Draft", order: 1, zone: .draft))
+        try context.save()
+
+        let snapshot = TodayActivitySnapshotBuilder.build(
+            modelContext: context,
+            now: now,
+            selectedThemeRaw: WeekTheme.amber.rawValue,
+            appearanceModeRaw: AppearanceMode.system.rawValue,
+            premiumThemeUnlocked: false
+        )
+
+        XCTAssertNil(snapshot)
+    }
+
+    @MainActor
+    func test_liveActivityAction_parseURL() {
+        let parsed = LiveActivityAction.parse(url: LiveActivityAction.postponeFocus.url(days: 2))
+        XCTAssertEqual(parsed?.action, .postponeFocus)
+        XCTAssertEqual(parsed?.days, 2)
+    }
+
+    @MainActor
+    func test_liveActivityActionRouter_doneFocusAdvancesExecutionQueue() throws {
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == today.dayId }) else {
+            XCTFail("Missing day")
+            return
+        }
+        day.status = .execute
+        day.tasks.append(TaskItem(title: "Focus", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Frozen", order: 2, zone: .frozen))
+        try context.save()
+
+        let appState = AppState()
+        let settings = UserSettings()
+        LiveActivityActionRouter.handle(
+            url: LiveActivityAction.doneFocus.url(),
+            modelContext: context,
+            appState: appState,
+            userSettings: settings,
+            notificationService: TestNotificationService(),
+            liveActivityService: NoopLiveActivityService()
+        )
+
+        XCTAssertEqual(day.completedTasks.count, 1)
+        XCTAssertEqual(day.focusTask?.title, "Frozen")
+    }
+
+    @MainActor
+    func test_liveActivityActionRouter_postponeMovesFocusToTargetDay() throws {
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == today.dayId }) else {
+            XCTFail("Missing day")
+            return
+        }
+        day.status = .execute
+        day.tasks.append(TaskItem(title: "Focus", order: 1, zone: .focus))
+        try context.save()
+
+        let appState = AppState()
+        let settings = UserSettings()
+        LiveActivityActionRouter.handle(
+            url: LiveActivityAction.postponeFocus.url(days: 1),
+            modelContext: context,
+            appState: appState,
+            userSettings: settings,
+            notificationService: TestNotificationService(),
+            liveActivityService: NoopLiveActivityService()
+        )
+
+        let tomorrowId = today.addingDays(1).dayId
+        let tomorrow = try context.fetch(
+            FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == tomorrowId })
+        ).first
+
+        XCTAssertNotNil(tomorrow)
+        XCTAssertEqual(tomorrow?.sortedDraftTasks.first?.title, "Focus")
     }
 
 }

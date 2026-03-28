@@ -9,6 +9,7 @@ struct DraftEditorView: View {
 
     @State private var errorMessage: String?
     @State private var localEditMode: EditMode = .inactive
+    private let actionIconFont: Font = .system(size: 23, weight: .semibold)
 
     private var isEditing: Bool {
         localEditMode == .active
@@ -28,7 +29,7 @@ struct DraftEditorView: View {
                     onAddTask()
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.title3)
+                        .font(actionIconFont)
                         .foregroundStyle(day.status == .draft || day.status == .empty ? Color.weekyiiPrimary : Color.textSecondary)
                 }
                 .disabled(!(day.status == .draft || day.status == .empty))
@@ -41,7 +42,7 @@ struct DraftEditorView: View {
                     }
                 } label: {
                     Image(systemName: isEditing ? "checkmark.circle.fill" : "pencil.circle.fill")
-                        .font(.title3)
+                        .font(actionIconFont)
                         .foregroundStyle(day.status == .draft || day.status == .empty ? Color.weekyiiPrimary : Color.textSecondary)
                 }
                 .disabled(!(day.status == .draft || day.status == .empty))

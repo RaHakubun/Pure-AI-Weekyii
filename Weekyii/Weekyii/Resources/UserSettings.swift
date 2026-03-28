@@ -37,6 +37,17 @@ final class UserSettings: ObservableObject {
     @Published var weekStartsOnMonday: Bool {
         didSet { save() }
     }
+
+    // Pending Month View Marker Settings
+    @Published var pendingMonthShowRegular: Bool {
+        didSet { save() }
+    }
+    @Published var pendingMonthShowDDL: Bool {
+        didSet { save() }
+    }
+    @Published var pendingMonthShowLeisure: Bool {
+        didSet { save() }
+    }
     
     // iCloud Sync (placeholder)
     @Published var iCloudSyncEnabled: Bool {
@@ -107,6 +118,9 @@ final class UserSettings: ObservableObject {
         self.fixedReminderHour = defaults.object(forKey: "fixedReminderHour") as? Int ?? 21
         self.fixedReminderMinute = defaults.object(forKey: "fixedReminderMinute") as? Int ?? 0
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
+        self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
+        self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
+        self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
@@ -138,6 +152,9 @@ final class UserSettings: ObservableObject {
         defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
         defaults.set(fixedReminderMinute, forKey: "fixedReminderMinute")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
+        defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
+        defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
+        defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(appearanceModeRaw, forKey: "appearanceMode")

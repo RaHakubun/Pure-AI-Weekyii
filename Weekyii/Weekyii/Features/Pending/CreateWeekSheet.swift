@@ -2,10 +2,10 @@ import SwiftUI
 
 struct CreateWeekSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDate = Date()
-    @State private var selectedMonth = Date()
+    @State private var selectedDate: Date
+    @State private var selectedMonth: Date
     @State private var selectedWeekId: String?
-    @State private var selectedMode: Mode = .date
+    @State private var selectedMode: Mode
     @State private var createdDay: DayModel?
     @State private var createdWeek: WeekModel?
     @State private var errorMessage: String?
@@ -16,6 +16,24 @@ struct CreateWeekSheet: View {
     enum Mode: String, CaseIterable {
         case date
         case weekId
+    }
+
+    init(
+        viewModel: PendingViewModel,
+        initialDate: Date? = nil,
+        initialMonth: Date? = nil,
+        initialMode: Mode? = nil
+    ) {
+        self.viewModel = viewModel
+
+        let fallbackDate = Date()
+        let resolvedDate = initialDate ?? fallbackDate
+        let resolvedMonth = initialMonth ?? resolvedDate
+
+        _selectedDate = State(initialValue: resolvedDate)
+        _selectedMonth = State(initialValue: resolvedMonth)
+        _selectedMode = State(initialValue: initialMode ?? .date)
+        _selectedWeekId = State(initialValue: nil)
     }
 
     var body: some View {

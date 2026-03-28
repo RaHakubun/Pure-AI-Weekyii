@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 enum AppearanceMode: String, CaseIterable, Codable, Identifiable {
     case system
@@ -7,6 +10,59 @@ enum AppearanceMode: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 }
+
+enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
+    case doneFocus = "done-focus"
+    case postponeFocus = "postpone-focus"
+    case openToday = "open-today"
+
+    static let scheme = "weekyii"
+    static let host = "live"
+
+    var id: String { rawValue }
+
+    func url(days: Int = 1) -> URL {
+        var components = URLComponents()
+        components.scheme = Self.scheme
+        components.host = Self.host
+        components.path = "/\(rawValue)"
+        if self == .postponeFocus {
+            components.queryItems = [URLQueryItem(name: "days", value: "\(max(1, days))")]
+        }
+        return components.url ?? URL(string: "weekyii://live/open-today")!
+    }
+
+    static func parse(url: URL) -> (action: LiveActivityAction, days: Int)? {
+        guard url.scheme == Self.scheme, url.host == Self.host else { return nil }
+        let actionRaw = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let action = LiveActivityAction(rawValue: actionRaw) else { return nil }
+        let daysValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "days" })?
+            .value
+            .flatMap(Int.init) ?? 1
+        return (action, max(1, daysValue))
+    }
+}
+
+#if canImport(ActivityKit)
+struct TodayActivityAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        var dayId: String
+        var focusTitle: String
+        var taskTypeRaw: String
+        var killTime: Date
+        var remainingSeconds: Int
+        var completionPercent: Int
+        var completedCount: Int
+        var totalCount: Int
+        var frozenCount: Int
+        var liveTheme: LiveActivityThemeSnapshot
+    }
+
+    var dayId: String
+}
+#endif
 
 // Shared bridge used by app and widget extension.
 enum WeekyiiWidgetBridge {
@@ -31,7 +87,7 @@ enum WeekyiiWidgetBridge {
     }
 }
 
-struct WidgetThemeSnapshot: Codable, Equatable {
+struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
     var primaryHex: String
     var primaryLightHex: String
     var accentHex: String
@@ -148,13 +204,181 @@ struct WidgetThemeSnapshot: Codable, Equatable {
     }
 }
 
-struct WidgetThemePalette: Equatable {
+struct WidgetThemePalette: Equatable, Hashable {
     var primaryHex: String
     var primaryLightHex: String
     var accentHex: String
     var backgroundHex: String
     var textPrimaryHex: String
     var textSecondaryHex: String
+}
+
+// Live Activities do not share widget semantics directly.
+// The island always renders against a system-managed dark capsule, while the
+// lock screen card resolves independently for light/dark appearance.
+struct LiveActivityLockPalette: Equatable, Hashable {
+    var backgroundHex: String
+    var surfaceHex: String
+    var textPrimaryHex: String
+    var textSecondaryHex: String
+    var accentHex: String
+    var progressTrackHex: String
+}
+
+struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
+    var islandTextPrimaryHex: String
+    var islandTextSecondaryHex: String
+    var islandAccentHex: String
+    var islandWarningHex: String
+    var islandSuccessHex: String
+    var islandChipPrimaryHex: String
+    var islandChipSecondaryHex: String
+    var islandKeylineHex: String
+    var lockBackgroundHex: String
+    var lockSurfaceHex: String
+    var lockTextPrimaryHex: String
+    var lockTextSecondaryHex: String
+    var lockAccentHex: String
+    var lockProgressTrackHex: String
+    var darkLockBackgroundHex: String
+    var darkLockSurfaceHex: String
+    var darkLockTextPrimaryHex: String
+    var darkLockTextSecondaryHex: String
+    var darkLockAccentHex: String
+    var darkLockProgressTrackHex: String
+    var appearanceModeRaw: String
+
+    init(
+        islandTextPrimaryHex: String,
+        islandTextSecondaryHex: String,
+        islandAccentHex: String,
+        islandWarningHex: String,
+        islandSuccessHex: String,
+        islandChipPrimaryHex: String,
+        islandChipSecondaryHex: String,
+        islandKeylineHex: String,
+        lockBackgroundHex: String,
+        lockSurfaceHex: String,
+        lockTextPrimaryHex: String,
+        lockTextSecondaryHex: String,
+        lockAccentHex: String,
+        lockProgressTrackHex: String,
+        darkLockBackgroundHex: String? = nil,
+        darkLockSurfaceHex: String? = nil,
+        darkLockTextPrimaryHex: String? = nil,
+        darkLockTextSecondaryHex: String? = nil,
+        darkLockAccentHex: String? = nil,
+        darkLockProgressTrackHex: String? = nil,
+        appearanceModeRaw: String = AppearanceMode.system.rawValue
+    ) {
+        self.islandTextPrimaryHex = islandTextPrimaryHex
+        self.islandTextSecondaryHex = islandTextSecondaryHex
+        self.islandAccentHex = islandAccentHex
+        self.islandWarningHex = islandWarningHex
+        self.islandSuccessHex = islandSuccessHex
+        self.islandChipPrimaryHex = islandChipPrimaryHex
+        self.islandChipSecondaryHex = islandChipSecondaryHex
+        self.islandKeylineHex = islandKeylineHex
+        self.lockBackgroundHex = lockBackgroundHex
+        self.lockSurfaceHex = lockSurfaceHex
+        self.lockTextPrimaryHex = lockTextPrimaryHex
+        self.lockTextSecondaryHex = lockTextSecondaryHex
+        self.lockAccentHex = lockAccentHex
+        self.lockProgressTrackHex = lockProgressTrackHex
+        self.darkLockBackgroundHex = darkLockBackgroundHex ?? lockBackgroundHex
+        self.darkLockSurfaceHex = darkLockSurfaceHex ?? lockSurfaceHex
+        self.darkLockTextPrimaryHex = darkLockTextPrimaryHex ?? lockTextPrimaryHex
+        self.darkLockTextSecondaryHex = darkLockTextSecondaryHex ?? lockTextSecondaryHex
+        self.darkLockAccentHex = darkLockAccentHex ?? lockAccentHex
+        self.darkLockProgressTrackHex = darkLockProgressTrackHex ?? lockProgressTrackHex
+        self.appearanceModeRaw = appearanceModeRaw
+    }
+
+    var appearanceMode: AppearanceMode {
+        AppearanceMode(rawValue: appearanceModeRaw) ?? .system
+    }
+
+    func resolvedLockPalette(isDarkSystem: Bool) -> LiveActivityLockPalette {
+        let useDark: Bool
+        switch appearanceMode {
+        case .system:
+            useDark = isDarkSystem
+        case .light:
+            useDark = false
+        case .dark:
+            useDark = true
+        }
+
+        if useDark {
+            return LiveActivityLockPalette(
+                backgroundHex: darkLockBackgroundHex,
+                surfaceHex: darkLockSurfaceHex,
+                textPrimaryHex: darkLockTextPrimaryHex,
+                textSecondaryHex: darkLockTextSecondaryHex,
+                accentHex: darkLockAccentHex,
+                progressTrackHex: darkLockProgressTrackHex
+            )
+        }
+
+        return LiveActivityLockPalette(
+            backgroundHex: lockBackgroundHex,
+            surfaceHex: lockSurfaceHex,
+            textPrimaryHex: lockTextPrimaryHex,
+            textSecondaryHex: lockTextSecondaryHex,
+            accentHex: lockAccentHex,
+            progressTrackHex: lockProgressTrackHex
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case islandTextPrimaryHex
+        case islandTextSecondaryHex
+        case islandAccentHex
+        case islandWarningHex
+        case islandSuccessHex
+        case islandChipPrimaryHex
+        case islandChipSecondaryHex
+        case islandKeylineHex
+        case lockBackgroundHex
+        case lockSurfaceHex
+        case lockTextPrimaryHex
+        case lockTextSecondaryHex
+        case lockAccentHex
+        case lockProgressTrackHex
+        case darkLockBackgroundHex
+        case darkLockSurfaceHex
+        case darkLockTextPrimaryHex
+        case darkLockTextSecondaryHex
+        case darkLockAccentHex
+        case darkLockProgressTrackHex
+        case appearanceModeRaw
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        islandTextPrimaryHex = try container.decode(String.self, forKey: .islandTextPrimaryHex)
+        islandTextSecondaryHex = try container.decode(String.self, forKey: .islandTextSecondaryHex)
+        islandAccentHex = try container.decode(String.self, forKey: .islandAccentHex)
+        islandWarningHex = try container.decode(String.self, forKey: .islandWarningHex)
+        islandSuccessHex = try container.decode(String.self, forKey: .islandSuccessHex)
+        islandChipPrimaryHex = try container.decode(String.self, forKey: .islandChipPrimaryHex)
+        islandChipSecondaryHex = try container.decode(String.self, forKey: .islandChipSecondaryHex)
+        islandKeylineHex = try container.decode(String.self, forKey: .islandKeylineHex)
+        lockBackgroundHex = try container.decode(String.self, forKey: .lockBackgroundHex)
+        lockSurfaceHex = try container.decode(String.self, forKey: .lockSurfaceHex)
+        lockTextPrimaryHex = try container.decode(String.self, forKey: .lockTextPrimaryHex)
+        lockTextSecondaryHex = try container.decode(String.self, forKey: .lockTextSecondaryHex)
+        lockAccentHex = try container.decode(String.self, forKey: .lockAccentHex)
+        lockProgressTrackHex = try container.decode(String.self, forKey: .lockProgressTrackHex)
+        darkLockBackgroundHex = try container.decodeIfPresent(String.self, forKey: .darkLockBackgroundHex) ?? lockBackgroundHex
+        darkLockSurfaceHex = try container.decodeIfPresent(String.self, forKey: .darkLockSurfaceHex) ?? lockSurfaceHex
+        darkLockTextPrimaryHex = try container.decodeIfPresent(String.self, forKey: .darkLockTextPrimaryHex) ?? lockTextPrimaryHex
+        darkLockTextSecondaryHex = try container.decodeIfPresent(String.self, forKey: .darkLockTextSecondaryHex) ?? lockTextSecondaryHex
+        darkLockAccentHex = try container.decodeIfPresent(String.self, forKey: .darkLockAccentHex) ?? lockAccentHex
+        darkLockProgressTrackHex = try container.decodeIfPresent(String.self, forKey: .darkLockProgressTrackHex) ?? lockProgressTrackHex
+        appearanceModeRaw = try container.decodeIfPresent(String.self, forKey: .appearanceModeRaw) ?? AppearanceMode.system.rawValue
+    }
 }
 
 struct WidgetTaskPreview: Codable, Equatable, Identifiable {

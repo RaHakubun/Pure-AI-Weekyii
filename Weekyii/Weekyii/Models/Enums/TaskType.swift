@@ -21,6 +21,14 @@ enum TaskType: String, Codable, CaseIterable {
         }
     }
 
+    var monthMarkerIconName: String {
+        switch self {
+        case .regular: return "circle.fill"
+        case .ddl: return "flame.fill"
+        case .leisure: return "leaf.fill"
+        }
+    }
+
     var color: Color {
         switch self {
         case .regular: return .taskRegular

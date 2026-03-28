@@ -1,0 +1,192 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip">
+      <rect width="1024" height="1024" rx="200" ry="200"/>
+    </clipPath>
+
+    <!-- Background: dark cognac to amber -->
+    <linearGradient id="bgGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#C05C1A"/>
+      <stop offset="55%" stop-color="#872E08"/>
+      <stop offset="100%" stop-color="#3E1204"/>
+    </linearGradient>
+
+    <!-- Ambient warm center glow -->
+    <radialGradient id="centerAmbient" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#E07020" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#E07020" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Inner circle (dark well) -->
+    <radialGradient id="innerFill" cx="50%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#4A1A06"/>
+      <stop offset="100%" stop-color="#1E0902"/>
+    </radialGradient>
+
+    <!-- Today segment: vivid orange -->
+    <radialGradient id="todayFill" cx="40%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFB050"/>
+      <stop offset="100%" stop-color="#E05808"/>
+    </radialGradient>
+
+    <!-- Today outer glow -->
+    <filter id="todayGlow" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="24" result="blurred"/>
+      <feFlood flood-color="#FF8020" flood-opacity="0.95" result="color"/>
+      <feComposite in="color" in2="blurred" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Past segment warm glow -->
+    <filter id="pastGlow" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blurred"/>
+      <feFlood flood-color="#E07020" flood-opacity="0.5" result="color"/>
+      <feComposite in="color" in2="blurred" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Dot glow -->
+    <filter id="dotGlow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Center text gradient -->
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE8C0"/>
+      <stop offset="100%" stop-color="#FFBE78"/>
+    </linearGradient>
+
+    <!-- Subtle label gradient -->
+    <linearGradient id="labelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E09040" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#E09040" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#E09040" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <g clip-path="url(#clip)">
+
+    <!-- === BACKGROUND === -->
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+    <rect width="1024" height="1024" fill="url(#centerAmbient)"/>
+
+    <!-- Faint decorative concentric rings -->
+    <circle cx="512" cy="512" r="372" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.05"/>
+    <circle cx="512" cy="512" r="420" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.04"/>
+
+    <!-- === 7-SEGMENT WEEK RING ===
+         Donut: outer R=340, inner R=195
+         Angles clockwise from top (-90°), gap=5° each, segment span≈46.43°
+         Mon=0, Tue=1, Wed=2, Thu=3(TODAY), Fri=4, Sat=5, Sun=6 -->
+
+    <!-- Monday  –90° → –43.57°  (upper right) -->
+    <path d="M 512,172
+             A 340,340 0 0,1 756.8,277.4
+             L 652.4,377.45
+             A 195,195 0 0,0 512,317 Z"
+          fill="#D97020" opacity="0.90" filter="url(#pastGlow)"/>
+
+    <!-- Tuesday  –38.57° → 7.86°  (right) -->
+    <path d="M 777.2,301.2
+             A 340,340 0 0,1 848.6,559.6
+             L 705.05,539.3
+             A 195,195 0 0,0 664.1,391.1 Z"
+          fill="#D97020" opacity="0.90" filter="url(#pastGlow)"/>
+
+    <!-- Wednesday  12.86° → 59.29°  (lower right) -->
+    <path d="M 841.8,586.8
+             A 340,340 0 0,1 685.4,804.4
+             L 611.45,679.7
+             A 195,195 0 0,0 701.15,554.9 Z"
+          fill="#D97020" opacity="0.90" filter="url(#pastGlow)"/>
+
+    <!-- TODAY — Thursday  64.29° → 110.71°  (bottom, GLOWING) -->
+    <path d="M 661.6,818
+             A 340,340 0 0,1 389.6,828.2
+             L 441.8,693.35
+             A 195,195 0 0,0 597.8,687.5 Z"
+          fill="url(#todayFill)" filter="url(#todayGlow)"/>
+
+    <!-- Friday  115.71° → 162.14°  (lower left) — future, dim -->
+    <path d="M 365.8,818
+             A 340,340 0 0,1 189,617.4
+             L 326.75,572.45
+             A 195,195 0 0,0 428.15,687.5 Z"
+          fill="#C46A1A" opacity="0.22"/>
+
+    <!-- Saturday  167.14° → 213.57°  (left) — future, dim -->
+    <path d="M 182.2,586.8
+             A 340,340 0 0,1 229.8,321.6
+             L 350.15,402.8
+             A 195,195 0 0,0 322.85,554.9 Z"
+          fill="#C46A1A" opacity="0.22"/>
+
+    <!-- Sunday  218.57° → 265°  (upper left) — future, dim -->
+    <path d="M 246.8,301.2
+             A 340,340 0 0,1 481.4,172
+             L 494.45,317
+             A 195,195 0 0,0 359.9,391.1 Z"
+          fill="#C46A1A" opacity="0.22"/>
+
+    <!-- === COMPLETION DOTS at mid-ring (r≈268) for past days === -->
+    <!-- Mon midpoint ~(617.5, 265.7) -->
+    <circle cx="617.5" cy="265.7" r="9"  fill="#FFFFFF" opacity="0.95" filter="url(#dotGlow)"/>
+    <!-- Tue midpoint ~(770.5, 441.2) -->
+    <circle cx="770.5" cy="441.2" r="9"  fill="#FFFFFF" opacity="0.95" filter="url(#dotGlow)"/>
+    <!-- Wed midpoint ~(728.8, 669.5) -->
+    <circle cx="728.8" cy="669.5" r="9"  fill="#FFFFFF" opacity="0.95" filter="url(#dotGlow)"/>
+
+    <!-- TODAY indicator: ring + dot at ~(523.7, 779.7) -->
+    <circle cx="523.7" cy="779.7" r="17" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.85" filter="url(#dotGlow)"/>
+    <circle cx="523.7" cy="779.7" r="10" fill="#FFFFFF" opacity="1.0"  filter="url(#dotGlow)"/>
+
+    <!-- === CENTER CIRCLE (inner well) === -->
+    <circle cx="512" cy="512" r="185" fill="url(#innerFill)"/>
+    <!-- Subtle amber rim on center circle -->
+    <circle cx="512" cy="512" r="183" fill="none" stroke="#E8952A" stroke-width="2" stroke-opacity="0.28"/>
+
+    <!-- === CENTER TYPOGRAPHY === -->
+    <!-- "Weekyii" — serif italic, gradient filled -->
+    <text x="512" y="495"
+          font-family="Georgia, 'Times New Roman', serif"
+          font-style="italic"
+          font-weight="bold"
+          font-size="70"
+          text-anchor="middle"
+          fill="url(#textGrad)"
+          letter-spacing="-1">Weekyii</text>
+
+    <!-- Separator line -->
+    <line x1="440" y1="510" x2="584" y2="510" stroke="#E09040" stroke-width="1" stroke-opacity="0.4"/>
+
+    <!-- "WEEKLY" caption -->
+    <text x="512" y="538"
+          font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          font-weight="300"
+          font-size="19"
+          letter-spacing="6"
+          text-anchor="middle"
+          fill="url(#labelGrad)">WEEKLY</text>
+
+    <!-- 7 progress dots (Mon→Sun), today=4th, bigger & bright -->
+    <!-- spacing=19, center x=514, range 457→571 -->
+    <circle cx="457" cy="568" r="4.5" fill="#D97020" opacity="0.70"/>
+    <circle cx="476" cy="568" r="4.5" fill="#D97020" opacity="0.70"/>
+    <circle cx="495" cy="568" r="4.5" fill="#D97020" opacity="0.70"/>
+    <circle cx="514" cy="568" r="7"   fill="#FFA840" opacity="1.00"/>
+    <circle cx="533" cy="568" r="4.5" fill="#C46A1A" opacity="0.28"/>
+    <circle cx="552" cy="568" r="4.5" fill="#C46A1A" opacity="0.28"/>
+    <circle cx="571" cy="568" r="4.5" fill="#C46A1A" opacity="0.28"/>
+
+  </g>
+</svg>

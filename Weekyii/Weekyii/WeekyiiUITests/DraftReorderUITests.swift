@@ -158,9 +158,73 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
         mindStampsSeeAll.tap()
 
-        let mindStampsEmptyCreate = app.buttons["mindstampsEmptyCreateButton"]
-        XCTAssertTrue(mindStampsEmptyCreate.waitForExistence(timeout: 3))
+        let mindStampsToolbarCreate = app.buttons["mindstampsToolbarCreateButton"]
+        XCTAssertTrue(mindStampsToolbarCreate.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["mindstampsFooterCreateButton"].exists)
+    }
+
+    func testMindStampsPageShowsToolbarCreateAndDeleteConfirmation() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let extensionsTab = app.tabBars.buttons["扩展"]
+        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
+        extensionsTab.tap()
+
+        let mindStampsSeeAll = app.buttons["extensionsMindStampsSeeAllButton"]
+        XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
+        mindStampsSeeAll.tap()
+
+        let toolbarCreateButton = app.buttons["mindstampsToolbarCreateButton"]
+        XCTAssertTrue(toolbarCreateButton.waitForExistence(timeout: 5))
+        toolbarCreateButton.tap()
+
+        let editorTextField = app.textFields["mindstampEditorTextField"]
+        XCTAssertTrue(editorTextField.waitForExistence(timeout: 3))
+        editorTextField.tap()
+        editorTextField.typeText("测试思想钢印")
+
+        let saveButton = app.buttons["mindstampEditorSaveButton"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        let stampDeleteButton = app.buttons["mindstampDeleteButton_0"]
+        XCTAssertTrue(stampDeleteButton.waitForExistence(timeout: 5))
+        stampDeleteButton.tap()
+
+        let confirmDeleteButton = app.alerts.buttons["删除"]
+        XCTAssertTrue(confirmDeleteButton.waitForExistence(timeout: 3))
+        confirmDeleteButton.tap()
+
+        XCTAssertFalse(app.buttons["mindstampDeleteButton_0"].waitForExistence(timeout: 3))
+    }
+
+    func testMindStampsEmptyStateExplainsToolbarCreateAction() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let extensionsTab = app.tabBars.buttons["扩展"]
+        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
+        extensionsTab.tap()
+
+        let mindStampsSeeAll = app.buttons["extensionsMindStampsSeeAllButton"]
+        XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
+        mindStampsSeeAll.tap()
+
+        let toolbarCreateButton = app.buttons["mindstampsToolbarCreateButton"]
+        XCTAssertTrue(toolbarCreateButton.waitForExistence(timeout: 5))
+
+        let hintLabel = app.staticTexts["mindstampEmptyCreateHint"]
+        XCTAssertTrue(hintLabel.waitForExistence(timeout: 3))
+        XCTAssertEqual(hintLabel.label, "右上角点 + 新建思想钢印")
     }
 
     func testPendingWeekDetailShowsDraftCrudEntryPoints() {

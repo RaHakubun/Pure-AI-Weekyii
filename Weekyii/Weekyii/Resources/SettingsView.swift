@@ -20,274 +20,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - Tasks & Time
-                Section {
-                    killTimeSettings
-                    reminderSettings
-                    taskTypeSettings
-                } header: {
-                    Text(String(localized: "settings.section.tasks"))
-                }
-                
-                // MARK: - Week & Stats
-                Section {
-                    Picker(
-                        String(localized: "settings.appearance.mode", defaultValue: "显示模式"),
-                        selection: Binding(
-                            get: { settings.appearanceModeRaw },
-                            set: { settings.appearanceModeRaw = $0 }
-                        )
-                    ) {
-                        ForEach(AppearanceMode.allCases) { mode in
-                            Text(appearanceDisplayName(for: mode))
-                                .tag(mode.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Picker(selection: selectedThemeBinding) {
-                        ForEach(WeekTheme.allCases) { theme in
-                            themeOptionRow(theme)
-                                .tag(theme.rawValue)
-                                .disabled(theme.isPremiumTheme && !settings.premiumThemeUnlocked)
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            SettingsIcon(icon: "paintpalette.fill", color: .purple)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "settings.theme.color", defaultValue: "主题色"))
-                                if !settings.premiumThemeUnlocked {
-                                    Text(String(localized: "settings.theme.premium.locked", defaultValue: "魔戒 为 Premium 主题"))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-
-                    themePalettePreview
-                } header: {
-                    Text(String(localized: "settings.section.week"))
-                } footer: {
-                    if !settings.premiumThemeUnlocked {
-                        Text(String(localized: "settings.theme.premium.footer", defaultValue: "解锁后可切换到魔戒主题；当前会回落到普通主题。"))
-                    }
-                }
-                
-                // MARK: - Data & Privacy
-                Section {
-                    Toggle(isOn: .constant(false)) {
-                        HStack(spacing: 12) {
-                            SettingsIcon(icon: "icloud.fill", color: .blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "settings.icloud.sync"))
-                                Text(String(localized: "settings.icloud.coming_soon"))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .disabled(true)
-
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "square.and.arrow.up.fill", color: .indigo)
-                        Text(String(localized: "settings.data.export"))
-                        Spacer()
-                        Text(String(localized: "settings.data.export.coming_soon"))
-                            .foregroundStyle(.tertiary)
-                    }
-                } header: {
-                    Text(String(localized: "settings.section.data"))
-                }
-
-                // MARK: - Developer Settings
-                Section {
-                    Toggle(isOn: Binding(
-                        get: { settings.developerSettingsEnabled },
-                        set: { settings.developerSettingsEnabled = $0 }
-                    )) {
-                        HStack(spacing: 12) {
-                            SettingsIcon(icon: "hammer.fill", color: .gray)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "settings.developer.show_debug"))
-                                Text(String(localized: "settings.developer.show_debug.subtitle"))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    
-                    if settings.developerSettingsEnabled {
-                        Toggle(isOn: Binding(
-                            get: { settings.premiumThemeUnlocked },
-                            set: { settings.premiumThemeUnlocked = $0 }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
-                                Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        Stepper(value: Binding(
-                            get: { settings.seedPastWeeks },
-                            set: { settings.seedPastWeeks = $0 }
-                        ), in: 1...24) {
-                            Text(String(localized: "settings.debug.seed.past_weeks") + " \(settings.seedPastWeeks)")
-                        }
-                        
-                        Stepper(value: Binding(
-                            get: { settings.seedFutureWeeks },
-                            set: { settings.seedFutureWeeks = $0 }
-                        ), in: 0...12) {
-                            Text(String(localized: "settings.debug.seed.future_weeks") + " \(settings.seedFutureWeeks)")
-                        }
-                        
-                        Stepper(value: Binding(
-                            get: { settings.seedTasksPerPastDay },
-                            set: { settings.seedTasksPerPastDay = $0 }
-                        ), in: 1...12) {
-                            Text(String(localized: "settings.debug.seed.past_tasks") + " \(settings.seedTasksPerPastDay)")
-                        }
-                        
-                        Stepper(value: Binding(
-                            get: { settings.seedTasksPerDraftDay },
-                            set: { settings.seedTasksPerDraftDay = $0 }
-                        ), in: 1...12) {
-                            Text(String(localized: "settings.debug.seed.draft_tasks") + " \(settings.seedTasksPerDraftDay)")
-                        }
-                        
-                        Stepper(value: Binding(
-                            get: { settings.seedExpiredEveryNDays },
-                            set: { settings.seedExpiredEveryNDays = $0 }
-                        ), in: 0...7) {
-                            Text(expiredEveryLabel)
-                        }
-                        
-                        Toggle(isOn: Binding(
-                            get: { settings.seedIncludeSteps },
-                            set: { settings.seedIncludeSteps = $0 }
-                        )) {
-                            Text(String(localized: "settings.debug.seed.include_steps"))
-                        }
-                        
-                        Toggle(isOn: Binding(
-                            get: { settings.seedIncludeAttachments },
-                            set: { settings.seedIncludeAttachments = $0 }
-                        )) {
-                            Text(String(localized: "settings.debug.seed.include_attachments"))
-                        }
-                        
-                        Toggle(isOn: Binding(
-                            get: { settings.seedIncludeDescriptions },
-                            set: { settings.seedIncludeDescriptions = $0 }
-                        )) {
-                            Text(String(localized: "settings.debug.seed.include_descriptions"))
-                        }
-                        
-                        Toggle(isOn: Binding(
-                            get: { settings.seedAllowExisting },
-                            set: { settings.seedAllowExisting = $0 }
-                        )) {
-                            Text(String(localized: "settings.debug.seed.allow_existing"))
-                        }
-                        
-                        Button {
-                            do {
-                                let seederContext = ModelContext(modelContext.container)
-                                let seeder = SampleDataSeeder(modelContext: seederContext)
-                                let result = try seeder.seed(options: seedOptions)
-                                switch result {
-                                case .seeded:
-                                    appState.bumpDataRevision()
-                                    seedAlertMessage = String(localized: "settings.debug.seed.success")
-                                case .skippedExisting:
-                                    seedAlertMessage = String(localized: "settings.debug.seed.already")
-                                case .skippedAll:
-                                    seedAlertMessage = String(localized: "settings.debug.seed.none")
-                                }
-                            } catch {
-                                seedAlertMessage = String(localized: "settings.debug.seed.failed") + " " + error.localizedDescription
-                            }
-                        } label: {
-                            Text(String(localized: "settings.debug.seed"))
-                        }
-                        
-                        Button(role: .destructive) {
-                            showingClearConfirm = true
-                        } label: {
-                            Text(String(localized: "settings.debug.clear"))
-                        }
-
-                        Button("立即重算状态") {
-                            let coordinator = makeHealthCoordinator()
-                            let report = coordinator.reconcile(trigger: .manualResync, force: true)
-                            appState.bumpDataRevision()
-                            seedAlertMessage = "重算完成：过期\(report.crossDayExpiredCount + report.staleDaysExpiredCount + report.killTimeExpiredCount)项，修复\(report.totalRepairCount)项。"
-                        }
-
-                        Button("导出状态诊断") {
-                            let coordinator = makeHealthCoordinator()
-                            UIPasteboard.general.string = coordinator.diagnosticsSnapshot()
-                            seedAlertMessage = "状态诊断已复制到剪贴板。"
-                        }
-
-                        Button("列出最近备份摘要") {
-                            let storeURL = WeekyiiPersistence.persistentStoreURL()
-                            let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL).prefix(5)
-                            if snapshots.isEmpty {
-                                seedAlertMessage = "当前没有可用备份。"
-                            } else {
-                                let lines = snapshots.map { summary in
-                                    "\(summary.folderName) | valid=\(summary.isValid ? "yes" : "no") | files=\(summary.fileCount)"
-                                }
-                                seedAlertMessage = lines.joined(separator: "\n")
-                            }
-                        }
-
-                        Button(role: .destructive) {
-                            showingRestoreBackupConfirm = true
-                        } label: {
-                            Text("回滚到最新备份（危险）")
-                        }
-                    }
-                } header: {
-                    Text(String(localized: "settings.developer.header"))
-                } footer: {
-                    Text(String(localized: "settings.developer.footer"))
-                }
-                
-                // MARK: - About
-                Section {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "info.circle.fill", color: .teal)
-                        Text(String(localized: "settings.about.version"))
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let startDate = appState.systemStartDate {
-                        HStack(spacing: 12) {
-                            SettingsIcon(icon: "calendar", color: .blue)
-                            Text(String(localized: "settings.about.start_date"))
-                            Spacer()
-                            Text(startDate, format: Date.FormatStyle().year().month().day())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "flag.fill", color: .orange)
-                        Text(String(localized: "settings.about.days_started"))
-                        Spacer()
-                        Text("\(appState.daysStartedCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text(String(localized: "settings.about.header"))
-                }
+                presentSection
+                pastSection
+                futureSection
+                displayThemeSection
+                dataPrivacySection
+                developerSection
+                aboutSection
             }
             .navigationTitle(String(localized: "settings.title"))
             .tint(.weekyiiPrimary)
@@ -388,75 +127,390 @@ struct SettingsView: View {
             Text("将直接替换当前数据库文件，可能丢失最新数据。")
         }
     }
+
+    // MARK: - Present
+    @ViewBuilder
+    private var presentSection: some View {
+        Section {
+            killTimeSettings
+            reminderSettings
+            taskTypeSettings
+        } header: {
+            Text(String(localized: "settings.section.present", defaultValue: "当下"))
+        }
+    }
+
+    // MARK: - Past
+    @ViewBuilder
+    private var pastSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "flag.fill", color: .orange)
+                Text(String(localized: "settings.about.days_started"))
+                Spacer()
+                Text("\(appState.daysStartedCount)")
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "chart.bar.fill", color: .mint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.past.summary.title", defaultValue: "统计口径说明"))
+                    Text(String(localized: "settings.past.summary.note", defaultValue: "completed 计入完成详情；expired 仅保留数量，不保留任务详情。"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text(String(localized: "settings.section.past", defaultValue: "过去"))
+        }
+    }
+
+    // MARK: - Future
+    @ViewBuilder
+    private var futureSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { settings.weekStartsOnMonday },
+                set: { settings.weekStartsOnMonday = $0 }
+            )) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "calendar.badge.clock", color: .blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.week.starts_monday"))
+                        Text(String(localized: "settings.week.starts_monday.subtitle"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(String(localized: "settings.future.month_markers.title", defaultValue: "在月视图上显示"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 40)
+
+                Toggle(isOn: Binding(
+                    get: { settings.pendingMonthShowRegular },
+                    set: { settings.pendingMonthShowRegular = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: TaskType.regular.monthMarkerIconName, color: .taskRegular)
+                        Text(String(localized: "settings.future.month_markers.regular", defaultValue: "常规任务"))
+                    }
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.pendingMonthShowDDL },
+                    set: { settings.pendingMonthShowDDL = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: TaskType.ddl.monthMarkerIconName, color: .taskDDL)
+                        Text(String(localized: "settings.future.month_markers.ddl", defaultValue: "截止任务"))
+                    }
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.pendingMonthShowLeisure },
+                    set: { settings.pendingMonthShowLeisure = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: TaskType.leisure.monthMarkerIconName, color: .taskLeisure)
+                        Text(String(localized: "settings.future.month_markers.leisure", defaultValue: "休闲任务"))
+                    }
+                }
+            }
+        } header: {
+            Text(String(localized: "settings.section.future", defaultValue: "未来"))
+        }
+    }
+
+    // MARK: - Display & Theme
+    @ViewBuilder
+    private var displayThemeSection: some View {
+        Section {
+            Picker(
+                String(localized: "settings.appearance.mode", defaultValue: "显示模式"),
+                selection: Binding(
+                    get: { settings.appearanceModeRaw },
+                    set: { settings.appearanceModeRaw = $0 }
+                )
+            ) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Text(appearanceDisplayName(for: mode))
+                        .tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Picker(selection: selectedThemeBinding) {
+                ForEach(WeekTheme.allCases) { theme in
+                    themeOptionRow(theme)
+                        .tag(theme.rawValue)
+                        .disabled(theme.isPremiumTheme && !settings.premiumThemeUnlocked)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "paintpalette.fill", color: .purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.theme.color", defaultValue: "主题色"))
+                        if !settings.premiumThemeUnlocked {
+                            Text(String(localized: "settings.theme.premium.locked", defaultValue: "魔戒 为 Premium 主题"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            themePalettePreview
+        } header: {
+            Text(String(localized: "settings.section.display_theme", defaultValue: "显示与主题"))
+        } footer: {
+            if !settings.premiumThemeUnlocked {
+                Text(String(localized: "settings.theme.premium.footer", defaultValue: "解锁后可切换到魔戒主题；当前会回落到普通主题。"))
+            }
+        }
+    }
+
+    // MARK: - Data & Privacy
+    @ViewBuilder
+    private var dataPrivacySection: some View {
+        Section {
+            Toggle(isOn: .constant(false)) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "icloud.fill", color: .blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.icloud.sync"))
+                        Text(String(localized: "settings.icloud.coming_soon"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .disabled(true)
+
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "square.and.arrow.up.fill", color: .indigo)
+                Text(String(localized: "settings.data.export"))
+                Spacer()
+                Text(String(localized: "settings.data.export.coming_soon"))
+                    .foregroundStyle(.tertiary)
+            }
+        } header: {
+            Text(String(localized: "settings.section.data"))
+        }
+    }
+
+    // MARK: - Developer
+    @ViewBuilder
+    private var developerSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { settings.developerSettingsEnabled },
+                set: { settings.developerSettingsEnabled = $0 }
+            )) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "hammer.fill", color: .gray)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.developer.show_debug"))
+                        Text(String(localized: "settings.developer.show_debug.subtitle"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if settings.developerSettingsEnabled {
+                Toggle(isOn: Binding(
+                    get: { settings.premiumThemeUnlocked },
+                    set: { settings.premiumThemeUnlocked = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
+                        Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Stepper(value: Binding(
+                    get: { settings.seedPastWeeks },
+                    set: { settings.seedPastWeeks = $0 }
+                ), in: 1...24) {
+                    Text(String(localized: "settings.debug.seed.past_weeks") + " \(settings.seedPastWeeks)")
+                }
+
+                Stepper(value: Binding(
+                    get: { settings.seedFutureWeeks },
+                    set: { settings.seedFutureWeeks = $0 }
+                ), in: 0...12) {
+                    Text(String(localized: "settings.debug.seed.future_weeks") + " \(settings.seedFutureWeeks)")
+                }
+
+                Stepper(value: Binding(
+                    get: { settings.seedTasksPerPastDay },
+                    set: { settings.seedTasksPerPastDay = $0 }
+                ), in: 1...12) {
+                    Text(String(localized: "settings.debug.seed.past_tasks") + " \(settings.seedTasksPerPastDay)")
+                }
+
+                Stepper(value: Binding(
+                    get: { settings.seedTasksPerDraftDay },
+                    set: { settings.seedTasksPerDraftDay = $0 }
+                ), in: 1...12) {
+                    Text(String(localized: "settings.debug.seed.draft_tasks") + " \(settings.seedTasksPerDraftDay)")
+                }
+
+                Stepper(value: Binding(
+                    get: { settings.seedExpiredEveryNDays },
+                    set: { settings.seedExpiredEveryNDays = $0 }
+                ), in: 0...7) {
+                    Text(expiredEveryLabel)
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.seedIncludeSteps },
+                    set: { settings.seedIncludeSteps = $0 }
+                )) {
+                    Text(String(localized: "settings.debug.seed.include_steps"))
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.seedIncludeAttachments },
+                    set: { settings.seedIncludeAttachments = $0 }
+                )) {
+                    Text(String(localized: "settings.debug.seed.include_attachments"))
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.seedIncludeDescriptions },
+                    set: { settings.seedIncludeDescriptions = $0 }
+                )) {
+                    Text(String(localized: "settings.debug.seed.include_descriptions"))
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.seedAllowExisting },
+                    set: { settings.seedAllowExisting = $0 }
+                )) {
+                    Text(String(localized: "settings.debug.seed.allow_existing"))
+                }
+
+                Button {
+                    do {
+                        let seederContext = ModelContext(modelContext.container)
+                        let seeder = SampleDataSeeder(modelContext: seederContext)
+                        let result = try seeder.seed(options: seedOptions)
+                        switch result {
+                        case .seeded:
+                            appState.bumpDataRevision()
+                            seedAlertMessage = String(localized: "settings.debug.seed.success")
+                        case .skippedExisting:
+                            seedAlertMessage = String(localized: "settings.debug.seed.already")
+                        case .skippedAll:
+                            seedAlertMessage = String(localized: "settings.debug.seed.none")
+                        }
+                    } catch {
+                        seedAlertMessage = String(localized: "settings.debug.seed.failed") + " " + error.localizedDescription
+                    }
+                } label: {
+                    Text(String(localized: "settings.debug.seed"))
+                }
+
+                Button(role: .destructive) {
+                    showingClearConfirm = true
+                } label: {
+                    Text(String(localized: "settings.debug.clear"))
+                }
+
+                Button("立即重算状态") {
+                    let coordinator = makeHealthCoordinator()
+                    let report = coordinator.reconcile(trigger: .manualResync, force: true)
+                    appState.bumpDataRevision()
+                    seedAlertMessage = "重算完成：过期\(report.crossDayExpiredCount + report.staleDaysExpiredCount + report.killTimeExpiredCount)项，修复\(report.totalRepairCount)项。"
+                }
+
+                Button("导出状态诊断") {
+                    let coordinator = makeHealthCoordinator()
+                    UIPasteboard.general.string = coordinator.diagnosticsSnapshot()
+                    seedAlertMessage = "状态诊断已复制到剪贴板。"
+                }
+
+                Button("列出最近备份摘要") {
+                    let storeURL = WeekyiiPersistence.persistentStoreURL()
+                    let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL).prefix(5)
+                    if snapshots.isEmpty {
+                        seedAlertMessage = "当前没有可用备份。"
+                    } else {
+                        let lines = snapshots.map { summary in
+                            "\(summary.folderName) | valid=\(summary.isValid ? "yes" : "no") | files=\(summary.fileCount)"
+                        }
+                        seedAlertMessage = lines.joined(separator: "\n")
+                    }
+                }
+
+                Button(role: .destructive) {
+                    showingRestoreBackupConfirm = true
+                } label: {
+                    Text("回滚到最新备份（危险）")
+                }
+            }
+        } header: {
+            Text(String(localized: "settings.developer.header"))
+        } footer: {
+            Text(String(localized: "settings.developer.footer"))
+        }
+    }
+
+    // MARK: - About
+    @ViewBuilder
+    private var aboutSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "info.circle.fill", color: .teal)
+                Text(String(localized: "settings.about.version"))
+                Spacer()
+                Text("1.0.0")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let startDate = appState.systemStartDate {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "calendar", color: .blue)
+                    Text(String(localized: "settings.about.start_date"))
+                    Spacer()
+                    Text(startDate, format: Date.FormatStyle().year().month().day())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text(String(localized: "settings.about.header"))
+        }
+    }
     
     // MARK: - Kill Time Settings
     @ViewBuilder
     private var killTimeSettings: some View {
         HStack(spacing: 12) {
             SettingsIcon(icon: "clock.fill", color: .orange)
-            Text(String(localized: "settings.default_kill_time"))
-            Spacer()
-            
-            HStack(spacing: 2) {
-                Picker("", selection: Binding(
-                    get: { pendingDefaultKillTimeHour },
-                    set: { pendingDefaultKillTimeHour = $0 }
-                )) {
-                    ForEach(0..<24, id: \.self) { hour in
-                        Text(String(format: "%02d", hour)).tag(hour)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 58)
-                .clipped()
-                
-                Text(":")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "settings.default_kill_time"))
+                Text(String(localized: "settings.default_kill_time.guidance", defaultValue: "一天的任务将在截止时间结算"))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                
-                Picker("", selection: Binding(
-                    get: { pendingDefaultKillTimeMinute },
-                    set: { pendingDefaultKillTimeMinute = $0 }
-                )) {
-                    ForEach(0..<60, id: \.self) { minute in
-                        Text(String(format: "%02d", minute)).tag(minute)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 58)
-                .clipped()
             }
-            .padding(.vertical, 2)
+            Spacer()
+            DatePicker(
+                "",
+                selection: pendingDefaultKillTimeDateBinding,
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
             .background(Color(uiColor: .tertiarySystemFill))
             .cornerRadius(8)
-        }
-
-        HStack(spacing: 12) {
-            Color.clear
-                .frame(width: 28, height: 28)
-            Text(String(localized: "settings.default_kill_time.guidance", defaultValue: "一天的任务将在截止时间结算"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-
-        HStack(spacing: 12) {
-            Color.clear
-                .frame(width: 28, height: 28) // Placeholder padding
-            Text("手动输入")
-                .foregroundStyle(.secondary)
-            Spacer()
-            timeInputField("HH", value: Binding(
-                get: { pendingDefaultKillTimeHour },
-                set: { pendingDefaultKillTimeHour = min(max($0, 0), 23) }
-            ))
-            Text(":")
-                .foregroundStyle(.secondary)
-            timeInputField("MM", value: Binding(
-                get: { pendingDefaultKillTimeMinute },
-                set: { pendingDefaultKillTimeMinute = min(max($0, 0), 59) }
-            ))
         }
 
         if hasPendingDefaultKillTimeChange {
@@ -519,18 +573,9 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 12) {
                 SettingsIcon(icon: "bell.fill", color: .red)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.kill_time_reminder"))
-                    Text(String(localized: "settings.kill_time_reminder.subtitle"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Text(String(localized: "settings.kill_time_reminder"))
             }
         }
-        Text("系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 40)
 
         Toggle(isOn: Binding(
             get: { settings.fixedReminderEnabled },
@@ -544,46 +589,28 @@ struct SettingsView: View {
 
         if settings.fixedReminderEnabled {
             HStack(spacing: 12) {
-                Color.clear
-                    .frame(width: 28, height: 28) // Placeholder alignment
+                SettingsIcon(icon: "clock.badge.fill", color: .indigo)
                 Text("提醒时刻")
-                    .foregroundStyle(.secondary)
                 Spacer()
-                
-                HStack(spacing: 2) {
-                    Picker("", selection: Binding(
-                        get: { settings.fixedReminderHour },
-                        set: { settings.fixedReminderHour = min(max($0, 0), 23) }
-                    )) {
-                        ForEach(0..<24, id: \.self) { hour in
-                            Text(String(format: "%02d", hour)).tag(hour)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .frame(width: 58)
-                    .clipped()
-                    
-                    Text(":")
-                        .foregroundStyle(.secondary)
-                    
-                    Picker("", selection: Binding(
-                        get: { settings.fixedReminderMinute },
-                        set: { settings.fixedReminderMinute = min(max($0, 0), 59) }
-                    )) {
-                        ForEach(0..<60, id: \.self) { minute in
-                            Text(String(format: "%02d", minute)).tag(minute)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .frame(width: 58)
-                    .clipped()
-                }
-                .padding(.vertical, 2)
+                DatePicker(
+                    "",
+                    selection: fixedReminderDateBinding,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
                 .background(Color(uiColor: .tertiarySystemFill))
                 .cornerRadius(8)
             }
+        }
+
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 28, height: 28)
+            Text("系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
     }
 
@@ -712,6 +739,40 @@ struct SettingsView: View {
             .font(.body.monospacedDigit())
     }
 
+    private var pendingDefaultKillTimeDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = pendingDefaultKillTimeHour
+                components.minute = pendingDefaultKillTimeMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                pendingDefaultKillTimeHour = min(max(components.hour ?? 0, 0), 23)
+                pendingDefaultKillTimeMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+
+    private var fixedReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.fixedReminderHour
+                components.minute = settings.fixedReminderMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.fixedReminderHour = min(max(components.hour ?? 0, 0), 23)
+                settings.fixedReminderMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+
     private var hasPendingDefaultKillTimeChange: Bool {
         pendingDefaultKillTimeHour != settings.defaultKillTimeHour
             || pendingDefaultKillTimeMinute != settings.defaultKillTimeMinute
@@ -833,7 +894,8 @@ struct SettingsView: View {
             timeProvider: TimeProvider(),
             notificationService: .shared,
             appState: appState,
-            userSettings: settings
+            userSettings: settings,
+            liveActivityService: TodayLiveActivityService.shared
         )
     }
 }
