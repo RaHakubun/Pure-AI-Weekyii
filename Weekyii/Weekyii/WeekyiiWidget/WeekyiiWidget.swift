@@ -62,195 +62,27 @@ struct WeekyiiLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    ExpandedIslandLeadingView(state: context.state)
+                    IslandExpandedLeading(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ExpandedIslandTrailingView(state: context.state)
+                    IslandExpandedTrailing(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    ExpandedIslandCenterView(state: context.state)
+                    IslandExpandedCenter(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ExpandedIslandActionsView(state: context.state)
+                    IslandExpandedActions(state: context.state)
                 }
             } compactLeading: {
-                CompactLeadingIslandView(state: context.state)
+                IslandCompactLeading(state: context.state)
             } compactTrailing: {
-                CompactTrailingIslandView(state: context.state)
+                IslandCompactTrailing(state: context.state)
             } minimal: {
-                MinimalIslandView(state: context.state)
+                IslandMinimal(state: context.state)
             }
             .widgetURL(LiveActivityAction.openToday.url())
             .keylineTint(Color(widgetHex: context.state.liveTheme.islandKeylineHex))
         }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct ExpandedIslandLeadingView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Color(widgetHex: state.liveTheme.islandChipSecondaryHex).opacity(0.35))
-                Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-            }
-            .frame(width: 30, height: 30)
-
-            Text("当前专注")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-        }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct ExpandedIslandTrailingView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text("剩余")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-
-            Text(state.killTime, style: .timer)
-                .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-        }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct ExpandedIslandCenterView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(state.focusTitle)
-                .font(.headline.weight(.semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.86)
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-
-            HStack(spacing: 8) {
-                islandMetric(title: "完成", value: "\(state.completedCount)/\(state.totalCount)")
-                islandMetric(title: "剩余", value: "\(state.frozenCount)")
-                islandMetric(title: "进度", value: "\(state.completionPercent)%")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func islandMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
-@available(iOS 16.1, *)
-private struct ExpandedIslandActionsView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Link(destination: LiveActivityAction.doneFocus.url()) {
-                islandActionButton(
-                    "完成专注",
-                    icon: "checkmark.circle.fill",
-                    fillHex: state.liveTheme.islandSuccessHex,
-                    foregroundHex: state.liveTheme.islandTextPrimaryHex
-                )
-            }
-
-            Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
-                islandActionButton(
-                    "后移 +1 天",
-                    icon: "calendar.badge.clock",
-                    fillHex: state.liveTheme.islandChipSecondaryHex,
-                    foregroundHex: state.liveTheme.islandTextPrimaryHex
-                )
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func islandActionButton(_ title: String, icon: String, fillHex: String, foregroundHex: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(title)
-        }
-        .font(.caption.weight(.semibold))
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .foregroundStyle(Color(widgetHex: foregroundHex))
-        .background(Color(widgetHex: fillHex), in: Capsule())
-    }
-}
-
-@available(iOS 16.1, *)
-private struct CompactLeadingIslandView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-            Circle()
-                .fill(Color(widgetHex: state.liveTheme.islandSuccessHex))
-                .frame(width: 5, height: 5)
-        }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct CompactTrailingIslandView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        Text(state.killTime, style: .timer)
-            .font(.caption.weight(.semibold).monospacedDigit())
-            .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-    }
-}
-
-@available(iOS 16.1, *)
-private struct MinimalIslandView: View {
-    let state: TodayActivityAttributes.ContentState
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.14), lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: CGFloat(state.completionPercent) / 100)
-                .stroke(
-                    Color(widgetHex: state.liveTheme.islandAccentHex),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-            Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-        }
-        .padding(3)
     }
 }
 
@@ -263,98 +95,293 @@ private struct LockScreenLiveActivityView: View {
         state.liveTheme.resolvedLockPalette(isDarkSystem: colorScheme == .dark)
     }
 
+    private var progress: CGFloat {
+        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
+    }
+
+    private var remainingLabel: String {
+        liveActivityCompactDurationText(seconds: state.remainingSeconds)
+    }
+
+    private var usesLightBackground: Bool {
+        isHexColorLight(palette.backgroundHex)
+    }
+
+    private var primaryTextColor: Color {
+        usesLightBackground ? Color(widgetHex: "#1F1712") : Color(widgetHex: palette.textPrimaryHex)
+    }
+
+    private var secondaryTextColor: Color {
+        usesLightBackground ? Color(widgetHex: "#6E584A") : Color(widgetHex: palette.textSecondaryHex)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(widgetHex: palette.surfaceHex))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(widgetHex: palette.surfaceHex))
+                    .frame(width: 32, height: 32)
+                    .overlay {
                         Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(Color(widgetHex: palette.accentHex))
                     }
-                    .frame(width: 34, height: 34)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("当前专注")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color(widgetHex: palette.textSecondaryHex))
-                        Text(deadlineLabel(for: state.killTime))
-                            .font(.caption2)
-                            .foregroundStyle(Color(widgetHex: palette.textSecondaryHex))
-                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(state.focusTitle)
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .foregroundStyle(primaryTextColor)
+                    Text(deadlineLabel(for: state.killTime))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(secondaryTextColor)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                Text(state.killTime, style: .timer)
-                    .font(.title3.weight(.bold).monospacedDigit())
-                    .foregroundStyle(Color(widgetHex: palette.accentHex))
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("剩余")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(secondaryTextColor)
+                    Text(remainingLabel)
+                        .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
+                        .lineLimit(1)
+                        .foregroundStyle(Color(widgetHex: palette.accentHex))
+                }
+                .fixedSize(horizontal: true, vertical: false)
             }
 
-            Text(state.focusTitle)
-                .font(.headline.weight(.semibold))
-                .lineLimit(2)
-                .foregroundStyle(Color(widgetHex: palette.textPrimaryHex))
+            LiveLinearProgress(
+                progress: progress,
+                fill: Color(widgetHex: palette.accentHex),
+                track: Color(widgetHex: palette.progressTrackHex).opacity(0.28)
+            )
+            .frame(height: 6)
 
-            HStack(spacing: 10) {
-                lockMetricCard(title: "完成", value: "\(state.completedCount)/\(state.totalCount)")
-                lockMetricCard(title: "剩余", value: "\(state.frozenCount)")
-                lockMetricCard(title: "进度", value: "\(state.completionPercent)%")
+            HStack(spacing: 6) {
+                lockMetric("完成", value: "\(state.completedCount)/\(state.totalCount)")
+                lockMetric("总数", value: "\(state.totalCount)")
+                lockMetric("剩余", value: "\(state.frozenCount)")
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Link(destination: LiveActivityAction.doneFocus.url()) {
-                    lockActionButton(
-                        "完成专注",
+                    LiveActionCapsule(
+                        title: "完成专注",
                         icon: "checkmark.circle.fill",
                         fill: Color(widgetHex: palette.accentHex),
-                        foreground: Color(widgetHex: palette.backgroundHex)
+                        foreground: Color(widgetHex: palette.backgroundHex),
+                        verticalPadding: 7
                     )
                 }
 
                 Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
-                    lockActionButton(
-                        "后移 +1 天",
+                    LiveActionCapsule(
+                        title: "后移 +1 天",
                         icon: "calendar.badge.clock",
                         fill: Color(widgetHex: palette.surfaceHex),
-                        foreground: Color(widgetHex: palette.textPrimaryHex)
+                        foreground: primaryTextColor,
+                        verticalPadding: 7
                     )
                 }
             }
         }
-        .padding(16)
-    }
-
-    @ViewBuilder
-    private func lockMetricCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color(widgetHex: palette.textSecondaryHex))
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: palette.textPrimaryHex))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .background(Color(widgetHex: palette.surfaceHex), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    @ViewBuilder
-    private func lockActionButton(_ title: String, icon: String, fill: Color, foreground: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-            Text(title)
-        }
-        .font(.caption.weight(.semibold))
-        .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .foregroundStyle(foreground)
-        .background(fill, in: Capsule())
+    }
+
+    @ViewBuilder
+    private func lockMetric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(secondaryTextColor)
+            Text(value)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(primaryTextColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color(widgetHex: palette.surfaceHex), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandExpandedLeading: View {
+    let state: TodayActivityAttributes.ContentState
+
+    var body: some View {
+        Circle()
+            .fill(Color(widgetHex: state.liveTheme.islandChipSecondaryHex).opacity(0.26))
+            .frame(width: 22, height: 22)
+            .overlay {
+                Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+            }
+            .frame(width: 24, height: 24, alignment: .center)
+            .accessibilityLabel(liveActivityTaskTypeLabel(raw: state.taskTypeRaw))
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandExpandedTrailing: View {
+    let state: TodayActivityAttributes.ContentState
+
+    private var remainingLabel: String {
+        liveActivityCompactDurationText(seconds: state.remainingSeconds)
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            Text("剩余")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
+            Text(remainingLabel)
+                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandExpandedCenter: View {
+    let state: TodayActivityAttributes.ContentState
+
+    private var progress: CGFloat {
+        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(state.focusTitle)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            LiveLinearProgress(
+                progress: progress,
+                fill: Color(widgetHex: state.liveTheme.islandAccentHex),
+                track: Color.white.opacity(0.16)
+            )
+            .frame(height: 7)
+
+            HStack(spacing: 6) {
+                islandMetric("完成", value: "\(state.completedCount)")
+                islandMetric("总数", value: "\(state.totalCount)")
+                islandMetric("剩余", value: "\(state.frozenCount)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func islandMetric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandExpandedActions: View {
+    let state: TodayActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Link(destination: LiveActivityAction.doneFocus.url()) {
+                LiveActionCapsule(
+                    title: "完成专注",
+                    icon: "checkmark.circle.fill",
+                    fill: Color(widgetHex: state.liveTheme.islandSuccessHex),
+                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex)
+                )
+            }
+
+            Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
+                LiveActionCapsule(
+                    title: "后移 +1 天",
+                    icon: "calendar.badge.clock",
+                    fill: Color(widgetHex: state.liveTheme.islandChipSecondaryHex),
+                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandCompactLeading: View {
+    let state: TodayActivityAttributes.ContentState
+
+    var body: some View {
+        Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
+            .frame(width: 13, height: 13)
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandCompactTrailing: View {
+    let state: TodayActivityAttributes.ContentState
+
+    private var iconColor: Color {
+        if state.remainingSeconds <= 3600 {
+            return Color(widgetHex: state.liveTheme.islandWarningHex)
+        }
+        return Color(widgetHex: state.liveTheme.islandAccentHex)
+    }
+
+    var body: some View {
+        Image(systemName: "timer")
+            .font(.system(size: 10, weight: .semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(iconColor)
+            .frame(width: 12, height: 12)
+    }
+}
+
+@available(iOS 16.1, *)
+private struct IslandMinimal: View {
+    let state: TodayActivityAttributes.ContentState
+
+    private var progress: CGFloat {
+        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.16), lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    Color(widgetHex: state.liveTheme.islandAccentHex),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+            Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+        }
+        .padding(3)
     }
 }
 
@@ -381,6 +408,552 @@ struct WeekyiiLiveActivityWidget: Widget {
 }
 #endif
 
+private struct WeekyiiWidgetRoot: View {
+    @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
+    let entry: WeekyiiWidgetEntry
+
+    private var palette: WidgetThemePalette {
+        entry.snapshot.theme.resolvedPalette(isDarkSystem: colorScheme == .dark)
+    }
+
+    private var tokens: WidgetVisualTokens {
+        WidgetVisualTokens(palette: palette)
+    }
+
+    private var semantic: WidgetSemanticData {
+        WidgetSemanticData(snapshot: entry.snapshot)
+    }
+
+    private var familyBackground: Color {
+        switch family {
+        case .accessoryInline, .accessoryRectangular, .accessoryCircular:
+            return tokens.accessoryBackground
+        default:
+            return tokens.background
+        }
+    }
+
+    var body: some View {
+        Group {
+            switch family {
+            case .systemSmall:
+                systemSmallView
+            case .systemMedium:
+                systemMediumView
+            case .systemLarge:
+                systemLargeView
+            case .accessoryInline:
+                accessoryInlineView
+            case .accessoryRectangular:
+                accessoryRectangularView
+            case .accessoryCircular:
+                accessoryCircularView
+            default:
+                systemSmallView
+            }
+        }
+        .weekyiiWidgetContainerBackground(familyBackground)
+        .widgetURL(LiveActivityAction.openToday.url())
+    }
+
+    private var systemSmallView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("当下")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tokens.textSecondary)
+                Spacer()
+                WidgetStatusPill(text: semantic.stateLabel, tokens: tokens)
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                WidgetProgressRing(
+                    progress: semantic.progress,
+                    lineWidth: 7,
+                    tint: tokens.primary,
+                    track: tokens.ringTrack,
+                    centerText: semantic.totalCount == 0 ? "--" : "\(semantic.progressPercent)",
+                    centerTextColor: tokens.textPrimary
+                )
+                .frame(width: 58, height: 58)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(semantic.keyline)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(tokens.textPrimary)
+                        .lineLimit(2)
+                    Text("完成 \(semantic.completedCount)/\(semantic.totalCount)")
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
+                .frame(height: 6)
+        }
+        .padding(12)
+    }
+
+    private var systemMediumView: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("今天")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(tokens.textPrimary)
+                    Spacer(minLength: 0)
+                    Text(semantic.killTimeText)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(tokens.textSecondary)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(semantic.progressPercent)")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(tokens.primary)
+                    Text("%")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(tokens.textSecondary)
+                }
+
+                HStack(spacing: 8) {
+                    WidgetMetricPill(title: "完成", value: semantic.completedCount, tokens: tokens)
+                    WidgetMetricPill(title: "剩余", value: semantic.remainingCount, tokens: tokens)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(semantic.keyline)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(2)
+
+                WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
+                    .frame(height: 6)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(semantic.previewRows.prefix(3)) { row in
+                        WidgetTaskPreviewLine(row: row, color: zoneColor(raw: row.zoneRaw), textColor: tokens.textSecondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(tokens.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(tokens.stroke, lineWidth: 1)
+            }
+        }
+        .padding(14)
+    }
+
+    private var systemLargeView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Weekyii · 当下")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(tokens.primary)
+                    Spacer()
+                    Text("截止 \(semantic.killTimeText)")
+                        .font(.caption)
+                        .foregroundStyle(tokens.textSecondary)
+                }
+
+                Text(semantic.keyline)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    WidgetMetricPill(title: "进度", valueText: "\(semantic.progressPercent)%", tokens: tokens)
+                    WidgetMetricPill(title: "完成", value: semantic.completedCount, tokens: tokens)
+                    WidgetMetricPill(title: "总数", value: semantic.totalCount, tokens: tokens)
+                    WidgetMetricPill(title: "剩余", value: semantic.remainingCount, tokens: tokens)
+                }
+
+                WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
+                    .frame(height: 7)
+            }
+            .padding(12)
+            .background(tokens.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(tokens.stroke, lineWidth: 1)
+            }
+
+            Text("本周条带")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tokens.textSecondary)
+                .padding(.leading, 2)
+
+            HStack(spacing: 6) {
+                ForEach(semantic.weekDays.prefix(7)) { day in
+                    WidgetWeekStripCell(day: day, tokens: tokens)
+                }
+            }
+        }
+        .padding(14)
+    }
+
+    private var accessoryInlineView: some View {
+        HStack(spacing: 4) {
+            Image(systemName: statusIcon(raw: semantic.statusRaw))
+                .foregroundStyle(tokens.primary)
+            Text("当下 \(semantic.completedCount)/\(semantic.totalCount) · \(semantic.stateLabel)")
+                .foregroundStyle(tokens.textPrimary)
+        }
+    }
+
+    private var accessoryRectangularView: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Text(semantic.keyline)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .foregroundStyle(tokens.textPrimary)
+                Spacer(minLength: 0)
+                Text("\(semantic.progressPercent)%")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(tokens.primary)
+            }
+
+            WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
+                .frame(height: 5)
+
+            HStack(spacing: 8) {
+                Text("完成 \(semantic.completedCount)/\(semantic.totalCount)")
+                Text("剩余 \(semantic.remainingCount)")
+            }
+            .font(.caption2)
+            .foregroundStyle(tokens.textSecondary)
+        }
+    }
+
+    private var accessoryCircularView: some View {
+        WidgetProgressRing(
+            progress: semantic.progress,
+            lineWidth: 4,
+            tint: tokens.primary,
+            track: tokens.ringTrack,
+            centerText: semantic.totalCount == 0 ? "--" : "\(semantic.progressPercent)",
+            centerTextColor: tokens.textPrimary
+        )
+        .padding(2)
+    }
+
+    private func zoneColor(raw: String) -> Color {
+        switch raw {
+        case "focus":
+            return tokens.primary
+        case "frozen":
+            return tokens.warning
+        case "draft":
+            return tokens.accent
+        case "completed":
+            return tokens.success
+        case "expired":
+            return tokens.danger
+        default:
+            return tokens.primary
+        }
+    }
+}
+
+private struct WidgetVisualTokens {
+    let primary: Color
+    let accent: Color
+    let background: Color
+    let accessoryBackground: Color
+    let surface: Color
+    let textPrimary: Color
+    let textSecondary: Color
+    let ringTrack: Color
+    let stroke: Color
+    let success: Color
+    let warning: Color
+    let danger: Color
+
+    init(palette: WidgetThemePalette) {
+        let primaryColor = Color(widgetHex: palette.primaryHex)
+        let accentColor = Color(widgetHex: palette.accentHex)
+        let baseBackground = Color(widgetHex: palette.backgroundHex)
+        let textMain = Color(widgetHex: palette.textPrimaryHex)
+
+        primary = primaryColor
+        accent = accentColor
+        background = baseBackground
+        accessoryBackground = baseBackground.opacity(0.75)
+        surface = Color(widgetHex: palette.primaryLightHex).opacity(0.14)
+        textPrimary = textMain
+        textSecondary = Color(widgetHex: palette.textSecondaryHex)
+        ringTrack = Color(widgetHex: palette.primaryLightHex).opacity(0.3)
+        stroke = textMain.opacity(0.08)
+        success = Color.green
+        warning = Color.orange
+        danger = Color.red
+    }
+}
+
+private struct WidgetWeekDaySemantic: Identifiable {
+    let id: String
+    let weekday: String
+    let number: Int
+    let progress: CGFloat
+    let completed: Int
+    let total: Int
+    let statusRaw: String
+
+    init(snapshot: WidgetWeekDaySnapshot) {
+        id = snapshot.dayId
+        weekday = snapshot.weekdaySymbol
+        number = snapshot.dayNumber
+        completed = snapshot.completedCount
+        total = snapshot.totalCount
+        statusRaw = snapshot.statusRaw
+        if snapshot.totalCount == 0 {
+            progress = 0
+        } else {
+            let raw = CGFloat(snapshot.completedCount) / CGFloat(snapshot.totalCount)
+            progress = max(min(raw, 1), 0)
+        }
+    }
+}
+
+private struct WidgetSemanticData {
+    let statusRaw: String
+    let todayTitle: String
+    let killTimeText: String
+    let keyline: String
+    let progressPercent: Int
+    let progress: CGFloat
+    let completedCount: Int
+    let totalCount: Int
+    let remainingCount: Int
+    let stateLabel: String
+    let previewRows: [WidgetTaskPreview]
+    let weekDays: [WidgetWeekDaySemantic]
+
+    init(snapshot: WidgetSnapshot) {
+        let today = snapshot.today
+        let boundedPercent = min(max(today.completionPercent, 0), 100)
+
+        statusRaw = today.statusRaw
+        todayTitle = today.weekdaySymbol
+        killTimeText = today.killTimeText
+        progressPercent = boundedPercent
+        progress = CGFloat(boundedPercent) / 100
+        completedCount = today.completedCount
+        totalCount = today.totalCount
+        remainingCount = max(today.totalCount - today.completedCount, 0)
+        previewRows = today.previewTasks
+        weekDays = snapshot.weekDays.map(WidgetWeekDaySemantic.init)
+
+        if let focus = today.focusTitle, !focus.isEmpty {
+            keyline = focus
+        } else if let first = today.previewTasks.first {
+            keyline = first.title
+        } else {
+            keyline = "今天没有待办"
+        }
+
+        switch today.statusRaw {
+        case "execute":
+            stateLabel = "专注"
+        case "draft":
+            stateLabel = "草稿"
+        case "completed":
+            stateLabel = "完成"
+        case "expired":
+            stateLabel = "过期"
+        default:
+            stateLabel = "待开始"
+        }
+    }
+}
+
+private struct WidgetStatusPill: View {
+    let text: String
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(tokens.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(tokens.surface, in: Capsule())
+    }
+}
+
+private struct WidgetMetricPill: View {
+    let title: String
+    let valueText: String
+    let tokens: WidgetVisualTokens
+
+    init(title: String, value: Int, tokens: WidgetVisualTokens) {
+        self.title = title
+        self.valueText = "\(value)"
+        self.tokens = tokens
+    }
+
+    init(title: String, valueText: String, tokens: WidgetVisualTokens) {
+        self.title = title
+        self.valueText = valueText
+        self.tokens = tokens
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(tokens.textSecondary)
+            Text(valueText)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tokens.textPrimary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+}
+
+private struct WidgetTaskPreviewLine: View {
+    let row: WidgetTaskPreview
+    let color: Color
+    let textColor: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(row.title)
+                .font(.caption2)
+                .lineLimit(1)
+                .foregroundStyle(textColor)
+        }
+    }
+}
+
+private struct WidgetWeekStripCell: View {
+    let day: WidgetWeekDaySemantic
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(day.weekday.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(tokens.textSecondary)
+            Text("\(day.number)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tokens.textPrimary)
+
+            WidgetLinearProgress(
+                progress: day.progress,
+                fill: progressFill,
+                track: tokens.ringTrack
+            )
+            .frame(height: 4)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity)
+        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var progressFill: Color {
+        switch day.statusRaw {
+        case "completed":
+            return tokens.success
+        case "expired":
+            return tokens.danger
+        default:
+            return tokens.primary
+        }
+    }
+}
+
+private struct WidgetProgressRing: View {
+    let progress: CGFloat
+    let lineWidth: CGFloat
+    let tint: Color
+    let track: Color
+    let centerText: String
+    let centerTextColor: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(track, lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: max(min(progress, 1), 0))
+                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text(centerText)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(centerTextColor)
+        }
+    }
+}
+
+private struct WidgetLinearProgress: View {
+    let progress: CGFloat
+    let fill: Color
+    let track: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(min(progress, 1), 0) * proxy.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                Capsule().fill(fill).frame(width: width)
+            }
+        }
+    }
+}
+
+private struct LiveActionCapsule: View {
+    let title: String
+    let icon: String
+    let fill: Color
+    let foreground: Color
+    var verticalPadding: CGFloat = 9
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+            Text(title)
+        }
+        .font(.caption.weight(.semibold))
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, verticalPadding)
+        .foregroundStyle(foreground)
+        .background(fill, in: Capsule())
+    }
+}
+
+private struct LiveLinearProgress: View {
+    let progress: CGFloat
+    let fill: Color
+    let track: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(min(progress, 1), 0) * proxy.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                Capsule().fill(fill).frame(width: width)
+            }
+        }
+    }
+}
+
 private func liveActivityTaskTypeIcon(raw: String) -> String {
     switch raw {
     case "ddl":
@@ -392,234 +965,77 @@ private func liveActivityTaskTypeIcon(raw: String) -> String {
     }
 }
 
+private func liveActivityTaskTypeLabel(raw: String) -> String {
+    switch raw {
+    case "ddl":
+        return "DDL"
+    case "leisure":
+        return "休闲"
+    default:
+        return "常规"
+    }
+}
+
+private func liveActivityDurationText(seconds: Int) -> String {
+    let safe = max(0, seconds)
+    let hours = safe / 3600
+    let minutes = (safe % 3600) / 60
+    let secs = safe % 60
+    return String(format: "%02d:%02d:%02d", hours, minutes, secs)
+}
+
+private func liveActivityCompactDurationText(seconds: Int) -> String {
+    let safe = max(0, seconds)
+    let hours = safe / 3600
+    let minutes = (safe % 3600) / 60
+    let secs = safe % 60
+    if hours > 0 {
+        return String(format: "%d:%02d", hours, minutes)
+    }
+    return String(format: "%02d:%02d", minutes, secs)
+}
+
+private func statusIcon(raw: String) -> String {
+    switch raw {
+    case "execute":
+        return "bolt.fill"
+    case "completed":
+        return "checkmark.seal.fill"
+    case "expired":
+        return "xmark.seal.fill"
+    case "draft":
+        return "square.and.pencil"
+    default:
+        return "circle.dotted"
+    }
+}
+
+private func isHexColorLight(_ hex: String) -> Bool {
+    var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+    if sanitized.hasPrefix("#") { sanitized.removeFirst() }
+    guard sanitized.count == 6, let value = Int(sanitized, radix: 16) else {
+        return false
+    }
+    let r = Double((value >> 16) & 0xFF) / 255.0
+    let g = Double((value >> 8) & 0xFF) / 255.0
+    let b = Double(value & 0xFF) / 255.0
+    let luma = 0.299 * r + 0.587 * g + 0.114 * b
+    return luma > 0.72
+}
+
 private func deadlineLabel(for date: Date) -> String {
     let formatter = DateFormatter()
     formatter.dateFormat = "截止 HH:mm"
     return formatter.string(from: date)
 }
 
-private struct WeekyiiWidgetRoot: View {
-    @Environment(\.widgetFamily) private var family
-    @Environment(\.colorScheme) private var colorScheme
-    let entry: WeekyiiWidgetEntry
-
-    var body: some View {
-        switch family {
-        case .systemSmall:
-            smallView
-        case .systemMedium:
-            mediumView
-        case .systemLarge:
-            largeView
-        case .accessoryInline:
-            inlineLockView
-        case .accessoryRectangular:
-            rectangularLockView
-        case .accessoryCircular:
-            circularLockView
-        default:
-            smallView
-        }
-    }
-
-    private var colors: WidgetThemePalette {
-        entry.snapshot.theme.resolvedPalette(isDarkSystem: colorScheme == .dark)
-    }
-
-    private var completionText: String {
-        "\(entry.snapshot.today.completedCount)/\(entry.snapshot.today.totalCount)"
-    }
-
-    private var smallView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(entry.snapshot.today.weekdaySymbol)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-                Spacer()
-                Text(entry.snapshot.today.killTimeText)
-                    .font(.caption2)
-                    .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-            }
-
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("\(entry.snapshot.today.completionPercent)")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(widgetHex: colors.primaryHex))
-                Text("%")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-            }
-
-            Text(entry.snapshot.today.focusTitle ?? "暂无焦点任务")
-                .font(.caption)
-                .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
-
-            Text("完成 \(completionText)")
-                .font(.caption2)
-                .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-        }
-        .padding(12)
-        .containerBackground(Color(widgetHex: colors.backgroundHex), for: .widget)
-    }
-
-    private var mediumView: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("今日")
-                    .font(.headline)
-                    .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-
-                Text("\(entry.snapshot.today.completionPercent)%")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(widgetHex: colors.primaryHex))
-
-                HStack(spacing: 8) {
-                    chip(title: "完成", value: entry.snapshot.today.completedCount)
-                    chip(title: "剩余", value: max(entry.snapshot.today.totalCount - entry.snapshot.today.completedCount, 0))
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(entry.snapshot.today.previewTasks.prefix(3)) { task in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(zoneColor(raw: task.zoneRaw))
-                            .frame(width: 6, height: 6)
-                        Text(task.title)
-                            .font(.caption)
-                            .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-                            .lineLimit(1)
-                    }
-                }
-                if entry.snapshot.today.previewTasks.isEmpty {
-                    Text("今天没有待办")
-                        .font(.caption)
-                        .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-                }
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(14)
-        .containerBackground(Color(widgetHex: colors.backgroundHex), for: .widget)
-    }
-
-    private var largeView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Weekyii")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Color(widgetHex: colors.primaryHex))
-                Spacer()
-                Text("Kill \(entry.snapshot.today.killTimeText)")
-                    .font(.caption)
-                    .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-            }
-
-            HStack(alignment: .center, spacing: 10) {
-                Text("\(entry.snapshot.today.completionPercent)%")
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(widgetHex: colors.primaryHex))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.snapshot.today.focusTitle ?? "暂无焦点任务")
-                        .font(.subheadline.weight(.medium))
-                        .lineLimit(2)
-                        .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-                    Text("完成 \(completionText)")
-                        .font(.caption)
-                        .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-                }
-                Spacer(minLength: 0)
-            }
-
-            Divider()
-                .overlay(Color(widgetHex: colors.primaryLightHex).opacity(0.35))
-
-            Text("本周")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-                ForEach(entry.snapshot.weekDays.prefix(7)) { day in
-                    VStack(spacing: 4) {
-                        Text(day.weekdaySymbol.uppercased())
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-                        Text("\(day.dayNumber)")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(zoneColor(raw: day.statusRaw).opacity(0.18), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-            }
-        }
-        .padding(14)
-        .containerBackground(Color(widgetHex: colors.backgroundHex), for: .widget)
-    }
-
-    private var inlineLockView: some View {
-        Text("今日 \(completionText)")
-    }
-
-    private var rectangularLockView: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(entry.snapshot.today.completionPercent)% · \(completionText)")
-                .font(.caption.weight(.semibold))
-            Text(entry.snapshot.today.focusTitle ?? "暂无焦点任务")
-                .font(.caption2)
-                .lineLimit(1)
-        }
-    }
-
-    private var circularLockView: some View {
-        ZStack {
-            Circle()
-                .stroke(Color(widgetHex: colors.primaryLightHex).opacity(0.35), lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: CGFloat(entry.snapshot.today.completionPercent) / 100)
-                .stroke(Color(widgetHex: colors.primaryHex), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(entry.snapshot.today.completionPercent)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-        }
-        .padding(3)
-    }
-
-    private func chip(title: String, value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color(widgetHex: colors.textSecondaryHex))
-            Text("\(value)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: colors.textPrimaryHex))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color(widgetHex: colors.primaryLightHex).opacity(0.2), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private func zoneColor(raw: String) -> Color {
-        switch raw {
-        case "focus":
-            return Color(widgetHex: colors.primaryHex)
-        case "frozen":
-            return Color(widgetHex: colors.accentHex)
-        case "draft":
-            return Color(widgetHex: colors.primaryLightHex)
-        case "completed":
-            return .green
-        case "expired":
-            return .red
-        default:
-            return Color(widgetHex: colors.primaryHex)
+private extension View {
+    @ViewBuilder
+    func weekyiiWidgetContainerBackground(_ color: Color) -> some View {
+        if #available(iOSApplicationExtension 17.0, *) {
+            containerBackground(for: .widget) { color }
+        } else {
+            background(color)
         }
     }
 }
@@ -649,114 +1065,3 @@ private extension Color {
         )
     }
 }
-
-#if DEBUG && canImport(ActivityKit)
-@available(iOS 17.0, *)
-private let previewActivityAttributes = TodayActivityAttributes(dayId: "2026-03-16")
-
-@available(iOS 17.0, *)
-private let previewAmberLiveTheme = LiveActivityThemeSnapshot(
-    islandTextPrimaryHex: "#F7EBDD",
-    islandTextSecondaryHex: "#D2BDA9",
-    islandAccentHex: "#E0A35B",
-    islandWarningHex: "#F18B70",
-    islandSuccessHex: "#6ECBC3",
-    islandChipPrimaryHex: "#E0A35B",
-    islandChipSecondaryHex: "#F4AE77",
-    islandKeylineHex: "#E0A35B",
-    lockBackgroundHex: "#FFFDF9",
-    lockSurfaceHex: "#F6EDE3",
-    lockTextPrimaryHex: "#2A1D16",
-    lockTextSecondaryHex: "#6B5A4F",
-    lockAccentHex: "#C46A1A",
-    lockProgressTrackHex: "#E0A35B",
-    darkLockBackgroundHex: "#221A14",
-    darkLockSurfaceHex: "#2E241D",
-    darkLockTextPrimaryHex: "#F7EBDD",
-    darkLockTextSecondaryHex: "#D2BDA9",
-    darkLockAccentHex: "#E0A35B",
-    darkLockProgressTrackHex: "#F2C284",
-    appearanceModeRaw: AppearanceMode.light.rawValue
-)
-
-@available(iOS 17.0, *)
-private let previewLotrLiveTheme = LiveActivityThemeSnapshot(
-    islandTextPrimaryHex: "#E6DECf",
-    islandTextSecondaryHex: "#B8AB94",
-    islandAccentHex: "#AF9160",
-    islandWarningHex: "#D28F62",
-    islandSuccessHex: "#8392AA",
-    islandChipPrimaryHex: "#AF9160",
-    islandChipSecondaryHex: "#BE8354",
-    islandKeylineHex: "#AF9160",
-    lockBackgroundHex: "#F5F2EB",
-    lockSurfaceHex: "#DDD8CD",
-    lockTextPrimaryHex: "#211D18",
-    lockTextSecondaryHex: "#4E4439",
-    lockAccentHex: "#7F683C",
-    lockProgressTrackHex: "#B79863",
-    darkLockBackgroundHex: "#101411",
-    darkLockSurfaceHex: "#171C18",
-    darkLockTextPrimaryHex: "#E6DECf",
-    darkLockTextSecondaryHex: "#B8AB94",
-    darkLockAccentHex: "#AF9160",
-    darkLockProgressTrackHex: "#C6AA79",
-    appearanceModeRaw: AppearanceMode.dark.rawValue
-)
-
-@available(iOS 17.0, *)
-private let amberLiveActivityPreviewState = TodayActivityAttributes.ContentState(
-    dayId: "2026-03-16",
-    focusTitle: "整理提案与明日计划",
-    taskTypeRaw: "regular",
-    killTime: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 16, hour: 22, minute: 30)) ?? Date(),
-    remainingSeconds: 3600,
-    completionPercent: 40,
-    completedCount: 2,
-    totalCount: 5,
-    frozenCount: 2,
-    liveTheme: previewAmberLiveTheme
-)
-
-@available(iOS 17.0, *)
-private let lotrLiveActivityPreviewState = TodayActivityAttributes.ContentState(
-    dayId: "2026-03-16",
-    focusTitle: "穿过黑夜前把今天的核心任务做完",
-    taskTypeRaw: "ddl",
-    killTime: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 16, hour: 23, minute: 45)) ?? Date(),
-    remainingSeconds: 5400,
-    completionPercent: 66,
-    completedCount: 2,
-    totalCount: 3,
-    frozenCount: 0,
-    liveTheme: previewLotrLiveTheme
-)
-
-@available(iOS 17.0, *)
-#Preview("Live Activity Lock · Amber", as: .content, using: previewActivityAttributes) {
-    WeekyiiLiveActivityWidget()
-} contentStates: {
-    amberLiveActivityPreviewState
-}
-
-@available(iOS 17.0, *)
-#Preview("Live Activity Expanded · Amber", as: .dynamicIsland(.expanded), using: previewActivityAttributes) {
-    WeekyiiLiveActivityWidget()
-} contentStates: {
-    amberLiveActivityPreviewState
-}
-
-@available(iOS 17.0, *)
-#Preview("Live Activity Compact · Amber", as: .dynamicIsland(.compact), using: previewActivityAttributes) {
-    WeekyiiLiveActivityWidget()
-} contentStates: {
-    amberLiveActivityPreviewState
-}
-
-@available(iOS 17.0, *)
-#Preview("Live Activity Minimal · Lotr", as: .dynamicIsland(.minimal), using: previewActivityAttributes) {
-    WeekyiiLiveActivityWidget()
-} contentStates: {
-    lotrLiveActivityPreviewState
-}
-#endif

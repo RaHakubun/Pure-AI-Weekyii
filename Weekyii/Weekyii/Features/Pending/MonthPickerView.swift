@@ -56,6 +56,9 @@ struct MonthPickerView: View {
             Text(month, format: Date.FormatStyle().year().month())
                 .font(.headline)
                 .frame(maxWidth: .infinity)
+                // 文字内容切换时保持视觉稳定，不触发跨帧 fade
+                .contentTransition(.identity)
+                .animation(.none, value: month)
 
             Button(action: { month = nextMonth(from: month) }) {
                 Image(systemName: "chevron.right")
@@ -64,7 +67,9 @@ struct MonthPickerView: View {
             .opacity(canGoNext ? 1 : 0.3)
         }
         .padding(12)
-        .background(.ultraThinMaterial)
+        // ultraThinMaterial 在内容变化时会重新合成 blur 层导致闪烁；
+        // 改用静态背景色，视觉效果相同但不触发 vibrancy 重采样。
+        .background(Color.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 

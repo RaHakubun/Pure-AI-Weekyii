@@ -19,65 +19,86 @@ struct PendingWeekCard: View {
         } label: {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    // 周标题
-                    HStack {
+                    // 周标题行：图标中性化，仅周标签用主色，右侧显示日期范围
+                    HStack(spacing: WeekSpacing.xs) {
                         Image(systemName: "calendar")
-                            .foregroundColor(.weekyiiPrimary)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.textTertiary)
                         Text(week.relativeWeekLabel())
                             .font(.titleSmall)
                             .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
+                        Text("·")
                             .font(.caption)
                             .foregroundColor(.textTertiary)
-                    }
-                    
-                    // 日期范围
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
                         Text(formatDateRange())
-                            .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
+                            .font(.caption)
+                            .foregroundColor(.textTertiary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.textTertiary)
                     }
-                    
-                    Divider()
-                    
-                    HStack(alignment: .center, spacing: WeekSpacing.md) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
+
+                    // 周预报信息区：中性面板背景，仅左侧竖线用 tone 色做强调
+                    HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                        // 左侧 tone 色竖线（唯一高饱和色块，宽度仅 3pt）
+                        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                            .fill(toneColor)
+                            .frame(width: 3)
+                            .padding(.vertical, 2)
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            // 层1：tone 标签（文字胶囊，无背景色块）
+                            HStack(spacing: 5) {
+                                Text(outlook.tone.displayName)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(toneColor)
                                 Text(String(localized: "pending.week.outlook.title", defaultValue: "周预报"))
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(Color.textSecondary)
-                                tonePill
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.textTertiary)
                                 Spacer(minLength: 0)
                             }
 
+                            // 层2：headline（一句话预期，最醒目的文字层）
                             Text(outlook.headline)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Color.textPrimary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
 
-                            HStack(spacing: 6) {
-                                typeMetric(icon: TaskType.regular.monthMarkerIconName, value: outlook.typeCounts.regular, tint: .taskRegular)
-                                typeMetric(icon: TaskType.ddl.monthMarkerIconName, value: outlook.typeCounts.ddl, tint: .taskDDL)
-                                typeMetric(icon: TaskType.leisure.monthMarkerIconName, value: outlook.typeCounts.leisure, tint: .taskLeisure)
+                            // 层3a：三类任务数量（图标 + 数字，无彩色背景，仅图标用任务色）
+                            HStack(spacing: WeekSpacing.sm) {
+                                typeCountItem(icon: TaskType.regular.monthMarkerIconName,
+                                              value: outlook.typeCounts.regular,
+                                              tint: .taskRegular)
+                                typeCountItem(icon: TaskType.ddl.monthMarkerIconName,
+                                              value: outlook.typeCounts.ddl,
+                                              tint: .taskDDL)
+                                typeCountItem(icon: TaskType.leisure.monthMarkerIconName,
+                                              value: outlook.typeCounts.leisure,
+                                              tint: .taskLeisure)
                                 Spacer(minLength: 0)
                             }
 
-                            advicePill
+                            // 层3b：建议文本（文字形式，最低视觉权重）
+                            HStack(spacing: 3) {
+                                Image(systemName: "lightbulb")
+                                    .font(.system(size: 9, weight: .regular))
+                                    .foregroundStyle(Color.textTertiary)
+                                Text(outlook.advice)
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.textSecondary)
+                                    .lineLimit(1)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
+                        // 压力 sparkline：无额外容器背景，融入面板
                         WeekLoadSparklineView(series: outlook.dayLoadSeries, tint: toneColor)
-                            .frame(width: 58, height: 50)
+                            .frame(width: 52, height: 52)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 9)
                     .background(forecastPanelFill, in: .rect(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
@@ -96,13 +117,12 @@ struct PendingWeekCard: View {
               let lastDay = sortedDays.last else {
             return ""
         }
-        
         let start = Self.monthDayFormatter.string(from: firstDay.date)
         let end = Self.monthDayFormatter.string(from: lastDay.date)
-        
         return "\(start) - \(end)"
     }
 
+    // 唯一主强调色，按 tone 决定
     private var toneColor: Color {
         switch outlook.tone {
         case .relaxed:
@@ -116,56 +136,40 @@ struct PendingWeekCard: View {
         case .deadlineRush:
             return .taskDDL
         case .overloadWarning:
-            return .red
+            // 用 taskDDL 替代 .red，避免高饱和红色噪音；
+            // taskDDL 在各主题下已调校为柔和锈橙，可读性更好
+            return .taskDDL
         }
     }
 
-    private var tonePill: some View {
-        Text(outlook.tone.displayName)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(toneColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(toneColor.opacity(colorScheme == .dark ? 0.22 : 0.14), in: .rect(cornerRadius: 6))
+    // 面板背景：极低透明度，仅用于区域感知，不传递情绪色
+    private var forecastPanelFill: Color {
+        colorScheme == .dark
+            ? Color.backgroundTertiary.opacity(0.6)
+            : Color.backgroundTertiary.opacity(0.5)
     }
 
-    private var advicePill: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "lightbulb.max.fill")
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
-            Text(outlook.advice)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(Color.backgroundTertiary.opacity(colorScheme == .dark ? 0.55 : 0.75), in: .rect(cornerRadius: 6))
+    // 面板边框：中性，不带 tone 色
+    private var forecastPanelBorder: Color {
+        colorScheme == .dark
+            ? Color.textTertiary.opacity(0.18)
+            : Color.textTertiary.opacity(0.12)
     }
 
-    private func typeMetric(icon: String, value: Int, tint: Color) -> some View {
+    // 任务数量行：图标用任务色，数字用次要文字色，无背景胶囊
+    private func typeCountItem(icon: String, value: Int, tint: Color) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(tint)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(tint.opacity(0.85))
             Text("\(value)")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(tint)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.textSecondary)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(tint.opacity(colorScheme == .dark ? 0.18 : 0.12), in: .rect(cornerRadius: 6))
-    }
-
-    private var forecastPanelFill: Color {
-        toneColor.opacity(colorScheme == .dark ? 0.14 : 0.08)
-    }
-
-    private var forecastPanelBorder: Color {
-        toneColor.opacity(colorScheme == .dark ? 0.30 : 0.20)
     }
 }
+
+// MARK: - Sparkline（弱化装饰，突出峰值日）
 
 private struct WeekLoadSparklineView: View {
     let series: [Double]
@@ -173,7 +177,7 @@ private struct WeekLoadSparklineView: View {
 
     private var normalizedSeries: [Double] {
         let maxValue = max(series.max() ?? 0, 1)
-        return series.map { max($0 / maxValue, 0.16) }
+        return series.map { max($0 / maxValue, 0.12) }
     }
 
     var body: some View {
@@ -181,13 +185,12 @@ private struct WeekLoadSparklineView: View {
             ForEach(Array(normalizedSeries.enumerated()), id: \.offset) { index, ratio in
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(barTint(at: index))
-                    .frame(width: 4, height: 32 * ratio)
+                    .frame(width: 4, height: 36 * ratio)
             }
         }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 5)
-        .background(Color.backgroundPrimary.opacity(0.72), in: .rect(cornerRadius: 8))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        // 移除独立容器背景框，直接融入面板；用 padding 保持对齐
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
     private var peakIndex: Int? {
@@ -197,15 +200,16 @@ private struct WeekLoadSparklineView: View {
 
     private func barTint(at index: Int) -> Color {
         guard let peakIndex else {
-            return .textTertiary.opacity(0.26)
+            return .textTertiary.opacity(0.20)
         }
         if index == peakIndex {
-            return tint.opacity(0.90)
+            // 峰值柱：用 toneColor，饱和度完整，其余柱极低透明
+            return tint.opacity(0.88)
         }
         if abs(index - peakIndex) == 1 {
-            return tint.opacity(0.45)
+            return tint.opacity(0.35)
         }
-        return .textTertiary.opacity(0.24)
+        return .textTertiary.opacity(0.18)
     }
 }
 
@@ -217,17 +221,43 @@ private struct WeekLoadSparklineView: View {
     let startDate = calendar.date(byAdding: .day, value: 7, to: today)!
     let endDate = calendar.date(byAdding: .day, value: 13, to: today)!
     
-    PendingWeekCard(
-        week: WeekModel(weekId: "2026-W06", startDate: startDate, endDate: endDate, status: .pending),
-        outlook: .init(
-            tone: .frontLooseBackTight,
-            headline: "后半周会明显变紧，建议提前启动关键事项",
-            advice: "周一周二先清关键任务",
-            typeCounts: .init(regular: 8, ddl: 3, leisure: 2),
-            peakDays: ["周四", "周五"],
-            dayLoadSeries: [1, 2.4, 2, 4, 4.2, 3, 1]
+    VStack(spacing: 16) {
+        PendingWeekCard(
+            week: WeekModel(weekId: "2026-W06", startDate: startDate, endDate: endDate, status: .pending),
+            outlook: .init(
+                tone: .frontLooseBackTight,
+                headline: "后半周会明显变紧，建议提前启动关键事项",
+                advice: "周一周二先清关键任务",
+                typeCounts: .init(regular: 8, ddl: 3, leisure: 2),
+                peakDays: ["周四", "周五"],
+                dayLoadSeries: [1, 2.4, 2, 4, 4.2, 3, 1]
+            )
         )
-    )
-        .padding()
-        .background(Color.backgroundPrimary)
+
+        PendingWeekCard(
+            week: WeekModel(weekId: "2026-W07", startDate: startDate, endDate: endDate, status: .pending),
+            outlook: .init(
+                tone: .overloadWarning,
+                headline: "本周负载偏高，高压在周三/周四",
+                advice: "建议拆分或减载安排",
+                typeCounts: .init(regular: 12, ddl: 5, leisure: 1),
+                peakDays: ["周三", "周四"],
+                dayLoadSeries: [3, 4, 5.5, 5.2, 4, 2, 1]
+            )
+        )
+
+        PendingWeekCard(
+            week: WeekModel(weekId: "2026-W08", startDate: startDate, endDate: endDate, status: .pending),
+            outlook: .init(
+                tone: .relaxed,
+                headline: "整体负载偏轻，按节奏推进即可",
+                advice: "保持节奏并留1天机动",
+                typeCounts: .init(regular: 3, ddl: 0, leisure: 2),
+                peakDays: [],
+                dayLoadSeries: [1, 0.5, 1.2, 0.8, 1, 0.3, 0]
+            )
+        )
+    }
+    .padding()
+    .background(Color.backgroundPrimary)
 }

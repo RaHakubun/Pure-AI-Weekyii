@@ -133,7 +133,7 @@ struct DayDetailView: View {
                     ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
                         HStack(spacing: WeekSpacing.sm) {
                             Button(action: { editingTask = task }) {
-                                TaskRowView(task: task)
+                                TaskRowView(task: task, showsProjectOrigin: true)
                             }
                             .buttonStyle(.plain)
                             .disabled(!isEditable || isEditingDraft)

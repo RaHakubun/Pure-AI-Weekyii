@@ -373,7 +373,7 @@ struct PendingWeekDetailView: View {
     private func readOnlyTaskList(_ tasks: [TaskItem]) -> some View {
         VStack(spacing: WeekSpacing.sm) {
             ForEach(tasks, id: \.id) { task in
-                TaskRowView(task: task)
+                TaskRowView(task: task, showsProjectOrigin: task.zone == .draft)
             }
         }
     }
@@ -494,7 +494,7 @@ private struct PendingEditableDraftTaskRow: View {
             Button {
                 onTaskTap()
             } label: {
-                TaskRowView(task: task)
+                TaskRowView(task: task, showsProjectOrigin: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)

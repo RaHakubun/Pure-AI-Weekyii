@@ -4,6 +4,7 @@ import SwiftUI
 
 struct FrozenZoneView: View {
     let tasks: [TaskItem]
+    var showsProjectOrigin: Bool = false
     var onTapTask: ((TaskItem) -> Void)? = nil
     var onPostponeTask: ((TaskItem) -> Void)? = nil
 
@@ -17,9 +18,14 @@ struct FrozenZoneView: View {
                     .weekPaddingVertical(WeekSpacing.md)
             } else {
                 ForEach(tasks) { task in
-                    TaskCard(task: task, showStatus: false, onTap: {
-                        onTapTask?(task)
-                    })
+                    TaskCard(
+                        task: task,
+                        showStatus: false,
+                        showsProjectOrigin: showsProjectOrigin,
+                        onTap: {
+                            onTapTask?(task)
+                        }
+                    )
                     .contextMenu {
                         if let onPostponeTask {
                             Button("后移任务", systemImage: "calendar.badge.clock") {

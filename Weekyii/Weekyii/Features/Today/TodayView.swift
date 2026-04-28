@@ -454,6 +454,11 @@ struct TodayView: View {
                         .onTapGesture {
                             selectedTaskForDetail = focusTask
                         }
+
+                    TaskProjectOriginBadge(
+                        project: focusTask.project,
+                        isOnDarkBackground: true
+                    )
                     
                     HStack {
                         if let startedAt = focusTask.startedAt {
@@ -525,11 +530,16 @@ struct TodayView: View {
                             .foregroundColor(.weekyiiPrimary)
                     }
                     
-                    FrozenZoneView(tasks: day.frozenTasks, onTapTask: { task in
-                        selectedTaskForDetail = task
-                    }, onPostponeTask: { task in
-                        taskForPostpone = task
-                    })
+                    FrozenZoneView(
+                        tasks: day.frozenTasks,
+                        showsProjectOrigin: true,
+                        onTapTask: { task in
+                            selectedTaskForDetail = task
+                        },
+                        onPostponeTask: { task in
+                            taskForPostpone = task
+                        }
+                    )
                 }
             }
         }
@@ -893,146 +903,42 @@ struct TodayView: View {
         let draftCount = day?.sortedDraftTasks.count ?? 0
         let killTimeHour = day?.killTimeHour ?? 20
         let killTimeMinute = day?.killTimeMinute ?? 0
+        let killTimeText = String(format: "%02d:%02d", killTimeHour, killTimeMinute)
 
-        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+        VStack(alignment: .leading, spacing: WeekSpacing.base) {
             if startFlowCoordinator.step == .warning {
-                HStack(alignment: .top, spacing: WeekSpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.weekyiiPrimary.opacity(0.12))
-                            .frame(width: 42, height: 42)
-                        Image(systemName: "play.circle.fill")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(Color.weekyiiGradient)
-                    }
-
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text("是否开始今日任务流？")
-                            .font(.title3.weight(.bold))
-                            .foregroundColor(.textPrimary)
-
-                        Text("进入后将按任务顺序推进，直到完成或截止。")
-                            .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("开始任务流头部信息")
-                .accessibilityIdentifier("startFlowSheetHeader")
-
-                HStack(spacing: WeekSpacing.sm) {
-                    startFlowSummaryItem(
-                        icon: "checklist",
-                        title: "草稿任务",
-                        value: "\(draftCount) 项"
-                    )
-                    startFlowSummaryItem(
-                        icon: "clock.fill",
-                        title: "截止时间",
-                        value: String(format: "%02d:%02d", killTimeHour, killTimeMinute)
-                    )
-                }
-
-                HStack(alignment: .top, spacing: WeekSpacing.sm) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.bodyLarge)
-                        .foregroundColor(.accentOrange)
-
-                    Text("同意后无法撤回，需要在截止时间前完成，未完成项将被过期遗忘。")
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(WeekSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: WeekRadius.medium)
-                        .fill(Color.accentOrangeLight.opacity(0.14))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: WeekRadius.medium)
-                        .stroke(Color.accentOrange.opacity(0.25), lineWidth: 1)
-                )
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("开始任务流风险提示")
-                .accessibilityIdentifier("startFlowWarningCard")
-
-                HStack(spacing: WeekSpacing.sm) {
-                    WeekButton("我再想想", style: .outline) {
+                StartFlowWarningStepView(
+                    draftCount: draftCount,
+                    killTimeText: killTimeText,
+                    onCancel: {
                         startFlowStamp = nil
                         startFlowCoordinator.cancel()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("startFlowSecondaryButton")
-
-                    WeekButton("直接进入", style: .primary) {
+                    },
+                    onContinue: {
                         startFlowStamp = viewModel.pickStartRitualStamp()
                         startFlowCoordinator.chooseDirectEnter()
                     }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("startFlowPrimaryButton")
-                }
+                )
             } else {
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    Text("今日思想钢印")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.textSecondary)
-
-                    if let quote = startFlowStamp?.text, quote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-                        Text("“\(quote)”")
-                            .font(.bodyLarge.weight(.medium))
-                            .foregroundColor(.textPrimary)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        Text("给自己一个清晰而坚定的开始。")
-                            .font(.bodyLarge.weight(.medium))
-                            .foregroundColor(.textSecondary)
+                StartFlowRitualStepView(
+                    stamp: startFlowStamp,
+                    onConfirm: {
+                        do {
+                            try viewModel.startDay()
+                            startFlowStamp = nil
+                            startFlowCoordinator.cancel()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
                     }
-                }
-                .padding(WeekSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.backgroundTertiary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("思想钢印内容")
-                .accessibilityIdentifier("startFlowRitualCard")
-
-                Spacer(minLength: WeekSpacing.sm)
-
-                WeekButton("确认开始", style: .primary) {
-                    do {
-                        try viewModel.startDay()
-                        startFlowStamp = nil
-                        startFlowCoordinator.cancel()
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("startFlowPrimaryButton")
+                )
             }
         }
-        .padding(WeekSpacing.base)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, WeekSpacing.base)
+        .padding(.top, WeekSpacing.lg)
+        .padding(.bottom, WeekSpacing.base)
         .background(Color.backgroundPrimary)
-    }
-
-    private func startFlowSummaryItem(icon: String, title: String, value: String) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: icon)
-                .font(.bodyMedium.weight(.semibold))
-                .foregroundStyle(Color.weekyiiGradient)
-
-            VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                Text(value)
-                    .font(.bodyLarge.weight(.semibold))
-                    .foregroundColor(.textPrimary)
-            }
-        }
-        .padding(WeekSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
     }
 
     @ViewBuilder
@@ -1143,6 +1049,186 @@ private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
                     selectedSection = target
                 }
             }
+    }
+}
+
+private struct StartFlowWarningStepView: View {
+    let draftCount: Int
+    let killTimeText: String
+    let onCancel: () -> Void
+    let onContinue: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.base) {
+            HStack(alignment: .top, spacing: WeekSpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.weekyiiPrimary.opacity(0.12))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "play.circle.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color.weekyiiGradient)
+                }
+
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    Text("是否开始今日任务流？")
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(.textPrimary)
+
+                    Text("进入后将按任务顺序推进，直到完成或截止。")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("开始任务流头部信息")
+            .accessibilityIdentifier("startFlowSheetHeader")
+
+            HStack(spacing: WeekSpacing.sm) {
+                summaryItem(icon: "checklist", title: "草稿任务", value: "\(draftCount) 项")
+                summaryItem(icon: "clock.fill", title: "截止时间", value: killTimeText)
+            }
+
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.bodyLarge)
+                    .foregroundColor(.accentOrange)
+
+                Text("同意后无法撤回，需要在截止时间前完成，未完成项将被过期遗忘。")
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(WeekSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .fill(Color.accentOrangeLight.opacity(0.14))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .stroke(Color.accentOrange.opacity(0.25), lineWidth: 1)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("开始任务流风险提示")
+            .accessibilityIdentifier("startFlowWarningCard")
+
+            HStack(spacing: WeekSpacing.sm) {
+                WeekButton("我再想想", style: .outline, action: onCancel)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowSecondaryButton")
+
+                WeekButton("直接进入", style: .primary, action: onContinue)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowPrimaryButton")
+            }
+        }
+    }
+
+    private func summaryItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Image(systemName: icon)
+                .font(.bodyMedium.weight(.semibold))
+                .foregroundStyle(Color.weekyiiGradient)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                Text(value)
+                    .font(.bodyLarge.weight(.semibold))
+                    .foregroundColor(.textPrimary)
+            }
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
+    }
+}
+
+private struct StartFlowRitualStepView: View {
+    let stamp: MindStampItem?
+    let onConfirm: () -> Void
+
+    private var quoteText: String? {
+        guard let stamp else { return nil }
+        let trimmed = stamp.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.base) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    Text("阶段 2/2 · 思想钢印")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.textSecondary)
+                    Text("把注意力收束到唯一入口，然后开始今天。")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                HStack(alignment: .top, spacing: WeekSpacing.md) {
+                    if let blob = stamp?.imageBlob, let uiImage = UIImage(data: blob) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                        Text("今日思想钢印")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.textSecondary)
+
+                        ScrollView(showsIndicators: false) {
+                            Text(contentText)
+                                .font(.bodyLarge.weight(.medium))
+                                .foregroundColor(quoteText == nil ? .textSecondary : .textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .lineSpacing(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: 120)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(WeekSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.backgroundTertiary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    .stroke(Color.backgroundTertiary.opacity(0.9), lineWidth: 1)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("思想钢印内容")
+            .accessibilityIdentifier("startFlowRitualCard")
+
+            VStack(spacing: WeekSpacing.sm) {
+                WeekButton("确认开始", style: .primary, action: onConfirm)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowPrimaryButton")
+            }
+            .padding(.top, WeekSpacing.xs)
+            .padding(.bottom, WeekSpacing.sm)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var contentText: String {
+        if let quoteText {
+            return "“\(quoteText)”"
+        }
+        return "给自己一个清晰而坚定的开始。"
     }
 }
 /// 高级 Segmented Control 样式的切换器

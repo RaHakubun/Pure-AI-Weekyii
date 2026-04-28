@@ -52,6 +52,41 @@ final class StateMachineTests: XCTestCase {
             premiumThemeUnlocked: Bool
         ) {}
 
+        func reconcileImmediately(
+            modelContext: ModelContext,
+            now: Date,
+            selectedThemeRaw: String,
+            appearanceModeRaw: String,
+            premiumThemeUnlocked: Bool
+        ) async {}
+
+        func endAll() {}
+    }
+
+    @MainActor
+    private final class RecordingLiveActivityService: LiveActivityManaging {
+        var immediateReconcileCount: Int = 0
+        var onImmediateReconcile: ((Int) -> Void)?
+
+        func reconcile(
+            modelContext: ModelContext,
+            now: Date,
+            selectedThemeRaw: String,
+            appearanceModeRaw: String,
+            premiumThemeUnlocked: Bool
+        ) {}
+
+        func reconcileImmediately(
+            modelContext: ModelContext,
+            now: Date,
+            selectedThemeRaw: String,
+            appearanceModeRaw: String,
+            premiumThemeUnlocked: Bool
+        ) async {
+            immediateReconcileCount += 1
+            onImmediateReconcile?(immediateReconcileCount)
+        }
+
         func endAll() {}
     }
 
@@ -790,6 +825,42 @@ final class StateMachineTests: XCTestCase {
 
         XCTAssertNotNil(tomorrow)
         XCTAssertEqual(tomorrow?.sortedDraftTasks.first?.title, "Focus")
+    }
+
+    @MainActor
+    func test_liveActivityActionRouter_postponePerformsCriticalImmediateReconcile() throws {
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let day = week.days.first(where: { $0.dayId == today.dayId }) else {
+            XCTFail("Missing day")
+            return
+        }
+        day.status = .execute
+        day.tasks.append(TaskItem(title: "Focus", order: 1, zone: .focus))
+        try context.save()
+
+        let appState = AppState()
+        let settings = UserSettings()
+        let service = RecordingLiveActivityService()
+        let reconcileExpectation = expectation(description: "immediate reconcile called twice")
+        reconcileExpectation.expectedFulfillmentCount = 2
+        service.onImmediateReconcile = { _ in
+            reconcileExpectation.fulfill()
+        }
+
+        LiveActivityActionRouter.handle(
+            url: LiveActivityAction.postponeFocus.url(days: 1),
+            modelContext: context,
+            appState: appState,
+            userSettings: settings,
+            notificationService: TestNotificationService(),
+            liveActivityService: service
+        )
+
+        wait(for: [reconcileExpectation], timeout: 2.0)
+        XCTAssertGreaterThanOrEqual(service.immediateReconcileCount, 2)
     }
 
 }

@@ -11,6 +11,12 @@ private struct PendingMonthAddTarget: Identifiable {
     let day: DayModel
 }
 
+private struct PendingMonthEditTarget: Identifiable {
+    let id: String
+    let day: DayModel
+    let task: TaskItem
+}
+
 struct PendingView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
@@ -20,6 +26,8 @@ struct PendingView: View {
     @State private var selectedDate = Date()
     @State private var showingCreateSheet = false
     @State private var monthAddTarget: PendingMonthAddTarget?
+    @State private var monthEditTarget: PendingMonthEditTarget?
+    @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
     @State private var displayMode: PendingDisplayMode = .weekList
     @State private var monthSummaries: [String: PendingViewModel.MonthDaySummary] = [:]
@@ -98,6 +106,48 @@ struct PendingView: View {
                     }
                 )
             }
+            .sheet(item: $monthEditTarget, onDismiss: {
+                refreshMonthSummaries()
+            }) { target in
+                TaskEditorSheet(
+                    title: String(localized: "draft.edit_title"),
+                    initialTitle: target.task.title,
+                    initialDescription: target.task.taskDescription,
+                    initialType: target.task.taskType,
+                    initialSteps: target.task.steps,
+                    initialAttachments: target.task.attachments,
+                    onSave: { title, description, type, steps, attachments in
+                        guard let viewModel else { return }
+                        do {
+                            try viewModel.updateDraftTask(
+                                target.task,
+                                in: target.day,
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                            monthEditTarget = nil
+                            refreshMonthSummaries()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+            .sheet(item: $selectedTaskForDetail) { task in
+                TaskEditorSheet(
+                    title: String(localized: "task.detail.title"),
+                    isReadOnly: true,
+                    initialTitle: task.title,
+                    initialDescription: task.taskDescription,
+                    initialType: task.taskType,
+                    initialSteps: task.steps,
+                    initialAttachments: task.attachments,
+                    onSave: { _, _, _, _, _ in }
+                )
+            }
         }
         .onAppear {
             if viewModel == nil {
@@ -112,8 +162,14 @@ struct PendingView: View {
             refreshMonthSummaries()
         }
         .onChange(of: selectedMonth) { _, _ in
-            normalizeSelectedDateForMonth()
-            refreshMonthSummaries()
+            // 在同一个无动画事务中完成 selectedDate 归位和 monthSummaries 刷新，
+            // 避免两者分两帧更新导致 selectedDayDetailCard 在中间帧读到不一致数据而闪烁。
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                normalizeSelectedDateForMonth()
+                refreshMonthSummaries()
+            }
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue {
@@ -239,6 +295,8 @@ struct PendingView: View {
                     showDDL: settings.pendingMonthShowDDL,
                     showLeisure: settings.pendingMonthShowLeisure
                 )
+                // 月份变化时强制重建日历格视图树，消除 LazyVGrid cell 跨月复用时的 identity 错乱。
+                .id(calendar.dateComponents([.year, .month], from: selectedMonth))
             }
 
             selectedDayDetailCard
@@ -310,7 +368,24 @@ struct PendingView: View {
                 } else {
                     VStack(spacing: WeekSpacing.sm) {
                         ForEach(tasks, id: \.id) { task in
-                            TaskRowView(task: task)
+                            Button {
+                                guard let day, let viewModel else {
+                                    selectedTaskForDetail = task
+                                    return
+                                }
+                                if viewModel.canEdit(day), task.zone == .draft {
+                                    monthEditTarget = PendingMonthEditTarget(
+                                        id: task.id.uuidString,
+                                        day: day,
+                                        task: task
+                                    )
+                                } else {
+                                    selectedTaskForDetail = task
+                                }
+                            } label: {
+                                TaskRowView(task: task, showsProjectOrigin: task.zone == .draft)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -346,6 +421,7 @@ struct PendingView: View {
     // MARK: - Weeks List
     
     private func weeksList(weeks: [WeekModel]) -> some View {
+        // .id 确保月份切换时整个列表整体替换而非逐个 diff，消除跨月卡片的残留动画。
         VStack(spacing: WeekSpacing.md) {
             // 统计信息
             WeekCard(accentColor: .accentOrange) {
@@ -375,6 +451,8 @@ struct PendingView: View {
                 )
             }
         }
+        // 月份切换时整体重建，避免跨月卡片复用时的 identity 错乱与残留动画。
+        .id(calendar.dateComponents([.year, .month], from: selectedMonth))
     }
 }
 

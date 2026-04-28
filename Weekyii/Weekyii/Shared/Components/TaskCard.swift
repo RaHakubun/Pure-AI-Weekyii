@@ -5,11 +5,13 @@ import SwiftUI
 struct TaskCard: View {
     let task: TaskItem
     let showStatus: Bool
+    let showsProjectOrigin: Bool
     let onTap: (() -> Void)?
     
-    init(task: TaskItem, showStatus: Bool = true, onTap: (() -> Void)? = nil) {
+    init(task: TaskItem, showStatus: Bool = true, showsProjectOrigin: Bool = false, onTap: (() -> Void)? = nil) {
         self.task = task
         self.showStatus = showStatus
+        self.showsProjectOrigin = showsProjectOrigin
         self.onTap = onTap
     }
     
@@ -50,6 +52,10 @@ struct TaskCard: View {
                     if showStatus {
                         TaskZoneBadge(zone: task.zone)
                     }
+                }
+
+                if showsProjectOrigin {
+                    TaskProjectOriginBadge(project: task.project)
                 }
 
                 // 时间信息

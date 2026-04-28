@@ -66,9 +66,12 @@ struct DraftEditorView: View {
                 List {
                     ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
                         rowView(task: task, index: index)
-                            .listRowInsets(EdgeInsets(top: WeekSpacing.xs, leading: 0, bottom: WeekSpacing.xs, trailing: 0))
+                            .listRowInsets(EdgeInsets(top: WeekSpacing.xs, leading: WeekSpacing.xs, bottom: WeekSpacing.xs, trailing: WeekSpacing.xs))
                             .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                    .fill(Color.backgroundSecondary)
+                            )
                     }
                     .onMove { source, destination in
                         do {
@@ -87,6 +90,7 @@ struct DraftEditorView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .background(Color.backgroundSecondary.opacity(0.65))
                 .frame(height: CGFloat(max(1, day.sortedDraftTasks.count)) * 82)
             }
         }
@@ -108,7 +112,12 @@ struct DraftEditorView: View {
             Button(action: {
                 onEditTask(task)
             }) {
-                TaskRowView(task: task, titleAccessibilityIdentifier: "draftTaskTitle_\(index)")
+                TaskRowView(
+                    task: task,
+                    titleAccessibilityIdentifier: "draftTaskTitle_\(index)",
+                    showsProjectOrigin: true,
+                    renderContext: .reorderList
+                )
             }
             .buttonStyle(.plain)
             .disabled(!(day.status == .draft || day.status == .empty))

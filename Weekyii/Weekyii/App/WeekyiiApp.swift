@@ -32,6 +32,13 @@ protocol LiveActivityManaging {
         appearanceModeRaw: String,
         premiumThemeUnlocked: Bool
     )
+    func reconcileImmediately(
+        modelContext: ModelContext,
+        now: Date,
+        selectedThemeRaw: String,
+        appearanceModeRaw: String,
+        premiumThemeUnlocked: Bool
+    ) async
     func endAll()
 }
 
@@ -110,6 +117,24 @@ final class TodayLiveActivityService: LiveActivityManaging {
         appearanceModeRaw: String,
         premiumThemeUnlocked: Bool
     ) {
+        Task {
+            await reconcileImmediately(
+                modelContext: modelContext,
+                now: now,
+                selectedThemeRaw: selectedThemeRaw,
+                appearanceModeRaw: appearanceModeRaw,
+                premiumThemeUnlocked: premiumThemeUnlocked
+            )
+        }
+    }
+
+    func reconcileImmediately(
+        modelContext: ModelContext,
+        now: Date,
+        selectedThemeRaw: String,
+        appearanceModeRaw: String,
+        premiumThemeUnlocked: Bool
+    ) async {
         guard let snapshot = TodayActivitySnapshotBuilder.build(
             modelContext: modelContext,
             now: now,
@@ -117,30 +142,43 @@ final class TodayLiveActivityService: LiveActivityManaging {
             appearanceModeRaw: appearanceModeRaw,
             premiumThemeUnlocked: premiumThemeUnlocked
         ) else {
-            endAll()
+            await endAllActivities()
             return
         }
 
         #if canImport(ActivityKit)
         guard #available(iOS 16.1, *), ActivityAuthorizationInfo().areActivitiesEnabled else {
-            endAll()
+            await endAllActivities()
             return
         }
 
-        Task {
-            await upsert(snapshot: snapshot)
-        }
+        await upsert(snapshot: snapshot)
         #endif
     }
 
     func endAll() {
+        Task {
+            await endAllActivities()
+        }
+    }
+}
+
+#if canImport(ActivityKit)
+@available(iOS 16.1, *)
+private extension TodayLiveActivityService {
+    func endAllActivitiesImpl() async {
+        for activity in Activity<TodayActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+}
+#endif
+
+private extension TodayLiveActivityService {
+    func endAllActivities() async {
         #if canImport(ActivityKit)
         guard #available(iOS 16.1, *) else { return }
-        Task {
-            for activity in Activity<TodayActivityAttributes>.activities {
-                await activity.end(nil, dismissalPolicy: .immediate)
-            }
-        }
+        await endAllActivitiesImpl()
         #endif
     }
 }
@@ -247,15 +285,58 @@ enum LiveActivityActionRouter {
             }
 
             appState.bumpDataRevision()
-            liveActivityService.reconcile(
+            WidgetSnapshotComposer.syncFromModelContext(
+                modelContext: modelContext,
+                now: timeProvider.now,
+                todayDate: timeProvider.today,
+                selectedThemeRaw: userSettings.selectedThemeRaw,
+                appearanceModeRaw: userSettings.appearanceModeRaw,
+                premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+            )
+            scheduleCriticalLiveActivitySync(
+                liveActivityService: liveActivityService,
+                modelContext: modelContext,
+                timeProvider: timeProvider,
+                userSettings: userSettings
+            )
+        } catch {
+            appState.runtimeErrorMessage = error.localizedDescription
+        }
+    }
+
+    private static func scheduleCriticalLiveActivitySync(
+        liveActivityService: any LiveActivityManaging,
+        modelContext: ModelContext,
+        timeProvider: TimeProviding,
+        userSettings: UserSettings
+    ) {
+        let backgroundTaskID = UIApplication.shared.beginBackgroundTask(
+            withName: "weekyii.live-action-sync",
+            expirationHandler: nil
+        )
+
+        Task { @MainActor in
+            defer {
+                if backgroundTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundTaskID)
+                }
+            }
+
+            await liveActivityService.reconcileImmediately(
                 modelContext: modelContext,
                 now: timeProvider.now,
                 selectedThemeRaw: userSettings.selectedThemeRaw,
                 appearanceModeRaw: userSettings.appearanceModeRaw,
                 premiumThemeUnlocked: userSettings.premiumThemeUnlocked
             )
-        } catch {
-            appState.runtimeErrorMessage = error.localizedDescription
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            await liveActivityService.reconcileImmediately(
+                modelContext: modelContext,
+                now: timeProvider.now,
+                selectedThemeRaw: userSettings.selectedThemeRaw,
+                appearanceModeRaw: userSettings.appearanceModeRaw,
+                premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+            )
         }
     }
 }

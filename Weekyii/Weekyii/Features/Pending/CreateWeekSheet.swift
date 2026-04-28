@@ -216,6 +216,7 @@ private struct CustomCalendarView: View {
     @Binding var selectedMonth: Date
     let viewModel: PendingViewModel
 
+    @EnvironmentObject private var settings: UserSettings
     @State private var cachedTaskDates: Set<String> = []
     @State private var cachedDDLDates: Set<String> = []
 
@@ -409,16 +410,14 @@ private struct CustomCalendarView: View {
                 }
                 .frame(width: 36, height: 36)
 
-                // 指示器区域（固定高度，保持布局稳定）
+                // 指示器区域（遵循「我的 > 未来月视图」设置项）
                 HStack(spacing: 3) {
-                    if day.isCurrentMonth && hasTasks {
-                        // 有任务/草稿 → 小绿点
+                    if day.isCurrentMonth && settings.pendingMonthShowRegular && hasTasks {
                         Circle()
                             .fill(Color.accentGreen)
                             .frame(width: 6, height: 6)
                     }
-                    if day.isCurrentMonth && hasDDL {
-                        // 有 DDL 任务 → 火焰图标
+                    if day.isCurrentMonth && settings.pendingMonthShowDDL && hasDDL {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 8))
                             .foregroundColor(.taskDDL)
