@@ -4,10 +4,14 @@ private enum MainTab: Hashable {
     case past
     case today
     case pending
+    case extensions
     case settings
 }
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var userSettings: UserSettings
     @State private var selectedTab: MainTab = .today
 
     var body: some View {
@@ -30,11 +34,39 @@ struct ContentView: View {
                 }
                 .tag(MainTab.pending)
 
+            ExtensionsHubView()
+                .tabItem {
+                    Label(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
+                }
+                .tag(MainTab.extensions)
+
             SettingsView()
                 .tabItem {
                     Label(String(localized: "tab.settings"), systemImage: "gearshape")
                 }
                 .tag(MainTab.settings)
+        }
+        .id("\(appState.dataRevision)-\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)")
+        .tint(.weekyiiPrimary)
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { appState.runtimeErrorMessage != nil },
+            set: { newValue in
+                if !newValue { appState.runtimeErrorMessage = nil }
+            }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(appState.runtimeErrorMessage ?? "")
+        }
+        .onOpenURL { url in
+            guard LiveActivityAction.parse(url: url) != nil else { return }
+            selectedTab = .today
+            LiveActivityActionRouter.handle(
+                url: url,
+                modelContext: modelContext,
+                appState: appState,
+                userSettings: userSettings
+            )
         }
     }
 }

@@ -1,20 +1,18 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct DraftEditorView: View {
     let day: DayModel
     let viewModel: TodayViewModel
+    let onAddTask: () -> Void
+    let onEditTask: (TaskItem) -> Void
+    let onPostponeTask: (TaskItem) -> Void
 
-    @State private var showingAddSheet = false
-    @State private var editingTask: TaskItem?
     @State private var errorMessage: String?
-    @State private var editMode: EditMode = .inactive
-    @State private var draggingTaskID: UUID?
-    @State private var lastDragTargetID: UUID?
-    @State private var dropTargetID: UUID?
-    
+    @State private var localEditMode: EditMode = .inactive
+    private let actionIconFont: Font = .system(size: 23, weight: .semibold)
+
     private var isEditing: Bool {
-        editMode.isEditing
+        localEditMode == .active
     }
 
     var body: some View {
@@ -27,15 +25,36 @@ struct DraftEditorView: View {
                 Text("\(day.sortedDraftTasks.count)")
                     .font(.titleSmall)
                     .foregroundColor(.weekyiiPrimary)
-                EditButton()
-                    .disabled(!(day.status == .draft || day.status == .empty))
-                    .accessibilityIdentifier("draftEditButton")
-                Button(action: { showingAddSheet = true }) {
-                    Image(systemName: "plus.circle")
-                        .font(.title2)
-                        .foregroundColor(.weekyiiPrimary)
+                Button {
+                    onAddTask()
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(actionIconFont)
+                        .foregroundStyle(day.status == .draft || day.status == .empty ? Color.weekyiiPrimary : Color.textSecondary)
                 }
                 .disabled(!(day.status == .draft || day.status == .empty))
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("新增任务")
+                .accessibilityIdentifier("draftAddButton")
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        localEditMode = isEditing ? .inactive : .active
+                    }
+                } label: {
+                    Image(systemName: isEditing ? "checkmark.circle.fill" : "pencil.circle.fill")
+                        .font(actionIconFont)
+                        .foregroundStyle(day.status == .draft || day.status == .empty ? Color.weekyiiPrimary : Color.textSecondary)
+                }
+                .disabled(!(day.status == .draft || day.status == .empty))
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(isEditing ? "完成编辑" : "编辑草稿")
+                .accessibilityIdentifier("draftEditButton")
+            }
+
+            if day.status == .draft {
+                Text("点击任务可编辑；进入编辑模式后可删除并拖拽排序。")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
             }
 
             if day.sortedDraftTasks.isEmpty {
@@ -44,57 +63,38 @@ struct DraftEditorView: View {
                     .foregroundColor(.textSecondary)
                     .padding(.vertical, WeekSpacing.lg)
             } else {
-                LazyVStack(spacing: WeekSpacing.sm) {
+                List {
                     ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
                         rowView(task: task, index: index)
-                            .onDrop(
-                                of: [UTType.text],
-                                delegate: DraftTaskDropDelegate(
-                                    target: task,
-                                    tasks: day.sortedDraftTasks,
-                                    isEnabled: canReorder,
-                                    draggingTaskID: $draggingTaskID,
-                                    lastDragTargetID: $lastDragTargetID,
-                                    dropTargetID: $dropTargetID,
-                                    onMove: moveTask(from:to:)
-                                )
+                            .listRowInsets(EdgeInsets(top: WeekSpacing.xs, leading: WeekSpacing.xs, bottom: WeekSpacing.xs, trailing: WeekSpacing.xs))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                    .fill(Color.backgroundSecondary)
                             )
                     }
+                    .onMove { source, destination in
+                        do {
+                            try viewModel.moveDraftTasks(from: source, to: destination)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                    .onDelete { offsets in
+                        do {
+                            try viewModel.deleteTasks(at: offsets)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.backgroundSecondary.opacity(0.65))
+                .frame(height: CGFloat(max(1, day.sortedDraftTasks.count)) * 82)
             }
         }
-        .environment(\.editMode, $editMode)
-        .sheet(isPresented: $showingAddSheet) {
-            TaskEditorSheet(
-                title: String(localized: "draft.add_title"),
-                onSave: { title, description, type, steps, attachments in
-                    do {
-                        try viewModel.addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
-                        showingAddSheet = false
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
-        }
-        .sheet(item: $editingTask) { task in
-            TaskEditorSheet(
-                title: String(localized: "draft.edit_title"),
-                initialTitle: task.title,
-                initialDescription: task.taskDescription,
-                initialType: task.taskType,
-                initialSteps: task.steps,
-                initialAttachments: task.attachments,
-                onSave: { newTitle, newDescription, newType, newSteps, newAttachments in
-                    do {
-                        try viewModel.updateTask(task, title: newTitle, description: newDescription, type: newType, steps: newSteps, attachments: newAttachments)
-                        editingTask = nil
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
-        }
+        .environment(\.editMode, $localEditMode)
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             errorMessage != nil
         }, set: { newValue in
@@ -106,117 +106,60 @@ struct DraftEditorView: View {
         }
     }
 
-    private var canReorder: Bool {
-        isEditing && day.status == .draft
-    }
-    
     @ViewBuilder
     private func rowView(task: TaskItem, index: Int) -> some View {
         HStack(spacing: WeekSpacing.sm) {
-            Button(action: { editingTask = task }) {
-                TaskRowView(task: task, titleAccessibilityIdentifier: "draftTaskTitle_\(index)")
+            Button(action: {
+                onEditTask(task)
+            }) {
+                TaskRowView(
+                    task: task,
+                    titleAccessibilityIdentifier: "draftTaskTitle_\(index)",
+                    showsProjectOrigin: true,
+                    renderContext: .reorderList
+                )
             }
             .buttonStyle(.plain)
             .disabled(!(day.status == .draft || day.status == .empty))
-            
+            .contextMenu {
+                Button("后移任务", systemImage: "calendar.badge.clock") {
+                    onPostponeTask(task)
+                }
+            }
+
             if isEditing {
                 VStack(spacing: WeekSpacing.xs) {
-                    dragHandle(task: task, index: index)
-                    
-                    Button(role: .destructive, action: { deleteTask(task) }) {
-                        Image(systemName: "trash")
-                            .font(.caption)
+                    Button {
+                        moveTask(from: index, to: max(index - 1, 0))
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.caption.bold())
                     }
+                    .buttonStyle(.borderless)
+                    .disabled(index == 0)
+                    .accessibilityIdentifier("draftMoveUp_\(index)")
+
+                    Button {
+                        moveTask(from: index, to: index + 2)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.caption.bold())
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index >= day.sortedDraftTasks.count - 1)
+                    .accessibilityIdentifier("draftMoveDown_\(index)")
                 }
+                .foregroundColor(.weekyiiPrimary)
             }
         }
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(
-                    dropTargetID == task.id ? Color.weekyiiPrimary.opacity(0.6) : Color.clear,
-                    lineWidth: 1
-                )
-        )
-    }
-    
-    private func dragHandle(task: TaskItem, index: Int) -> some View {
-        let isEnabled = canReorder
-        return Image(systemName: "line.3.horizontal")
-            .font(.caption)
-            .foregroundColor(isEnabled ? .textSecondary : .textTertiary)
-            .padding(6)
-            .background(Color.backgroundTertiary.opacity(0.8), in: Capsule())
-            .accessibilityIdentifier("draftDragHandle_\(index)")
-            .opacity(isEditing ? 1 : 0)
-            .allowsHitTesting(isEditing)
-            .onDrag {
-                draggingTaskID = task.id
-                lastDragTargetID = task.id
-                return NSItemProvider(object: NSString(string: task.id.uuidString))
-            }
-    }
-    
-    private func deleteTask(_ task: TaskItem) {
-        guard let index = day.sortedDraftTasks.firstIndex(where: { $0.id == task.id }) else { return }
-        do {
-            try viewModel.deleteTasks(at: IndexSet(integer: index))
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-    
-    private func moveTask(from source: Int, to destination: Int) {
-        guard destination >= 0, destination < day.sortedDraftTasks.count else { return }
-        do {
-            try viewModel.moveDraftTasks(from: IndexSet(integer: source), to: destination)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
-    private struct DraftTaskDropDelegate: DropDelegate {
-        let target: TaskItem
-        let tasks: [TaskItem]
-        let isEnabled: Bool
-        @Binding var draggingTaskID: UUID?
-        @Binding var lastDragTargetID: UUID?
-        @Binding var dropTargetID: UUID?
-        let onMove: (Int, Int) -> Void
-        
-        func dropEntered(info: DropInfo) {
-            guard isEnabled else { return }
-            guard let draggingTaskID,
-                  draggingTaskID != target.id,
-                  let from = tasks.firstIndex(where: { $0.id == draggingTaskID }),
-                  let to = tasks.firstIndex(where: { $0.id == target.id }) else { return }
-            
-            dropTargetID = target.id
-            
-            if lastDragTargetID == target.id { return }
-            lastDragTargetID = target.id
-            
-            let destination = to
-            if from != destination {
-                onMove(from, destination)
-            }
-        }
-        
-        func dropExited(info: DropInfo) {
-            if dropTargetID == target.id {
-                dropTargetID = nil
-            }
-        }
-        
-        func performDrop(info: DropInfo) -> Bool {
-            draggingTaskID = nil
-            lastDragTargetID = nil
-            dropTargetID = nil
-            return true
-        }
-        
-        func dropUpdated(info: DropInfo) -> DropProposal? {
-            DropProposal(operation: isEnabled ? .move : .cancel)
+    private func moveTask(from sourceIndex: Int, to destination: Int) {
+        do {
+            try viewModel.moveDraftTasks(from: IndexSet(integer: sourceIndex), to: destination)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

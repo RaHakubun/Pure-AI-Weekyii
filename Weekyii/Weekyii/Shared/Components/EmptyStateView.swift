@@ -75,7 +75,7 @@ struct EmptyStateView: View {
                 subtitle: "点击下方按钮创建第一个任务",
                 systemImage: "square.and.pencil",
                 actionTitle: "创建任务",
-                action: { print("Create task") }
+                action: {}
             )
         }
         

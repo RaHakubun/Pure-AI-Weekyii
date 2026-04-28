@@ -43,10 +43,11 @@ struct WeekButton: View {
             .weekPaddingVertical(14)
             .background(backgroundForStyle)
             .foregroundColor(foregroundForStyle)
-            .cornerRadius(WeekRadius.medium)
+            .clipShape(.rect(cornerRadius: WeekRadius.xlarge))
             .overlay(outlineOverlay)
         }
         .buttonStyle(ScaleButtonStyle())
+        .shadow(color: shadowForStyle.color, radius: shadowForStyle.radius, x: shadowForStyle.x, y: shadowForStyle.y)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -77,8 +78,19 @@ struct WeekButton: View {
     @ViewBuilder
     private var outlineOverlay: some View {
         if style == .outline {
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
+            RoundedRectangle(cornerRadius: WeekRadius.xlarge)
                 .stroke(Color.weekyiiPrimary, lineWidth: 2)
+        }
+    }
+
+    private var shadowForStyle: WeekShadow {
+        switch style {
+        case .primary:
+            return .medium
+        case .secondary:
+            return .light
+        case .outline:
+            return WeekShadow(color: .clear, radius: 0, x: 0, y: 0)
         }
     }
 }
@@ -88,8 +100,9 @@ struct WeekButton: View {
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.94 : 1.0)
+            .animation(.spring(response: 0.32, dampingFraction: 0.65), value: configuration.isPressed)
     }
 }
 
@@ -98,19 +111,15 @@ struct ScaleButtonStyle: ButtonStyle {
 #Preview {
     VStack(spacing: 20) {
         WeekButton("Primary Button", icon: "plus.circle.fill", style: .primary) {
-            print("Primary tapped")
         }
         
         WeekButton("Secondary Button", icon: "star.fill", style: .secondary) {
-            print("Secondary tapped")
         }
         
         WeekButton("Outline Button", icon: "arrow.right", style: .outline) {
-            print("Outline tapped")
         }
         
         WeekButton("Disabled Button", style: .primary, isEnabled: false) {
-            print("This won't print")
         }
     }
     .padding()

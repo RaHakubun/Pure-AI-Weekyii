@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekyii — Core Selling Points (Rebuilt)</title>
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:wght@400;500;600&display=swap">
+
+    <style>
+        /* === THEME TOKENS === */
+        :root {
+            --bg-primary: #0b0a08;
+            --bg-secondary: #12100d;
+            --bg-ember: #1a1510;
+            --text-primary: #efe6d6;
+            --text-secondary: #b9ad9a;
+            --accent-gold: #c9a15a;
+            --accent-ember: #b06a2b;
+            --accent-moss: #4b5b3f;
+            --accent-glow: rgba(201, 161, 90, 0.35);
+
+            --font-display: 'Cinzel Decorative', serif;
+            --font-body: 'Cormorant Garamond', serif;
+
+            --title-size: clamp(2.4rem, 7.4vw, 5.6rem);
+            --subtitle-size: clamp(1.05rem, 2.7vw, 1.8rem);
+            --body-size: clamp(0.95rem, 1.9vw, 1.35rem);
+            --small-size: clamp(0.74rem, 1.1vw, 1rem);
+
+            --slide-padding: clamp(1.5rem, 4vw, 4rem);
+            --content-gap: clamp(0.8rem, 2vw, 2rem);
+            --element-gap: clamp(0.5rem, 1.2vw, 1.1rem);
+
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.9s;
+        }
+
+        /* === BASE RESET === */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        /* === VIEWPORT FITTING: MANDATORY BASE STYLES === */
+        /* 1. Lock html/body to viewport */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        html {
+            scroll-snap-type: none;
+            scroll-behavior: auto;
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 2. Each slide = exact viewport height */
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate3d(0, 8vh, 0) scale(0.985);
+            transition: opacity 0.55s var(--ease-out-expo),
+                        transform 0.8s var(--ease-out-expo);
+        }
+
+        .slide::before,
+        .slide::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .slide::before {
+            z-index: 0;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(201, 161, 90, 0.12), transparent 34%),
+                linear-gradient(180deg, rgba(201, 161, 90, 0.08), transparent 12%);
+            opacity: 0.75;
+        }
+
+        .slide::after {
+            z-index: 0;
+            background:
+                radial-gradient(circle at 24% 22%, rgba(201, 161, 90, 0.07), transparent 26%),
+                radial-gradient(circle at 76% 22%, rgba(201, 161, 90, 0.07), transparent 26%),
+                radial-gradient(circle at 18% 78%, rgba(176, 106, 43, 0.06), transparent 24%),
+                radial-gradient(circle at 82% 76%, rgba(75, 91, 63, 0.05), transparent 24%);
+            opacity: 0.9;
+            mix-blend-mode: screen;
+        }
+
+        .slide.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate3d(0, 0, 0) scale(1);
+            z-index: 2;
+        }
+
+        .slide.prev {
+            transform: translate3d(0, -6vh, 0) scale(0.985);
+        }
+
+        .slide.next {
+            transform: translate3d(0, 8vh, 0) scale(0.985);
+        }
+
+        /* 3. Content container with flex for centering */
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 4. ALL typography uses clamp() for responsive scaling */
+        :root {
+            --title-size: clamp(1.7rem, 5.4vw, 4.4rem);
+            --h2-size: clamp(1.4rem, 3.8vw, 2.8rem);
+            --h3-size: clamp(1.12rem, 2.7vw, 1.92rem);
+
+            --body-size: clamp(0.88rem, 1.7vw, 1.22rem);
+            --small-size: clamp(0.72rem, 1.05vw, 0.94rem);
+
+            --slide-padding: clamp(1rem, 4vw, 4rem);
+            --content-gap: clamp(0.5rem, 2vw, 2rem);
+            --element-gap: clamp(0.25rem, 1vw, 1rem);
+        }
+
+        /* 5. Cards/containers use viewport-relative max sizes */
+        .card, .container, .content-box {
+            max-width: min(90vw, 1000px);
+            max-height: min(80vh, 700px);
+        }
+
+        /* 6. Lists auto-scale with viewport */
+        .feature-list, .bullet-list {
+            gap: clamp(0.4rem, 1vh, 1rem);
+        }
+
+        .feature-list li, .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.4;
+        }
+
+        /* 7. Grids adapt to available space */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+        }
+
+        /* 8. Images constrained to viewport */
+        img, .image-container {
+            max-width: 100%;
+            max-height: min(50vh, 400px);
+            object-fit: contain;
+        }
+
+        /* === RESPONSIVE BREAKPOINTS === */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+                --h2-size: clamp(1rem, 3vw, 1.75rem);
+            }
+        }
+
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+                --title-size: clamp(1.1rem, 4vw, 2rem);
+                --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+            }
+
+            .nav-dots, .keyboard-hint, .decorative {
+                display: none;
+            }
+        }
+
+        @media (max-height: 500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+                --body-size: clamp(0.65rem, 1vw, 0.85rem);
+            }
+        }
+
+        @media (max-width: 600px) {
+            :root {
+                --title-size: clamp(1.25rem, 7vw, 2.5rem);
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* === REDUCED MOTION === */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+        /* === TYPOGRAPHY & BASICS === */
+        .title {
+            font-family: var(--font-display);
+            font-size: var(--title-size);
+            letter-spacing: clamp(0.06rem, 0.4vw, 0.4rem);
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: var(--subtitle-size);
+            color: var(--text-secondary);
+            max-width: min(70vw, 780px);
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: var(--h2-size);
+            color: var(--text-primary);
+            letter-spacing: clamp(0.02rem, 0.2vw, 0.2rem);
+        }
+
+        .accent {
+            color: var(--accent-gold);
+        }
+
+        .chapter {
+            display: inline-flex;
+            align-items: center;
+            gap: clamp(0.45rem, 1vw, 0.9rem);
+            font-size: var(--small-size);
+            letter-spacing: clamp(0.2rem, 0.6vw, 0.8rem);
+            text-transform: uppercase;
+            color: rgba(201, 161, 90, 0.62);
+            margin-bottom: clamp(0.35rem, 0.9vw, 0.8rem);
+        }
+
+        .chapter::after {
+            content: '';
+            width: clamp(2.5rem, 7vw, 6rem);
+            height: 1px;
+            background: linear-gradient(90deg, rgba(201, 161, 90, 0.75), rgba(201, 161, 90, 0));
+            opacity: 0.8;
+        }
+
+        .muted {
+            color: var(--text-secondary);
+        }
+
+        /* === LISTS === */
+        .bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: var(--element-gap);
+            margin-top: var(--content-gap);
+        }
+
+        .bullet-list li {
+            position: relative;
+            padding-left: clamp(1.2rem, 2vw, 2rem);
+            color: var(--text-primary);
+        }
+
+        .bullet-list li::before {
+            content: '✦';
+            position: absolute;
+            left: 0;
+            color: var(--accent-gold);
+        }
+
+        /* === LOTR ATMOSPHERE LAYERS === */
+        .rune-strip {
+            position: absolute;
+            top: 4vh;
+            right: 6vw;
+            font-family: var(--font-display);
+            font-size: clamp(0.6rem, 1.2vw, 1rem);
+            letter-spacing: clamp(0.2rem, 0.8vw, 0.6rem);
+            color: rgba(201, 161, 90, 0.35);
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        .ring-glow {
+            position: absolute;
+            width: clamp(160px, 24vw, 260px);
+            height: clamp(160px, 24vw, 260px);
+            border-radius: 50%;
+            border: 1px solid rgba(201, 161, 90, 0.45);
+            box-shadow: 0 0 45px rgba(201, 161, 90, 0.35);
+            right: clamp(1.5rem, 6vw, 6rem);
+            bottom: clamp(1.5rem, 6vw, 5rem);
+            filter: blur(0.2px);
+            pointer-events: none;
+        }
+
+        .mist {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 24%, rgba(74, 62, 45, 0.28), transparent 44%),
+                        radial-gradient(circle at 22% 74%, rgba(69, 50, 32, 0.18), transparent 52%),
+                        radial-gradient(circle at 78% 72%, rgba(69, 50, 32, 0.18), transparent 52%);
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .ember-line {
+            position: absolute;
+            bottom: 8vh;
+            left: 10vw;
+            width: 40vw;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(201, 161, 90, 0.6), transparent);
+        }
+
+        /* === LAYOUT COMPONENTS === */
+        .slide-frame {
+            max-width: min(92vw, 1200px);
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--content-gap);
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.95fr);
+            gap: clamp(2rem, 5vw, 4rem);
+            align-items: center;
+        }
+
+        .hero-copy {
+            width: 100%;
+            max-width: min(54vw, 40rem);
+            min-height: clamp(32rem, 52vh, 42rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: clamp(0.4rem, 1vw, 0.8rem) clamp(0.5rem, 1.5vw, 1.5rem) 0 0;
+        }
+
+        .hero-title {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.65rem, 1.4vw, 1.15rem);
+            max-width: 9ch;
+            line-height: 0.8;
+            letter-spacing: clamp(0.01rem, 0.12vw, 0.07rem);
+            font-size: clamp(2.6rem, 4.8vw, 4.25rem);
+        }
+
+        .hero-title .line {
+            display: block;
+            white-space: nowrap;
+        }
+
+        .hero-title .accent {
+            display: inline-block;
+        }
+
+        .hero-subtitle {
+            max-width: min(36vw, 30rem);
+            line-height: 1.22;
+            font-size: clamp(0.94rem, 1.55vw, 1.12rem);
+            margin-top: clamp(1.1rem, 2.3vw, 1.8rem);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: clamp(0.85rem, 1.9vw, 1.5rem);
+            align-self: center;
+            width: 100%;
+            max-width: min(32rem, 40vw);
+        }
+
+        .stat-card {
+            padding: clamp(0.95rem, 2vw, 1.55rem);
+            border: 1px solid rgba(201, 161, 90, 0.2);
+            background: linear-gradient(135deg, rgba(18, 16, 13, 0.85), rgba(21, 17, 12, 0.9));
+            border-radius: clamp(0.5rem, 1vw, 1rem);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .stat-label {
+            font-size: var(--small-size);
+            text-transform: uppercase;
+            letter-spacing: clamp(0.15rem, 0.4vw, 0.4rem);
+            color: rgba(201, 161, 90, 0.7);
+        }
+
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: clamp(1.28rem, 2.5vw, 2.1rem);
+            margin-top: clamp(0.4rem, 1vw, 0.8rem);
+            line-height: 1;
+            overflow-wrap: anywhere;
+        }
+
+        .stat-value-tight {
+            font-size: clamp(1.12rem, 2vw, 1.7rem);
+            letter-spacing: 0.01em;
+            line-height: 1.02;
+        }
+
+        .panel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+            gap: clamp(0.6rem, 1.8vw, 1.4rem);
+        }
+
+        .panel {
+            padding: clamp(0.9rem, 2vw, 1.4rem);
+            border-radius: clamp(0.4rem, 1vw, 0.9rem);
+            background: rgba(18, 16, 13, 0.7);
+            border: 1px solid rgba(201, 161, 90, 0.22);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .panel h3 {
+            font-family: var(--font-display);
+            font-size: var(--h3-size);
+            margin-bottom: clamp(0.4rem, 1vw, 0.8rem);
+        }
+
+        .panel p {
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+        }
+
+        .flow {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: clamp(0.7rem, 1.8vw, 1.4rem);
+        }
+
+        .flow-step {
+            padding: clamp(0.9rem, 2vw, 1.5rem);
+            border-left: 2px solid rgba(201, 161, 90, 0.6);
+            background: rgba(18, 16, 13, 0.65);
+        }
+
+        .flow-step span {
+            display: block;
+            font-size: clamp(0.8rem, 1.1vw, 1rem);
+            text-transform: uppercase;
+            letter-spacing: clamp(0.14rem, 0.35vw, 0.35rem);
+            color: rgba(201, 161, 90, 0.7);
+        }
+
+        .flow-step strong {
+            display: block;
+            font-family: var(--font-display);
+            font-size: clamp(1.1rem, 2.2vw, 1.8rem);
+            line-height: 1.05;
+            margin-top: clamp(0.45rem, 0.8vw, 0.8rem);
+        }
+
+        .flow-step p {
+            font-size: clamp(0.88rem, 1.35vw, 1.08rem);
+            line-height: 1.35;
+            margin-top: clamp(0.25rem, 0.5vw, 0.45rem);
+        }
+
+        .surface-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+            gap: clamp(0.5rem, 1.4vw, 1.2rem);
+        }
+
+        .surface-card {
+            padding: clamp(0.7rem, 1.8vw, 1.2rem);
+            border-radius: clamp(0.4rem, 0.9vw, 0.8rem);
+            border: 1px solid rgba(201, 161, 90, 0.18);
+            background: rgba(12, 10, 8, 0.75);
+        }
+
+        .surface-card span {
+            font-size: var(--small-size);
+            letter-spacing: clamp(0.12rem, 0.3vw, 0.3rem);
+            text-transform: uppercase;
+            color: rgba(201, 161, 90, 0.65);
+        }
+
+        .surface-card h4 {
+            font-family: var(--font-display);
+            font-size: clamp(1rem, 2.3vw, 1.6rem);
+            margin: clamp(0.4rem, 0.8vw, 0.8rem) 0;
+        }
+
+        .surface-card p {
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: clamp(0.5rem, 1.6vw, 1.2rem);
+        }
+
+        .timeline-item {
+            padding: clamp(0.6rem, 1.4vw, 1rem);
+            border: 1px dashed rgba(201, 161, 90, 0.4);
+            border-radius: clamp(0.4rem, 0.8vw, 0.7rem);
+            background: rgba(18, 16, 13, 0.6);
+        }
+
+        .timeline-item strong {
+            font-family: var(--font-display);
+            display: block;
+            margin-bottom: clamp(0.3rem, 0.7vw, 0.6rem);
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: clamp(0.4rem, 1vw, 0.8rem);
+        }
+
+        .badge {
+            padding: clamp(0.3rem, 0.7vw, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+            border-radius: 999px;
+            font-size: var(--small-size);
+            text-transform: uppercase;
+            letter-spacing: clamp(0.1rem, 0.3vw, 0.3rem);
+            border: 1px solid rgba(201, 161, 90, 0.4);
+            background: rgba(201, 161, 90, 0.08);
+        }
+
+        .split {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: clamp(0.8rem, 2.5vw, 2.2rem);
+        }
+
+        .split-wide {
+            grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+            align-items: start;
+            gap: clamp(0.9rem, 2.2vw, 2rem);
+        }
+
+        .column-stack {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.55rem, 1.4vw, 1.2rem);
+        }
+
+        .contribution-kicker {
+            font-size: var(--small-size);
+            letter-spacing: clamp(0.14rem, 0.35vw, 0.34rem);
+            text-transform: uppercase;
+            color: rgba(201, 161, 90, 0.76);
+            margin-top: clamp(0.2rem, 0.6vw, 0.5rem);
+        }
+
+        .distinction-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.4rem, 1vw, 0.85rem);
+        }
+
+        .distinction-list li {
+            padding: clamp(0.55rem, 1.3vw, 1rem) clamp(0.65rem, 1.45vw, 1.1rem);
+            border-left: 2px solid rgba(201, 161, 90, 0.58);
+            background: rgba(14, 12, 10, 0.66);
+            font-size: var(--body-size);
+            line-height: 1.3;
+        }
+
+        .lore-figure {
+            margin: 0;
+            border-radius: clamp(0.5rem, 1vw, 0.9rem);
+            border: 1px solid rgba(201, 161, 90, 0.24);
+            background: rgba(10, 9, 7, 0.72);
+            overflow: hidden;
+            box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.45);
+        }
+
+        .lore-figure img {
+            width: 100%;
+            max-height: min(36vh, 300px);
+            object-fit: cover;
+            display: block;
+        }
+
+        .lore-figure figcaption {
+            padding: clamp(0.45rem, 1vw, 0.85rem) clamp(0.6rem, 1.2vw, 1rem);
+            color: var(--text-secondary);
+            font-size: var(--small-size);
+            letter-spacing: clamp(0.06rem, 0.15vw, 0.13rem);
+            text-transform: uppercase;
+        }
+
+        .visual-heavy img {
+            max-height: min(49vh, 420px);
+            object-fit: contain;
+            background: linear-gradient(180deg, rgba(20, 16, 12, 0.55), rgba(12, 10, 8, 0.6));
+        }
+
+        .slide-dense .slide-content {
+            justify-content: flex-start;
+            padding-top: clamp(0.85rem, 2.2vh, 1.7rem);
+        }
+
+        .slide-dense .slide-frame {
+            gap: clamp(0.45rem, 1.05vw, 0.9rem);
+        }
+
+        @media (max-width: 900px) {
+            .split,
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* === SLIDE BACKGROUNDS === */
+        .slide-bg {
+            background: radial-gradient(circle at 50% 18%, rgba(34, 27, 19, 0.85), transparent 42%),
+                        radial-gradient(circle at 78% 24%, rgba(201, 161, 90, 0.1), transparent 28%),
+                        radial-gradient(circle at 22% 76%, rgba(176, 106, 43, 0.1), transparent 30%),
+                        linear-gradient(180deg, rgba(9, 8, 6, 0.95), rgba(14, 12, 9, 0.9));
+        }
+
+        .slide-alt {
+            background: radial-gradient(circle at 50% 20%, rgba(56, 40, 26, 0.72), transparent 48%),
+                        radial-gradient(circle at 30% 80%, rgba(75, 91, 63, 0.12), transparent 34%),
+                        radial-gradient(circle at 72% 76%, rgba(201, 161, 90, 0.08), transparent 26%),
+                        linear-gradient(160deg, rgba(11, 10, 8, 0.98), rgba(18, 14, 10, 0.92));
+        }
+
+        /* === NAVIGATION + EDITING === */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: clamp(2px, 0.4vh, 4px);
+            background: linear-gradient(90deg, rgba(201, 161, 90, 0.2), rgba(201, 161, 90, 0.85));
+            width: 0%;
+            z-index: 15;
+        }
+
+        .nav-dots {
+            position: fixed;
+            right: clamp(0.5rem, 2vw, 1.5rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.4rem, 1vh, 0.9rem);
+            z-index: 10;
+        }
+
+        .nav-dots button {
+            width: clamp(0.5rem, 1.2vw, 0.8rem);
+            height: clamp(0.5rem, 1.2vw, 0.8rem);
+            border-radius: 50%;
+            border: 1px solid rgba(201, 161, 90, 0.5);
+            background: rgba(201, 161, 90, 0.15);
+            cursor: pointer;
+        }
+
+        .nav-dots button.active {
+            background: var(--accent-gold);
+            box-shadow: 0 0 12px rgba(201, 161, 90, 0.8);
+        }
+
+        .keyboard-hint {
+            position: fixed;
+            bottom: clamp(0.4rem, 1vh, 0.8rem);
+            right: clamp(0.8rem, 2vw, 2rem);
+            font-size: var(--small-size);
+            color: rgba(239, 230, 214, 0.5);
+        }
+
+        .language-switch {
+            position: fixed;
+            top: clamp(0.5rem, 1vh, 1rem);
+            right: clamp(0.5rem, 2vw, 1.5rem);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 4.2rem;
+            min-height: 2rem;
+            padding: clamp(0.3rem, 0.6vw, 0.6rem) clamp(0.75rem, 1.4vw, 1.1rem);
+            color: var(--text-primary);
+            text-decoration: none;
+            background: rgba(10, 9, 7, 0.76);
+            border: 1px solid rgba(201, 161, 90, 0.48);
+            border-radius: 999px;
+            box-shadow: 0 0 18px rgba(201, 161, 90, 0.14);
+            font-family: var(--font-body);
+            font-size: var(--small-size);
+            font-weight: 600;
+            letter-spacing: 0;
+            cursor: pointer;
+            z-index: 10002;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+        }
+
+        .language-switch:hover,
+        .language-switch:focus-visible {
+            border-color: rgba(201, 161, 90, 0.86);
+            box-shadow: 0 0 24px rgba(201, 161, 90, 0.28);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+
+        .edit-toggle {
+            position: fixed;
+            top: clamp(0.5rem, 1vh, 1rem);
+            left: clamp(0.5rem, 2vw, 1.5rem);
+            display: inline-flex;
+            align-items: center;
+            gap: clamp(0.4rem, 1vw, 0.8rem);
+            padding: clamp(0.3rem, 0.6vw, 0.6rem) clamp(0.6rem, 1.2vw, 1rem);
+            background: rgba(10, 9, 7, 0.7);
+            border: 1px solid rgba(201, 161, 90, 0.4);
+            border-radius: 999px;
+            font-size: var(--small-size);
+            cursor: pointer;
+            z-index: 10001;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .export-button {
+            margin-left: clamp(0.3rem, 0.6vw, 0.6rem);
+            padding: clamp(0.2rem, 0.4vw, 0.4rem) clamp(0.4rem, 0.8vw, 0.7rem);
+            border-radius: 999px;
+            border: 1px solid rgba(201, 161, 90, 0.4);
+            background: rgba(201, 161, 90, 0.12);
+            font-size: var(--small-size);
+            color: var(--text-primary);
+        }
+
+        .editable[contenteditable="true"] {
+            outline: 1px dashed rgba(201, 161, 90, 0.6);
+            outline-offset: clamp(0.2rem, 0.6vw, 0.5rem);
+            border-radius: clamp(0.3rem, 0.8vw, 0.6rem);
+        }
+
+        /* === ANIMATION SYSTEM === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(clamp(10px, 2vw, 30px));
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+            will-change: transform, opacity;
+        }
+
+        .slide.active .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .deck {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            isolation: isolate;
+        }
+
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+        .delay-4 { transition-delay: 0.4s; }
+        .delay-5 { transition-delay: 0.5s; }
+        .delay-6 { transition-delay: 0.6s; }
+    </style>
+</head>
+<body>
+    <div class="mist"></div>
+    <div class="ring-glow"></div>
+    <div class="rune-strip">Ash nazg durbatulûk • One Week To Rule Them All</div>
+    <div class="ember-line"></div>
+
+    <div class="progress-bar" id="progressBar"></div>
+    <a class="language-switch" href="index-zh.html" lang="zh-Hans" hreflang="zh-Hans" aria-label="切换到中文">中文</a>
+    <div class="edit-hotzone" id="editHotzone" title="Edit mode (E)"></div>
+    <button class="edit-toggle" id="editToggle" title="Edit mode (E)">Edit</button>
+
+    <nav class="nav-dots" id="navDots" aria-label="Slide navigation"></nav>
+    <div class="keyboard-hint">Scroll / Space / Arrow Keys</div>
+
+    <main class="deck" id="deck">
+        <!-- Slide 1: Title -->
+        <section class="slide slide-bg" id="slide-1">
+            <div class="slide-content">
+                <div class="slide-frame hero-grid">
+                    <div class="hero-copy">
+                        <p class="chapter reveal">Weekyii Core Selling Points</p>
+                        <h1 class="title hero-title reveal delay-1 editable">
+                            <span class="line">A Week-Driven</span>
+                            <span class="line"><span class="accent">AI Native</span></span>
+                            <span class="line">Task Realm</span>
+                        </h1>
+                        <p class="subtitle hero-subtitle reveal delay-2 editable">Weekyii binds your attention by the week, not by the noise of lists. It turns tasks into a ritual: draft, start, focus, complete, then forget.</p>
+                        <div class="badge-row reveal delay-3">
+                            <span class="badge editable">Week-centric</span>
+                            <span class="badge editable">No Backlog Debt</span>
+                            <span class="badge editable">Ritualized Focus</span>
+                        </div>
+                    </div>
+                    <div class="stat-grid reveal delay-4">
+                        <div class="stat-card">
+                            <div class="stat-label editable">System Mode</div>
+                            <div class="stat-value editable">Week First</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label editable">Execution</div>
+                            <div class="stat-value editable">Focus → Done</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label editable">Memory</div>
+                            <div class="stat-value editable">Past Only</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label editable">State</div>
+                            <div class="stat-value editable">Present Ritual</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 2: Problem -->
+        <section class="slide slide-alt" id="slide-2">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Cracks</p>
+                    <h2 class="section-title reveal delay-1 editable">Traditional Task Tools Collapse Under Endless Backlog</h2>
+                    <div class="split reveal delay-2">
+                        <ul class="bullet-list">
+                            <li class="editable">Daily lists ignore the weekly rhythm of life and work.</li>
+                            <li class="editable">Backlogs accumulate guilt and stale tasks.</li>
+                            <li class="editable">Context switching erodes deep focus.</li>
+                            <li class="editable">No ritual for completion — tasks linger endlessly.</li>
+                        </ul>
+                        <div class="panel-grid">
+                            <div class="panel">
+                                <h3 class="editable">List Fatigue</h3>
+                                <p class="editable">Unbounded lists turn into graveyards of unfinished work.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">Time Drift</h3>
+                                <p class="editable">Daily planners forget the weekly narrative users care about.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">Focus Leakage</h3>
+                                <p class="editable">Tasks compete; none receive full attention.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">No Clear End</h3>
+                                <p class="editable">Tasks stay open too long and never feel truly finished.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: Philosophy -->
+        <section class="slide slide-bg" id="slide-3">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Oath</p>
+                    <h2 class="section-title reveal delay-1 editable">Weekyii Philosophy: Ritual, Focus, Forgetting</h2>
+                    <div class="panel-grid reveal delay-2">
+                        <div class="panel">
+                            <h3 class="editable">One Week Realm</h3>
+                            <p class="editable">Only the current week may live in Present. Everything else moves to Past or Pending.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">No Backlog Debt</h3>
+                            <p class="editable">If it expires, it is forgotten; memory is earned only by completion.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">Start Is a Pact</h3>
+                            <p class="editable">Once started, the day cannot be rewritten. Focus is sacred.</p>
+                        </div>
+                    </div>
+                    <div class="badge-row reveal delay-3">
+                        <span class="badge editable">Draft → Execute → Complete</span>
+                        <span class="badge editable">Focus Zone Only</span>
+                        <span class="badge editable">Past = Truth</span>
+                        <span class="badge editable">Pending = Promise</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: Engine -->
+        <section class="slide slide-alt" id="slide-4">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Engine</p>
+                    <h2 class="section-title reveal delay-1 editable">Contribution I: Week-Driven Auto-Progress State Machine</h2>
+                    <p class="contribution-kicker reveal delay-1 editable">Past / Present / Pending are not views, they are enforced timeline states.</p>
+                    <div class="flow reveal delay-2">
+                        <div class="flow-step">
+                            <span class="editable">Step 01</span>
+                            <strong class="editable">One Present Week</strong>
+                            <p class="muted editable">The current week is the only active execution realm.</p>
+                        </div>
+                        <div class="flow-step">
+                            <span class="editable">Step 02</span>
+                            <strong class="editable">Daily Auto Advance</strong>
+                            <p class="muted editable">Today shifts with real time, not with manual refreshing.</p>
+                        </div>
+                        <div class="flow-step">
+                            <span class="editable">Step 03</span>
+                            <strong class="editable">Cross-Week Rollover</strong>
+                            <p class="muted editable">Past absorbs old week, Pending promotes new week.</p>
+                        </div>
+                        <div class="flow-step">
+                            <span class="editable">Step 04</span>
+                            <strong class="editable">Habit Reinforcement</strong>
+                            <p class="muted editable">Recorded tasks carry clear weekly time pressure.</p>
+                        </div>
+                    </div>
+                    <div class="split reveal delay-3">
+                        <ul class="distinction-list">
+                            <li class="editable">Week as the modeling core gives long-term companionship and supervision, not fragmented daily anxiety.</li>
+                            <li class="editable">Any explicitly recorded task gains time perception immediately, making procrastination psychologically harder.</li>
+                            <li class="editable">The state machine, not user memory, guarantees timeline progression integrity.</li>
+                        </ul>
+                        <figure class="lore-figure">
+                            <img src="assets/week-state-machine.svg" alt="Weekyii week-driven state machine">
+                            <figcaption class="editable">Week-driven state machine: Past / Present / Pending auto progression</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: Product Surfaces -->
+        <section class="slide slide-bg" id="slide-5">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Surfaces</p>
+                    <h2 class="section-title reveal delay-1 editable">A Week is Experienced Across Five Surfaces</h2>
+                    <div class="surface-grid reveal delay-2">
+                        <div class="surface-card">
+                            <span class="editable">Present</span>
+                            <h4 class="editable">Home Realm</h4>
+                            <p class="editable">Today overview, focus zone, and kill time control.</p>
+                        </div>
+                        <div class="surface-card">
+                            <span class="editable">Week View</span>
+                            <h4 class="editable">Seven-Day Scroll</h4>
+                            <p class="editable">Swipe through the current week without leaving Present.</p>
+                        </div>
+                        <div class="surface-card">
+                            <span class="editable">Pending</span>
+                            <h4 class="editable">Future Forge</h4>
+                            <p class="editable">Create future weeks and seed drafts ahead of time.</p>
+                        </div>
+                        <div class="surface-card">
+                            <span class="editable">Past</span>
+                            <h4 class="editable">Chronicle</h4>
+                            <p class="editable">Only completed tasks are remembered and searchable.</p>
+                        </div>
+                        <div class="surface-card">
+                            <span class="editable">Weekly Summary</span>
+                            <h4 class="editable">Ritual Recap</h4>
+                            <p class="editable">Completion counts, expired counts, total started days.</p>
+                        </div>
+                    </div>
+                    <div class="badge-row reveal delay-3">
+                        <span class="badge editable">iOS + macOS + iPadOS</span>
+                        <span class="badge editable">No External DB</span>
+                        <span class="badge editable">Plain Markdown Files</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 6: Today Execution -->
+        <section class="slide slide-alt slide-dense" id="slide-6">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Ritual</p>
+                    <h2 class="section-title reveal delay-1 editable">Contribution II: Commitment & Accountability Mechanism</h2>
+                    <p class="contribution-kicker reveal delay-1 editable">Start is commitment · Expire is forgetting · Complete is reward · Neglect has penalty.</p>
+                    <div class="split split-wide reveal delay-2">
+                        <div class="column-stack">
+                            <ul class="distinction-list">
+                                <li class="editable">Every day has an explicit deadline (`kill_time`), and every task has a clear owner: you.</li>
+                                <li class="editable">Draft zone is editable. After start, tasks enter Focus/Frozen and sequencing discipline begins.</li>
+                                <li class="editable">A lightweight regret path exists: tasks can move later, but commitment pressure remains visible.</li>
+                                <li class="editable">Expired tasks are forgotten forever, forcing respect for daily promises instead of backlog hoarding.</li>
+                            </ul>
+                            <div class="badge-row">
+                                <span class="badge editable">Start = Commitment</span>
+                                <span class="badge editable">Expire = Forgetting</span>
+                                <span class="badge editable">Complete = Reward</span>
+                                <span class="badge editable">Neglect = Penalty</span>
+                            </div>
+                        </div>
+                        <figure class="lore-figure visual-heavy">
+                            <img src="assets/commitment-mechanism.svg" alt="Weekyii commitment and responsibility mechanism">
+                            <figcaption class="editable">Commitment flow with explicit responsibility and daily cutoff</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: Week + Pending -->
+        <section class="slide slide-bg" id="slide-7">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Week Horizon</p>
+                    <h2 class="section-title reveal delay-1 editable">Plan Forward Without Polluting the Present</h2>
+                    <div class="split reveal delay-2">
+                        <ul class="bullet-list">
+                            <li class="editable">Pending holds future weeks as full structures.</li>
+                            <li class="editable">Entering a new week auto-moves Pending → Present.</li>
+                            <li class="editable">Only one Present week exists at any time.</li>
+                            <li class="editable">Copy today’s draft into a future day when needed.</li>
+                        </ul>
+                        <div class="panel-grid">
+                            <div class="panel">
+                                <h3 class="editable">Pending Week</h3>
+                                <p class="editable">Seed drafts without distraction or guilt.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">Auto Rollover</h3>
+                                <p class="editable">Past absorbs finished weeks automatically.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">Week View</h3>
+                                <p class="editable">Swipe through all 7 days with clear status signals.</p>
+                            </div>
+                            <div class="panel">
+                                <h3 class="editable">Regret Mechanism</h3>
+                                <p class="editable">Shift task into future days.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: Past Analytics -->
+        <section class="slide slide-alt" id="slide-8">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Chronicle</p>
+                    <h2 class="section-title reveal delay-1 editable">Past Retains Only Earned Memory</h2>
+                    <div class="split reveal delay-2">
+                        <div class="stat-grid">
+                            <div class="stat-card">
+                                <div class="stat-label editable">Completed Tasks</div>
+                                <div class="stat-value editable">Truth</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Expired Tasks</div>
+                                <div class="stat-value editable">Count Only</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Weekly Summary</div>
+                                <div class="stat-value editable">Auto</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Past View</div>
+                                <div class="stat-value stat-value-tight editable">Month/Week</div>
+                            </div>
+                        </div>
+                        <ul class="bullet-list">
+                            <li class="editable">Completed tasks remain with timestamps.</li>
+                            <li class="editable">Expired tasks collapse into numeric summaries.</li>
+                            <li class="editable">Past is searchable by week, month, or day.</li>
+                            <li class="editable">No retro-editing once a week is sealed.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: Extensions -->
+        <section class="slide slide-bg slide-dense" id="slide-9">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Future Modules</p>
+                    <h2 class="section-title reveal delay-1 editable">Contribution III: MindStamp + Suspense Box + Project Rhythm</h2>
+                    <p class="contribution-kicker reveal delay-1 editable">Built for long-horizon missions, while still obeying daily execution rules.</p>
+                    <div class="split split-wide reveal delay-2">
+                        <div class="column-stack">
+                            <ul class="distinction-list">
+                                <li class="editable">MindStamp captures intent instantly, so long-term goals stop leaking from memory.</li>
+                                <li class="editable">Suspense Box holds deliberately deferred items instead of mixing them into daily focus lanes.</li>
+                                <li class="editable">Project management spans multiple weeks, but every project step still lands in daily commitment flow.</li>
+                                <li class="editable">This keeps Weekyii stronger than generic todo lists for sustained, habit-based execution.</li>
+                            </ul>
+                            <div class="badge-row">
+                                <span class="badge editable">MindStamp</span>
+                                <span class="badge editable">Suspense Box</span>
+                                <span class="badge editable">Project Rhythm</span>
+                            </div>
+                        </div>
+                        <figure class="lore-figure visual-heavy">
+                            <img src="assets/mindstamp-projects.svg" alt="Weekyii long-term modules: MindStamp, Suspense Box, Projects">
+                            <figcaption class="editable">Long-term modules linked to the same daily contract model</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10: Widget -->
+        <section class="slide slide-alt" id="slide-10">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Widget</p>
+                    <h2 class="section-title reveal delay-1 editable">Weekyii Already Ships With Widgets</h2>
+                    <div class="split reveal delay-2">
+                        <ul class="bullet-list">
+                            <li class="editable">Today’s focus and remaining tasks surface on the home screen.</li>
+                            <li class="editable">Minimal, ritual-like glance to protect attention.</li>
+                            <li class="editable">Widget supports day and week snapshots.</li>
+                            <li class="editable">Designed for iOS, iPadOS, and macOS surfaces.</li>
+                        </ul>
+                        <div class="stat-grid">
+                            <div class="stat-card">
+                                <div class="stat-label editable">Widget Type</div>
+                                <div class="stat-value editable">Today Focus</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Week Snapshot</div>
+                                <div class="stat-value editable">Glanceable</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Platform</div>
+                                <div class="stat-value editable">iOS / macOS</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label editable">Status</div>
+                                <div class="stat-value editable">Shipped</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 11: Data Model -->
+        <section class="slide slide-bg" id="slide-11">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Engine Room</p>
+                    <h2 class="section-title reveal delay-1 editable">Plain File Data Model, Zero Black Box</h2>
+                    <div class="panel-grid reveal delay-2">
+                        <div class="panel">
+                            <h3 class="editable">STATE.md</h3>
+                            <p class="editable">Global state: current day, week, rollover timestamps.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">Week.md</h3>
+                            <p class="editable">Weekly summary with status for each day.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">Day.md</h3>
+                            <p class="editable">Draft, focus, frozen, and complete zones tracked in text.</p>
+                        </div>
+                    </div>
+                    <ul class="bullet-list reveal delay-3">
+                        <li class="editable">No database required; everything readable and portable.</li>
+                        <li class="editable">Automatic rollover preserves integrity of Past weeks.</li>
+                        <li class="editable">Kill-time enforcement keeps ritual boundaries.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 12: Status & Roadmap -->
+        <section class="slide slide-alt" id="slide-12">
+            <div class="slide-content">
+                <div class="slide-frame">
+                    <p class="chapter reveal">The Road Ahead</p>
+                    <h2 class="section-title reveal delay-1 editable">Release Status & Next Milestones</h2>
+                    <div class="panel-grid reveal delay-2">
+                        <div class="panel">
+                            <h3 class="editable">Current</h3>
+                            <p class="editable">Core Week engine, ritual flow, widget, and file model complete.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">Next</h3>
+                            <p class="editable">App Store release preparation and onboarding polish.</p>
+                        </div>
+                        <div class="panel">
+                            <h3 class="editable">Later</h3>
+                            <p class="editable">Projects + MindStamps modules and analytics expansion.</p>
+                        </div>
+                    </div>
+                    <p class="subtitle reveal delay-3 editable">Weekyii is built to feel like a ritual, not a list. Every week is a journey with a clear beginning, a focused middle, and a definitive end.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        /* === SLIDE PRESENTATION CONTROLLER === */
+        class SlidePresentation {
+            constructor() {
+                this.slides = Array.from(document.querySelectorAll('.slide'));
+                this.navDots = document.getElementById('navDots');
+                this.progressBar = document.getElementById('progressBar');
+                this.currentSlide = 0;
+                this.isAnimating = false;
+                this.animationTimer = null;
+                this.wheelDelta = 0;
+                this.wheelResetTimer = null;
+                this.setupNavDots();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupWheelNav();
+                this.updateProgress();
+                this.applySlideState(true);
+            }
+
+            clampIndex(index) {
+                return Math.max(0, Math.min(this.slides.length - 1, index));
+            }
+
+            applySlideState(initial = false) {
+                this.slides.forEach((slide, index) => {
+                    slide.classList.toggle('active', index === this.currentSlide);
+                    slide.classList.toggle('prev', index < this.currentSlide);
+                    slide.classList.toggle('next', index > this.currentSlide);
+                    slide.setAttribute('aria-hidden', index === this.currentSlide ? 'false' : 'true');
+                });
+                this.updateActiveDot();
+                this.updateProgress();
+                clearTimeout(this.animationTimer);
+                if (!initial) {
+                    this.isAnimating = true;
+                    this.animationTimer = setTimeout(() => {
+                        this.isAnimating = false;
+                    }, 700);
+                }
+            }
+
+            setupNavDots() {
+                this.slides.forEach((slide, index) => {
+                    const dot = document.createElement('button');
+                    dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
+                    dot.addEventListener('click', () => this.goToSlide(index));
+                    this.navDots.appendChild(dot);
+                });
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (event) => {
+                    if (event.repeat) return;
+                    const target = event.target;
+                    if (target instanceof Element && target.closest('[contenteditable="true"]')) return;
+                    if (this.isAnimating) return;
+                    if (['ArrowDown', 'PageDown', ' '].includes(event.key)) {
+                        event.preventDefault();
+                        this.nextSlide();
+                    }
+                    if (['ArrowUp', 'PageUp'].includes(event.key)) {
+                        event.preventDefault();
+                        this.previousSlide();
+                    }
+                    if (event.key === 'Home') {
+                        event.preventDefault();
+                        this.goToSlide(0, true);
+                    }
+                    if (event.key === 'End') {
+                        event.preventDefault();
+                        this.goToSlide(this.slides.length - 1, true);
+                    }
+                });
+            }
+
+            setupTouchNav() {
+                let startY = 0;
+                let startX = 0;
+                window.addEventListener('touchstart', (event) => {
+                    const touch = event.changedTouches[0];
+                    startY = touch.clientY;
+                    startX = touch.clientX;
+                }, { passive: true });
+                window.addEventListener('touchend', (event) => {
+                    if (this.isAnimating) return;
+                    const touch = event.changedTouches[0];
+                    const deltaY = startY - touch.clientY;
+                    const deltaX = startX - touch.clientX;
+                    if (Math.abs(deltaY) < 50 || Math.abs(deltaY) < Math.abs(deltaX)) return;
+                    if (deltaY > 0) {
+                        this.nextSlide();
+                    } else {
+                        this.previousSlide();
+                    }
+                });
+            }
+
+            setupWheelNav() {
+                document.addEventListener('wheel', (event) => {
+                    if (event.ctrlKey) return;
+                    event.preventDefault();
+                    if (this.isAnimating) return;
+                    this.wheelDelta += event.deltaY;
+                    clearTimeout(this.wheelResetTimer);
+                    this.wheelResetTimer = setTimeout(() => {
+                        this.wheelDelta = 0;
+                    }, 120);
+                    if (Math.abs(this.wheelDelta) < 45) return;
+                    const direction = this.wheelDelta > 0 ? 1 : -1;
+                    this.wheelDelta = 0;
+                    this.goToSlide(this.currentSlide + direction);
+                }, { passive: false, capture: true });
+            }
+
+            updateProgress() {
+                const denominator = Math.max(1, this.slides.length - 1);
+                const progress = (this.currentSlide / denominator) * 100;
+                this.progressBar.style.width = `${progress}%`;
+            }
+
+            updateActiveDot() {
+                this.slides.forEach((slide, index) => {
+                    const dot = this.navDots.children[index];
+                    if (!dot) return;
+                    if (index === this.currentSlide) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+            }
+
+            goToSlide(index, force = false) {
+                const nextIndex = this.clampIndex(index);
+                if (!this.slides[nextIndex]) return;
+                if (nextIndex === this.currentSlide) return;
+                if (this.isAnimating && !force) return;
+                this.currentSlide = nextIndex;
+                this.applySlideState();
+            }
+
+            nextSlide() {
+                const current = this.currentSlide;
+                this.goToSlide(Math.min(current + 1, this.slides.length - 1));
+            }
+
+            previousSlide() {
+                const current = this.currentSlide;
+                this.goToSlide(Math.max(current - 1, 0));
+            }
+        }
+
+        /* === INLINE EDITOR === */
+        class InlineEditor {
+            constructor() {
+                this.editToggle = document.getElementById('editToggle');
+                this.hotzone = document.getElementById('editHotzone');
+                this.editableNodes = Array.from(document.querySelectorAll('.editable'));
+                this.storageKey = 'weekyii_lotr_slides_rebuilt_editable';
+                this.isActive = false;
+                this.hideTimeout = null;
+                this.exportButton = null;
+                this.bind();
+                this.loadEdits();
+            }
+
+            bind() {
+                this.editToggle.addEventListener('click', () => this.toggleEditMode());
+                this.hotzone.addEventListener('mouseenter', () => this.showToggle());
+                this.hotzone.addEventListener('mouseleave', () => this.scheduleHide());
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+                this.editToggle.addEventListener('mouseenter', () => this.showToggle());
+                this.editToggle.addEventListener('mouseleave', () => this.scheduleHide());
+
+                document.addEventListener('keydown', (event) => {
+                    if ((event.key === 'e' || event.key === 'E') && !event.target.getAttribute('contenteditable')) {
+                        this.toggleEditMode();
+                    }
+                    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                        event.preventDefault();
+                        this.saveEdits();
+                    }
+                });
+            }
+
+            showToggle() {
+                clearTimeout(this.hideTimeout);
+                this.editToggle.classList.add('show');
+            }
+
+            scheduleHide() {
+                this.hideTimeout = setTimeout(() => {
+                    if (!this.isActive) this.editToggle.classList.remove('show');
+                }, 400);
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                this.editToggle.classList.toggle('active', this.isActive);
+                this.editToggle.textContent = this.isActive ? 'Editing' : 'Edit';
+                this.editableNodes.forEach(node => {
+                    node.setAttribute('contenteditable', this.isActive ? 'true' : 'false');
+                });
+                if (this.isActive) {
+                    this.addExportButton();
+                } else {
+                    this.removeExportButton();
+                }
+            }
+
+            addExportButton() {
+                if (this.exportButton) return;
+                this.exportButton = document.createElement('button');
+                this.exportButton.className = 'export-button';
+                this.exportButton.textContent = 'Export';
+                this.exportButton.addEventListener('click', () => this.exportHtml());
+                this.editToggle.appendChild(this.exportButton);
+            }
+
+            removeExportButton() {
+                if (!this.exportButton) return;
+                this.exportButton.remove();
+                this.exportButton = null;
+            }
+
+            saveEdits() {
+                const data = this.editableNodes.map(node => node.innerHTML);
+                localStorage.setItem(this.storageKey, JSON.stringify(data));
+            }
+
+            loadEdits() {
+                const stored = localStorage.getItem(this.storageKey);
+                if (!stored) return;
+                const values = JSON.parse(stored);
+                values.forEach((value, index) => {
+                    if (this.editableNodes[index]) this.editableNodes[index].innerHTML = value;
+                });
+            }
+
+            exportHtml() {
+                this.saveEdits();
+                const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'weekyii-lotr-slides.html';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            new SlidePresentation();
+            new InlineEditor();
+        });
+    </script>
+</body>
+</html>

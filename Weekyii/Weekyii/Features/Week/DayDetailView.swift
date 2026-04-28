@@ -3,6 +3,7 @@ import SwiftData
 
 struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.editMode) private var editMode
 
     let day: DayModel
 
@@ -11,8 +12,14 @@ struct DayDetailView: View {
     @State private var errorMessage: String?
 
     private var isEditable: Bool {
-        let today = TimeProvider().today
-        return day.date >= today && (day.status == .empty || day.status == .draft)
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: TimeProvider().today)
+        let targetDay = calendar.startOfDay(for: day.date)
+        return targetDay >= today && (day.status == .empty || day.status == .draft)
+    }
+
+    private var isEditingDraft: Bool {
+        (editMode?.wrappedValue.isEditing ?? false) && isEditable
     }
 
     var body: some View {
@@ -123,24 +130,52 @@ struct DayDetailView: View {
                 .weekyiiCard()
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(day.sortedDraftTasks) { task in
-                        Button(action: { editingTask = task }) {
-                            TaskRowView(task: task)
-                        }
-                        .disabled(!isEditable)
-                    }
-                    .onDelete { offsets in
-                        do {
-                            try deleteTasks(at: offsets)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                    .onMove { source, destination in
-                        do {
-                            try moveDraftTasks(from: source, to: destination)
-                        } catch {
-                            errorMessage = error.localizedDescription
+                    ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
+                        HStack(spacing: WeekSpacing.sm) {
+                            Button(action: { editingTask = task }) {
+                                TaskRowView(task: task, showsProjectOrigin: true)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!isEditable || isEditingDraft)
+
+                            if isEditingDraft {
+                                HStack(spacing: WeekSpacing.xs) {
+                                    Button(action: {
+                                        do {
+                                            try moveDraftTasks(from: IndexSet(integer: index), to: index - 1)
+                                        } catch {
+                                            errorMessage = error.localizedDescription
+                                        }
+                                    }) {
+                                        Image(systemName: "arrow.up")
+                                    }
+                                    .disabled(index == 0)
+
+                                    Button(action: {
+                                        do {
+                                            try moveDraftTasks(from: IndexSet(integer: index), to: index + 2)
+                                        } catch {
+                                            errorMessage = error.localizedDescription
+                                        }
+                                    }) {
+                                        Image(systemName: "arrow.down")
+                                    }
+                                    .disabled(index == day.sortedDraftTasks.count - 1)
+
+                                    Button(role: .destructive, action: {
+                                        do {
+                                            try deleteTasks(at: IndexSet(integer: index))
+                                        } catch {
+                                            errorMessage = error.localizedDescription
+                                        }
+                                    }) {
+                                        Image(systemName: "trash")
+                                    }
+                                }
+                                .foregroundColor(.accentOrange)
+                                .font(.caption)
+                                .padding(.trailing, WeekSpacing.sm)
+                            }
                         }
                     }
                 }
@@ -173,12 +208,10 @@ struct DayDetailView: View {
             order: order,
             zone: .draft
         )
-        task.day = day
-        // Assign relationships
-        task.steps = steps
+        task.steps = normalizedStepCopies(from: steps)
         task.attachments = attachments
         day.tasks.append(task)
-        try? modelContext.save()
+        try modelContext.save()
     }
 
     private func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
@@ -186,20 +219,25 @@ struct DayDetailView: View {
         task.title = title
         task.taskDescription = description
         task.taskType = type
-        task.steps = steps
+        replaceSteps(for: task, with: steps)
         task.attachments = attachments
-        try? modelContext.save()
+        try modelContext.save()
     }
 
     private func deleteTasks(at offsets: IndexSet) throws {
         guard isEditable else { throw WeekyiiError.cannotEditStartedDay }
         let tasks = day.sortedDraftTasks
-        for index in offsets {
-            let task = tasks[index]
+        let tasksToDelete = offsets.compactMap { index in
+            tasks.indices.contains(index) ? tasks[index] : nil
+        }
+        day.tasks.removeAll { task in
+            tasksToDelete.contains { $0.id == task.id }
+        }
+        for task in tasksToDelete {
             modelContext.delete(task)
         }
         renumberDraftTasks()
-        try? modelContext.save()
+        try modelContext.save()
     }
 
     private func moveDraftTasks(from source: IndexSet, to destination: Int) throws {
@@ -209,7 +247,7 @@ struct DayDetailView: View {
         for (index, task) in tasks.enumerated() {
             task.order = index + 1
         }
-        try? modelContext.save()
+        try modelContext.save()
     }
 
     private func renumberDraftTasks() {
@@ -218,6 +256,25 @@ struct DayDetailView: View {
             task.order = index + 1
         }
     }
+
+    private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
+        task.steps.forEach { modelContext.delete($0) }
+        task.steps = normalizedStepCopies(from: steps)
+    }
+
+    private func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
+        steps
+            .sorted {
+                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+                return $0.createdAt < $1.createdAt
+            }
+            .enumerated()
+            .map { index, step in
+                TaskStep(
+                    title: step.title,
+                    isCompleted: step.isCompleted,
+                    sortOrder: index
+                )
+            }
+    }
 }
-
-

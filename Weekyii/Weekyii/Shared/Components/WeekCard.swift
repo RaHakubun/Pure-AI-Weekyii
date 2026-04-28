@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - WeekCard - 增强版卡片组件
 
 struct WeekCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let content: Content
     let useGradient: Bool
     let accentColor: Color?
@@ -21,35 +22,96 @@ struct WeekCard<Content: View>: View {
     }
     
     var body: some View {
+        let isPremiumTheme = WeekTheme.activeTheme.isPremiumTheme
+
         VStack(alignment: .leading, spacing: WeekSpacing.base) {
             content
         }
         .weekPadding(WeekSpacing.lg)
         .background(backgroundView)
-        .cornerRadius(WeekRadius.large)
+        .clipShape(.rect(cornerRadius: WeekRadius.large))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.large)
+                .stroke(borderColor(isPremiumTheme: isPremiumTheme), lineWidth: 1)
+                .allowsHitTesting(false)
+        )
         .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
-        .overlay(accentBar, alignment: .top)
+        .overlay(accentBar(isPremiumTheme: isPremiumTheme), alignment: .top)
     }
     
     @ViewBuilder
     private var backgroundView: some View {
+        let isPremiumTheme = WeekTheme.activeTheme.isPremiumTheme
+
         if useGradient {
-            Color.weekyiiGradient
+            ZStack {
+                Color.weekyiiGradient
+                if isPremiumTheme {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.08 : 0.12),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
         } else {
-            Color.backgroundSecondary
+            ZStack {
+                Color.backgroundSecondary
+                if isPremiumTheme {
+                    LinearGradient(
+                        colors: [
+                            Color.weekyiiPrimary.opacity(0.10),
+                            Color.clear,
+                            Color.accentOrange.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .blendMode(.screen)
+                }
+                if colorScheme == .dark {
+                    Color.backgroundTertiary.opacity(0.28)
+                }
+            }
         }
+    }
+
+    private func borderColor(isPremiumTheme: Bool) -> Color {
+        if useGradient {
+            return isPremiumTheme
+                ? Color.white.opacity(colorScheme == .dark ? 0.32 : 0.22)
+                : Color.white.opacity(colorScheme == .dark ? 0.24 : 0.18)
+        }
+        if isPremiumTheme {
+            return Color.weekyiiPrimary.opacity(colorScheme == .dark ? 0.30 : 0.22)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.12) : Color.backgroundTertiary
     }
     
     @ViewBuilder
-    private var accentBar: some View {
+    private func accentBar(isPremiumTheme: Bool) -> some View {
         if let color = accentColor {
+            let barStyle: AnyShapeStyle = isPremiumTheme
+                ? AnyShapeStyle(
+                    LinearGradient(
+                        colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight, color],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                : AnyShapeStyle(color)
+
             VStack {
                 RoundedRectangle(cornerRadius: WeekRadius.full)
-                    .fill(color)
-                    .frame(width: 40, height: 4)
+                    .fill(barStyle)
+                    .frame(width: isPremiumTheme ? 56 : 40, height: 4)
                     .padding(.top, WeekSpacing.md)
                 Spacer()
             }
+            .allowsHitTesting(false)
         }
     }
 }

@@ -8,8 +8,9 @@ final class DayModel {
     var dayOfWeek: String
     var status: DayStatus
 
-    var killTimeHour: Int = 20
-    var killTimeMinute: Int = 0
+    var killTimeHour: Int = 23
+    var killTimeMinute: Int = 45
+    var followsDefaultKillTime: Bool = true
 
     var initiatedAt: Date?
     var closedAt: Date?

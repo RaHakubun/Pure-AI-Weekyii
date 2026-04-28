@@ -10,6 +10,7 @@ final class WeekViewModel {
     private let weekCalculator = WeekCalculator()
 
     var presentWeek: WeekModel?
+    var errorMessage: String?
 
     init(modelContext: ModelContext, timeProvider: TimeProviding) {
         self.modelContext = modelContext
@@ -17,15 +18,45 @@ final class WeekViewModel {
     }
 
     func refresh() {
+        errorMessage = nil
+        let currentWeekId = timeProvider.currentWeekId
         let descriptor = FetchDescriptor<WeekModel>()
-        let weeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .present }
-        if let week = weeks.first {
-            presentWeek = week
+        let allWeeks = (try? modelContext.fetch(descriptor)) ?? []
+        let presentWeeks = allWeeks.filter { $0.status == .present }
+
+        if let currentPresent = presentWeeks.first(where: { $0.weekId == currentWeekId }) {
+            for extra in presentWeeks where extra.id != currentPresent.id {
+                extra.status = .past
+            }
+            persist { presentWeek = currentPresent }
             return
+        }
+
+        if let existingCurrent = allWeeks.first(where: { $0.weekId == currentWeekId }) {
+            existingCurrent.status = .present
+            for week in presentWeeks where week.id != existingCurrent.id {
+                week.status = .past
+            }
+            persist { presentWeek = existingCurrent }
+            return
+        }
+
+        for week in presentWeeks {
+            week.status = .past
         }
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
-        presentWeek = week
-        try? modelContext.save()
+        persist { presentWeek = week }
     }
+
+    private func persist(onSuccess: () -> Void) {
+        do {
+            try modelContext.save()
+            onSuccess()
+        } catch {
+            errorMessage = error.localizedDescription
+            presentWeek = nil
+        }
+    }
+
 }
