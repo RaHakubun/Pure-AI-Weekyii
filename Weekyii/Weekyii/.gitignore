@@ -1,6 +1,7 @@
 # Build artifacts
 .build/
 DerivedData/
+.derivedData*/
 *.xcuserstate
 
 # IDE

@@ -47,7 +47,7 @@ struct MindStampListView: View {
     private var emptyState: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "seal.fill")
+                Image(systemName: "bandage.fill")
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
 
@@ -62,7 +62,7 @@ struct MindStampListView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Text("右上角点 + 新建思想钢印")
+                Text("右上角点 + 新建呆胶布")
                     .font(.caption.weight(.medium))
                     .foregroundColor(.textTertiary)
                     .padding(.horizontal, WeekSpacing.md)
@@ -88,57 +88,76 @@ struct MindStampListView: View {
 
     private func stampCard(_ stamp: MindStampItem, index: Int) -> some View {
         WeekCard {
-            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                // Header: date + actions
-                HStack {
-                    Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
-                        .font(.caption)
-                        .foregroundColor(.textTertiary)
-
-                    Spacer()
-
-                    actionButton(
-                        systemImage: "pencil",
-                        foreground: .textSecondary,
-                        background: Color.backgroundTertiary,
-                        accessibilityID: "mindstampEditButton_\(index)"
-                    ) {
-                        editingItem = stamp
-                    }
-
-                    actionButton(
-                        systemImage: "trash",
-                        foreground: .taskDDL,
-                        background: Color.taskDDL.opacity(0.1),
-                        accessibilityID: "mindstampDeleteButton_\(index)"
-                    ) {
-                        deletingItem = stamp
-                    }
-                }
-                .zIndex(2)
-
-                // Text content
-                if !stamp.text.isEmpty {
-                    HStack(alignment: .top, spacing: 0) {
-                        Text(stamp.text)
-                            .font(.bodyMedium)
-                            .foregroundColor(.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    // Swallow taps on the full text band so they do not fall through to the image preview area.
-                    .onTapGesture { }
-                }
-
-                // Image
+            HStack(alignment: .center, spacing: WeekSpacing.md) {
                 if let blob = stamp.imageBlob, let uiImage = UIImage(data: blob) {
-                    imagePreview(uiImage)
-                        .onTapGesture {
-                            imagePreviewItem = ImagePreviewItem(image: uiImage)
+                    Button {
+                        imagePreviewItem = ImagePreviewItem(image: uiImage)
+                    } label: {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(.rect(cornerRadius: WeekRadius.small))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: WeekRadius.small)
+                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("预览呆胶布图片")
+                    .accessibilityIdentifier("mindstampImagePreviewButton_\(index)")
+                } else {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(Color.accentPink)
+                        .frame(width: 56, height: 56)
+                        .background(Color.accentPink.opacity(0.1), in: RoundedRectangle(cornerRadius: WeekRadius.small))
+                }
+
+                Button {
+                    editingItem = stamp
+                } label: {
+                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                        Text(stamp.text.isEmpty ? "仅图片记录" : stamp.text)
+                            .font(.bodyMedium)
+                            .foregroundStyle(stamp.text.isEmpty ? Color.textSecondary : Color.textPrimary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(spacing: WeekSpacing.sm) {
+                            Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
+                                .font(.caption)
+                                .foregroundStyle(Color.textTertiary)
+                                .lineLimit(1)
+                                .accessibilityIdentifier("mindstampItemMeta_\(index)")
+
+                            if stamp.imageBlob != nil {
+                                Label("含图片", systemImage: "photo")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.accentPink)
+                                    .labelStyle(.titleAndIcon)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Label("编辑", systemImage: "pencil")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.weekyiiPrimary)
                         }
-                        .zIndex(0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("mindstampItemCard_\(index)")
+
+                actionButton(
+                    systemImage: "trash",
+                    foreground: .taskDDL,
+                    background: Color.taskDDL.opacity(0.1),
+                    accessibilityID: "mindstampDeleteButton_\(index)"
+                ) {
+                    deletingItem = stamp
                 }
             }
         }
@@ -165,14 +184,4 @@ struct MindStampListView: View {
         .accessibilityIdentifier(accessibilityID)
     }
 
-    private func imagePreview(_ image: UIImage) -> some View {
-        Image(uiImage: image)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: 160)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-            .contentShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-    }
 }

@@ -153,6 +153,15 @@ final class StateMachineTests: XCTestCase {
         retainedWeekViewModels.append(viewModel)
     }
 
+    private func makeUserSettings(executionMode: ExecutionMode) -> UserSettings {
+        let suiteName = "StateMachineTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = UserSettings(defaults: defaults)
+        settings.defaultExecutionMode = executionMode
+        return settings
+    }
+
     @MainActor
     func test_crossDay_executeToExpired() throws {
         let context = container.mainContext
@@ -232,6 +241,43 @@ final class StateMachineTests: XCTestCase {
         machine.processStateTransitions()
 
         XCTAssertEqual(week.status, .past)
+    }
+
+    @MainActor
+    func test_crossWeek_archivesStalePendingWeek() throws {
+        let context = container.mainContext
+        let appState = makeAppState()
+        let now = DateComponents(
+            calendar: Calendar(identifier: .iso8601),
+            timeZone: TimeZone(secondsFromGMT: 8 * 60 * 60),
+            year: 2026,
+            month: 6,
+            day: 21,
+            hour: 13,
+            minute: 14
+        ).date!
+        let stalePendingWeek = WeekCalculator().makeWeek(for: now.addingDays(-14), status: .pending)
+        let currentWeek = WeekCalculator().makeWeek(for: now, status: .present)
+        let futurePendingWeek = WeekCalculator().makeWeek(for: now.addingDays(7), status: .pending)
+        context.insert(stalePendingWeek)
+        context.insert(currentWeek)
+        context.insert(futurePendingWeek)
+        try context.save()
+
+        let machine = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: makeSettings()
+        )
+
+        let report = machine.reconcile(now: now, force: true)
+
+        XCTAssertEqual(stalePendingWeek.status, .past)
+        XCTAssertEqual(currentWeek.status, .present)
+        XCTAssertEqual(futurePendingWeek.status, .pending)
+        XCTAssertEqual(report.crossWeekAdjustedCount, 1)
     }
 
     @MainActor
@@ -861,6 +907,172 @@ final class StateMachineTests: XCTestCase {
 
         wait(for: [reconcileExpectation], timeout: 2.0)
         XCTAssertGreaterThanOrEqual(service.immediateReconcileCount, 2)
+    }
+
+    @MainActor
+    func test_startDaySnapshotsFlexibleModeAndKeepsQueueLocked() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == now.dayId }))
+        day.status = .draft
+        day.tasks.append(TaskItem(title: "First", order: 1, zone: .draft))
+        day.tasks.append(TaskItem(title: "Second", order: 2, zone: .draft))
+        let settings = makeUserSettings(executionMode: .flexible)
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: TestNotificationService(),
+            appState: makeAppState(),
+            userSettings: settings
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+
+        try viewModel.startDay()
+        settings.defaultExecutionMode = .strict
+
+        XCTAssertEqual(day.executionMode, .flexible)
+        XCTAssertFalse(day.isDraftZoneUnlocked)
+        XCTAssertEqual(day.focusTask?.title, "First")
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Second"])
+    }
+
+    @MainActor
+    func test_strictModeRejectsUnlockingExecutionQueue() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .strict, frozenTitles: ["Second"])
+
+        XCTAssertThrowsError(try viewModel.setDraftZoneUnlocked(true))
+        XCTAssertFalse(day.isDraftZoneUnlocked)
+    }
+
+    @MainActor
+    func test_flexibleLockedQueueRejectsEditingAndExchange() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: ["Second"])
+
+        XCTAssertThrowsError(try viewModel.addExecutionTask(title: "Third", type: .regular))
+        XCTAssertThrowsError(try viewModel.exchangeFocusWithFirstDraft())
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Second"])
+        XCTAssertFalse(day.isDraftZoneUnlocked)
+    }
+
+    @MainActor
+    func test_flexibleUnlockedEmptyQueueRejectsExchange() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: [])
+        let originalFocusID = day.focusTask?.id
+        try viewModel.setDraftZoneUnlocked(true)
+
+        XCTAssertThrowsError(try viewModel.exchangeFocusWithFirstDraft()) { error in
+            guard let weekyiiError = error as? WeekyiiError,
+                  case .executionQueueEmpty = weekyiiError else {
+                return XCTFail("Expected executionQueueEmpty, got \(error)")
+            }
+        }
+        XCTAssertEqual(day.focusTask?.id, originalFocusID)
+        XCTAssertTrue(day.isDraftZoneUnlocked)
+    }
+
+    @MainActor
+    func test_flexibleExecutionEditRejectsTaskOutsideTodayQueue() throws {
+        let (_, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: ["Second"])
+        try viewModel.setDraftZoneUnlocked(true)
+        let foreignTask = TaskItem(title: "Foreign", order: 2, zone: .frozen)
+
+        XCTAssertThrowsError(try viewModel.updateExecutionTask(
+            foreignTask,
+            title: "Changed",
+            description: "",
+            type: .regular,
+            steps: [],
+            attachments: []
+        ))
+        XCTAssertEqual(foreignTask.title, "Foreign")
+    }
+
+    @MainActor
+    func test_flexibleUnlockedQueueSupportsCreateDeleteAndReorder() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: ["Second", "Third"])
+        try viewModel.setDraftZoneUnlocked(true)
+
+        try viewModel.addExecutionTask(title: "Fourth", type: .regular)
+        try viewModel.moveExecutionTasks(from: IndexSet(integer: 2), to: 0)
+        try viewModel.deleteExecutionTasks(at: IndexSet(integer: 1))
+
+        XCTAssertTrue(day.isDraftZoneUnlocked)
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Fourth", "Third"])
+        XCTAssertEqual(day.frozenTasks.map(\.order), [2, 3])
+    }
+
+    @MainActor
+    func test_exchangeFocusWithFirstDraftResetsTimingAndPreservesUnlock() throws {
+        let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
+        let timeProvider = MutableTimeProvider(mockDate: now)
+        let (day, viewModel) = try makeExecutingToday(
+            mode: .flexible,
+            frozenTitles: ["Second", "Third"],
+            timeProvider: timeProvider
+        )
+        let originalFocus = try XCTUnwrap(day.focusTask)
+        originalFocus.startedAt = now.addingTimeInterval(-600)
+        try viewModel.setDraftZoneUnlocked(true)
+        timeProvider.mockDate = now.addingTimeInterval(60)
+
+        try viewModel.exchangeFocusWithFirstDraft()
+
+        XCTAssertEqual(day.focusTask?.title, "Second")
+        XCTAssertEqual(day.focusTask?.startedAt, timeProvider.now)
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["First", "Third"])
+        XCTAssertNil(originalFocus.startedAt)
+        XCTAssertEqual(day.focusTask?.order, 1)
+        XCTAssertEqual(day.frozenTasks.map(\.order), [2, 3])
+        XCTAssertTrue(day.isDraftZoneUnlocked)
+    }
+
+    @MainActor
+    func test_completingFinalFlexibleTaskLocksCompletedDay() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: [])
+        try viewModel.setDraftZoneUnlocked(true)
+
+        try viewModel.doneFocus()
+
+        XCTAssertEqual(day.status, .completed)
+        XCTAssertFalse(day.isDraftZoneUnlocked)
+    }
+
+    @MainActor
+    private func makeExecutingToday(
+        mode: ExecutionMode,
+        frozenTitles: [String],
+        timeProvider: (any TimeProviding)? = nil
+    ) throws -> (DayModel, TodayViewModel) {
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let resolvedTimeProvider = timeProvider ?? MockTimeProvider(mockDate: now)
+        let context = container.mainContext
+        let week = WeekCalculator().makeWeek(for: resolvedTimeProvider.today, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == resolvedTimeProvider.today.dayId }))
+        day.status = .execute
+        day.executionMode = mode
+        let focus = TaskItem(title: "First", order: 1, zone: .focus)
+        focus.startedAt = resolvedTimeProvider.now.addingTimeInterval(-300)
+        day.tasks.append(focus)
+        for (index, title) in frozenTitles.enumerated() {
+            day.tasks.append(TaskItem(title: title, order: index + 2, zone: .frozen))
+        }
+        try context.save()
+
+        let settings = makeUserSettings(executionMode: mode)
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: resolvedTimeProvider,
+            notificationService: TestNotificationService(),
+            appState: makeAppState(),
+            userSettings: settings
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+        return (day, viewModel)
     }
 
 }

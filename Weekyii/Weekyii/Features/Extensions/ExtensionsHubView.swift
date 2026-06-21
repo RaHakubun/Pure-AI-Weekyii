@@ -20,14 +20,18 @@ struct ExtensionsHubView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: WeekSpacing.lg) {
-                    // Mind Stamps Module
-                    if let mindStampViewModel {
-                        MindStampsModulePreview(viewModel: mindStampViewModel)
-                    }
+                    if let mindStampViewModel, let viewModel {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: WeekSpacing.md),
+                                GridItem(.flexible())
+                            ],
+                            spacing: WeekSpacing.md
+                        ) {
+                            MindStampsModulePreview(viewModel: mindStampViewModel)
+                            SuspendedTasksModulePreview(viewModel: viewModel)
+                        }
 
-                    // Suspended + Projects Modules
-                    if let viewModel {
-                        SuspendedTasksModulePreview(viewModel: viewModel)
                         ProjectsModulePreview(viewModel: viewModel)
                     }
                 }
@@ -75,129 +79,23 @@ struct ExtensionsHubView: View {
 
 private struct SuspendedTasksModulePreview: View {
     let viewModel: ExtensionsViewModel
-    @State private var showingEditor = false
-
-    private var previewTasks: [SuspendedTaskItem] {
-        viewModel.dueSoonSuspendedTasks()
-    }
 
     private var stats: (total: Int, dueSoon: Int, dueToday: Int) {
         viewModel.suspendedTaskStats()
     }
 
     var body: some View {
-        ModuleContainer(
+        ExtensionShortcutTile(
             title: "悬置箱",
-            subtitle: "期限内收纳未成型的任务",
             icon: "hourglass.circle.fill",
-            iconColor: .suspendedModuleTint,
-            seeAllAccessibilityID: "extensionsSuspendedSeeAllButton",
+            tint: .suspendedModuleTint,
+            value: "\(stats.total)",
+            detail: "项未决任务",
+            accessibilityIdentifier: "extensionsSuspendedSeeAllButton",
             destination: {
                 SuspendedTasksFullView(viewModel: viewModel)
             }
-        ) {
-            if previewTasks.isEmpty {
-                moduleEmptyState
-            } else {
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    HStack(spacing: WeekSpacing.sm) {
-                        suspendedStatPill(value: "\(stats.total)", label: "总数")
-                        suspendedStatPill(value: "\(stats.dueSoon)", label: "7天内到期")
-                        suspendedStatPill(value: "\(stats.dueToday)", label: "今日到期")
-                    }
-
-                    ForEach(previewTasks) { task in
-                        suspendedPreviewRow(task)
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingEditor, onDismiss: {
-            viewModel.refresh()
-        }) {
-            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, countdownDays, steps, attachments in
-                _ = viewModel.createSuspendedTask(
-                    title: title,
-                    description: description,
-                    type: type,
-                    countdownDays: countdownDays,
-                    steps: steps,
-                    attachments: attachments
-                )
-            }
-        }
-    }
-
-    private var moduleEmptyState: some View {
-        VStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "hourglass.circle.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(Color.suspendedModuleTint)
-
-            Text("先记下未决事项，再给它一个倒计时。")
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
-                .multilineTextAlignment(.center)
-
-            Button {
-                showingEditor = true
-            } label: {
-                Text("新增悬置任务")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.md)
-                    .padding(.vertical, WeekSpacing.sm)
-                    .background(Color.suspendedModuleGradient)
-                    .clipShape(Capsule())
-            }
-            .accessibilityIdentifier("suspendedEmptyCreateButton")
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, WeekSpacing.lg)
-    }
-
-    private func suspendedPreviewRow(_ task: SuspendedTaskItem) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: task.taskType.iconName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(task.taskType.color)
-                .frame(width: 28, height: 28)
-                .background(task.taskType.color.opacity(0.12))
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.textPrimary)
-                    .lineLimit(1)
-
-                Text(suspendedDeadlineLabel(for: task))
-                    .font(.caption)
-                    .foregroundColor(.textTertiary)
-            }
-
-            Spacer()
-
-            suspendedCountdownBadge(task)
-        }
-        .padding(WeekSpacing.sm)
-        .background(Color.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-    }
-
-    private func suspendedStatPill(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.suspendedModuleTint)
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(WeekSpacing.sm)
-        .background(Color.backgroundTertiary)
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+        )
     }
 }
 
@@ -1181,113 +1079,96 @@ enum SuspendedTaskMetaFormatter {
 
 private struct MindStampsModulePreview: View {
     let viewModel: MindStampViewModel
-    @State private var showingEditor = false
-    @State private var editingItem: MindStampItem?
-
-    private var previewStamps: [MindStampItem] {
-        Array(viewModel.stamps.prefix(4))
-    }
 
     var body: some View {
-        ModuleContainer(
+        ExtensionShortcutTile(
             title: String(localized: "extensions.module.mindstamps.title"),
-            subtitle: String(localized: "extensions.module.mindstamps.subtitle"),
-            icon: "seal.fill",
-            iconColor: .accentPink,
-            seeAllAccessibilityID: "extensionsMindStampsSeeAllButton",
+            icon: "bandage.fill",
+            tint: .accentPink,
+            value: "\(viewModel.stamps.count)",
+            detail: "张呆胶布",
+            accessibilityIdentifier: "extensionsMindStampsSeeAllButton",
             destination: {
                 MindStampsFullView(viewModel: viewModel)
             }
-        ) {
-            if previewStamps.isEmpty {
-                moduleEmptyState
-            } else {
-                VStack(spacing: WeekSpacing.sm) {
-                    ForEach(previewStamps) { stamp in
-                        stampPreviewRow(stamp)
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingEditor, onDismiss: {
-            viewModel.refresh()
-        }) {
-            MindStampEditorSheet(viewModel: viewModel)
-        }
+        )
     }
+}
 
-    private var moduleEmptyState: some View {
-        VStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "seal.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(Color.accentPink)
+private struct ExtensionShortcutTile<Destination: View>: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let value: String
+    let detail: String
+    let accessibilityIdentifier: String
+    @ViewBuilder let destination: () -> Destination
 
-            Text(String(localized: "mindstamp.empty.title"))
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
-
-            Button {
-                showingEditor = true
-            } label: {
-                Text(String(localized: "mindstamp.add"))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.md)
-                    .padding(.vertical, WeekSpacing.sm)
-                    .background(Color.accentPink)
-                    .clipShape(Capsule())
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, WeekSpacing.lg)
-    }
-
-    private func stampPreviewRow(_ stamp: MindStampItem) -> some View {
-        Button {
-            editingItem = stamp
+    var body: some View {
+        NavigationLink {
+            destination()
         } label: {
-            HStack(spacing: WeekSpacing.sm) {
-                if let blob = stamp.imageBlob, let uiImage = UIImage(data: blob) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                } else {
-                    Image(systemName: "seal.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.accentPink)
-                        .frame(width: 44, height: 44)
-                        .background(Color.accentPink.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(stamp.text.isEmpty ? String(localized: "mindstamp.placeholder") : stamp.text)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(.textPrimary)
-                        .lineLimit(2)
-
-                    Text(stamp.createdAt, format: .dateTime.month().day())
-                        .font(.caption)
-                        .foregroundColor(.textTertiary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.textTertiary)
-            }
-            .padding(WeekSpacing.sm)
-            .background(Color.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+            tileContent
         }
         .buttonStyle(.plain)
-        .sheet(item: $editingItem, onDismiss: {
-            viewModel.refresh()
-        }) { item in
-            MindStampEditorSheet(viewModel: viewModel, editingItem: item)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var tileContent: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            tileHeader
+            Spacer(minLength: 0)
+
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Color.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            tileMetric
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .aspectRatio(1, contentMode: .fit)
+        .background(Color.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+        .overlay {
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .stroke(tint.opacity(0.12), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        .contentShape(Rectangle())
+    }
+
+    private var tileHeader: some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 42, height: 42)
+                .background(tint.opacity(0.12), in: Circle())
+
+            Spacer()
+
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.textTertiary)
+                .frame(width: 28, height: 28)
+        }
+    }
+
+    private var tileMetric: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(value)
+                .font(.system(size: 25, weight: .bold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
         }
     }
 }
@@ -2276,7 +2157,7 @@ private struct MindStampsFullView: View {
     private var emptyState: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "seal.fill")
+                Image(systemName: "bandage.fill")
                     .font(.system(size: 60))
                     .foregroundStyle(Color.accentPink)
 
@@ -2291,7 +2172,7 @@ private struct MindStampsFullView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Text("右上角点 + 新建思想钢印")
+                Text("右上角点 + 新建呆胶布")
                     .font(.caption.weight(.medium))
                     .foregroundColor(.textTertiary)
                     .padding(.horizontal, WeekSpacing.md)

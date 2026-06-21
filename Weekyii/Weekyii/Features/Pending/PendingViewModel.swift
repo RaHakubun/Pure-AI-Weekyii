@@ -103,8 +103,13 @@ final class PendingViewModel {
         errorMessage = nil
         let descriptor = FetchDescriptor<WeekModel>()
         pendingWeeks = ((try? modelContext.fetch(descriptor)) ?? [])
-            .filter { $0.status == .pending }
+            .filter { Self.isFutureWeek($0, relativeTo: timeProvider.today) }
             .sorted { $0.startDate < $1.startDate }
+    }
+
+    static func isFutureWeek(_ week: WeekModel, relativeTo today: Date) -> Bool {
+        let nextWeekStart = today.startOfWeek.addingDays(7)
+        return week.status == .pending && week.startDate >= nextWeekStart
     }
 
     func seedPendingWeekForUITestsIfNeeded() {

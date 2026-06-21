@@ -116,36 +116,39 @@ private struct LockScreenLiveActivityView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 10) {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color(widgetHex: palette.surfaceHex))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .overlay {
                         Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Color(widgetHex: palette.accentHex))
                     }
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(state.focusTitle)
-                        .font(.headline.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(primaryTextColor)
-                    Text(deadlineLabel(for: state.killTime))
+                    Text("完成 \(state.completedCount)/\(state.totalCount) · 剩余 \(state.frozenCount) · \(deadlineLabel(for: state.killTime))")
                         .font(.caption2.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                         .foregroundStyle(secondaryTextColor)
                 }
+                .layoutPriority(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
 
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("剩余")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(secondaryTextColor)
                     Text(remainingLabel)
-                        .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
                         .lineLimit(1)
                         .foregroundStyle(Color(widgetHex: palette.accentHex))
                 }
@@ -159,52 +162,32 @@ private struct LockScreenLiveActivityView: View {
             )
             .frame(height: 6)
 
-            HStack(spacing: 6) {
-                lockMetric("完成", value: "\(state.completedCount)/\(state.totalCount)")
-                lockMetric("总数", value: "\(state.totalCount)")
-                lockMetric("剩余", value: "\(state.frozenCount)")
-            }
-
             HStack(spacing: 8) {
                 Link(destination: LiveActivityAction.doneFocus.url()) {
                     LiveActionCapsule(
-                        title: "完成专注",
+                        title: "完成",
                         icon: "checkmark.circle.fill",
                         fill: Color(widgetHex: palette.accentHex),
                         foreground: Color(widgetHex: palette.backgroundHex),
-                        verticalPadding: 7
+                        horizontalPadding: 10,
+                        verticalPadding: 6
                     )
                 }
 
                 Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
                     LiveActionCapsule(
-                        title: "后移 +1 天",
+                        title: "+1天",
                         icon: "calendar.badge.clock",
                         fill: Color(widgetHex: palette.surfaceHex),
                         foreground: primaryTextColor,
-                        verticalPadding: 7
+                        horizontalPadding: 10,
+                        verticalPadding: 6
                     )
                 }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
-
-    @ViewBuilder
-    private func lockMetric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(secondaryTextColor)
-            Text(value)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(primaryTextColor)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color(widgetHex: palette.surfaceHex), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 9)
     }
 }
 
@@ -235,16 +218,11 @@ private struct IslandExpandedTrailing: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            Text("剩余")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-            Text(remainingLabel)
-                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-        }
+        Text(remainingLabel)
+            .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
         .fixedSize(horizontal: true, vertical: false)
     }
 }
@@ -258,11 +236,11 @@ private struct IslandExpandedCenter: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(state.focusTitle)
                 .font(.headline.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.82)
+                .minimumScaleFactor(0.78)
                 .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -271,30 +249,20 @@ private struct IslandExpandedCenter: View {
                 fill: Color(widgetHex: state.liveTheme.islandAccentHex),
                 track: Color.white.opacity(0.16)
             )
-            .frame(height: 7)
+            .frame(height: 6)
 
-            HStack(spacing: 6) {
-                islandMetric("完成", value: "\(state.completedCount)")
-                islandMetric("总数", value: "\(state.totalCount)")
-                islandMetric("剩余", value: "\(state.frozenCount)")
+            HStack(spacing: 8) {
+                Text("完成 \(state.completedCount)/\(state.totalCount)")
+                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+                Spacer(minLength: 4)
+                Text("剩余 \(state.frozenCount)")
+                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
             }
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func islandMetric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -306,19 +274,23 @@ private struct IslandExpandedActions: View {
         HStack(spacing: 10) {
             Link(destination: LiveActivityAction.doneFocus.url()) {
                 LiveActionCapsule(
-                    title: "完成专注",
+                    title: "完成",
                     icon: "checkmark.circle.fill",
                     fill: Color(widgetHex: state.liveTheme.islandSuccessHex),
-                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex)
+                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex),
+                    horizontalPadding: 10,
+                    verticalPadding: 6
                 )
             }
 
             Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
                 LiveActionCapsule(
-                    title: "后移 +1 天",
+                    title: "+1天",
                     icon: "calendar.badge.clock",
                     fill: Color(widgetHex: state.liveTheme.islandChipSecondaryHex),
-                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex)
+                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex),
+                    horizontalPadding: 10,
+                    verticalPadding: 6
                 )
             }
         }
@@ -334,7 +306,8 @@ private struct IslandCompactLeading: View {
         Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
             .font(.system(size: 11, weight: .bold))
             .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-            .frame(width: 13, height: 13)
+            .frame(width: 14, height: 14)
+            .accessibilityLabel(liveActivityTaskTypeLabel(raw: state.taskTypeRaw))
     }
 }
 
@@ -354,7 +327,8 @@ private struct IslandCompactTrailing: View {
             .font(.system(size: 10, weight: .semibold))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(iconColor)
-            .frame(width: 12, height: 12)
+            .frame(width: 14, height: 14)
+            .accessibilityLabel("剩余时间")
     }
 }
 
@@ -382,6 +356,8 @@ private struct IslandMinimal: View {
                 .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
         }
         .padding(3)
+        .frame(width: 24, height: 24)
+        .accessibilityLabel("今日进度 \(state.completionPercent)%")
     }
 }
 
@@ -458,11 +434,12 @@ private struct WeekyiiWidgetRoot: View {
     }
 
     private var systemSmallView: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Text("当下")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(tokens.textSecondary)
+                    .lineLimit(1)
                 Spacer()
                 WidgetStatusPill(text: semantic.stateLabel, tokens: tokens)
             }
@@ -476,17 +453,20 @@ private struct WeekyiiWidgetRoot: View {
                     centerText: semantic.totalCount == 0 ? "--" : "\(semantic.progressPercent)",
                     centerTextColor: tokens.textPrimary
                 )
-                .frame(width: 58, height: 58)
+                .frame(width: 54, height: 54)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(semantic.keyline)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(tokens.textPrimary)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.82)
                     Text("完成 \(semantic.completedCount)/\(semantic.totalCount)")
                         .font(.caption2)
+                        .lineLimit(1)
                         .foregroundStyle(tokens.textSecondary)
                 }
+                .layoutPriority(1)
                 Spacer(minLength: 0)
             }
 
@@ -497,56 +477,52 @@ private struct WeekyiiWidgetRoot: View {
     }
 
     private var systemMediumView: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("今天")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(tokens.textPrimary)
-                    Spacer(minLength: 0)
-                    Text(semantic.killTimeText)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(tokens.textSecondary)
-                }
-
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text("\(semantic.progressPercent)")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(tokens.primary)
                     Text("%")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(tokens.textSecondary)
                 }
+                .lineLimit(1)
 
-                HStack(spacing: 8) {
-                    WidgetMetricPill(title: "完成", value: semantic.completedCount, tokens: tokens)
-                    WidgetMetricPill(title: "剩余", value: semantic.remainingCount, tokens: tokens)
-                }
+                Text("\(semantic.stateLabel) · 完成 \(semantic.completedCount)/\(semantic.totalCount)")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(tokens.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
+            .frame(width: 86, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(semantic.keyline)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(tokens.textPrimary)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    Text(semantic.keyline)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(tokens.textPrimary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                    Spacer(minLength: 0)
+                    Text("截止 \(semantic.killTimeText)")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
 
                 WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
                     .frame(height: 6)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(semantic.previewRows.prefix(3)) { row in
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(semantic.previewRows.prefix(2)) { row in
                         WidgetTaskPreviewLine(row: row, color: zoneColor(raw: row.zoneRaw), textColor: tokens.textSecondary)
                     }
                 }
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(tokens.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(tokens.stroke, lineWidth: 1)
-            }
         }
         .padding(14)
     }
@@ -568,13 +544,9 @@ private struct WeekyiiWidgetRoot: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(tokens.textPrimary)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.86)
 
-                HStack(spacing: 8) {
-                    WidgetMetricPill(title: "进度", valueText: "\(semantic.progressPercent)%", tokens: tokens)
-                    WidgetMetricPill(title: "完成", value: semantic.completedCount, tokens: tokens)
-                    WidgetMetricPill(title: "总数", value: semantic.totalCount, tokens: tokens)
-                    WidgetMetricPill(title: "剩余", value: semantic.remainingCount, tokens: tokens)
-                }
+                WidgetStatsStrip(semantic: semantic, tokens: tokens)
 
                 WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
                     .frame(height: 7)
@@ -605,14 +577,15 @@ private struct WeekyiiWidgetRoot: View {
             Image(systemName: statusIcon(raw: semantic.statusRaw))
                 .foregroundStyle(tokens.primary)
             Text("当下 \(semantic.completedCount)/\(semantic.totalCount) · \(semantic.stateLabel)")
+                .lineLimit(1)
                 .foregroundStyle(tokens.textPrimary)
         }
     }
 
     private var accessoryRectangularView: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(semantic.keyline)
+                Text(semantic.stateLabel)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                     .foregroundStyle(tokens.textPrimary)
@@ -625,11 +598,10 @@ private struct WeekyiiWidgetRoot: View {
             WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
                 .frame(height: 5)
 
-            HStack(spacing: 8) {
-                Text("完成 \(semantic.completedCount)/\(semantic.totalCount)")
-                Text("剩余 \(semantic.remainingCount)")
-            }
+            Text("完成 \(semantic.completedCount)/\(semantic.totalCount) · 剩余 \(semantic.remainingCount)")
             .font(.caption2)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .foregroundStyle(tokens.textSecondary)
         }
     }
@@ -822,6 +794,43 @@ private struct WidgetMetricPill: View {
     }
 }
 
+private struct WidgetStatsStrip: View {
+    let semantic: WidgetSemanticData
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        HStack(spacing: 8) {
+            stat("进度", "\(semantic.progressPercent)%")
+            Divider()
+                .frame(height: 16)
+                .overlay(tokens.stroke)
+            stat("完成", "\(semantic.completedCount)/\(semantic.totalCount)")
+            Divider()
+                .frame(height: 16)
+                .overlay(tokens.stroke)
+            stat("剩余", "\(semantic.remainingCount)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func stat(_ title: String, _ value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .foregroundStyle(tokens.textSecondary)
+            Text(value)
+                .fontWeight(.semibold)
+                .foregroundStyle(tokens.textPrimary)
+                .monospacedDigit()
+        }
+        .font(.caption2)
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
+        .frame(maxWidth: .infinity)
+    }
+}
+
 private struct WidgetTaskPreviewLine: View {
     let row: WidgetTaskPreview
     let color: Color
@@ -922,6 +931,7 @@ private struct LiveActionCapsule: View {
     let icon: String
     let fill: Color
     let foreground: Color
+    var horizontalPadding: CGFloat = 12
     var verticalPadding: CGFloat = 9
 
     var body: some View {
@@ -930,8 +940,10 @@ private struct LiveActionCapsule: View {
             Text(title)
         }
         .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .foregroundStyle(foreground)
         .background(fill, in: Capsule())

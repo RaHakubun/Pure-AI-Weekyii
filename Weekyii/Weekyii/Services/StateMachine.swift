@@ -179,9 +179,14 @@ struct StateMachine {
 
     private func processCrossWeek() -> Int {
         let currentWeekId = timeProvider.currentWeekId
-        let presentWeeks = fetchWeeks(status: .present).sorted { $0.startDate < $1.startDate }
         var adjustments = 0
 
+        for week in fetchWeeks(status: .pending) where week.endDate < timeProvider.today {
+            finalizeWeekToPast(week)
+            adjustments += 1
+        }
+
+        let presentWeeks = fetchWeeks(status: .present).sorted { $0.startDate < $1.startDate }
         if presentWeeks.isEmpty {
             if let existingCurrent = fetchWeek(weekId: currentWeekId) {
                 existingCurrent.status = .present
@@ -268,6 +273,7 @@ struct StateMachine {
         guard day.status != .expired else { return false }
         day.status = .expired
         day.expiredCount = expiredCount
+        day.isDraftZoneUnlocked = false
         removeTasks(in: [.draft, .focus, .frozen], from: day)
         notificationService.cancelKillTimeNotification(for: day)
         return true
@@ -509,9 +515,17 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             }
         }
 
-        guard newStatus != day.status else { return false }
-        day.status = newStatus
-        return true
+        var changed = false
+        if newStatus != day.status {
+            day.status = newStatus
+            changed = true
+        }
+
+        if (newStatus != .execute || day.executionMode != .flexible), day.isDraftZoneUnlocked {
+            day.isDraftZoneUnlocked = false
+            changed = true
+        }
+        return changed
     }
 
     private func ensureTodayExists(today: Date) -> Bool {

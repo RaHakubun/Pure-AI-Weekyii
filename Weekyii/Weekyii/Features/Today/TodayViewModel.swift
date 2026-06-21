@@ -32,6 +32,7 @@ final class TodayViewModel {
     private let randomMindStampProvider: () -> MindStampItem?
     private let taskPostponeService: TaskPostponeService
     private let taskMutationService: TaskMutationService
+    private let liveActivityService: (any LiveActivityManaging)?
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -44,6 +45,7 @@ final class TodayViewModel {
         notificationService: any NotificationScheduling,
         appState: any AppStateStore,
         userSettings: UserSettings,
+        liveActivityService: (any LiveActivityManaging)? = nil,
         randomMindStampProvider: (() -> MindStampItem?)? = nil
     ) {
         self.modelContext = modelContext
@@ -51,6 +53,7 @@ final class TodayViewModel {
         self.notificationService = notificationService
         self.appState = appState
         self.userSettings = userSettings
+        self.liveActivityService = liveActivityService
         self.taskPostponeService = TaskPostponeService(modelContext: modelContext)
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
         self.randomMindStampProvider = randomMindStampProvider ?? {
@@ -100,6 +103,49 @@ final class TodayViewModel {
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    func seedFlexibleExecutionForUITestsIfNeeded() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-uiTestingSeedFlexibleExecution") else { return }
+        guard let day = fetchOrCreateToday() else { return }
+
+        for task in day.tasks {
+            modelContext.delete(task)
+        }
+        day.tasks.removeAll()
+
+        let focusTask = TaskItem(
+            title: "Flexible Focus Task",
+            taskType: .regular,
+            order: 1,
+            zone: .focus
+        )
+        focusTask.startedAt = timeProvider.now
+        focusTask.day = day
+
+        let queueTask = TaskItem(
+            title: "Flexible Queue Task",
+            taskType: .regular,
+            order: 2,
+            zone: .frozen
+        )
+        queueTask.day = day
+
+        day.tasks.append(contentsOf: [focusTask, queueTask])
+        day.status = .execute
+        day.initiatedAt = timeProvider.now
+        day.closedAt = nil
+        day.executionMode = .flexible
+        day.isDraftZoneUnlocked = false
+        day.expiredCount = 0
+
+        do {
+            try modelContext.save()
+            syncToday()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -170,6 +216,8 @@ final class TodayViewModel {
         }
         day.status = .execute
         day.initiatedAt = now
+        day.executionMode = userSettings.defaultExecutionMode
+        day.isDraftZoneUnlocked = false
 
         if let first = sortedTasks.first {
             first.zone = .focus
@@ -202,9 +250,107 @@ final class TodayViewModel {
         } else {
             day.status = .completed
             day.closedAt = now
+            day.isDraftZoneUnlocked = false
             notificationService.cancelKillTimeNotification(for: day)
         }
 
+        try modelContext.save()
+        syncToday()
+    }
+
+    func setDraftZoneUnlocked(_ isUnlocked: Bool) throws {
+        let day = try resolveFlexibleExecutionDay()
+        day.isDraftZoneUnlocked = isUnlocked
+        try modelContext.save()
+        syncToday()
+    }
+
+    func addExecutionTask(
+        title: String,
+        description: String = "",
+        type: TaskType,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = []
+    ) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .frozen, project: nil)
+        taskMutationService.normalizeOrder(in: day, zone: .frozen)
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func updateExecutionTask(
+        _ task: TaskItem,
+        title: String,
+        description: String,
+        type: TaskType,
+        steps: [TaskStep],
+        attachments: [TaskAttachment]
+    ) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        guard task.zone == .frozen,
+              day.tasks.contains(where: { $0.id == task.id }) else {
+            throw WeekyiiError.cannotEditStartedDay
+        }
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            steps: steps,
+            attachments: attachments
+        )
+        try taskMutationService.updateTask(task, payload: payload)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func deleteExecutionTasks(at offsets: IndexSet) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        _ = try taskMutationService.deleteTasks(in: day, zone: .frozen, at: offsets)
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func moveExecutionTasks(from source: IndexSet, to destination: Int) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        try taskMutationService.moveTasks(in: day, zone: .frozen, from: source, to: destination)
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func exchangeFocusWithFirstDraft() throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        guard let currentFocus = day.focusTask else { throw WeekyiiError.taskNotFound(UUID()) }
+        guard let nextFocus = day.frozenTasks.first else { throw WeekyiiError.executionQueueEmpty }
+
+        let remainingFrozen = day.frozenTasks.dropFirst()
+        currentFocus.zone = .frozen
+        currentFocus.startedAt = nil
+        currentFocus.endedAt = nil
+        currentFocus.completedOrder = 0
+
+        nextFocus.zone = .focus
+        nextFocus.startedAt = timeProvider.now
+        nextFocus.endedAt = nil
+        nextFocus.completedOrder = 0
+        nextFocus.order = 1
+
+        currentFocus.order = 2
+        for (index, task) in remainingFrozen.enumerated() {
+            task.order = index + 3
+        }
+
+        updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
@@ -314,6 +460,7 @@ final class TodayViewModel {
     private func expire(day: DayModel, expiredCount: Int) {
         day.status = .expired
         day.expiredCount = expiredCount
+        day.isDraftZoneUnlocked = false
         removeTasks(in: [.draft, .focus, .frozen], from: day)
         notificationService.cancelKillTimeNotification(for: day)
     }
@@ -371,6 +518,21 @@ final class TodayViewModel {
         let resolved = fetchOrCreateToday()
         self.today = resolved
         return resolved
+    }
+
+    private func resolveFlexibleExecutionDay() throws -> DayModel {
+        guard let day = resolveToday() else {
+            throw WeekyiiError.dayNotFound(timeProvider.today.dayId)
+        }
+        guard day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
+        guard day.executionMode == .flexible else { throw WeekyiiError.flexibleModeRequired }
+        return day
+    }
+
+    private func resolveUnlockedFlexibleExecutionDay() throws -> DayModel {
+        let day = try resolveFlexibleExecutionDay()
+        guard day.isDraftZoneUnlocked else { throw WeekyiiError.draftZoneLocked }
+        return day
     }
 
     private func ensurePresentWeek() {
@@ -454,6 +616,13 @@ final class TodayViewModel {
     private func syncToday() {
         today = fetchDay(by: timeProvider.today.dayId)
         refreshWidgetSnapshot()
+        liveActivityService?.reconcile(
+            modelContext: modelContext,
+            now: timeProvider.now,
+            selectedThemeRaw: userSettings.selectedThemeRaw,
+            appearanceModeRaw: userSettings.appearanceModeRaw,
+            premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+        )
     }
 
     private func refreshWidgetSnapshot() {

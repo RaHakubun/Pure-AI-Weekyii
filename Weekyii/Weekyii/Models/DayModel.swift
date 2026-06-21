@@ -14,6 +14,8 @@ final class DayModel {
 
     var initiatedAt: Date?
     var closedAt: Date?
+    var executionModeRaw: String = ExecutionMode.strict.rawValue
+    var isDraftZoneUnlocked: Bool = false
 
     var week: WeekModel?
 
@@ -51,5 +53,10 @@ final class DayModel {
 
     var hasSingleFocus: Bool {
         tasks.filter { $0.zone == .focus }.count <= 1
+    }
+
+    var executionMode: ExecutionMode {
+        get { ExecutionMode(rawValue: executionModeRaw) ?? .strict }
+        set { executionModeRaw = newValue.rawValue }
     }
 }

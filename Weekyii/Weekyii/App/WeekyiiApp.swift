@@ -259,7 +259,8 @@ enum LiveActivityActionRouter {
             timeProvider: timeProvider,
             notificationService: notificationService,
             appState: appState,
-            userSettings: userSettings
+            userSettings: userSettings,
+            liveActivityService: liveActivityService
         )
         retainedViewModels.append(viewModel)
         if retainedViewModels.count > 8 {

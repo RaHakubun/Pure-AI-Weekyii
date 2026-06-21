@@ -37,6 +37,10 @@ protocol TaskMutating {
     @discardableResult
     func deleteDraftTasks(in day: DayModel, at offsets: IndexSet) throws -> [TaskItem]
     func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws
+    @discardableResult
+    func deleteTasks(in day: DayModel, zone: TaskZone, at offsets: IndexSet) throws -> [TaskItem]
+    func moveTasks(in day: DayModel, zone: TaskZone, from source: IndexSet, to destination: Int) throws
+    func normalizeOrder(in day: DayModel, zone: TaskZone)
 }
 
 struct TaskMutationService: TaskMutating {
@@ -58,7 +62,7 @@ struct TaskMutationService: TaskMutating {
         case .focus:
             nextOrder = 1
         case .frozen:
-            nextOrder = (day.frozenTasks.last?.order ?? 0) + (day.focusTask == nil ? 1 : 2)
+            nextOrder = (day.frozenTasks.last?.order ?? (day.focusTask == nil ? 0 : 1)) + 1
         case .complete:
             nextOrder = (day.completedTasks.last?.order ?? 0) + 1
         }
@@ -95,7 +99,16 @@ struct TaskMutationService: TaskMutating {
 
     @discardableResult
     func deleteDraftTasks(in day: DayModel, at offsets: IndexSet) throws -> [TaskItem] {
-        let tasks = day.sortedDraftTasks
+        let deleted = try deleteTasks(in: day, zone: .draft, at: offsets)
+        if day.sortedDraftTasks.isEmpty, day.status == .draft {
+            day.status = .empty
+        }
+        return deleted
+    }
+
+    @discardableResult
+    func deleteTasks(in day: DayModel, zone: TaskZone, at offsets: IndexSet) throws -> [TaskItem] {
+        let tasks = orderedTasks(in: day, zone: zone)
         let tasksToDelete = offsets.compactMap { index in
             tasks.indices.contains(index) ? tasks[index] : nil
         }
@@ -103,20 +116,30 @@ struct TaskMutationService: TaskMutating {
         for task in tasksToDelete {
             modelContext.delete(task)
         }
-        renumberDraftTasks(in: day)
-        if day.sortedDraftTasks.isEmpty, day.status == .draft {
-            day.status = .empty
-        }
+        normalizeOrder(in: day, zone: zone)
         return tasksToDelete
     }
 
     func moveDraftTasks(in day: DayModel, from source: IndexSet, to destination: Int) throws {
-        let count = day.sortedDraftTasks.count
+        try moveTasks(in: day, zone: .draft, from: source, to: destination)
+    }
+
+    func moveTasks(in day: DayModel, zone: TaskZone, from source: IndexSet, to destination: Int) throws {
+        let ordered = orderedTasks(in: day, zone: zone)
+        let count = ordered.count
         guard source.isEmpty == false, destination >= 0, destination <= count else { return }
-        var tasks = day.sortedDraftTasks
+        var tasks = ordered
         tasks.move(fromOffsets: source, toOffset: destination)
+        let startingOrder = zone == .frozen && day.focusTask != nil ? 2 : 1
         for (index, task) in tasks.enumerated() {
-            task.order = index + 1
+            task.order = startingOrder + index
+        }
+    }
+
+    func normalizeOrder(in day: DayModel, zone: TaskZone) {
+        let startingOrder = zone == .frozen && day.focusTask != nil ? 2 : 1
+        for (index, task) in orderedTasks(in: day, zone: zone).enumerated() {
+            task.order = startingOrder + index
         }
     }
 
@@ -171,6 +194,19 @@ struct TaskMutationService: TaskMutating {
     private func renumberDraftTasks(in day: DayModel) {
         for (index, task) in day.sortedDraftTasks.enumerated() {
             task.order = index + 1
+        }
+    }
+
+    private func orderedTasks(in day: DayModel, zone: TaskZone) -> [TaskItem] {
+        switch zone {
+        case .draft:
+            return day.sortedDraftTasks
+        case .focus:
+            return day.focusTask.map { [$0] } ?? []
+        case .frozen:
+            return day.frozenTasks
+        case .complete:
+            return day.completedTasks
         }
     }
 }
@@ -378,6 +414,7 @@ struct TaskPostponeService {
             } else {
                 day.status = .completed
                 day.closedAt = now
+                day.isDraftZoneUnlocked = false
             }
 
         case .frozen:
@@ -390,6 +427,7 @@ struct TaskPostponeService {
             } else if day.status == .execute, day.focusTask == nil, day.frozenTasks.isEmpty {
                 day.status = .completed
                 day.closedAt = now
+                day.isDraftZoneUnlocked = false
             }
 
         case .complete:

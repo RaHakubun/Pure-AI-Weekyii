@@ -18,6 +18,10 @@ final class UserSettings: ObservableObject {
     @Published var defaultTaskType: TaskType {
         didSet { save() }
     }
+
+    @Published var defaultExecutionModeRaw: String {
+        didSet { save() }
+    }
     
     // Notification Settings
     @Published var killTimeReminderMinutes: Int {
@@ -99,9 +103,10 @@ final class UserSettings: ObservableObject {
         didSet { save() }
     }
     
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         // Load saved values or use defaults
         self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
         self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
@@ -112,6 +117,7 @@ final class UserSettings: ObservableObject {
         } else {
             self.defaultTaskType = .regular
         }
+        self.defaultExecutionModeRaw = defaults.string(forKey: "defaultExecutionMode") ?? ExecutionMode.strict.rawValue
         
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
         self.fixedReminderEnabled = defaults.object(forKey: "fixedReminderEnabled") as? Bool ?? false
@@ -147,6 +153,7 @@ final class UserSettings: ObservableObject {
         defaults.set(defaultKillTimeHour, forKey: "defaultKillTimeHour")
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
+        defaults.set(defaultExecutionModeRaw, forKey: "defaultExecutionMode")
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
         defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
         defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
@@ -204,6 +211,11 @@ final class UserSettings: ObservableObject {
     var appearanceMode: AppearanceMode {
         get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
         set { appearanceModeRaw = newValue.rawValue }
+    }
+
+    var defaultExecutionMode: ExecutionMode {
+        get { ExecutionMode(rawValue: defaultExecutionModeRaw) ?? .strict }
+        set { defaultExecutionModeRaw = newValue.rawValue }
     }
 
     var effectiveColorScheme: ColorScheme? {

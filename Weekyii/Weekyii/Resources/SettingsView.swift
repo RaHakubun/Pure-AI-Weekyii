@@ -132,6 +132,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var presentSection: some View {
         Section {
+            executionModeSettings
             killTimeSettings
             reminderSettings
             taskTypeSettings
@@ -490,6 +491,41 @@ struct SettingsView: View {
         }
     }
     
+    // MARK: - Kill Time Settings
+    @ViewBuilder
+    private var executionModeSettings: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "slider.horizontal.3", color: .weekyiiPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("执行模式")
+                    Text("修改将在下一次开始任务流时生效")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Picker("执行模式", selection: Binding(
+                get: { settings.defaultExecutionModeRaw },
+                set: { settings.defaultExecutionModeRaw = $0 }
+            )) {
+                ForEach(ExecutionMode.allCases) { mode in
+                    Text(mode.displayName)
+                        .tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("executionModePicker")
+
+            Text(settings.defaultExecutionMode == .strict
+                 ? "严格模式：开始后按固定顺序逐项推进。"
+                 : "灵动模式：开始后可解冻草稿区，调整任务并与专注任务交换。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
     // MARK: - Kill Time Settings
     @ViewBuilder
     private var killTimeSettings: some View {

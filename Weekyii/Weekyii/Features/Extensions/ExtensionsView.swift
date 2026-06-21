@@ -15,7 +15,7 @@ private enum ExtensionTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .projects: "folder.fill"
-        case .mindStamps: "seal.fill"
+        case .mindStamps: "bandage.fill"
         }
     }
 }

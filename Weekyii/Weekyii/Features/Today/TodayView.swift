@@ -6,16 +6,21 @@ private enum TodaySection: Int {
     case week
 }
 
+private enum TaskEditorContext: String {
+    case draft
+    case flexibleExecution
+}
+
 private enum DraftTaskEditorMode: Identifiable {
-    case create
-    case edit(TaskItem)
+    case create(TaskEditorContext)
+    case edit(TaskItem, TaskEditorContext)
 
     var id: String {
         switch self {
-        case .create:
-            return "create"
-        case .edit(let task):
-            return "edit-\(task.id.uuidString)"
+        case .create(let context):
+            return "create-\(context.rawValue)"
+        case .edit(let task, let context):
+            return "edit-\(context.rawValue)-\(task.id.uuidString)"
         }
     }
 }
@@ -120,12 +125,14 @@ struct TodayView: View {
                     timeProvider: TimeProvider(),
                     notificationService: NotificationService.shared,
                     appState: appState,
-                    userSettings: userSettings
+                    userSettings: userSettings,
+                    liveActivityService: TodayLiveActivityService.shared
                 )
                 viewModel = model
             }
             viewModel?.refresh()
             viewModel?.seedDraftTasksForUITestsIfNeeded()
+            viewModel?.seedFlexibleExecutionForUITestsIfNeeded()
         }
         .onChange(of: userSettings.defaultKillTimeHour) { _, _ in
             viewModel?.refresh()
@@ -405,7 +412,7 @@ struct TodayView: View {
         }
         
         WeekButton(String(localized: "action.create"), icon: "plus.circle.fill", style: .primary) {
-            draftTaskEditorMode = .create
+            draftTaskEditorMode = .create(.draft)
         }
     }
     
@@ -419,10 +426,10 @@ struct TodayView: View {
                     day: day,
                     viewModel: viewModel,
                     onAddTask: {
-                        draftTaskEditorMode = .create
+                        draftTaskEditorMode = .create(.draft)
                     },
                     onEditTask: { task in
-                        draftTaskEditorMode = .edit(task)
+                        draftTaskEditorMode = .edit(task, .draft)
                     },
                     onPostponeTask: { task in
                         taskForPostpone = task
@@ -488,6 +495,30 @@ struct TodayView: View {
                         .background(.white.opacity(0.2), in: Capsule())
                         .buttonStyle(.plain)
 
+                        if day.executionMode == .flexible {
+                            Button {
+                                do {
+                                    try viewModel.exchangeFocusWithFirstDraft()
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            } label: {
+                                HStack(spacing: WeekSpacing.xs) {
+                                    Image(systemName: "arrow.triangle.swap")
+                                    Text("交换")
+                                }
+                                .font(.caption.weight(.semibold))
+                                .padding(.vertical, WeekSpacing.xs)
+                                .padding(.horizontal, WeekSpacing.sm)
+                            }
+                            .foregroundColor(.white)
+                            .background(.white.opacity(0.2), in: Capsule())
+                            .buttonStyle(.plain)
+                            .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
+                            .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
+                            .accessibilityIdentifier("focusExchangeButton")
+                        }
+
                         Button {
                             do {
                                 try viewModel.doneFocus()
@@ -512,8 +543,31 @@ struct TodayView: View {
             }
         }
         
-        // 冻结任务
-        if !day.frozenTasks.isEmpty {
+        if day.executionMode == .flexible {
+            WeekCard {
+                DraftEditorView(
+                    day: day,
+                    viewModel: viewModel,
+                    presentationMode: .flexibleExecution,
+                    onAddTask: {
+                        draftTaskEditorMode = .create(.flexibleExecution)
+                    },
+                    onEditTask: { task in
+                        draftTaskEditorMode = .edit(task, .flexibleExecution)
+                    },
+                    onPostponeTask: { task in
+                        taskForPostpone = task
+                    },
+                    onToggleLock: {
+                        do {
+                            try viewModel.setDraftZoneUnlocked(!day.isDraftZoneUnlocked)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+        } else if !day.frozenTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
@@ -730,27 +784,38 @@ struct TodayView: View {
     @ViewBuilder
     private func draftTaskEditorSheet(mode: DraftTaskEditorMode) -> some View {
         switch mode {
-        case .create:
+        case .create(let context):
             TaskEditorSheet(
                 title: String(localized: "draft.add_title"),
                 initialType: userSettings.defaultTaskType,
                 onSave: { title, description, type, steps, attachments in
                     guard let viewModel else { return }
                     do {
-                        try viewModel.addTask(
-                            title: title,
-                            description: description,
-                            type: type,
-                            steps: steps,
-                            attachments: attachments
-                        )
+                        switch context {
+                        case .draft:
+                            try viewModel.addTask(
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        case .flexibleExecution:
+                            try viewModel.addExecutionTask(
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        }
                         draftTaskEditorMode = nil
                     } catch {
                         errorMessage = error.localizedDescription
                     }
                 }
             )
-        case .edit(let task):
+        case .edit(let task, let context):
             TaskEditorSheet(
                 title: String(localized: "draft.edit_title"),
                 initialTitle: task.title,
@@ -761,14 +826,26 @@ struct TodayView: View {
                 onSave: { title, description, type, steps, attachments in
                     guard let viewModel else { return }
                     do {
-                        try viewModel.updateTask(
-                            task,
-                            title: title,
-                            description: description,
-                            type: type,
-                            steps: steps,
-                            attachments: attachments
-                        )
+                        switch context {
+                        case .draft:
+                            try viewModel.updateTask(
+                                task,
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        case .flexibleExecution:
+                            try viewModel.updateExecutionTask(
+                                task,
+                                title: title,
+                                description: description,
+                                type: type,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        }
                         draftTaskEditorMode = nil
                     } catch {
                         errorMessage = error.localizedDescription
@@ -1160,7 +1237,7 @@ private struct StartFlowRitualStepView: View {
         VStack(alignment: .leading, spacing: WeekSpacing.base) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    Text("阶段 2/2 · 思想钢印")
+                    Text("阶段 2/2 · 呆胶布")
                         .font(.caption.weight(.semibold))
                         .foregroundColor(.textSecondary)
                     Text("把注意力收束到唯一入口，然后开始今天。")
@@ -1185,7 +1262,7 @@ private struct StartFlowRitualStepView: View {
                     }
 
                     VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                        Text("今日思想钢印")
+                        Text("今日呆胶布")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.textSecondary)
 
@@ -1210,7 +1287,7 @@ private struct StartFlowRitualStepView: View {
                     .stroke(Color.backgroundTertiary.opacity(0.9), lineWidth: 1)
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("思想钢印内容")
+            .accessibilityLabel("呆胶布内容")
             .accessibilityIdentifier("startFlowRitualCard")
 
             VStack(spacing: WeekSpacing.sm) {

@@ -252,22 +252,12 @@ struct PendingView: View {
                 presentMonthTaskAddEditor()
             }
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.weekyiiGradient)
-                    .shadow(color: WeekShadow.medium.color, radius: 6, x: 0, y: 3)
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.weekyiiPrimary.opacity(0.22), lineWidth: 1)
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color.backgroundSecondary)
-            }
-            .frame(width: 36, height: 36)
+            Image(systemName: "plus")
         }
-        .buttonStyle(.plain)
         .disabled(displayMode == .month && isSelectedDatePast)
         .opacity(displayMode == .month && isSelectedDatePast ? 0.45 : 1.0)
         .accessibilityLabel(String(localized: "pending.add_week"))
+        .accessibilityIdentifier("pendingToolbarAddButton")
     }
 
     private func presentMonthTaskAddEditor() {
@@ -366,8 +356,8 @@ struct PendingView: View {
                         .font(.bodyMedium)
                         .foregroundColor(.textTertiary)
                 } else {
-                    VStack(spacing: WeekSpacing.sm) {
-                        ForEach(tasks, id: \.id) { task in
+                    VStack(spacing: 0) {
+                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                             Button {
                                 guard let day, let viewModel else {
                                     selectedTaskForDetail = task
@@ -383,11 +373,27 @@ struct PendingView: View {
                                     selectedTaskForDetail = task
                                 }
                             } label: {
-                                TaskRowView(task: task, showsProjectOrigin: task.zone == .draft)
+                                OrderedTaskRow(
+                                    task: task,
+                                    index: index,
+                                    accessibilityIdentifier: "pendingMonthTask_\(index)"
+                                )
                             }
                             .buttonStyle(.plain)
+
+                            if index < tasks.count - 1 {
+                                Divider()
+                                    .padding(.leading, 56)
+                            }
                         }
                     }
+                    .padding(.horizontal, WeekSpacing.md)
+                    .background(Color.backgroundPrimary.opacity(0.55))
+                    .clipShape(.rect(cornerRadius: WeekRadius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium)
+                            .stroke(Color.backgroundTertiary, lineWidth: 1)
+                    )
                 }
             }
         }

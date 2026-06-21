@@ -1,6 +1,37 @@
 import XCTest
 
 final class DraftReorderUITests: XCTestCase {
+    func testExtensionsHubUsesSquareShortcutsAboveProjects() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let extensionsTab = app.tabBars.buttons["扩展"]
+        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
+        extensionsTab.tap()
+
+        let mindStamps = app.buttons["extensionsMindStampsSeeAllButton"]
+        let suspended = app.buttons["extensionsSuspendedSeeAllButton"]
+        let projects = app.buttons["extensionsProjectsSeeAllButton"]
+        XCTAssertTrue(mindStamps.waitForExistence(timeout: 5))
+        XCTAssertTrue(suspended.waitForExistence(timeout: 5))
+        XCTAssertTrue(projects.waitForExistence(timeout: 5))
+
+        let mindFrame = mindStamps.frame
+        let suspendedFrame = suspended.frame
+        let projectsFrame = projects.frame
+        let tolerance: CGFloat = 3
+
+        XCTAssertEqual(mindFrame.minY, suspendedFrame.minY, accuracy: tolerance)
+        XCTAssertEqual(mindFrame.width, suspendedFrame.width, accuracy: tolerance)
+        XCTAssertEqual(mindFrame.height, suspendedFrame.height, accuracy: tolerance)
+        XCTAssertEqual(mindFrame.width, mindFrame.height, accuracy: tolerance)
+        XCTAssertGreaterThan(projectsFrame.minY, max(mindFrame.maxY, suspendedFrame.maxY))
+    }
+
     func testDragHandleReordersDraftTasks() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -60,6 +91,83 @@ final class DraftReorderUITests: XCTestCase {
         firstDraftTask.tap()
 
         XCTAssertTrue(editorTitleField.waitForExistence(timeout: 3))
+    }
+
+    func testFlexibleExecutionUnlockEnablesQueueEditingAndExchange() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedFlexibleExecution",
+            "1"
+        ]
+        app.launch()
+
+        let lockButton = app.buttons["executionQueueLockButton"]
+        let exchangeButton = app.buttons["focusExchangeButton"]
+        let addButton = app.buttons["draftAddButton"]
+        let editButton = app.buttons["draftEditButton"]
+
+        XCTAssertTrue(lockButton.waitForExistence(timeout: 5))
+        XCTAssertEqual(lockButton.label, "解冻草稿区")
+        XCTAssertEqual(lockButton.value as? String, "冻结")
+        XCTAssertTrue(exchangeButton.waitForExistence(timeout: 3))
+        XCTAssertFalse(exchangeButton.isEnabled)
+        XCTAssertFalse(addButton.isEnabled)
+        XCTAssertFalse(editButton.isEnabled)
+        XCTAssertTrue(lockButton.isHittable)
+
+        lockButton.tap()
+
+        XCTAssertEqual(lockButton.label, "冻结草稿区")
+        XCTAssertEqual(lockButton.value as? String, "解冻")
+        XCTAssertTrue(exchangeButton.isEnabled)
+        XCTAssertTrue(addButton.isEnabled)
+        XCTAssertTrue(editButton.isEnabled)
+        XCTAssertTrue(addButton.isHittable)
+        XCTAssertTrue(editButton.isHittable)
+    }
+
+    func testFlexibleExecutionExchangeSwapsFirstQueueTaskIntoFocus() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedFlexibleExecution",
+            "1"
+        ]
+        app.launch()
+
+        let lockButton = app.buttons["executionQueueLockButton"]
+        let exchangeButton = app.buttons["focusExchangeButton"]
+        XCTAssertTrue(lockButton.waitForExistence(timeout: 5))
+        lockButton.tap()
+        XCTAssertTrue(exchangeButton.waitForExistence(timeout: 3))
+        exchangeButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Flexible Queue Task"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["draftTaskTitle_0"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["draftTaskTitle_0"].label, "Flexible Focus Task")
+    }
+
+    func testSettingsExecutionModePickerCanSelectFlexibleMode() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let settingsTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
+        settingsTab.tap()
+
+        let picker = app.segmentedControls["executionModePicker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 3))
+        let flexibleButton = picker.buttons["灵动模式"]
+        XCTAssertTrue(flexibleButton.exists)
+        flexibleButton.tap()
+        XCTAssertTrue(flexibleButton.isSelected)
     }
 
     func testDraftShowsFloatingStartButton() {
@@ -179,6 +287,8 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
         mindStampsSeeAll.tap()
 
+        XCTAssertTrue(app.navigationBars["呆胶布"].waitForExistence(timeout: 3))
+
         let toolbarCreateButton = app.buttons["mindstampsToolbarCreateButton"]
         XCTAssertTrue(toolbarCreateButton.waitForExistence(timeout: 5))
         toolbarCreateButton.tap()
@@ -186,11 +296,23 @@ final class DraftReorderUITests: XCTestCase {
         let editorTextField = app.textFields["mindstampEditorTextField"]
         XCTAssertTrue(editorTextField.waitForExistence(timeout: 3))
         editorTextField.tap()
-        editorTextField.typeText("测试思想钢印")
+        editorTextField.typeText("测试呆胶布")
 
         let saveButton = app.buttons["mindstampEditorSaveButton"]
         XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
         saveButton.tap()
+
+        let itemCard = app.buttons["mindstampItemCard_0"]
+        let itemMeta = app.staticTexts["mindstampItemMeta_0"]
+        XCTAssertTrue(itemCard.waitForExistence(timeout: 5))
+        XCTAssertTrue(itemMeta.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["测试呆胶布"].exists)
+
+        itemCard.tap()
+        XCTAssertTrue(app.navigationBars["编辑呆胶布"].waitForExistence(timeout: 3))
+        let cancelEditButton = app.buttons["取消"]
+        XCTAssertTrue(cancelEditButton.waitForExistence(timeout: 2))
+        cancelEditButton.tap()
 
         let stampDeleteButton = app.buttons["mindstampDeleteButton_0"]
         XCTAssertTrue(stampDeleteButton.waitForExistence(timeout: 5))
@@ -224,7 +346,7 @@ final class DraftReorderUITests: XCTestCase {
 
         let hintLabel = app.staticTexts["mindstampEmptyCreateHint"]
         XCTAssertTrue(hintLabel.waitForExistence(timeout: 3))
-        XCTAssertEqual(hintLabel.label, "右上角点 + 新建思想钢印")
+        XCTAssertEqual(hintLabel.label, "右上角点 + 新建呆胶布")
     }
 
     func testPendingWeekDetailShowsDraftCrudEntryPoints() {
@@ -344,6 +466,23 @@ final class DraftReorderUITests: XCTestCase {
         let weekButton = app.buttons["todaySectionWeekButton"]
         XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
         weekButton.tap()
+
+        let topology = app.descendants(matching: .any)["weekTopologyView"]
+        XCTAssertTrue(topology.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["weekTopologyDay_0"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["weekTopologyDay_6"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["weekTopologyInspector"].waitForExistence(timeout: 3))
+
+        app.buttons["weekTopologyDay_0"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["weekTopologyInspector"].exists)
+
+        let fullScreenButton = app.buttons["weekTopologyFullscreenButton"]
+        XCTAssertTrue(fullScreenButton.waitForExistence(timeout: 3))
+        fullScreenButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["weekTopologyFullscreen"].waitForExistence(timeout: 3))
+        let closeFullScreen = app.buttons["weekTopologyFullscreenCloseButton"]
+        XCTAssertTrue(closeFullScreen.waitForExistence(timeout: 3))
+        closeFullScreen.tap()
 
         let cardsGrid = app.descendants(matching: .any)["weekOverviewCardsGrid"]
         XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))

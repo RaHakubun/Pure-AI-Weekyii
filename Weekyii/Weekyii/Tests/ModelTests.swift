@@ -5,6 +5,113 @@ import SwiftUI
 @testable import Weekyii
 
 final class ModelTests: XCTestCase {
+    private static var retainedUserSettings: [UserSettings] = []
+
+    @MainActor
+    func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
+        let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.defaultExecutionMode, .strict)
+
+        settings.defaultExecutionMode = .flexible
+        XCTAssertEqual(defaults.string(forKey: "defaultExecutionMode"), ExecutionMode.flexible.rawValue)
+    }
+
+    @MainActor
+    func test_persistentContainer_migratesV4DayToStrictLockedV5Defaults() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let legacySchema = Schema(versionedSchema: WeekyiiSchemaV4.self)
+        let legacyConfig = ModelConfiguration(
+            "Weekyii",
+            schema: legacySchema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfig)
+        let legacyContext = legacyContainer.mainContext
+        let date = Date().startOfDay
+        let week = WeekyiiSchemaV4.WeekModel(
+            weekId: date.weekId,
+            startDate: date.startOfWeek,
+            endDate: date.startOfWeek.addingDays(6),
+            status: .present
+        )
+        let day = WeekyiiSchemaV4.DayModel(
+            dayId: date.dayId,
+            date: date,
+            dayOfWeek: date.dayOfWeekShort,
+            status: .execute
+        )
+        week.days.append(day)
+        legacyContext.insert(week)
+        try legacyContext.save()
+
+        let migratedContainer = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let days = try migratedContainer.mainContext.fetch(FetchDescriptor<DayModel>())
+
+        XCTAssertFalse(days.isEmpty)
+        XCTAssertTrue(days.allSatisfy { $0.executionMode == .strict })
+        XCTAssertTrue(days.allSatisfy { !$0.isDraftZoneUnlocked })
+    }
+
+    @MainActor
+    func test_persistentContainer_migratesV2StoreThroughFrozenHistoricalSchemas() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let legacySchema = Schema(versionedSchema: WeekyiiSchemaV2.self)
+        let legacyConfig = ModelConfiguration(
+            "Weekyii",
+            schema: legacySchema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfig)
+        let project = WeekyiiSchemaV4.ProjectModel(
+            name: "V2 Project",
+            startDate: Date(timeIntervalSince1970: 100),
+            endDate: Date(timeIntervalSince1970: 200)
+        )
+        legacyContainer.mainContext.insert(project)
+        try legacyContainer.mainContext.save()
+
+        let migratedContainer = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let projects = try migratedContainer.mainContext.fetch(FetchDescriptor<ProjectModel>())
+
+        XCTAssertEqual(projects.map(\.name), ["V2 Project"])
+    }
+
+    @MainActor
+    func test_persistentContainer_migratesV3SuspendedTaskStoreToV5() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let legacySchema = Schema(versionedSchema: WeekyiiSchemaV3.self)
+        let legacyConfig = ModelConfiguration(
+            "Weekyii",
+            schema: legacySchema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfig)
+        let suspended = WeekyiiSchemaV3.SuspendedTaskItem(
+            title: "V3 Suspended",
+            decisionDeadline: Date(timeIntervalSince1970: 300),
+            preferredCountdownDays: 3
+        )
+        legacyContainer.mainContext.insert(suspended)
+        try legacyContainer.mainContext.save()
+
+        let migratedContainer = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let tasks = try migratedContainer.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>())
+
+        XCTAssertEqual(tasks.map(\.title), ["V3 Suspended"])
+        XCTAssertTrue(tasks.allSatisfy { $0.steps.isEmpty && $0.attachments.isEmpty })
+    }
+
     @MainActor
     func test_persistentContainer_migratesLegacyProjectTilesStore() throws {
         let storeURL = try makeTemporaryStoreURL()
@@ -295,6 +402,106 @@ final class ModelTests: XCTestCase {
         let summary = WeekOverviewDayStripSummary(day: day)
 
         XCTAssertEqual(summary.highlight, .completed("1 项已完成"))
+    }
+
+    func test_weekTopologySnapshot_mapsResultCountsAndStableIDs() {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        let day = DayModel(dayId: start.dayId, date: start, status: .execute)
+        day.expiredCount = 2
+        day.tasks.append(TaskItem(title: "Focus", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Frozen", order: 2, zone: .frozen))
+        day.tasks.append(TaskItem(title: "Draft", order: 3, zone: .draft))
+        let completed = TaskItem(title: "Done", order: 4, zone: .complete)
+        completed.completedOrder = 1
+        day.tasks.append(completed)
+        week.days.append(day)
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let topologyDay = try! XCTUnwrap(snapshot.days.first)
+
+        XCTAssertEqual(topologyDay.id, "day:\(day.dayId)")
+        XCTAssertEqual(topologyDay.remainingCount, 3)
+        XCTAssertEqual(topologyDay.completedCount, 1)
+        XCTAssertEqual(topologyDay.forgottenCount, 2)
+        XCTAssertEqual(topologyDay.totalCount, 6)
+        XCTAssertEqual(snapshot.totalCount, 6)
+    }
+
+    func test_weekTopologySnapshot_ordersRemainingAndCompletedTasks() {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        let day = DayModel(dayId: start.dayId, date: start, status: .execute)
+        day.tasks.append(TaskItem(title: "Draft 2", order: 4, zone: .draft))
+        day.tasks.append(TaskItem(title: "Frozen 2", order: 3, zone: .frozen))
+        day.tasks.append(TaskItem(title: "Focus", order: 1, zone: .focus))
+        day.tasks.append(TaskItem(title: "Frozen 1", order: 2, zone: .frozen))
+        day.tasks.append(TaskItem(title: "Draft 1", order: 3, zone: .draft))
+        let doneSecond = TaskItem(title: "Done 2", order: 6, zone: .complete)
+        doneSecond.completedOrder = 2
+        let doneFirst = TaskItem(title: "Done 1", order: 5, zone: .complete)
+        doneFirst.completedOrder = 1
+        day.tasks.append(contentsOf: [doneSecond, doneFirst])
+        week.days.append(day)
+
+        let topologyDay = WeekTopologySnapshot(week: week).days[0]
+
+        XCTAssertEqual(topologyDay.remainingTasks.map(\.title), [
+            "Focus", "Frozen 1", "Frozen 2", "Draft 1", "Draft 2"
+        ])
+        XCTAssertEqual(topologyDay.completedTasks.map(\.title), ["Done 1", "Done 2"])
+    }
+
+    func test_weekTopologySnapshot_createsAnonymousForgottenNodesOnly() {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        let day = DayModel(dayId: start.dayId, date: start, status: .expired)
+        day.expiredCount = 3
+        week.days.append(day)
+
+        let topologyDay = WeekTopologySnapshot(week: week).days[0]
+
+        XCTAssertEqual(topologyDay.forgottenNodes.map(\.id), [
+            "forgotten:\(day.dayId):0",
+            "forgotten:\(day.dayId):1",
+            "forgotten:\(day.dayId):2"
+        ])
+        XCTAssertTrue(topologyDay.forgottenNodes.allSatisfy { $0.title == nil })
+    }
+
+    func test_weekTopologySemanticLevel_usesStableScaleThresholds() {
+        XCTAssertEqual(WeekTopologySemanticLevel(scale: 1.0), .overview)
+        XCTAssertEqual(WeekTopologySemanticLevel(scale: 1.65), .groups)
+        XCTAssertEqual(WeekTopologySemanticLevel(scale: 2.45), .tasks)
+    }
+
+    func test_weekTopologyLayout_placesSevenDaysOnHorizontalSpine() {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let snapshot = WeekTopologySnapshot(week: week)
+
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let dayPoints = snapshot.days.compactMap { layout.positions[$0.id] }
+
+        XCTAssertEqual(dayPoints.count, 7)
+        XCTAssertEqual(Set(dayPoints.map(\.y)).count, 1)
+        XCTAssertTrue(zip(dayPoints, dayPoints.dropFirst()).allSatisfy { $0.x < $1.x })
+        XCTAssertGreaterThan(layout.contentBounds.width, layout.contentBounds.height)
     }
 
     func test_suspendedCountdownPreset_defaults() {
@@ -1010,6 +1217,17 @@ final class TaskPostponeServiceTests: XCTestCase {
         let createdDay = createdWeek?.days.first(where: { $0.dayId == targetDate.dayId })
         XCTAssertEqual(createdDay?.status, .draft)
         XCTAssertEqual(createdDay?.sortedDraftTasks.first?.title, "MissingWeek")
+    }
+
+    func test_pendingViewModel_onlyIncludesWeeksAfterCurrentWeek() {
+        let today = makeDate(2026, 6, 21, 13, 14)
+        let stalePendingWeek = WeekCalculator().makeWeek(for: today.addingDays(-14), status: .pending)
+        let currentPendingWeek = WeekCalculator().makeWeek(for: today, status: .pending)
+        let futurePendingWeek = WeekCalculator().makeWeek(for: today.addingDays(7), status: .pending)
+
+        XCTAssertFalse(PendingViewModel.isFutureWeek(stalePendingWeek, relativeTo: today))
+        XCTAssertFalse(PendingViewModel.isFutureWeek(currentPendingWeek, relativeTo: today))
+        XCTAssertTrue(PendingViewModel.isFutureWeek(futurePendingWeek, relativeTo: today))
     }
 
     @MainActor

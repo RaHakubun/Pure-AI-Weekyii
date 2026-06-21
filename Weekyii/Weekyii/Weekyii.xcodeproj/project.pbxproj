@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
+		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
@@ -29,6 +30,8 @@
 		944E58612F2B593A00DB2DEE /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58092F2B593A00DB2DEE /* AppState.swift */; };
 		944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581D2F2B593A00DB2DEE /* DayCardView.swift */; };
 		944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */; };
+		C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00230A0000100BEEF01 /* WeekTopology.swift */; };
+		C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */; };
 		944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580A2F2B593A00DB2DEE /* ContentView.swift */; };
 		944E58662F2B593A00DB2DEE /* DayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58232F2B593A00DB2DEE /* DayStatus.swift */; };
 		944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58182F2B593A00DB2DEE /* FocusZoneView.swift */; };
@@ -179,6 +182,8 @@
 		944E581D2F2B593A00DB2DEE /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		944E581E2F2B593A00DB2DEE /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
 		944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
+		C0D3A00230A0000100BEEF01 /* WeekTopology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopology.swift; sourceTree = "<group>"; };
+		C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopologyView.swift; sourceTree = "<group>"; };
 		944E58202F2B593A00DB2DEE /* WeekViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekViewModel.swift; sourceTree = "<group>"; };
 		944E58232F2B593A00DB2DEE /* DayStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayStatus.swift; sourceTree = "<group>"; };
 		944E58242F2B593A00DB2DEE /* TaskType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskType.swift; sourceTree = "<group>"; };
@@ -251,6 +256,7 @@
 		B20000072F90000000AAA001 /* Weekyii.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Weekyii.entitlements; sourceTree = "<group>"; };
 		B20000082F90000000AAA001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderedTaskRow.swift; sourceTree = "<group>"; };
 		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
 		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
@@ -378,6 +384,8 @@
 				944E581D2F2B593A00DB2DEE /* DayCardView.swift */,
 				944E581E2F2B593A00DB2DEE /* DayDetailView.swift */,
 				944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */,
+				C0D3A00230A0000100BEEF01 /* WeekTopology.swift */,
+				C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */,
 				944E58202F2B593A00DB2DEE /* WeekViewModel.swift */,
 			);
 			path = Week;
@@ -459,6 +467,7 @@
 				94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */,
 				94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */,
 				C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */,
+				C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */,
 				94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */,
 				94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */,
 				94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */,
@@ -761,6 +770,7 @@
 				944E585B2F2B593A00DB2DEE /* CreateWeekSheet.swift in Sources */,
 				944E585C2F2B593A00DB2DEE /* TaskRowView.swift in Sources */,
 				224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */,
+				C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */,
 				944E585D2F2B593A00DB2DEE /* CompleteZoneView.swift in Sources */,
 				94E266502F2E5D180083581A /* PendingWeekDetailView.swift in Sources */,
 				944E585F2F2B593A00DB2DEE /* NotificationService.swift in Sources */,
@@ -769,6 +779,8 @@
 				944E58612F2B593A00DB2DEE /* AppState.swift in Sources */,
 				944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */,
 				944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */,
+				C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */,
+				C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */,
 				94C1D0ED2F3F64DC00AA8E13 /* AddProjectTaskSheet.swift in Sources */,
 				94C1D0EE2F3F64DC00AA8E13 /* CreateProjectSheet.swift in Sources */,
 				94C1D0EF2F3F64DC00AA8E13 /* ProjectDetailView.swift in Sources */,

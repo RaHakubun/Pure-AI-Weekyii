@@ -13,6 +13,9 @@ enum WeekyiiError: LocalizedError {
     case postponeSourceTaskNotInToday
     case cannotPostponeCompletedTask
     case postponeTargetDayUnavailable
+    case flexibleModeRequired
+    case draftZoneLocked
+    case executionQueueEmpty
 
     var errorDescription: String? {
         switch self {
@@ -40,6 +43,12 @@ enum WeekyiiError: LocalizedError {
             return "已完成任务不可后移。"
         case .postponeTargetDayUnavailable:
             return "目标日期不可接收后移任务。"
+        case .flexibleModeRequired:
+            return "该操作仅适用于灵动模式。"
+        case .draftZoneLocked:
+            return "草稿区仍处于冻结状态。"
+        case .executionQueueEmpty:
+            return "草稿区没有可交换的任务。"
         }
     }
 }

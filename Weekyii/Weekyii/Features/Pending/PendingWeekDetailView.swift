@@ -151,19 +151,20 @@ struct PendingWeekDetailView: View {
     @ToolbarContentBuilder
     private var draftToolbar: some ToolbarContent {
         if isSelectedDayEditable {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showingAddSheet = true
                 } label: {
-                    Image(systemName: "plus.circle")
+                    Image(systemName: "plus")
                 }
                 .accessibilityIdentifier("pendingDraftAddButton")
-            }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(isEditingDraft ? String(localized: "action.done") : String(localized: "action.edit")) {
+                Button {
                     editMode?.wrappedValue = isEditingDraft ? .inactive : .active
+                } label: {
+                    Image(systemName: isEditingDraft ? "checkmark" : "pencil")
                 }
+                .accessibilityLabel(isEditingDraft ? String(localized: "action.done") : String(localized: "action.edit"))
                 .accessibilityIdentifier("pendingDraftEditButton")
             }
         }
@@ -371,11 +372,23 @@ struct PendingWeekDetailView: View {
     }
 
     private func readOnlyTaskList(_ tasks: [TaskItem]) -> some View {
-        VStack(spacing: WeekSpacing.sm) {
-            ForEach(tasks, id: \.id) { task in
-                TaskRowView(task: task, showsProjectOrigin: task.zone == .draft)
+        VStack(spacing: 0) {
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                OrderedTaskRow(task: task, index: index, showsChevron: false)
+
+                if index < tasks.count - 1 {
+                    Divider()
+                        .padding(.leading, 56)
+                }
             }
         }
+        .padding(.horizontal, WeekSpacing.md)
+        .background(Color.backgroundPrimary.opacity(0.55))
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .stroke(Color.backgroundTertiary, lineWidth: 1)
+        )
     }
 
     private var draftDaysCount: Int {
@@ -494,12 +507,16 @@ private struct PendingEditableDraftTaskRow: View {
             Button {
                 onTaskTap()
             } label: {
-                TaskRowView(task: task, showsProjectOrigin: true)
+                OrderedTaskRow(
+                    task: task,
+                    index: index,
+                    showsChevron: !isEditingDraft,
+                    accessibilityIdentifier: "pendingDraftTask_\(index)"
+                )
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
             .disabled(isEditingDraft)
-            .accessibilityIdentifier("pendingDraftTask_\(index)")
 
             if isEditingDraft {
                 HStack(spacing: WeekSpacing.xs) {
