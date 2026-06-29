@@ -39,14 +39,17 @@ struct ProjectDetailView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments
-            ) { title, description, type, steps, attachments in
+            ) { _, _, _, _, _ in
+            } onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                 viewModel.updateProjectTask(
                     task,
                     title: title,
                     description: description,
                     type: type,
+                    taskTypeIdRaw: typeIdRaw,
                     steps: steps,
                     attachments: attachments
                 )

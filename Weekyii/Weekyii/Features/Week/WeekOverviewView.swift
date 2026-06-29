@@ -295,6 +295,7 @@ struct WeekOverviewContentView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
                 onSave: { _, _, _, _, _ in }

@@ -22,6 +22,80 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_userSettings_defaultTaskTypeIdPersistsSelection() {
+        let suiteName = "ModelTests.TaskTypeId.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.defaultTaskTypeIdRaw, TaskType.regular.rawValue)
+
+        settings.defaultTaskTypeIdRaw = "custom-focus"
+        XCTAssertEqual(defaults.string(forKey: "defaultTaskTypeId"), "custom-focus")
+    }
+
+    @MainActor
+    func test_taskTypeCatalogSeedsBuiltInDefinitions() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+
+        try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: context)
+        let definitions = try context.fetch(FetchDescriptor<TaskTypeDefinition>())
+            .sorted { $0.sortOrder < $1.sortOrder }
+
+        XCTAssertEqual(definitions.map(\.idRaw), ["regular", "ddl", "leisure"])
+        XCTAssertEqual(definitions.map(\.baseKind), [.regular, .ddl, .leisure])
+        XCTAssertTrue(definitions.allSatisfy(\.isBuiltIn))
+    }
+
+    @MainActor
+    func test_taskTypeCatalogResolvesCustomDefinitionAndFallback() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: context)
+        let custom = TaskTypeDefinition(
+            idRaw: "custom-writing",
+            name: "写作",
+            iconName: "pencil.line",
+            colorHex: "#4D9DE0",
+            baseKind: .ddl,
+            sortOrder: 10,
+            isBuiltIn: false
+        )
+        context.insert(custom)
+        try context.save()
+
+        let catalog = try TaskTypeCatalog.load(in: context)
+
+        XCTAssertEqual(catalog.definition(for: "custom-writing").name, "写作")
+        XCTAssertEqual(catalog.baseKind(for: "custom-writing"), .ddl)
+        XCTAssertEqual(catalog.definition(for: "missing").idRaw, TaskType.regular.rawValue)
+    }
+
+    @MainActor
+    func test_taskMutationStoresCustomTaskTypeIdAndBaseKind() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: context)
+
+        let day = DayModel(dayId: "2026-06-28", date: Date(timeIntervalSince1970: 1), status: .empty)
+        context.insert(day)
+        let service = TaskMutationService(modelContext: context)
+        let payload = TaskDraftPayload(
+            title: "Write launch note",
+            description: "",
+            type: .ddl,
+            taskTypeIdRaw: "custom-writing"
+        )
+
+        let task = try service.createTask(in: day, payload: payload, zone: .draft, project: nil)
+
+        XCTAssertEqual(task.taskTypeIdRaw, "custom-writing")
+        XCTAssertEqual(task.taskType, .ddl)
+    }
+
+    @MainActor
     func test_persistentContainer_migratesV4DayToStrictLockedV5Defaults() throws {
         let storeURL = try makeTemporaryStoreURL()
         let legacySchema = Schema(versionedSchema: WeekyiiSchemaV4.self)

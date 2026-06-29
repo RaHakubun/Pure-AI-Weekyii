@@ -153,7 +153,7 @@ final class TodayViewModel {
         randomMindStampProvider()
     }
 
-    func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
+    func addTask(title: String, description: String = "", type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
 
@@ -161,6 +161,7 @@ final class TodayViewModel {
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -170,13 +171,14 @@ final class TodayViewModel {
         syncToday()
     }
 
-    func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
+    func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let payload = TaskDraftPayload(
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -269,6 +271,7 @@ final class TodayViewModel {
         title: String,
         description: String = "",
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = []
     ) throws {
@@ -277,6 +280,7 @@ final class TodayViewModel {
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -292,6 +296,7 @@ final class TodayViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep],
         attachments: [TaskAttachment]
     ) throws {
@@ -304,6 +309,7 @@ final class TodayViewModel {
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )

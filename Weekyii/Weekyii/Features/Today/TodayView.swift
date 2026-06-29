@@ -155,6 +155,7 @@ struct TodayView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
                 onSave: { _, _, _, _, _ in }
@@ -788,7 +789,9 @@ struct TodayView: View {
             TaskEditorSheet(
                 title: String(localized: "draft.add_title"),
                 initialType: userSettings.defaultTaskType,
-                onSave: { title, description, type, steps, attachments in
+                initialTypeIdRaw: userSettings.defaultTaskTypeIdRaw,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                     guard let viewModel else { return }
                     do {
                         switch context {
@@ -797,6 +800,7 @@ struct TodayView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -805,6 +809,7 @@ struct TodayView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -821,9 +826,11 @@ struct TodayView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
-                onSave: { title, description, type, steps, attachments in
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                     guard let viewModel else { return }
                     do {
                         switch context {
@@ -833,6 +840,7 @@ struct TodayView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -842,6 +850,7 @@ struct TodayView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )

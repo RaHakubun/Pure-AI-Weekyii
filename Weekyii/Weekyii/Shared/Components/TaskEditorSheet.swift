@@ -9,13 +9,17 @@ struct TaskEditorSheet: View {
     @State var taskTitle: String
     @State var taskDescription: String
     @State var taskType: TaskType
+    @State private var taskTypeIdRaw: String
+    @State private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var stepDrafts: [TaskStepDraft]
     @State var attachments: [TaskAttachment]
     
     // Config for save callback: returns necessary data
     var onSave: (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
+    var onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)?
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     // Step editing state
     @State private var newStepTitle: String = ""
@@ -33,15 +37,19 @@ struct TaskEditorSheet: View {
         initialTitle: String = "",
         initialDescription: String = "",
         initialType: TaskType = .regular,
+        initialTypeIdRaw: String? = nil,
         initialSteps: [TaskStep] = [],
         initialAttachments: [TaskAttachment] = [],
-        onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
+        onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void,
+        onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)? = nil
     ) {
         self.title = title
         self.isReadOnly = isReadOnly
         _taskTitle = State(initialValue: initialTitle)
         _taskDescription = State(initialValue: initialDescription)
         _taskType = State(initialValue: initialType)
+        _taskTypeIdRaw = State(initialValue: initialTypeIdRaw ?? initialType.rawValue)
+        _taskTypeDefinitions = State(initialValue: TaskTypeDefinition.builtInDefinitions())
         _stepDrafts = State(initialValue: initialSteps
             .sorted {
                 if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
@@ -59,17 +67,18 @@ struct TaskEditorSheet: View {
         )
         _attachments = State(initialValue: initialAttachments)
         self.onSave = onSave
+        self.onSaveWithTypeId = onSaveWithTypeId
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    WeekCard(accentColor: taskType.color) {
+                    WeekCard(accentColor: selectedTaskTypeDefinition.color) {
                         sectionHeader(
                             titleKey: "task.basic_info",
                             icon: "text.badge.plus",
-                            accent: taskType.color
+                            accent: selectedTaskTypeDefinition.color
                         )
                         
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
@@ -94,11 +103,14 @@ struct TaskEditorSheet: View {
                                     .font(.captionBold)
                                     .foregroundColor(.textSecondary)
                                 
-                                HStack(spacing: WeekSpacing.sm) {
-                                    ForEach(TaskType.allCases, id: \.self) { type in
-                                        taskTypeChip(for: type)
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: WeekSpacing.xs) {
+                                        ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
+                                            taskTypeChip(for: definition)
+                                        }
                                     }
                                 }
+                                .scrollIndicators(.hidden)
                             }
                         }
                     }
@@ -202,7 +214,11 @@ struct TaskEditorSheet: View {
                                         sortOrder: draft.sortOrder
                                     )
                                 }
-                            onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
+                            if let onSaveWithTypeId {
+                                onSaveWithTypeId(taskTitle, taskDescription, taskType, taskTypeIdRaw, normalizedSteps, attachments)
+                            } else {
+                                onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
+                            }
                         }
                         .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityIdentifier("taskEditorSaveButton")
@@ -224,6 +240,9 @@ struct TaskEditorSheet: View {
         .fullScreenCover(item: $imagePreviewItem) { item in
             ImageViewerScreen(image: item.image)
         }
+        .task {
+            loadTaskTypeDefinitions()
+        }
     }
 
     private func sectionHeader(titleKey: LocalizedStringKey, icon: String, accent: Color) -> some View {
@@ -237,23 +256,57 @@ struct TaskEditorSheet: View {
         }
     }
     
-    private func taskTypeChip(for type: TaskType) -> some View {
-        let isSelected = taskType == type
-        
-        return Button(action: { taskType = type }) {
+    private var selectedTaskTypeDefinition: TaskTypeDefinition {
+        taskTypeDefinitions.first { $0.idRaw == taskTypeIdRaw }
+            ?? taskTypeDefinitions.first { $0.idRaw == taskType.rawValue }
+            ?? TaskTypeCatalog.builtInFallback
+    }
+
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        let merged = active.contains(where: { $0.idRaw == taskTypeIdRaw })
+            ? active
+            : active + [selectedTaskTypeDefinition]
+        return merged.sorted { lhs, rhs in
+            if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func loadTaskTypeDefinitions() {
+        do {
+            taskTypeDefinitions = try TaskTypeCatalog.load(in: modelContext).definitions
+            let selected = selectedTaskTypeDefinition
+            taskType = selected.baseKind
+            taskTypeIdRaw = selected.idRaw
+        } catch {
+            taskTypeDefinitions = TaskTypeDefinition.builtInDefinitions()
+        }
+    }
+
+    private func taskTypeChip(for definition: TaskTypeDefinition) -> some View {
+        let isSelected = taskTypeIdRaw == definition.idRaw
+        let color = definition.color
+
+        return Button(action: {
+            taskTypeIdRaw = definition.idRaw
+            taskType = definition.baseKind
+        }) {
             HStack(spacing: WeekSpacing.xs) {
-                Image(systemName: type.iconName)
-                Text(type.displayName)
+                Image(systemName: definition.iconName)
+                    .font(.caption)
+                Text(definition.name)
                     .font(.captionBold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
-            .foregroundColor(isSelected ? type.color : .textSecondary)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(isSelected ? type.color.opacity(0.15) : Color.backgroundTertiary)
+            .foregroundColor(isSelected ? color : .textSecondary)
+            .frame(width: 78, height: 34)
+            .background(isSelected ? color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(isSelected ? type.color : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? color : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

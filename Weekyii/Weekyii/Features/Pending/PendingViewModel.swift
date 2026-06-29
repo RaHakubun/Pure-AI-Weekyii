@@ -205,13 +205,14 @@ final class PendingViewModel {
         let allDays = (try? modelContext.fetch(descriptor)) ?? []
 
         var result: [String: MonthDaySummary] = [:]
+        let catalog = try? TaskTypeCatalog.load(in: modelContext)
         for day in allDays {
             let dayDate = calendar.startOfDay(for: day.date)
             guard dayDate >= monthStart, dayDate < monthEnd else { continue }
 
-            let regularCount = day.tasks.filter { $0.taskType == .regular }.count
-            let ddlCount = day.tasks.filter { $0.taskType == .ddl }.count
-            let leisureCount = day.tasks.filter { $0.taskType == .leisure }.count
+            let regularCount = day.tasks.filter { taskBaseKind($0, catalog: catalog) == .regular }.count
+            let ddlCount = day.tasks.filter { taskBaseKind($0, catalog: catalog) == .ddl }.count
+            let leisureCount = day.tasks.filter { taskBaseKind($0, catalog: catalog) == .leisure }.count
             let summary = MonthDaySummary(
                 dayId: day.dayId,
                 regularCount: regularCount,
@@ -236,10 +237,10 @@ final class PendingViewModel {
     }
 
     func weekOutlook(for week: WeekModel) -> WeekOutlookSnapshot {
-        Self.buildWeekOutlook(for: week)
+        Self.buildWeekOutlook(for: week, catalog: try? TaskTypeCatalog.load(in: modelContext))
     }
 
-    static func buildWeekOutlook(for week: WeekModel) -> WeekOutlookSnapshot {
+    static func buildWeekOutlook(for week: WeekModel, catalog: TaskTypeCatalog? = nil) -> WeekOutlookSnapshot {
         let calendar = Calendar(identifier: .iso8601)
         let start = calendar.startOfDay(for: week.startDate)
         let dayMap = Dictionary(
@@ -256,9 +257,9 @@ final class PendingViewModel {
             guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { continue }
             let day = dayMap[date]
             let tasks = day?.tasks ?? []
-            regularSeries.append(tasks.filter { $0.taskType == .regular }.count)
-            ddlSeries.append(tasks.filter { $0.taskType == .ddl }.count)
-            leisureSeries.append(tasks.filter { $0.taskType == .leisure }.count)
+            regularSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .regular }.count)
+            ddlSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .ddl }.count)
+            leisureSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .leisure }.count)
             dayLabels.append(Self.weekdayLabel(for: date))
         }
 
@@ -346,6 +347,14 @@ final class PendingViewModel {
         )
     }
 
+    private static func taskBaseKind(_ task: TaskItem, catalog: TaskTypeCatalog?) -> TaskType {
+        catalog?.baseKind(for: task.taskTypeIdRaw) ?? task.taskType
+    }
+
+    private func taskBaseKind(_ task: TaskItem, catalog: TaskTypeCatalog?) -> TaskType {
+        Self.taskBaseKind(task, catalog: catalog)
+    }
+
     func day(in week: WeekModel, for date: Date) -> DayModel? {
         let targetDayId = calendar.startOfDay(for: date).dayId
         return week.days.first { $0.dayId == targetDayId }
@@ -411,6 +420,7 @@ final class PendingViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep],
         attachments: [TaskAttachment]
     ) throws {
@@ -419,6 +429,7 @@ final class PendingViewModel {
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -432,6 +443,7 @@ final class PendingViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep],
         attachments: [TaskAttachment]
     ) throws {
@@ -440,6 +452,7 @@ final class PendingViewModel {
             title: title,
             description: description,
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )

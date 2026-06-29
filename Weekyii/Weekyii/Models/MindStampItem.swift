@@ -33,6 +33,7 @@ final class SuspendedTaskItem {
     var title: String
     var taskDescription: String
     var taskType: TaskType
+    var taskTypeIdRaw: String = TaskType.regular.rawValue
     var createdAt: Date
     var decisionDeadline: Date
     var preferredCountdownDays: Int
@@ -54,6 +55,7 @@ final class SuspendedTaskItem {
         self.title = title
         self.taskDescription = taskDescription
         self.taskType = taskType
+        self.taskTypeIdRaw = taskType.rawValue
         self.createdAt = createdAt
         self.decisionDeadline = decisionDeadline
         self.preferredCountdownDays = preferredCountdownDays

@@ -87,7 +87,10 @@ struct PendingView: View {
             }) { target in
                 TaskEditorSheet(
                     title: String(localized: "draft.add_title"),
-                    onSave: { title, description, type, steps, attachments in
+                    initialType: settings.defaultTaskType,
+                    initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
+                    onSave: { _, _, _, _, _ in },
+                    onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                         guard let viewModel else { return }
                         do {
                             try viewModel.addDraftTask(
@@ -95,6 +98,7 @@ struct PendingView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -114,9 +118,11 @@ struct PendingView: View {
                     initialTitle: target.task.title,
                     initialDescription: target.task.taskDescription,
                     initialType: target.task.taskType,
+                    initialTypeIdRaw: target.task.taskTypeIdRaw,
                     initialSteps: target.task.steps,
                     initialAttachments: target.task.attachments,
-                    onSave: { title, description, type, steps, attachments in
+                    onSave: { _, _, _, _, _ in },
+                    onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                         guard let viewModel else { return }
                         do {
                             try viewModel.updateDraftTask(
@@ -125,6 +131,7 @@ struct PendingView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -143,6 +150,7 @@ struct PendingView: View {
                     initialTitle: task.title,
                     initialDescription: task.taskDescription,
                     initialType: task.taskType,
+                    initialTypeIdRaw: task.taskTypeIdRaw,
                     initialSteps: task.steps,
                     initialAttachments: task.attachments,
                     onSave: { _, _, _, _, _ in }

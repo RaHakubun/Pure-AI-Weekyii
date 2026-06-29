@@ -88,6 +88,7 @@ final class ExtensionsViewModel {
         title: String,
         description: String = "",
         taskType: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = [],
         on date: Date
@@ -132,6 +133,7 @@ final class ExtensionsViewModel {
             title: title.trimmingCharacters(in: .whitespaces),
             description: description.trimmingCharacters(in: .whitespacesAndNewlines),
             type: taskType,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -420,6 +422,7 @@ final class ExtensionsViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = []
     ) {
@@ -433,6 +436,7 @@ final class ExtensionsViewModel {
             title: normalizedTitle,
             description: description.trimmingCharacters(in: .whitespacesAndNewlines),
             type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
             steps: steps,
             attachments: attachments
         )
@@ -752,6 +756,7 @@ struct SuspendedTaskLifecycleService {
             order: order,
             zone: .draft
         )
+        taskItem.taskTypeIdRaw = task.taskTypeIdRaw
         replaceSteps(for: taskItem, with: task.steps)
         replaceAttachments(for: taskItem, with: task.attachments)
         targetDay.tasks.append(taskItem)

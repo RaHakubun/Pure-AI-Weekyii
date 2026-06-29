@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
     @State private var pendingDefaultKillTimeHour = 0
@@ -16,6 +17,8 @@ struct SettingsView: View {
     @State private var showingDefaultKillTimeRiskConfirm = false
     @State private var showingCannotSyncExpiredTodayAlert = false
     @State private var showingRestoreBackupConfirm = false
+    @State private var showingCreateTaskType = false
+    @State private var editingTaskTypeIdRaw: String?
     
     var body: some View {
         NavigationStack {
@@ -126,6 +129,25 @@ struct SettingsView: View {
         } message: {
             Text("将直接替换当前数据库文件，可能丢失最新数据。")
         }
+        .sheet(isPresented: $showingCreateTaskType) {
+            TaskTypeDefinitionEditorSheet { name, iconName, colorHex in
+                createTaskType(name: name, iconName: iconName, colorHex: colorHex)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { editingTaskTypeIdRaw != nil },
+            set: { if !$0 { editingTaskTypeIdRaw = nil } }
+        )) {
+            if let definition = taskTypeDefinitions.first(where: { $0.idRaw == editingTaskTypeIdRaw }) {
+                TaskTypeDefinitionEditorSheet(definition: definition) { name, iconName, colorHex in
+                    updateTaskType(definition, name: name, iconName: iconName, colorHex: colorHex)
+                    editingTaskTypeIdRaw = nil
+                } onArchive: {
+                    archiveTaskType(definition)
+                    editingTaskTypeIdRaw = nil
+                }
+            }
+        }
     }
 
     // MARK: - Present
@@ -136,6 +158,7 @@ struct SettingsView: View {
             killTimeSettings
             reminderSettings
             taskTypeSettings
+            taskTypeManagementSettings
         } header: {
             Text(String(localized: "settings.section.present", defaultValue: "当下"))
         }
@@ -575,15 +598,19 @@ struct SettingsView: View {
     @ViewBuilder
     private var taskTypeSettings: some View {
         Picker(selection: Binding(
-            get: { settings.defaultTaskType },
-            set: { settings.defaultTaskType = $0 }
+            get: { resolvedDefaultTaskTypeId },
+            set: { newValue in
+                let definition = taskTypeDefinition(for: newValue)
+                settings.defaultTaskTypeIdRaw = definition.idRaw
+                settings.defaultTaskType = definition.baseKind
+            }
         )) {
-            ForEach(TaskType.allCases, id: \.self) { type in
+            ForEach(activeTaskTypeDefinitions, id: \.idRaw) { type in
                 HStack {
                     Image(systemName: type.iconName)
-                    Text(type.displayName)
+                    Text(type.name)
                 }
-                .tag(type)
+                .tag(type.idRaw)
             }
         } label: {
             HStack(spacing: 12) {
@@ -591,6 +618,59 @@ struct SettingsView: View {
                 Text(String(localized: "settings.default_task_type"))
             }
         }
+    }
+
+    @ViewBuilder
+    private var taskTypeManagementSettings: some View {
+        HStack(spacing: 12) {
+            SettingsIcon(icon: "tag.fill", color: .teal)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("任务类型管理")
+                Text("\(activeTaskTypeDefinitions.count) 个类型 · 自定义分类外观")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                showingCreateTaskType = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("新增任务类型")
+        }
+
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(activeTaskTypeDefinitions, id: \.idRaw) { definition in
+                    taskTypePill(definition)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+        .listRowInsets(EdgeInsets(top: 8, leading: 54, bottom: 10, trailing: 16))
+    }
+
+    private func taskTypePill(_ definition: TaskTypeDefinition) -> some View {
+        Button {
+            guard !definition.isBuiltIn else { return }
+            editingTaskTypeIdRaw = definition.idRaw
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: definition.iconName)
+                    .font(.caption.weight(.semibold))
+                Text(definition.name)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(definition.color)
+            .frame(width: 78, height: 34)
+            .background(definition.color.opacity(0.12), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(definition.isBuiltIn ? definition.name : "编辑 \(definition.name)")
     }
     
     // MARK: - Reminder Settings
@@ -662,6 +742,62 @@ struct SettingsView: View {
             includeDescriptions: settings.seedIncludeDescriptions,
             allowExisting: settings.seedAllowExisting
         )
+    }
+
+    private var activeTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        if active.isEmpty {
+            return TaskTypeDefinition.builtInDefinitions()
+        }
+        return active.sorted { lhs, rhs in
+            if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private var resolvedDefaultTaskTypeId: String {
+        if activeTaskTypeDefinitions.contains(where: { $0.idRaw == settings.defaultTaskTypeIdRaw }) {
+            return settings.defaultTaskTypeIdRaw
+        }
+        return TaskType.regular.rawValue
+    }
+
+    private func taskTypeDefinition(for idRaw: String) -> TaskTypeDefinition {
+        taskTypeDefinitions.first { $0.idRaw == idRaw }
+            ?? TaskTypeDefinition.builtInDefinitions().first { $0.idRaw == idRaw }
+            ?? TaskTypeCatalog.builtInFallback
+    }
+
+    private func createTaskType(name: String, iconName: String, colorHex: String) {
+        let nextOrder = ((try? modelContext.fetch(FetchDescriptor<TaskTypeDefinition>())) ?? [])
+            .map(\.sortOrder)
+            .max() ?? 2
+        modelContext.insert(TaskTypeDefinition(
+            name: name,
+            iconName: iconName,
+            colorHex: colorHex,
+            baseKind: .regular,
+            sortOrder: nextOrder + 1
+        ))
+        try? modelContext.save()
+    }
+
+    private func updateTaskType(_ definition: TaskTypeDefinition, name: String, iconName: String, colorHex: String) {
+        guard !definition.isBuiltIn else { return }
+        definition.name = name
+        definition.iconName = iconName
+        definition.colorHex = colorHex
+        try? modelContext.save()
+    }
+
+    private func archiveTaskType(_ definition: TaskTypeDefinition) {
+        guard !definition.isBuiltIn else { return }
+        definition.isArchived = true
+        if settings.defaultTaskTypeIdRaw == definition.idRaw {
+            settings.defaultTaskTypeIdRaw = TaskType.regular.rawValue
+            settings.defaultTaskType = .regular
+        }
+        try? modelContext.save()
     }
     
     private var expiredEveryLabel: String {
@@ -1129,6 +1265,105 @@ private struct SeedOptions {
     let includeAttachments: Bool
     let includeDescriptions: Bool
     let allowExisting: Bool
+}
+
+private struct TaskTypeDefinitionEditorSheet: View {
+    let definition: TaskTypeDefinition?
+    let onSave: (String, String, String) -> Void
+    let onArchive: (() -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var iconName: String
+    @State private var colorHex: String
+
+    private let icons = ["checkmark.circle", "scope", "pencil.line", "book.closed", "hammer", "bolt", "flame", "calendar.badge.clock", "leaf", "sparkles", "star", "heart"]
+    private let colors = ["#4A90A4", "#C46A1A", "#8B5A83", "#4D9DE0", "#59A14F", "#E15759", "#B07AA1", "#F28E2B"]
+
+    init(
+        definition: TaskTypeDefinition? = nil,
+        onSave: @escaping (String, String, String) -> Void,
+        onArchive: (() -> Void)? = nil
+    ) {
+        self.definition = definition
+        self.onSave = onSave
+        self.onArchive = onArchive
+        _name = State(initialValue: definition?.name ?? "")
+        _iconName = State(initialValue: definition?.iconName ?? "tag.fill")
+        _colorHex = State(initialValue: definition?.colorHex ?? "#4A90A4")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("基础") {
+                    TextField("类型名称", text: $name)
+                }
+
+                Section("图标") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+                        ForEach(icons, id: \.self) { icon in
+                            Button {
+                                iconName = icon
+                            } label: {
+                                Image(systemName: icon)
+                                    .font(.title3)
+                                    .frame(width: 44, height: 44)
+                                    .foregroundStyle(iconName == icon ? .white : Color(hex: colorHex))
+                                    .background(iconName == icon ? Color(hex: colorHex) : Color(hex: colorHex).opacity(0.12), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Section("颜色") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+                        ForEach(colors, id: \.self) { hex in
+                            Button {
+                                colorHex = hex
+                            } label: {
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 36, height: 36)
+                                    .overlay {
+                                        if colorHex == hex {
+                                            Image(systemName: "checkmark")
+                                                .font(.caption.bold())
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if definition?.isBuiltIn == false, let onArchive {
+                    Section {
+                        Button("归档类型", role: .destructive) {
+                            onArchive()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(definition == nil ? "新增任务类型" : "编辑任务类型")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "action.cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "action.save")) {
+                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), iconName, colorHex)
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
 }
 
 struct SettingsIcon: View {

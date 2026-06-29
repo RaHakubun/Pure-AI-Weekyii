@@ -3,6 +3,7 @@ import SwiftData
 
 struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var settings: UserSettings
 
     let day: DayModel
 
@@ -86,9 +87,12 @@ struct DayDetailView: View {
         .sheet(isPresented: $showingAddSheet) {
             TaskEditorSheet(
                 title: String(localized: "draft.add_title"),
-                onSave: { title, description, type, steps, attachments in
+                initialType: settings.defaultTaskType,
+                initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                     do {
-                        try addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
+                        try addTask(title: title, description: description, type: type, taskTypeIdRaw: typeIdRaw, steps: steps, attachments: attachments)
                         showingAddSheet = false
                     } catch {
                         errorMessage = error.localizedDescription
@@ -102,11 +106,13 @@ struct DayDetailView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
-                onSave: { title, description, type, steps, attachments in
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                     do {
-                        try updateTask(task, title: title, description: description, type: type, steps: steps, attachments: attachments)
+                        try updateTask(task, title: title, description: description, type: type, taskTypeIdRaw: typeIdRaw, steps: steps, attachments: attachments)
                         editingTask = nil
                     } catch {
                         errorMessage = error.localizedDescription
@@ -302,7 +308,7 @@ struct DayDetailView: View {
         .weekyiiCard()
     }
 
-    private func addTask(title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
+    private func addTask(title: String, description: String, type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard isEditable else { throw WeekyiiError.cannotEditStartedDay }
         if day.status == .empty {
             day.status = .draft
@@ -315,17 +321,19 @@ struct DayDetailView: View {
             order: order,
             zone: .draft
         )
+        task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         task.steps = normalizedStepCopies(from: steps)
         task.attachments = attachments
         day.tasks.append(task)
         try modelContext.save()
     }
 
-    private func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
+    private func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard isEditable else { throw WeekyiiError.cannotEditStartedDay }
         task.title = title
         task.taskDescription = description
         task.taskType = type
+        task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         replaceSteps(for: task, with: steps)
         task.attachments = attachments
         try modelContext.save()

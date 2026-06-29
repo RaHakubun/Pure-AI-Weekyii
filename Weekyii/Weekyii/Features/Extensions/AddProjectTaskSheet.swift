@@ -2,12 +2,14 @@ import SwiftUI
 
 struct AddProjectTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: UserSettings
     let project: ProjectModel
     let viewModel: ExtensionsViewModel
 
     @State private var title = ""
     @State private var description = ""
     @State private var taskType: TaskType = .regular
+    @State private var taskTypeIdRaw: String = TaskType.regular.rawValue
     @State private var steps: [TaskStep] = []
     @State private var attachments: [TaskAttachment] = []
     @State private var selectedDates: Set<DateComponents> = []
@@ -49,29 +51,35 @@ struct AddProjectTaskSheet: View {
                                 .font(.bodyMedium)
                                 .foregroundColor(.textSecondary)
 
-                            HStack(spacing: WeekSpacing.sm) {
-                                ForEach(TaskType.allCases, id: \.self) { type in
-                                    Button {
-                                        taskType = type
-                                    } label: {
-                                        HStack(spacing: WeekSpacing.xs) {
-                                            Image(systemName: type.iconName)
-                                                .font(.caption)
-                                            Text(type.displayName)
-                                                .font(.bodyMedium)
+                            ScrollView(.horizontal) {
+                                HStack(spacing: WeekSpacing.xs) {
+                                    ForEach(TaskType.allCases, id: \.self) { type in
+                                        Button {
+                                            taskType = type
+                                            taskTypeIdRaw = type.rawValue
+                                        } label: {
+                                            HStack(spacing: WeekSpacing.xs) {
+                                                Image(systemName: type.iconName)
+                                                    .font(.caption)
+                                                Text(type.displayName)
+                                                    .font(.captionBold)
+                                                    .lineLimit(1)
+                                                    .minimumScaleFactor(0.78)
+                                            }
+                                            .foregroundColor(taskType == type ? type.color : .textSecondary)
+                                            .frame(width: 78, height: 34)
+                                            .background(taskType == type ? type.color.opacity(0.15) : Color.backgroundTertiary)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(taskType == type ? type.color : Color.clear, lineWidth: 1)
+                                            )
                                         }
-                                        .foregroundColor(taskType == type ? .white : type.color)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.horizontal, WeekSpacing.md)
-                                        .padding(.vertical, WeekSpacing.sm)
-                                        .background(taskType == type ? type.color : type.color.opacity(0.1))
-                                        .cornerRadius(WeekRadius.small)
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
-                                    .frame(maxWidth: .infinity)
                                 }
                             }
-                            .frame(maxWidth: .infinity)
+                            .scrollIndicators(.hidden)
                         }
                     }
 
@@ -178,17 +186,24 @@ struct AddProjectTaskSheet: View {
                     initialTitle: title,
                     initialDescription: description,
                     initialType: taskType,
+                    initialTypeIdRaw: taskTypeIdRaw,
                     initialSteps: steps,
                     initialAttachments: attachments
-                ) { newTitle, newDescription, newType, newSteps, newAttachments in
+                ) { _, _, _, _, _ in
+                } onSaveWithTypeId: { newTitle, newDescription, newType, newTypeIdRaw, newSteps, newAttachments in
                     title = newTitle
                     description = newDescription
                     taskType = newType
+                    taskTypeIdRaw = newTypeIdRaw
                     steps = newSteps
                     attachments = newAttachments
                     showingTaskDetailEditor = false
                 }
             }
+        }
+        .onAppear {
+            taskType = settings.defaultTaskType
+            taskTypeIdRaw = settings.defaultTaskTypeIdRaw
         }
     }
 
@@ -209,6 +224,7 @@ struct AddProjectTaskSheet: View {
                 title: title.trimmingCharacters(in: .whitespaces),
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 taskType: taskType,
+                taskTypeIdRaw: taskTypeIdRaw,
                 steps: steps,
                 attachments: attachments,
                 on: date

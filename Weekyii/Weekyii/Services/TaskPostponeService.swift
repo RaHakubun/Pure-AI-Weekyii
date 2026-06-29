@@ -5,6 +5,7 @@ struct TaskDraftPayload: Equatable {
     let title: String
     let description: String
     let type: TaskType
+    let taskTypeIdRaw: String
     let steps: [TaskStep]
     let attachments: [TaskAttachment]
 
@@ -12,12 +13,14 @@ struct TaskDraftPayload: Equatable {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = []
     ) {
         self.title = title
         self.description = description
         self.type = type
+        self.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         self.steps = steps
         self.attachments = attachments
     }
@@ -74,6 +77,7 @@ struct TaskMutationService: TaskMutating {
             order: nextOrder,
             zone: zone
         )
+        task.taskTypeIdRaw = payload.taskTypeIdRaw
         task.day = day
         task.project = project
         replaceTaskResources(for: task, steps: payload.steps, attachments: payload.attachments)
@@ -94,6 +98,7 @@ struct TaskMutationService: TaskMutating {
         task.title = normalizedTitle
         task.taskDescription = payload.description.trimmingCharacters(in: .whitespacesAndNewlines)
         task.taskType = payload.type
+        task.taskTypeIdRaw = payload.taskTypeIdRaw
         replaceTaskResources(for: task, steps: payload.steps, attachments: payload.attachments)
     }
 

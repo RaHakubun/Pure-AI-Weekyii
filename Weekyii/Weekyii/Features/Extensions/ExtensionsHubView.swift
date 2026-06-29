@@ -670,11 +670,14 @@ private struct SuspendedTaskEditorSheet: View {
                                 Text("任务类型")
                                     .font(.captionBold)
                                     .foregroundColor(.textSecondary)
-                                HStack(spacing: WeekSpacing.sm) {
-                                    ForEach(TaskType.allCases, id: \.self) { type in
-                                        suspendedTypeChip(type)
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: WeekSpacing.xs) {
+                                        ForEach(TaskType.allCases, id: \.self) { type in
+                                            suspendedTypeChip(type)
+                                        }
                                     }
                                 }
+                                .scrollIndicators(.hidden)
                             }
                         }
                     }
@@ -821,12 +824,14 @@ private struct SuspendedTaskEditorSheet: View {
         } label: {
             HStack(spacing: WeekSpacing.xs) {
                 Image(systemName: type.iconName)
+                    .font(.caption)
                 Text(type.displayName)
                     .font(.captionBold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
             .foregroundColor(isSelected ? type.color : .textSecondary)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .frame(width: 78, height: 34)
             .background(isSelected ? type.color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(

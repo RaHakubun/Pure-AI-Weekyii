@@ -298,18 +298,8 @@ struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
         AppearanceMode(rawValue: appearanceModeRaw) ?? .system
     }
 
-    func resolvedLockPalette(isDarkSystem: Bool) -> LiveActivityLockPalette {
-        let useDark: Bool
-        switch appearanceMode {
-        case .system:
-            useDark = isDarkSystem
-        case .light:
-            useDark = false
-        case .dark:
-            useDark = true
-        }
-
-        if useDark {
+    func resolvedLockPalette(prefersDarkLock: Bool) -> LiveActivityLockPalette {
+        if prefersDarkLock {
             return LiveActivityLockPalette(
                 backgroundHex: darkLockBackgroundHex,
                 surfaceHex: darkLockSurfaceHex,
@@ -328,6 +318,10 @@ struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
             accentHex: lockAccentHex,
             progressTrackHex: lockProgressTrackHex
         )
+    }
+
+    var usesExplicitDarkLockPalette: Bool {
+        appearanceMode == .dark
     }
 
     private enum CodingKeys: String, CodingKey {

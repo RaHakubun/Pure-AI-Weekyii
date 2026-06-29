@@ -6,6 +6,7 @@ import SwiftData
 struct PendingWeekDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.editMode) private var editMode
+    @EnvironmentObject private var settings: UserSettings
 
     let week: WeekModel
 
@@ -71,7 +72,10 @@ struct PendingWeekDetailView: View {
             if let selectedDay {
                 TaskEditorSheet(
                     title: String(localized: "draft.add_title"),
-                    onSave: { title, description, type, steps, attachments in
+                    initialType: settings.defaultTaskType,
+                    initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
+                    onSave: { _, _, _, _, _ in },
+                    onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                         guard let viewModel else { return }
                         do {
                             try viewModel.addDraftTask(
@@ -79,6 +83,7 @@ struct PendingWeekDetailView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )
@@ -97,9 +102,11 @@ struct PendingWeekDetailView: View {
                     initialTitle: task.title,
                     initialDescription: task.taskDescription,
                     initialType: task.taskType,
+                    initialTypeIdRaw: task.taskTypeIdRaw,
                     initialSteps: task.steps,
                     initialAttachments: task.attachments,
-                    onSave: { title, description, type, steps, attachments in
+                    onSave: { _, _, _, _, _ in },
+                    onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                         guard let viewModel else { return }
                         do {
                             try viewModel.updateDraftTask(
@@ -108,6 +115,7 @@ struct PendingWeekDetailView: View {
                                 title: title,
                                 description: description,
                                 type: type,
+                                taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
                                 attachments: attachments
                             )

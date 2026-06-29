@@ -88,11 +88,10 @@ struct WeekyiiLiveActivityWidget: Widget {
 
 @available(iOS 16.1, *)
 private struct LockScreenLiveActivityView: View {
-    @Environment(\.colorScheme) private var colorScheme
     let state: TodayActivityAttributes.ContentState
 
     private var palette: LiveActivityLockPalette {
-        state.liveTheme.resolvedLockPalette(isDarkSystem: colorScheme == .dark)
+        state.liveTheme.resolvedLockPalette(prefersDarkLock: state.liveTheme.usesExplicitDarkLockPalette)
     }
 
     private var progress: CGFloat {
@@ -116,25 +115,25 @@ private struct LockScreenLiveActivityView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 11) {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color(widgetHex: palette.surfaceHex))
-                    .frame(width: 30, height: 30)
+                    .frame(width: 36, height: 36)
                     .overlay {
                         Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(Color(widgetHex: palette.accentHex))
                     }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(state.focusTitle)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.headline.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .foregroundStyle(primaryTextColor)
                     Text("完成 \(state.completedCount)/\(state.totalCount) · 剩余 \(state.frozenCount) · \(deadlineLabel(for: state.killTime))")
-                        .font(.caption2.weight(.medium))
+                        .font(.caption.weight(.medium))
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .foregroundStyle(secondaryTextColor)
@@ -148,7 +147,7 @@ private struct LockScreenLiveActivityView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(secondaryTextColor)
                     Text(remainingLabel)
-                        .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
                         .lineLimit(1)
                         .foregroundStyle(Color(widgetHex: palette.accentHex))
                 }
@@ -158,19 +157,19 @@ private struct LockScreenLiveActivityView: View {
             LiveLinearProgress(
                 progress: progress,
                 fill: Color(widgetHex: palette.accentHex),
-                track: Color(widgetHex: palette.progressTrackHex).opacity(0.28)
+                track: Color(widgetHex: palette.progressTrackHex).opacity(0.2)
             )
-            .frame(height: 6)
+            .frame(height: 7)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Link(destination: LiveActivityAction.doneFocus.url()) {
                     LiveActionCapsule(
                         title: "完成",
                         icon: "checkmark.circle.fill",
-                        fill: Color(widgetHex: palette.accentHex),
-                        foreground: Color(widgetHex: palette.backgroundHex),
+                        fill: Color(widgetHex: palette.accentHex).opacity(0.16),
+                        foreground: primaryTextColor,
                         horizontalPadding: 10,
-                        verticalPadding: 6
+                        verticalPadding: 8
                     )
                 }
 
@@ -181,13 +180,13 @@ private struct LockScreenLiveActivityView: View {
                         fill: Color(widgetHex: palette.surfaceHex),
                         foreground: primaryTextColor,
                         horizontalPadding: 10,
-                        verticalPadding: 6
+                        verticalPadding: 8
                     )
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 }
 
@@ -363,11 +362,10 @@ private struct IslandMinimal: View {
 
 @available(iOS 16.1, *)
 private struct LiveActivityLockStylingModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     let theme: LiveActivityThemeSnapshot
 
     func body(content: Content) -> some View {
-        let palette = theme.resolvedLockPalette(isDarkSystem: colorScheme == .dark)
+        let palette = theme.resolvedLockPalette(prefersDarkLock: theme.usesExplicitDarkLockPalette)
         content
             .activityBackgroundTint(Color(widgetHex: palette.backgroundHex))
             .activitySystemActionForegroundColor(Color(widgetHex: palette.textPrimaryHex))
@@ -943,6 +941,7 @@ private struct LiveActionCapsule: View {
         .lineLimit(1)
         .minimumScaleFactor(0.82)
         .frame(maxWidth: .infinity)
+        .frame(minHeight: 36)
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .foregroundStyle(foreground)

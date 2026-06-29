@@ -18,6 +18,9 @@ final class UserSettings: ObservableObject {
     @Published var defaultTaskType: TaskType {
         didSet { save() }
     }
+    @Published var defaultTaskTypeIdRaw: String {
+        didSet { save() }
+    }
 
     @Published var defaultExecutionModeRaw: String {
         didSet { save() }
@@ -111,12 +114,15 @@ final class UserSettings: ObservableObject {
         self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
         self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
         
+        let resolvedDefaultTaskType: TaskType
         if let rawTaskType = defaults.string(forKey: "defaultTaskType"),
            let taskType = TaskType(rawValue: rawTaskType) {
-            self.defaultTaskType = taskType
+            resolvedDefaultTaskType = taskType
         } else {
-            self.defaultTaskType = .regular
+            resolvedDefaultTaskType = .regular
         }
+        self.defaultTaskType = resolvedDefaultTaskType
+        self.defaultTaskTypeIdRaw = defaults.string(forKey: "defaultTaskTypeId") ?? resolvedDefaultTaskType.rawValue
         self.defaultExecutionModeRaw = defaults.string(forKey: "defaultExecutionMode") ?? ExecutionMode.strict.rawValue
         
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
@@ -153,6 +159,7 @@ final class UserSettings: ObservableObject {
         defaults.set(defaultKillTimeHour, forKey: "defaultKillTimeHour")
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
+        defaults.set(defaultTaskTypeIdRaw, forKey: "defaultTaskTypeId")
         defaults.set(defaultExecutionModeRaw, forKey: "defaultExecutionMode")
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
         defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
