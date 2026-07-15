@@ -10,6 +10,7 @@
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
 		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
+		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
@@ -179,6 +180,7 @@
 		944E58182F2B593A00DB2DEE /* FocusZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusZoneView.swift; sourceTree = "<group>"; };
 		944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrozenZoneView.swift; sourceTree = "<group>"; };
 		944E581A2F2B593A00DB2DEE /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
 		944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayViewModel.swift; sourceTree = "<group>"; };
 		944E581D2F2B593A00DB2DEE /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		944E581E2F2B593A00DB2DEE /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
@@ -366,6 +368,7 @@
 		944E581C2F2B593A00DB2DEE /* Today */ = {
 			isa = PBXGroup;
 			children = (
+				C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */,
 				945022912F433AB7000D67FF /* MindStampRitualView.swift */,
 				944E58162F2B593A00DB2DEE /* CompleteZoneView.swift */,
 				944E58172F2B593A00DB2DEE /* DraftEditorView.swift */,
@@ -848,6 +851,7 @@
 				944E587D2F2B593A00DB2DEE /* TimeProvider.swift in Sources */,
 				944E587E2F2B593A00DB2DEE /* PastView.swift in Sources */,
 				944E587F2F2B593A00DB2DEE /* Color+Weekyii.swift in Sources */,
+				C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */,
 				944E58802F2B593A00DB2DEE /* TodayView.swift in Sources */,
 				944E58822F2B593A00DB2DEE /* DraftEditorView.swift in Sources */,
 				944E58832F2B593A00DB2DEE /* PastViewModel.swift in Sources */,

@@ -293,25 +293,14 @@ struct TodayView: View {
                     }
                 }
 
-                if userSettings.selectedTheme == .sunset {
-                    SunsetStatusIllustration()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 84)
-                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
-                        )
-                } else if userSettings.selectedTheme == .lotr {
-                    LotrStatusIllustration()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
-                        )
-                }
+                ThemeStatusArtwork(theme: userSettings.selectedTheme)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 88)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+                    )
 
                 // 日期显示
                 Text(formatDate(day.dayId))
@@ -1631,156 +1620,6 @@ private struct SunsetWaterReflectionBackground: View {
     }
 }
 
-private struct SunsetStatusIllustration: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var drift = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let sunX = size.width * 0.382
-            let sunY = size.height * 0.31 + (drift ? 1.3 : -1.3)
-            let horizonY = size.height * 0.58
-
-            ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#3E201E"), Color(hex: "#562922"), Color(hex: "#6A2F27")]
-                        : [Color(hex: "#F8D0BA"), Color(hex: "#F19F79"), Color(hex: "#E0715D")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: colorScheme == .dark ? "#1D2937" : "#8FB2CA"),
-                                Color(hex: colorScheme == .dark ? "#111C2A" : "#5E88A6")
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: size.height * 0.42)
-                    .offset(y: horizonY)
-
-                // 水平线
-                Rectangle()
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.24))
-                    .frame(height: 1.0)
-                    .position(x: size.width * 0.5, y: horizonY)
-
-                // 不对称地平线体块（右侧）
-                UnevenRoundedRectangle(cornerRadii: .init(topLeading: 20, bottomLeading: 2, bottomTrailing: 0, topTrailing: 0))
-                    .fill(Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16))
-                    .frame(width: size.width * 0.34, height: size.height * 0.22)
-                    .position(x: size.width * 0.84, y: horizonY - 2)
-                    .overlay(alignment: .topLeading) {
-                        Rectangle()
-                            .fill(Color.white.opacity(colorScheme == .dark ? 0.06 : 0.12))
-                            .frame(width: size.width * 0.20, height: 1)
-                            .offset(x: -10, y: 0)
-                    }
-
-                // 太阳本体（偏红，扁平拟物，无漫反射光晕）
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: colorScheme == .dark ? "#F46A5F" : "#EE5A4E"),
-                                Color(hex: colorScheme == .dark ? "#D8473F" : "#C63B35")
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                    )
-                    .overlay(
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.26), Color.clear],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                            .scaleEffect(0.68)
-                            .offset(y: -8)
-                    )
-                    .frame(width: 52, height: 52)
-                    .position(x: sunX, y: sunY)
-
-                // 主倒影体块（不居中，略向右偏）
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#F36A5D").opacity(colorScheme == .dark ? 0.46 : 0.54),
-                                Color(hex: "#D64A42").opacity(colorScheme == .dark ? 0.34 : 0.42),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 64, height: size.height * 0.52)
-                    .scaleEffect(x: 1.05, y: 1.0, anchor: .top)
-                    .position(x: sunX + 12, y: size.height * 0.77)
-
-                // 非对称水纹
-                stylizedRipples(size: size, horizonY: horizonY, sunX: sunX)
-            }
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 5.8).repeatForever(autoreverses: true)) {
-                    drift = true
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func stylizedRipples(size: CGSize, horizonY: CGFloat, sunX: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 20.0)) { timeline in
-            Canvas { context, canvasSize in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let bandCount = 8
-                let verticalStep = max((canvasSize.height - horizonY) / CGFloat(bandCount + 1), 6.0)
-
-                for i in 0..<bandCount {
-                    let p = CGFloat(i) / CGFloat(max(bandCount - 1, 1))
-                    let y = horizonY + CGFloat(i + 1) * verticalStep + CGFloat(i % 2 == 0 ? -1.5 : 0.8)
-                    let baseWidth = canvasSize.width * (0.14 + p * 0.44)
-                    let wobble = CGFloat(sin(t * 0.52 + Double(i) * 0.95)) * (reduceMotion ? 0.8 : 2.6)
-                    let centerX = sunX + 10 + wobble + CGFloat(i) * 0.7
-                    let height = max(0.9, 1.8 - p * 0.9)
-                    let alpha = max(0.05, 0.27 - Double(p) * 0.17)
-
-                    let rect = CGRect(
-                        x: centerX - baseWidth / 2,
-                        y: y,
-                        width: baseWidth,
-                        height: height
-                    )
-                    let path = Path(roundedRect: rect, cornerRadius: height)
-                    context.fill(path, with: .color(Color(hex: "#FFD2AE").opacity(alpha)))
-                    context.stroke(
-                        path,
-                        with: .color(Color.white.opacity(alpha * 0.42)),
-                        style: StrokeStyle(lineWidth: 0.45)
-                    )
-                }
-            }
-            .blendMode(.screen)
-        }
-    }
-}
-
 private struct LotrRainNightBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -1869,81 +1708,5 @@ private struct LotrRainNightBackground: View {
                 }
             }
         }
-    }
-}
-
-private struct LotrStatusIllustration: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var pulse = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let horizonY = size.height * 0.62
-            let beaconX = size.width * 0.382
-
-            ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#0B0D10"), Color(hex: "#14171C"), Color(hex: "#1E232A")]
-                        : [Color(hex: "#D9DBE0"), Color(hex: "#C9CCD3"), Color(hex: "#BABEC7")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: colorScheme == .dark ? "#1A1E24" : "#A3A8B1"),
-                                Color(hex: colorScheme == .dark ? "#10141A" : "#8E949F")
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: size.height * 0.42)
-                    .offset(y: horizonY)
-
-                Path { path in
-                    path.move(to: CGPoint(x: -12, y: horizonY + 10))
-                    path.addLine(to: CGPoint(x: size.width * 0.24, y: horizonY - 22))
-                    path.addLine(to: CGPoint(x: size.width * 0.46, y: horizonY + 6))
-                    path.addLine(to: CGPoint(x: size.width * 0.66, y: horizonY - 18))
-                    path.addLine(to: CGPoint(x: size.width + 12, y: horizonY + 14))
-                    path.addLine(to: CGPoint(x: size.width + 12, y: size.height + 20))
-                    path.addLine(to: CGPoint(x: -12, y: size.height + 20))
-                    path.closeSubpath()
-                }
-                .fill(Color.black.opacity(colorScheme == .dark ? 0.66 : 0.34))
-
-                Capsule()
-                    .fill(Color(hex: colorScheme == .dark ? "#D5A56A" : "#A67943").opacity(pulse ? 0.88 : 0.64))
-                    .frame(width: 4, height: 16)
-                    .position(x: beaconX, y: horizonY - 6)
-
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#C99A65").opacity(colorScheme == .dark ? 0.34 : 0.24),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 26, height: 44)
-                    .position(x: beaconX + 5, y: horizonY + 14)
-            }
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
-        }
-        .accessibilityHidden(true)
     }
 }
