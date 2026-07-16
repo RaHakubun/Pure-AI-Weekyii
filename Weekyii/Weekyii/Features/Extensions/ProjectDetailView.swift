@@ -5,6 +5,7 @@ struct ProjectDetailView: View {
     let viewModel: ExtensionsViewModel
 
     @State private var showingAddTaskSheet = false
+    @State private var showingEditProjectSheet = false
     @State private var showingDeleteAlert = false
     @State private var deletingTask: TaskItem?
     @State private var editingTask: TaskItem?
@@ -12,15 +13,18 @@ struct ProjectDetailView: View {
     @State private var expandedSectionIDs: Set<String> = []
     @State private var seenSectionIDs: Set<String> = []
     @State private var expandedTaskIDs: Set<UUID> = []
+    @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     private var projectColor: Color { Color(hex: project.color) }
     private var snapshot: ProjectDetailSnapshot { viewModel.projectDetailSnapshot(for: project) }
+    private var isProjectWritable: Bool { project.status == .planning || project.status == .active }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 identitySection
+                lifecycleSection
                 summarySection
                 ledgerSection
             }
@@ -32,6 +36,9 @@ struct ProjectDetailView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: $showingAddTaskSheet, onDismiss: { viewModel.refresh() }) {
             AddProjectTaskSheet(project: project, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingEditProjectSheet, onDismiss: { viewModel.refresh() }) {
+            CreateProjectSheet(viewModel: viewModel, projectToEdit: project)
         }
         .sheet(item: $editingTask, onDismiss: { viewModel.refresh() }) { task in
             TaskEditorSheet(
@@ -102,20 +109,38 @@ struct ProjectDetailView: View {
         .onChange(of: snapshot.sections.map(\.id)) { _, _ in
             syncExpandedSections(with: snapshot.sections)
         }
+        .onChange(of: viewModel.errorMessage) { _, newValue in
+            if let newValue { errorMessage = newValue }
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button {
-                showingAddTaskSheet = true
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(projectColor)
+            if isProjectWritable {
+                Button {
+                    showingAddTaskSheet = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(projectColor)
+                }
             }
 
             Menu {
+                if isProjectWritable {
+                    Button("编辑项目信息", systemImage: "pencil") {
+                        showingEditProjectSheet = true
+                    }
+                }
                 if project.status == .active && project.isAllCompleted {
                     Button(String(localized: "project.action.complete")) {
                         viewModel.updateStatus(project, to: .completed)
@@ -124,6 +149,14 @@ struct ProjectDetailView: View {
                 if project.status == .completed {
                     Button(String(localized: "project.action.archive")) {
                         viewModel.updateStatus(project, to: .archived)
+                    }
+                    Button("重新打开项目") {
+                        viewModel.updateStatus(project, to: .active)
+                    }
+                }
+                if project.status == .archived {
+                    Button("恢复到已完成") {
+                        viewModel.updateStatus(project, to: .completed)
                     }
                 }
                 Divider()
@@ -175,6 +208,75 @@ struct ProjectDetailView: View {
                             .foregroundStyle(.white.opacity(0.86))
                             .lineLimit(3)
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var lifecycleSection: some View {
+        if project.status == .active && project.isAllCompleted {
+            WeekCard(accentColor: .accentGreen) {
+                HStack(spacing: WeekSpacing.md) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.title2)
+                        .foregroundStyle(Color.accentGreen)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("所有项目任务均已完成")
+                            .font(.titleSmall)
+                            .foregroundStyle(Color.textPrimary)
+                        Text("确认结项后，项目将进入只读状态。")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    Spacer()
+                    Button("确认结项") {
+                        viewModel.updateStatus(project, to: .completed)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.accentGreen)
+                }
+            }
+        } else if project.status == .completed {
+            WeekCard(accentColor: projectColor) {
+                VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                    Label("项目已完成", systemImage: "checkmark.circle.fill")
+                        .font(.titleSmall)
+                        .foregroundStyle(Color.accentGreen)
+                    Text("已完成项目保持只读。你可以归档收纳，或重新打开继续添加任务。")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                    HStack {
+                        Button("重新打开") {
+                            viewModel.updateStatus(project, to: .active)
+                        }
+                        .buttonStyle(.bordered)
+                        Button("归档项目") {
+                            viewModel.updateStatus(project, to: .archived)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+        } else if project.status == .archived {
+            WeekCard {
+                HStack(spacing: WeekSpacing.md) {
+                    Image(systemName: "archivebox.fill")
+                        .font(.title2)
+                        .foregroundStyle(Color.textSecondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("项目已归档")
+                            .font(.titleSmall)
+                            .foregroundStyle(Color.textPrimary)
+                        Text("任务记录仍然保留，恢复后可重新打开项目。")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    Spacer()
+                    Button("恢复") {
+                        viewModel.updateStatus(project, to: .completed)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
         }
@@ -284,12 +386,14 @@ struct ProjectDetailView: View {
                         Text(String(localized: "project.tasks.empty"))
                             .font(.bodyMedium)
                             .foregroundStyle(Color.textSecondary)
-                        Button {
-                            showingAddTaskSheet = true
-                        } label: {
-                            Text(String(localized: "project.tasks.add_first"))
-                                .font(.bodyMedium)
-                                .foregroundStyle(projectColor)
+                        if isProjectWritable {
+                            Button {
+                                showingAddTaskSheet = true
+                            } label: {
+                                Text(String(localized: "project.tasks.add_first"))
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(projectColor)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -343,18 +447,20 @@ struct ProjectDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                Menu {
-                    Button(String(localized: "action.edit")) {
-                        editingTask = task
+                if canEditTaskFromProject(task) {
+                    Menu {
+                        Button(String(localized: "action.edit")) {
+                            editingTask = task
+                        }
+                        Button(String(localized: "project.task.delete.action"), role: .destructive) {
+                            deletingTask = task
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(Color.textSecondary)
+                            .frame(width: 32, height: 32)
                     }
-                    Button(String(localized: "project.task.delete.action"), role: .destructive) {
-                        deletingTask = task
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundStyle(Color.textSecondary)
-                        .frame(width: 32, height: 32)
                 }
             }
 
@@ -436,6 +542,11 @@ struct ProjectDetailView: View {
             expandedSectionIDs.insert(section.id)
         }
         seenSectionIDs = valid
+    }
+
+    private func canEditTaskFromProject(_ task: TaskItem) -> Bool {
+        guard isProjectWritable, let day = task.day else { return false }
+        return (day.status == .empty || day.status == .draft) && task.zone == .draft
     }
 
     private func toggleSection(_ id: String) {

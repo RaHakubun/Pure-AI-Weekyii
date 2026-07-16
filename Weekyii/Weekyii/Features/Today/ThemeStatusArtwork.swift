@@ -465,54 +465,116 @@ private struct MintGreenhouseScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let shimmer = CGFloat((sin(time * 0.58) + 1) * 0.5)
+        let sway = CGFloat(sin(time * 0.46)) * 1.8
+        let dropletTravel = CGFloat((sin(time * 0.72) + 1) * 0.5)
+        let glassX = size.width * 0.43
 
         ZStack {
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(hex: "#0B201C"), Color(hex: "#174039"), Color(hex: "#2C6A5E")]
-                    : [Color(hex: "#DDF8F0"), Color(hex: "#A8E0D1"), Color(hex: "#65B7A5")],
+                    ? [Color(hex: "#071D1A"), Color(hex: "#123A34"), Color(hex: "#2F7467")]
+                    : [Color(hex: "#ECFFF9"), Color(hex: "#B8EBDD"), Color(hex: "#68BDAA")],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
+            // The arched conservatory window gives the scene a recognisable silhouette.
             Path { path in
-                path.move(to: CGPoint(x: size.width * 0.16, y: size.height))
-                path.addLine(to: CGPoint(x: size.width * 0.16, y: size.height * 0.54))
+                path.move(to: CGPoint(x: size.width * 0.08, y: size.height + 2))
+                path.addLine(to: CGPoint(x: size.width * 0.08, y: size.height * 0.58))
                 path.addQuadCurve(
-                    to: CGPoint(x: size.width * 0.84, y: size.height * 0.54),
-                    control: CGPoint(x: size.width * 0.50, y: -size.height * 0.14)
+                    to: CGPoint(x: size.width * 0.92, y: size.height * 0.58),
+                    control: CGPoint(x: size.width * 0.50, y: -size.height * 0.30)
                 )
-                path.addLine(to: CGPoint(x: size.width * 0.84, y: size.height))
+                path.addLine(to: CGPoint(x: size.width * 0.92, y: size.height + 2))
             }
-            .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.38), lineWidth: 1.2)
+            .stroke(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.48), lineWidth: 1.2)
 
             Path { path in
-                path.move(to: CGPoint(x: size.width * 0.50, y: size.height * 0.16))
+                path.move(to: CGPoint(x: size.width * 0.50, y: size.height * 0.08))
                 path.addLine(to: CGPoint(x: size.width * 0.50, y: size.height))
-                path.move(to: CGPoint(x: size.width * 0.24, y: size.height * 0.42))
-                path.addLine(to: CGPoint(x: size.width * 0.76, y: size.height * 0.42))
+                path.move(to: CGPoint(x: size.width * 0.16, y: size.height * 0.44))
+                path.addLine(to: CGPoint(x: size.width * 0.84, y: size.height * 0.44))
             }
-            .stroke(Color.white.opacity(colorScheme == .dark ? 0.09 : 0.24), lineWidth: 0.8)
+            .stroke(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.26), lineWidth: 0.8)
 
-            Capsule()
-                .fill(Color(hex: colorScheme == .dark ? "#72C7AE" : "#2F8F78").opacity(0.72))
-                .frame(width: size.width * 0.26, height: size.height * 0.28)
-                .rotationEffect(.degrees(-24))
-                .position(x: size.width * 0.33, y: size.height * 0.70)
+            // A translucent drinking glass anchors the composition.
+            UnevenRoundedRectangle(
+                cornerRadii: .init(topLeading: 3, bottomLeading: 10, bottomTrailing: 10, topTrailing: 3),
+                style: .continuous
+            )
+            .fill(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.28))
+            .overlay {
+                UnevenRoundedRectangle(
+                    cornerRadii: .init(topLeading: 3, bottomLeading: 10, bottomTrailing: 10, topTrailing: 3),
+                    style: .continuous
+                )
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.38 : 0.72), lineWidth: 1)
+            }
+            .frame(width: 52, height: 47)
+            .position(x: glassX, y: size.height * 0.76)
 
-            Capsule()
-                .fill(Color(hex: colorScheme == .dark ? "#4EA58F" : "#57AF96").opacity(0.70))
-                .frame(width: size.width * 0.25, height: size.height * 0.25)
-                .rotationEffect(.degrees(28))
-                .position(x: size.width * 0.65, y: size.height * 0.72)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color(hex: colorScheme == .dark ? "#4DB69C" : "#77CEB8").opacity(0.30))
+                .frame(width: 45, height: 21)
+                .position(x: glassX, y: size.height * 0.83)
+
+            Path { path in
+                path.move(to: CGPoint(x: glassX, y: size.height * 0.72))
+                path.addQuadCurve(
+                    to: CGPoint(x: glassX + sway, y: size.height * 0.22),
+                    control: CGPoint(x: glassX - 9, y: size.height * 0.48)
+                )
+                path.move(to: CGPoint(x: glassX - 5, y: size.height * 0.63))
+                path.addQuadCurve(
+                    to: CGPoint(x: glassX - 31 + sway, y: size.height * 0.40),
+                    control: CGPoint(x: glassX - 18, y: size.height * 0.52)
+                )
+                path.move(to: CGPoint(x: glassX - 2, y: size.height * 0.52))
+                path.addQuadCurve(
+                    to: CGPoint(x: glassX + 32 + sway, y: size.height * 0.34),
+                    control: CGPoint(x: glassX + 17, y: size.height * 0.45)
+                )
+            }
+            .stroke(Color(hex: colorScheme == .dark ? "#87D8C1" : "#237E69"), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+            mintLeaf(width: 35, height: 17, rotation: -25, colorScheme: colorScheme)
+                .position(x: glassX - 29 + sway, y: size.height * 0.39)
+            mintLeaf(width: 39, height: 18, rotation: 22, colorScheme: colorScheme)
+                .position(x: glassX + 31 + sway, y: size.height * 0.33)
+            mintLeaf(width: 31, height: 15, rotation: -8, colorScheme: colorScheme)
+                .position(x: glassX + sway, y: size.height * 0.23)
 
             Circle()
-                .fill(Color.white.opacity(0.55 + Double(shimmer) * 0.25))
-                .frame(width: 8, height: 8)
-                .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 0.8))
-                .position(x: size.width * 0.382 + shimmer * 2, y: size.height * 0.56 - shimmer)
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.82 : 0.94))
+                .frame(width: 7, height: 9)
+                .overlay(Circle().stroke(Color(hex: "#A7F3DE").opacity(0.70), lineWidth: 0.8))
+                .position(
+                    x: glassX + 42,
+                    y: size.height * 0.31 + dropletTravel * size.height * 0.34
+                )
+
+            Ellipse()
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.52), lineWidth: 1)
+                .frame(width: 30 + dropletTravel * 9, height: 6 + dropletTravel * 2)
+                .position(x: glassX + 3, y: size.height * 0.82)
         }
+    }
+
+    private func mintLeaf(width: CGFloat, height: CGFloat, rotation: Double, colorScheme: ColorScheme) -> some View {
+        Capsule()
+            .fill(
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color(hex: "#A1E8D2"), Color(hex: "#38957E")]
+                        : [Color(hex: "#C9F7E9"), Color(hex: "#2D9B7F")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(Capsule().stroke(Color.white.opacity(0.22), lineWidth: 0.7))
+            .frame(width: width, height: height)
+            .rotationEffect(.degrees(rotation))
     }
 }
 
@@ -724,76 +786,91 @@ private struct SunsetStatusIllustration: View {
     }
 }
 
-// Existing LOTR composition, moved out of TodayView without changing its no-green direction.
+// A no-green Middle-earth impression built around weathered gold, volcanic rock and embers.
 private struct LotrStatusIllustration: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @State private var pulse = false
 
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let horizonY = size.height * 0.62
-            let beaconX = size.width * 0.382
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 18.0)) { timeline in
+            GeometryReader { proxy in
+                let size = proxy.size
+                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let glint = CGFloat((sin(time * 0.65) + 1) * 0.5)
+                let ringX = size.width * 0.34
+                let ringY = size.height * 0.48
 
-            ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#0B0D10"), Color(hex: "#14171C"), Color(hex: "#1E232A")]
-                        : [Color(hex: "#D9DBE0"), Color(hex: "#C9CCD3"), Color(hex: "#BABEC7")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: colorScheme == .dark ? "#1A1E24" : "#A3A8B1"),
-                                Color(hex: colorScheme == .dark ? "#10141A" : "#8E949F")
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                ZStack {
+                    LinearGradient(
+                        colors: colorScheme == .dark
+                            ? [Color(hex: "#090909"), Color(hex: "#231512"), Color(hex: "#4B1E15")]
+                            : [Color(hex: "#E8DFD0"), Color(hex: "#B7A995"), Color(hex: "#755A48")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .frame(height: size.height * 0.42)
-                    .offset(y: horizonY)
 
-                Path { path in
-                    path.move(to: CGPoint(x: -12, y: horizonY + 10))
-                    path.addLine(to: CGPoint(x: size.width * 0.24, y: horizonY - 22))
-                    path.addLine(to: CGPoint(x: size.width * 0.46, y: horizonY + 6))
-                    path.addLine(to: CGPoint(x: size.width * 0.66, y: horizonY - 18))
-                    path.addLine(to: CGPoint(x: size.width + 12, y: horizonY + 14))
-                    path.addLine(to: CGPoint(x: size.width + 12, y: size.height + 20))
-                    path.addLine(to: CGPoint(x: -12, y: size.height + 20))
-                    path.closeSubpath()
-                }
-                .fill(Color.black.opacity(colorScheme == .dark ? 0.66 : 0.34))
+                    Circle()
+                        .fill(Color(hex: "#D94A2E").opacity(colorScheme == .dark ? 0.24 : 0.16))
+                        .frame(width: 78, height: 78)
+                        .blur(radius: 12)
+                        .position(x: size.width * 0.76, y: size.height * 0.48)
 
-                Capsule()
-                    .fill(Color(hex: colorScheme == .dark ? "#D5A56A" : "#A67943").opacity(pulse ? 0.88 : 0.64))
-                    .frame(width: 4, height: 16)
-                    .position(x: beaconX, y: horizonY - 6)
+                    // A distant volcanic ridge replaces the previous anonymous mountain line.
+                    Path { path in
+                        path.move(to: CGPoint(x: size.width * 0.43, y: size.height + 4))
+                        path.addLine(to: CGPoint(x: size.width * 0.59, y: size.height * 0.64))
+                        path.addLine(to: CGPoint(x: size.width * 0.68, y: size.height * 0.46))
+                        path.addLine(to: CGPoint(x: size.width * 0.73, y: size.height * 0.35))
+                        path.addLine(to: CGPoint(x: size.width * 0.79, y: size.height * 0.47))
+                        path.addLine(to: CGPoint(x: size.width * 0.92, y: size.height * 0.69))
+                        path.addLine(to: CGPoint(x: size.width + 8, y: size.height + 4))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(hex: colorScheme == .dark ? "#08090A" : "#4B4642").opacity(0.94))
 
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#C99A65").opacity(colorScheme == .dark ? 0.34 : 0.24),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
+                    Path { path in
+                        path.move(to: CGPoint(x: size.width * 0.75, y: size.height * 0.42))
+                        path.addCurve(
+                            to: CGPoint(x: size.width * 0.82, y: size.height),
+                            control1: CGPoint(x: size.width * 0.73, y: size.height * 0.60),
+                            control2: CGPoint(x: size.width * 0.86, y: size.height * 0.74)
                         )
+                    }
+                    .stroke(
+                        LinearGradient(colors: [Color(hex: "#FFB14E"), Color(hex: "#B52B1D")], startPoint: .top, endPoint: .bottom),
+                        style: StrokeStyle(lineWidth: 3.2, lineCap: .round)
                     )
-                    .frame(width: 26, height: 44)
-                    .position(x: beaconX + 5, y: horizonY + 14)
-            }
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
-                    pulse = true
+
+                    // The weathered gold ring is the unmistakable focal object.
+                    Circle()
+                        .stroke(
+                            AngularGradient(
+                                colors: [Color(hex: "#8E5C21"), Color(hex: "#F5D27A"), Color(hex: "#A76B25"), Color(hex: "#FFE29A"), Color(hex: "#8E5C21")],
+                                center: .center
+                            ),
+                            lineWidth: 8
+                        )
+                        .frame(width: 45, height: 45)
+                        .rotation3DEffect(.degrees(-18), axis: (x: 1, y: 0, z: 0))
+                        .shadow(color: Color(hex: "#E6A348").opacity(colorScheme == .dark ? 0.42 : 0.22), radius: 5)
+                        .position(x: ringX, y: ringY)
+
+                    Capsule()
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.72 : 0.56))
+                        .frame(width: 11, height: 2.2)
+                        .rotationEffect(.degrees(-38))
+                        .position(x: ringX - 11 + glint * 20, y: ringY - 17 + glint * 5)
+
+                    Canvas { context, canvas in
+                        for index in 0..<8 {
+                            let phase = time * 0.42 + Double(index) * 0.73
+                            let x = canvas.width * (0.55 + CGFloat((index * 11) % 37) / 100)
+                            let rise = CGFloat((phase.truncatingRemainder(dividingBy: 1.0))) * canvas.height * 0.58
+                            let y = canvas.height * 0.96 - rise
+                            let ember = Path(ellipseIn: CGRect(x: x, y: y, width: 1.8, height: 1.8))
+                            context.fill(ember, with: .color(Color(hex: index.isMultiple(of: 2) ? "#FFB14E" : "#D84C2F").opacity(0.58)))
+                        }
+                    }
                 }
             }
         }

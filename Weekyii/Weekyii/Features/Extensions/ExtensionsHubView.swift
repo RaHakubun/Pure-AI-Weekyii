@@ -1230,6 +1230,21 @@ private struct ModuleContainer<Content: View, Destination: View>: View {
 // MARK: - Projects Full View (Wrapped Existing)
 
 private struct ProjectsFullView: View {
+    private enum ProjectFilter: String, CaseIterable, Identifiable {
+        case current
+        case completed
+        case archived
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .current: "进行中"
+            case .completed: "已完成"
+            case .archived: "已归档"
+            }
+        }
+    }
+
     private enum BoardMetrics {
         static let columns = 4
         static let columnSpacing: CGFloat = 6
@@ -1245,6 +1260,7 @@ private struct ProjectsFullView: View {
     @State private var draggingProjectID: UUID?
     @State private var deletingProject: ProjectModel?
     @State private var errorMessage: String?
+    @State private var selectedFilter: ProjectFilter = .current
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -1266,6 +1282,14 @@ private struct ProjectsFullView: View {
             }
             .onChange(of: viewModel.projects.map(\.id)) { _, _ in
                 syncTileProjectsFromModel(force: draggingProjectID == nil)
+            }
+            .onChange(of: viewModel.projects.map(\.status)) { _, _ in
+                syncTileProjectsFromModel(force: draggingProjectID == nil)
+            }
+            .onChange(of: selectedFilter) { _, _ in
+                isEditingTiles = false
+                draggingProjectID = nil
+                syncTileProjectsFromModel(force: true)
             }
             .confirmationDialog(
                 String(localized: "project.delete.confirm"),
@@ -1299,52 +1323,76 @@ private struct ProjectsFullView: View {
                 if viewModel.projects.isEmpty {
                     emptyStateView
                 } else {
-                    if isEditingTiles {
-                        Text(String(localized: "project.tiles.edit_hint"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.textSecondary)
+                    Picker("项目状态", selection: $selectedFilter) {
+                        ForEach(ProjectFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if tileProjects.isEmpty {
+                        WeekCard {
+                            VStack(spacing: WeekSpacing.sm) {
+                                Image(systemName: selectedFilter == .archived ? "archivebox" : "tray")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.textTertiary)
+                                Text("这里还没有\(selectedFilter.title)的项目")
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, WeekSpacing.lg)
+                        }
+                    } else {
+                        if isEditingTiles {
+                            Text(String(localized: "project.tiles.edit_hint"))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.textSecondary)
+                        }
+
+                        ProjectTileGridLayout(
+                            columns: BoardMetrics.columns,
+                            columnSpacing: BoardMetrics.columnSpacing,
+                            rowSpacing: BoardMetrics.rowSpacing
+                        ) {
+                            ForEach(tileProjects) { project in
+                                tileView(for: project)
+                                    .layoutValue(key: TileColSpanLayoutKey.self, value: project.tileSize.colSpan)
+                                    .layoutValue(key: TileRowSpanLayoutKey.self, value: project.tileSize.rowSpan)
+                            }
+                        }
+                        .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.id))
+                        .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.tileSizeRaw))
+                        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.9), value: isEditingTiles)
+                        .transaction { transaction in
+                            if draggingProjectID != nil {
+                                transaction.animation = nil
+                            }
+                        }
                     }
 
-                    ProjectTileGridLayout(
-                        columns: BoardMetrics.columns,
-                        columnSpacing: BoardMetrics.columnSpacing,
-                        rowSpacing: BoardMetrics.rowSpacing
-                    ) {
-                        ForEach(tileProjects) { project in
-                            tileView(for: project)
-                                .layoutValue(key: TileColSpanLayoutKey.self, value: project.tileSize.colSpan)
-                                .layoutValue(key: TileRowSpanLayoutKey.self, value: project.tileSize.rowSpan)
+                    if selectedFilter == .current {
+                        Button {
+                            showingCreateSheet = true
+                        } label: {
+                            HStack(spacing: WeekSpacing.xs) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 14))
+                                Text(String(localized: "project.add"))
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, WeekSpacing.xl)
+                            .padding(.vertical, WeekSpacing.md)
+                            .background(Color.weekyiiGradient)
+                            .clipShape(Capsule())
+                            .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
                         }
+                        .accessibilityIdentifier("projectsFooterCreateButton")
+                        .buttonStyle(ScaleButtonStyle())
+                        .padding(.top, BoardMetrics.footerSpacing)
+                        .padding(.bottom, BoardMetrics.footerSpacing)
                     }
-                    .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.id))
-                    .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.tileSizeRaw))
-                    .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.9), value: isEditingTiles)
-                    .transaction { transaction in
-                        if draggingProjectID != nil {
-                            transaction.animation = nil
-                        }
-                    }
-
-                    Button {
-                        showingCreateSheet = true
-                    } label: {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 14))
-                            Text(String(localized: "project.add"))
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, WeekSpacing.xl)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.weekyiiGradient)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
-                    }
-                    .accessibilityIdentifier("projectsFooterCreateButton")
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.top, BoardMetrics.footerSpacing)
-                    .padding(.bottom, BoardMetrics.footerSpacing)
                 }
             }
             .padding(.horizontal, BoardMetrics.horizontalPadding)
@@ -1355,7 +1403,7 @@ private struct ProjectsFullView: View {
 
     @ToolbarContentBuilder
     private var editToolbar: some ToolbarContent {
-        if !viewModel.projects.isEmpty {
+        if !tileProjects.isEmpty {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(isEditingTiles ? String(localized: "action.done") : String(localized: "action.edit")) {
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
@@ -1388,7 +1436,16 @@ private struct ProjectsFullView: View {
 
     private func syncTileProjectsFromModel(force: Bool) {
         guard force else { return }
-        tileProjects = viewModel.sortedProjectsForBoard()
+        tileProjects = viewModel.sortedProjectsForBoard().filter { project in
+            switch selectedFilter {
+            case .current:
+                project.status == .planning || project.status == .active
+            case .completed:
+                project.status == .completed
+            case .archived:
+                project.status == .archived
+            }
+        }
     }
 
     @ViewBuilder

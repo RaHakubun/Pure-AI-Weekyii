@@ -13,10 +13,15 @@ struct TaskEditorSheet: View {
     @State private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var stepDrafts: [TaskStepDraft]
     @State var attachments: [TaskAttachment]
+    @State private var selectedProjectID: UUID?
+    let allowsProjectSelection: Bool
+    let projectDate: Date?
+    @Query(sort: \ProjectModel.createdAt, order: .reverse) private var projects: [ProjectModel]
     
     // Config for save callback: returns necessary data
     var onSave: (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
     var onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)?
+    var onSaveWithProject: ((String, String, TaskType, String, [TaskStep], [TaskAttachment], ProjectModel?) -> Void)?
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -40,8 +45,11 @@ struct TaskEditorSheet: View {
         initialTypeIdRaw: String? = nil,
         initialSteps: [TaskStep] = [],
         initialAttachments: [TaskAttachment] = [],
+        allowsProjectSelection: Bool = false,
+        projectDate: Date? = nil,
         onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void,
-        onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)? = nil
+        onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)? = nil,
+        onSaveWithProject: ((String, String, TaskType, String, [TaskStep], [TaskAttachment], ProjectModel?) -> Void)? = nil
     ) {
         self.title = title
         self.isReadOnly = isReadOnly
@@ -66,8 +74,12 @@ struct TaskEditorSheet: View {
             }
         )
         _attachments = State(initialValue: initialAttachments)
+        _selectedProjectID = State(initialValue: nil)
+        self.allowsProjectSelection = allowsProjectSelection
+        self.projectDate = projectDate
         self.onSave = onSave
         self.onSaveWithTypeId = onSaveWithTypeId
+        self.onSaveWithProject = onSaveWithProject
     }
 
     var body: some View {
@@ -112,6 +124,29 @@ struct TaskEditorSheet: View {
                                 }
                                 .scrollIndicators(.hidden)
                             }
+                        }
+                    }
+
+                    if allowsProjectSelection {
+                        WeekCard(accentColor: selectedProject.map { Color(hex: $0.color) } ?? .weekyiiPrimary) {
+                            sectionHeader(
+                                titleKey: "所属项目",
+                                icon: "folder.fill",
+                                accent: selectedProject.map { Color(hex: $0.color) } ?? .weekyiiPrimary
+                            )
+
+                            Picker("所属项目", selection: $selectedProjectID) {
+                                Text("不关联项目").tag(nil as UUID?)
+                                ForEach(selectableProjects) { project in
+                                    Label(project.name, systemImage: project.icon)
+                                        .tag(Optional(project.id))
+                                }
+                            }
+                            .pickerStyle(.menu)
+
+                            Text("关联后，这项任务会同时计入项目进度，但仍由当日任务流统一执行。")
+                                .font(.caption)
+                                .foregroundStyle(Color.textSecondary)
                         }
                     }
                     
@@ -214,7 +249,9 @@ struct TaskEditorSheet: View {
                                         sortOrder: draft.sortOrder
                                     )
                                 }
-                            if let onSaveWithTypeId {
+                            if let onSaveWithProject {
+                                onSaveWithProject(taskTitle, taskDescription, taskType, taskTypeIdRaw, normalizedSteps, attachments, selectedProject)
+                            } else if let onSaveWithTypeId {
                                 onSaveWithTypeId(taskTitle, taskDescription, taskType, taskTypeIdRaw, normalizedSteps, attachments)
                             } else {
                                 onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
@@ -232,6 +269,7 @@ struct TaskEditorSheet: View {
                 }
             }
     }
+
         .alert("步骤全文", isPresented: $showingStepFullText) {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
@@ -243,6 +281,22 @@ struct TaskEditorSheet: View {
         .task {
             loadTaskTypeDefinitions()
         }
+    }
+
+    private var selectableProjects: [ProjectModel] {
+        projects.filter { project in
+            guard project.status == .planning || project.status == .active else { return false }
+            guard let projectDate else { return true }
+            let calendar = Calendar(identifier: .iso8601)
+            let date = calendar.startOfDay(for: projectDate)
+            return date >= calendar.startOfDay(for: project.startDate)
+                && date <= calendar.startOfDay(for: project.endDate)
+        }
+    }
+
+    private var selectedProject: ProjectModel? {
+        guard let selectedProjectID else { return nil }
+        return selectableProjects.first { $0.id == selectedProjectID }
     }
 
     private func sectionHeader(titleKey: LocalizedStringKey, icon: String, accent: Color) -> some View {

@@ -80,7 +80,81 @@ final class ExtensionsViewModel {
         }
     }
 
+    func updateProject(
+        _ project: ProjectModel,
+        name: String,
+        description: String,
+        color: String,
+        icon: String,
+        startDate: Date,
+        endDate: Date
+    ) -> Bool {
+        guard project.status == .planning || project.status == .active else {
+            errorMessage = WeekyiiError.projectReadOnly.localizedDescription
+            return false
+        }
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty else {
+            errorMessage = String(localized: "project.error.name_empty")
+            return false
+        }
+        let start = calendar.startOfDay(for: startDate)
+        let end = calendar.startOfDay(for: endDate)
+        guard end >= start else {
+            errorMessage = String(localized: "project.error.date_invalid")
+            return false
+        }
+        let tasksRemainInRange = project.tasks.allSatisfy { task in
+            guard let date = task.day?.date else { return true }
+            let taskDate = calendar.startOfDay(for: date)
+            return taskDate >= start && taskDate <= end
+        }
+        guard tasksRemainInRange else {
+            errorMessage = "新的项目日期范围不能排除已有任务。"
+            return false
+        }
+
+        project.name = normalizedName
+        project.projectDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        project.color = color
+        project.icon = icon
+        project.startDate = startDate
+        project.endDate = endDate
+        do {
+            try modelContext.save()
+            refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     // MARK: - Add Task to Project
+
+    func projectTaskPlacementError(for project: ProjectModel, on date: Date) -> String? {
+        guard project.status == .planning || project.status == .active else {
+            return WeekyiiError.projectReadOnly.localizedDescription
+        }
+        let projectStart = calendar.startOfDay(for: project.startDate)
+        let projectEnd = calendar.startOfDay(for: project.endDate)
+        let taskDate = calendar.startOfDay(for: date)
+        let today = calendar.startOfDay(for: Date())
+        guard taskDate >= projectStart && taskDate <= projectEnd else {
+            return WeekyiiError.projectDateOutOfRange.localizedDescription
+        }
+        guard taskDate >= today else {
+            return String(localized: "project.error.day_expired")
+        }
+
+        let dayId = taskDate.dayId
+        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        if let day = try? modelContext.fetch(descriptor).first,
+           day.status != .empty && day.status != .draft {
+            return WeekyiiError.projectTaskStateLocked.localizedDescription
+        }
+        return nil
+    }
 
     @discardableResult
     func addTask(
@@ -97,6 +171,10 @@ final class ExtensionsViewModel {
             errorMessage = String(localized: "project.error.task_title_empty")
             return nil
         }
+        if let placementError = projectTaskPlacementError(for: project, on: date) {
+            errorMessage = placementError
+            return nil
+        }
         
         // Date Validation
         let projectStart = calendar.startOfDay(for: project.startDate)
@@ -104,14 +182,7 @@ final class ExtensionsViewModel {
         let taskDate = calendar.startOfDay(for: date)
         let today = calendar.startOfDay(for: Date())
         
-        guard taskDate >= projectStart && taskDate <= projectEnd else {
-            errorMessage = String(localized: "project.error.date_out_of_range")
-            return nil
-        }
-        guard taskDate >= today else {
-            errorMessage = String(localized: "project.error.day_expired")
-            return nil
-        }
+        guard taskDate >= projectStart && taskDate <= projectEnd, taskDate >= today else { return nil }
 
         // 1. 找到或创建该日期所属的 Week
         let day = findOrCreateDay(for: date)
@@ -119,12 +190,8 @@ final class ExtensionsViewModel {
             errorMessage = String(localized: "error.operation_failed_retry")
             return nil
         }
-        guard day.status != .expired else {
-            errorMessage = String(localized: "project.error.day_expired")
-            return nil
-        }
-        guard day.status != .completed else {
-            errorMessage = String(localized: "project.error.day_completed")
+        guard day.status == .empty || day.status == .draft else {
+            errorMessage = WeekyiiError.projectTaskStateLocked.localizedDescription
             return nil
         }
 
@@ -169,11 +236,21 @@ final class ExtensionsViewModel {
     
     func deleteProject(_ project: ProjectModel, includeTasks: Bool) {
         if includeTasks {
-            // 级联删除：删除项目关联的所有任务
-            // 注意：SwiftData 的 deleteRule: .nullify 只会断开关联，不会删除 TaskItem
-            // 所以这里需要手动删除任务
+            guard project.tasks.allSatisfy(isTaskEditableFromProject) else {
+                errorMessage = "项目包含已启动或已完成任务。请保留任务记录，仅删除项目。"
+                return
+            }
+
+            let affectedDays = project.tasks.compactMap(\.day)
             for task in project.tasks {
+                task.day?.tasks.removeAll { $0.id == task.id }
                 modelContext.delete(task)
+            }
+            for day in affectedDays {
+                taskMutationService.normalizeOrder(in: day, zone: .draft)
+                if day.status == .draft && day.sortedDraftTasks.isEmpty {
+                    day.status = .empty
+                }
             }
         } else {
             // 仅删除项目：断开关联（任务保留）- .nullify 规则会自动处理，这里显式置空更清晰
@@ -194,6 +271,27 @@ final class ExtensionsViewModel {
     // MARK: - Update Project Status
 
     func updateStatus(_ project: ProjectModel, to status: ProjectStatus) {
+        let transitionIsAllowed: Bool
+        switch (project.status, status) {
+        case (.planning, .active),
+             (.active, .completed),
+             (.completed, .archived),
+             (.completed, .active),
+             (.archived, .completed):
+            transitionIsAllowed = true
+        default:
+            transitionIsAllowed = project.status == status
+        }
+
+        guard transitionIsAllowed else {
+            errorMessage = "当前项目状态不能执行该操作。"
+            return
+        }
+        if status == .completed && !project.isAllCompleted {
+            errorMessage = WeekyiiError.projectHasOpenTasks.localizedDescription
+            return
+        }
+
         project.status = status
         do {
             try modelContext.save()
@@ -206,6 +304,16 @@ final class ExtensionsViewModel {
     // MARK: - Delete Project Task
 
     func deleteProjectTask(_ task: TaskItem) {
+        guard let project = task.project,
+              project.status == .planning || project.status == .active else {
+            errorMessage = WeekyiiError.projectReadOnly.localizedDescription
+            return
+        }
+        guard isTaskEditableFromProject(task) else {
+            errorMessage = WeekyiiError.projectTaskStateLocked.localizedDescription
+            return
+        }
+
         if let day = task.day {
             day.tasks.removeAll { $0.id == task.id }
             if day.tasks.isEmpty && day.status == .draft {
@@ -264,7 +372,11 @@ final class ExtensionsViewModel {
     }
 
     func completedProjects() -> [ProjectModel] {
-        projects.filter { $0.status == .completed || $0.status == .archived }
+        projects.filter { $0.status == .completed }
+    }
+
+    func archivedProjects() -> [ProjectModel] {
+        projects.filter { $0.status == .archived }
     }
 
     func dueSoonSuspendedTasks(limit: Int = 3) -> [SuspendedTaskItem] {
@@ -426,6 +538,16 @@ final class ExtensionsViewModel {
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = []
     ) {
+        guard let project = task.project,
+              project.status == .planning || project.status == .active else {
+            errorMessage = WeekyiiError.projectReadOnly.localizedDescription
+            return
+        }
+        guard isTaskEditableFromProject(task) else {
+            errorMessage = WeekyiiError.projectTaskStateLocked.localizedDescription
+            return
+        }
+
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedTitle.isEmpty else {
             errorMessage = String(localized: "project.error.task_title_empty")
@@ -456,6 +578,11 @@ final class ExtensionsViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func isTaskEditableFromProject(_ task: TaskItem) -> Bool {
+        guard let day = task.day else { return false }
+        return (day.status == .empty || day.status == .draft) && task.zone == .draft
     }
 
     private func replaceProjectTaskSteps(for task: TaskItem, with steps: [TaskStep]) {

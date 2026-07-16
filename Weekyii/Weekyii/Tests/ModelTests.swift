@@ -612,6 +612,66 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_projectCannotReceiveTasksAfterCompletion() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let project = ProjectModel(name: "Closed", status: .completed, startDate: today, endDate: today.addingDays(7))
+        context.insert(project)
+        try context.save()
+
+        let viewModel = ExtensionsViewModel(modelContext: context)
+        let result = viewModel.addTask(to: project, title: "Should not exist", taskType: .regular, on: today)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(project.tasks.count, 0)
+        XCTAssertEqual(viewModel.errorMessage, WeekyiiError.projectReadOnly.localizedDescription)
+    }
+
+    @MainActor
+    func test_projectCannotInsertDraftTaskIntoExecutingDay() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        let day = try XCTUnwrap(week.days.first { $0.dayId == today.dayId })
+        day.status = .execute
+        let focus = TaskItem(title: "Focus", order: 1, zone: .focus)
+        focus.day = day
+        day.tasks.append(focus)
+        let project = ProjectModel(name: "Active", status: .active, startDate: today, endDate: today.addingDays(7))
+        context.insert(week)
+        context.insert(project)
+        try context.save()
+
+        let viewModel = ExtensionsViewModel(modelContext: context)
+        let result = viewModel.addTask(to: project, title: "Late draft", taskType: .regular, on: today)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(day.sortedDraftTasks.count, 0)
+        XCTAssertEqual(viewModel.errorMessage, WeekyiiError.projectTaskStateLocked.localizedDescription)
+    }
+
+    @MainActor
+    func test_projectCannotCompleteWithOpenTasks() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let project = ProjectModel(name: "Active", status: .active, startDate: today, endDate: today.addingDays(7))
+        let task = TaskItem(title: "Open", order: 1, zone: .draft)
+        task.project = project
+        project.tasks = [task]
+        context.insert(project)
+        try context.save()
+
+        let viewModel = ExtensionsViewModel(modelContext: context)
+        viewModel.updateStatus(project, to: .completed)
+
+        XCTAssertEqual(project.status, .active)
+        XCTAssertEqual(viewModel.errorMessage, WeekyiiError.projectHasOpenTasks.localizedDescription)
+    }
+
+    @MainActor
     func test_projectDetailSnapshot_countsAndNextTaskFromUpcomingDate() throws {
         let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
         let yesterday = today.addingDays(-1)
@@ -1062,6 +1122,29 @@ final class TaskPostponeServiceTests: XCTestCase {
         XCTAssertTrue(preview.requiresWeekCreation)
         XCTAssertEqual(preview.targetWeekId, targetDate.weekId)
         XCTAssertEqual(preview.targetDayId, targetDate.dayId)
+    }
+
+    func test_preview_rejectsProjectTaskBeyondProjectEndDate() throws {
+        let context = container.mainContext
+        let service = TaskPostponeService(modelContext: context)
+        let today = makeDate(2026, 3, 5)
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        let day = requireDay(in: week, date: today)
+        day.status = .draft
+        let project = ProjectModel(name: "Bounded", status: .active, startDate: today, endDate: today.addingDays(2))
+        let task = TaskItem(title: "Project task", order: 1, zone: .draft)
+        task.project = project
+        day.tasks.append(task)
+        context.insert(week)
+        context.insert(project)
+        try context.save()
+
+        XCTAssertThrowsError(try service.preview(taskID: task.id, targetDate: today.addingDays(3), today: today)) { error in
+            guard let weekyiiError = error as? WeekyiiError else {
+                return XCTFail("Expected WeekyiiError, received \(error)")
+            }
+            XCTAssertEqual(weekyiiError, .projectDateOutOfRange)
+        }
     }
 
     func test_serviceLifecycle_withoutUsage() throws {

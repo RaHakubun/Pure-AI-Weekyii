@@ -153,9 +153,10 @@ final class TodayViewModel {
         randomMindStampProvider()
     }
 
-    func addTask(title: String, description: String = "", type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
+    func addTask(title: String, description: String = "", type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep] = [], attachments: [TaskAttachment] = [], project: ProjectModel? = nil) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
+        try validateProjectPlacement(project, on: day.date)
 
         let payload = TaskDraftPayload(
             title: title,
@@ -165,7 +166,7 @@ final class TodayViewModel {
             steps: steps,
             attachments: attachments
         )
-        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft, project: nil)
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft, project: project)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -273,9 +274,11 @@ final class TodayViewModel {
         type: TaskType,
         taskTypeIdRaw: String? = nil,
         steps: [TaskStep] = [],
-        attachments: [TaskAttachment] = []
+        attachments: [TaskAttachment] = [],
+        project: ProjectModel? = nil
     ) throws {
         let day = try resolveUnlockedFlexibleExecutionDay()
+        try validateProjectPlacement(project, on: day.date)
         let payload = TaskDraftPayload(
             title: title,
             description: description,
@@ -284,7 +287,7 @@ final class TodayViewModel {
             steps: steps,
             attachments: attachments
         )
-        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .frozen, project: nil)
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .frozen, project: project)
         taskMutationService.normalizeOrder(in: day, zone: .frozen)
         updateNotificationSchedule(for: day)
         try modelContext.save()
@@ -476,6 +479,18 @@ final class TodayViewModel {
         day.tasks.removeAll { zones.contains($0.zone) }
         for task in toRemove {
             modelContext.delete(task)
+        }
+    }
+
+    private func validateProjectPlacement(_ project: ProjectModel?, on date: Date) throws {
+        guard let project else { return }
+        guard project.status == .planning || project.status == .active else {
+            throw WeekyiiError.projectReadOnly
+        }
+        let target = calendar.startOfDay(for: date)
+        guard target >= calendar.startOfDay(for: project.startDate),
+              target <= calendar.startOfDay(for: project.endDate) else {
+            throw WeekyiiError.projectDateOutOfRange
         }
     }
 

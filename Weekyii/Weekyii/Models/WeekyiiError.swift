@@ -1,6 +1,6 @@
 import Foundation
 
-enum WeekyiiError: LocalizedError {
+enum WeekyiiError: LocalizedError, Equatable {
     case dayNotFound(String)
     case taskNotFound(UUID)
     case cannotStartEmptyDay
@@ -16,6 +16,10 @@ enum WeekyiiError: LocalizedError {
     case flexibleModeRequired
     case draftZoneLocked
     case executionQueueEmpty
+    case projectReadOnly
+    case projectHasOpenTasks
+    case projectDateOutOfRange
+    case projectTaskStateLocked
 
     var errorDescription: String? {
         switch self {
@@ -49,6 +53,14 @@ enum WeekyiiError: LocalizedError {
             return "草稿区仍处于冻结状态。"
         case .executionQueueEmpty:
             return "草稿区没有可交换的任务。"
+        case .projectReadOnly:
+            return "已完成或已归档的项目为只读状态，请先重新打开项目。"
+        case .projectHasOpenTasks:
+            return "项目仍有未完成任务，暂时不能结项。"
+        case .projectDateOutOfRange:
+            return "任务日期必须位于项目的开始与结束日期之间。"
+        case .projectTaskStateLocked:
+            return "该任务所属日期已启动或结束，不能从项目页面修改。"
         }
     }
 }

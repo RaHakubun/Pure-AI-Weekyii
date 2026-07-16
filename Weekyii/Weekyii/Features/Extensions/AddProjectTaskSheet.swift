@@ -216,9 +216,14 @@ struct AddProjectTaskSheet: View {
     }
 
     private func createTasks() {
+        let dates = sortedSelectedDates.compactMap { calendar.date(from: $0) }
+        if let placementError = dates.compactMap({ viewModel.projectTaskPlacementError(for: project, on: $0) }).first {
+            errorMessage = placementError
+            return
+        }
+
         var firstFailureMessage: String?
-        for dc in sortedSelectedDates {
-            guard let date = calendar.date(from: dc) else { continue }
+        for date in dates {
             let result = viewModel.addTask(
                 to: project,
                 title: title.trimmingCharacters(in: .whitespaces),

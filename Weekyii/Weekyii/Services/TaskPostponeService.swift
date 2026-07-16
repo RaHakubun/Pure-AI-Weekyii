@@ -253,6 +253,7 @@ struct TaskPostponeService {
 
         let task = try fetchTask(by: taskID)
         try validateSourceTask(task, todayDayId: todayStart.dayId)
+        try validateProjectPlacement(for: task, targetDate: normalizedTargetDate)
 
         let targetDayId = normalizedTargetDate.dayId
         let targetWeekId = normalizedTargetDate.weekId
@@ -290,6 +291,7 @@ struct TaskPostponeService {
             throw WeekyiiError.postponeSourceTaskNotInToday
         }
         try validateSourceTask(task, todayDayId: todayDayId)
+        try validateProjectPlacement(for: task, targetDate: preview.targetDate)
 
         let resolution = try resolveTargetDay(preview: preview, today: today, allowCreateWeek: allowCreateWeek)
         let targetDay = resolution.day
@@ -344,6 +346,19 @@ struct TaskPostponeService {
             break
         case .complete:
             throw WeekyiiError.cannotPostponeCompletedTask
+        }
+    }
+
+    private func validateProjectPlacement(for task: TaskItem, targetDate: Date) throws {
+        guard let project = task.project else { return }
+        guard project.status == .planning || project.status == .active else {
+            throw WeekyiiError.projectReadOnly
+        }
+        let target = calendar.startOfDay(for: targetDate)
+        let start = calendar.startOfDay(for: project.startDate)
+        let end = calendar.startOfDay(for: project.endDate)
+        guard target >= start && target <= end else {
+            throw WeekyiiError.projectDateOutOfRange
         }
     }
 
