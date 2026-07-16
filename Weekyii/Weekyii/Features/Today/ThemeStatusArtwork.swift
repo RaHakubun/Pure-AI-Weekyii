@@ -45,7 +45,7 @@ private struct NarrativeThemeStatusIllustration: View {
     @ViewBuilder
     var body: some View {
         if shouldAnimate {
-            TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
                 GeometryReader { proxy in
                     scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
                 }
@@ -89,7 +89,8 @@ private struct AmberWindowScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let pulse = (sin(time * 0.72) + 1) * 0.5
+        let pulse = CGFloat((sin(time * 0.72) + 1) * 0.5)
+        let flameSway = CGFloat(sin(time * 1.35)) * 3.4
         let windowX = size.width * 0.67
         let deskY = size.height * 0.70
 
@@ -131,10 +132,17 @@ private struct AmberWindowScene: View {
                 .frame(height: size.height * 0.31)
                 .position(x: size.width / 2, y: size.height * 0.89)
 
+            Circle()
+                .fill(Color(hex: "#FFBE62").opacity(0.12 + Double(pulse) * 0.16))
+                .frame(width: 52 + pulse * 8, height: 52 + pulse * 8)
+                .blur(radius: 9)
+                .position(x: size.width * 0.34 + flameSway * 0.35, y: deskY - size.height * 0.27)
+
             Capsule()
-                .fill(Color(hex: colorScheme == .dark ? "#F3B65E" : "#FFF0B2").opacity(0.68 + pulse * 0.14))
-                .frame(width: 5, height: size.height * 0.28)
-                .position(x: size.width * 0.34, y: deskY - size.height * 0.15)
+                .fill(Color(hex: colorScheme == .dark ? "#F3B65E" : "#FFF0B2").opacity(0.72 + Double(pulse) * 0.24))
+                .frame(width: 8, height: 15 + pulse * 5)
+                .rotationEffect(.degrees(Double(flameSway) * 1.8))
+                .position(x: size.width * 0.34 + flameSway, y: deskY - size.height * 0.27)
 
             Path { path in
                 path.move(to: CGPoint(x: size.width * 0.27, y: deskY))
@@ -164,7 +172,9 @@ private struct OceanSailScene: View {
 
     var body: some View {
         let horizonY = size.height * 0.52
-        let sailX = size.width * 0.382 + CGFloat(sin(time * 0.25)) * 2
+        let sailX = size.width * 0.382
+        let boatBob = CGFloat(sin(time * 0.92)) * 3.5
+        let boatTilt = sin(time * 0.58) * 2.2
 
         ZStack {
             LinearGradient(
@@ -193,12 +203,12 @@ private struct OceanSailScene: View {
                     let progress = CGFloat(index) / 6
                     let y = horizonY + 6 + CGFloat(index) * max((canvas.height - horizonY - 8) / 7, 4)
                     let phase = time * 0.55 + Double(index) * 0.74
-                    let drift = CGFloat(sin(phase)) * (2.5 + progress * 2)
+                    let drift = CGFloat(sin(phase)) * (5 + progress * 3)
                     var path = Path()
                     path.move(to: CGPoint(x: canvas.width * 0.06 + drift, y: y))
                     path.addQuadCurve(
                         to: CGPoint(x: canvas.width * 0.94 - drift, y: y),
-                        control: CGPoint(x: canvas.width * 0.50, y: y + CGFloat(cos(phase)) * 2.4)
+                        control: CGPoint(x: canvas.width * 0.50, y: y + CGFloat(cos(phase)) * 4.2)
                     )
                     context.stroke(
                         path,
@@ -215,6 +225,8 @@ private struct OceanSailScene: View {
                 path.closeSubpath()
             }
             .fill(Color.white.opacity(colorScheme == .dark ? 0.78 : 0.94))
+            .offset(y: boatBob)
+            .rotationEffect(.degrees(boatTilt), anchor: .bottom)
 
             Path { path in
                 path.move(to: CGPoint(x: sailX - 23, y: horizonY + 3))
@@ -224,6 +236,8 @@ private struct OceanSailScene: View {
                 )
             }
             .stroke(Color(hex: colorScheme == .dark ? "#B9DCEC" : "#174E70"), lineWidth: 2)
+            .offset(y: boatBob)
+            .rotationEffect(.degrees(boatTilt), anchor: .center)
         }
     }
 }
@@ -235,7 +249,7 @@ private struct ForestPathScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let mistOffset = CGFloat(sin(time * 0.18)) * 5
+        let mistOffset = CGFloat(sin(time * 0.24)) * 14
         let horizonY = size.height * 0.55
 
         ZStack {
@@ -247,9 +261,9 @@ private struct ForestPathScene: View {
                 endPoint: .bottom
             )
 
-            ForestTreeLayer(size: size, baseline: horizonY + 8, tint: Color(hex: colorScheme == .dark ? "#274936" : "#4F8660"), scale: 0.72, offsetX: mistOffset)
+            ForestTreeLayer(size: size, baseline: horizonY + 8, tint: Color(hex: colorScheme == .dark ? "#274936" : "#4F8660"), scale: 0.72, offsetX: mistOffset * 0.75)
                 .opacity(colorScheme == .dark ? 0.72 : 0.66)
-            ForestTreeLayer(size: size, baseline: horizonY + 23, tint: Color(hex: colorScheme == .dark ? "#112A1D" : "#2F6544"), scale: 1.0, offsetX: -mistOffset * 0.55)
+            ForestTreeLayer(size: size, baseline: horizonY + 23, tint: Color(hex: colorScheme == .dark ? "#112A1D" : "#2F6544"), scale: 1.0, offsetX: -mistOffset * 0.28)
 
             Path { path in
                 path.move(to: CGPoint(x: size.width * 0.44, y: horizonY + 3))
@@ -270,8 +284,8 @@ private struct ForestPathScene: View {
 
             Capsule()
                 .fill(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.18))
-                .frame(width: size.width * 0.62, height: 12)
-                .blur(radius: 4)
+                .frame(width: size.width * 0.72, height: 14)
+                .blur(radius: 5)
                 .offset(x: mistOffset, y: -4)
         }
     }
@@ -308,7 +322,7 @@ private struct RoseGardenScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let petalDrift = CGFloat(sin(time * 0.42)) * 5
+        let breeze = CGFloat(sin(time * 0.68)) * 7
 
         ZStack {
             LinearGradient(
@@ -345,13 +359,32 @@ private struct RoseGardenScene: View {
                     control: CGPoint(x: canvas.width * 0.22, y: canvas.height * 0.56)
                 )
                 context.stroke(stem, with: .color(Color(hex: colorScheme == .dark ? "#8E6D78" : "#8F5368").opacity(0.7)), lineWidth: 2)
+
+                for index in 0..<6 {
+                    let progress = CGFloat(
+                        (time * 0.12 + Double(index) * 0.19)
+                            .truncatingRemainder(dividingBy: 1.0)
+                    )
+                    let baseX = canvas.width * (0.18 + CGFloat((index * 17) % 61) / 100)
+                    let flutter = CGFloat(sin(time * 1.25 + Double(index) * 0.9)) * 11
+                    let petal = CGRect(
+                        x: baseX + flutter + progress * 16,
+                        y: canvas.height * (0.08 + progress * 0.86),
+                        width: 9,
+                        height: 5
+                    )
+                    context.fill(
+                        Path(ellipseIn: petal),
+                        with: .color(Color(hex: colorScheme == .dark ? "#F0ADC1" : "#FFF0F4").opacity(0.58 + Double(index % 3) * 0.12))
+                    )
+                }
             }
 
             Capsule()
                 .fill(Color(hex: colorScheme == .dark ? "#E2A6B9" : "#FFF2F5").opacity(0.72))
                 .frame(width: 18, height: 9)
-                .rotationEffect(.degrees(-24))
-                .position(x: size.width * 0.38 + petalDrift, y: size.height * 0.32 - petalDrift * 0.25)
+                .rotationEffect(.degrees(-24 + Double(breeze)))
+                .position(x: size.width * 0.38 + breeze, y: size.height * 0.32 - breeze * 0.25)
 
             Rectangle()
                 .fill(Color(hex: colorScheme == .dark ? "#170C12" : "#8E3F59").opacity(colorScheme == .dark ? 0.42 : 0.18))
@@ -369,7 +402,6 @@ private struct LavenderFieldScene: View {
 
     var body: some View {
         let horizonY = size.height * 0.48
-        let sway = CGFloat(sin(time * 0.38)) * 2.2
 
         ZStack {
             LinearGradient(
@@ -402,9 +434,13 @@ private struct LavenderFieldScene: View {
                 let vanishing = CGPoint(x: canvas.width * 0.42, y: horizonY)
                 for index in 0..<9 {
                     let bottomX = CGFloat(index) / 8 * canvas.width
+                    let rowSway = CGFloat(sin(time * 0.82 + Double(index) * 0.48)) * 6
                     var row = Path()
                     row.move(to: vanishing)
-                    row.addLine(to: CGPoint(x: bottomX + sway * CGFloat(index % 2 == 0 ? 1 : -1), y: canvas.height + 2))
+                    row.addQuadCurve(
+                        to: CGPoint(x: bottomX + rowSway, y: canvas.height + 2),
+                        control: CGPoint(x: (vanishing.x + bottomX) * 0.5 + rowSway * 0.35, y: canvas.height * 0.73)
+                    )
                     context.stroke(
                         row,
                         with: .color(Color(hex: colorScheme == .dark ? "#A786BF" : "#D8BCE9").opacity(0.38)),
@@ -414,7 +450,8 @@ private struct LavenderFieldScene: View {
                 for index in 0..<22 {
                     let x = CGFloat((index * 47) % 101) / 100 * canvas.width
                     let y = horizonY + CGFloat((index * 29) % 47) / 47 * (canvas.height - horizonY)
-                    let rect = CGRect(x: x + sway, y: y, width: 2.4, height: 6)
+                    let flowerSway = CGFloat(sin(time * 0.82 + Double(index) * 0.31)) * 5
+                    let rect = CGRect(x: x + flowerSway, y: y, width: 2.8, height: 7)
                     context.fill(Path(roundedRect: rect, cornerRadius: 1.2), with: .color(Color(hex: "#D8B6EA").opacity(0.56)))
                 }
             }
@@ -429,7 +466,8 @@ private struct GraphiteRidgeScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let shift = CGFloat(sin(time * 0.22)) * 1.8
+        let shift = CGFloat(sin(time * 0.34)) * 4
+        let pulse = CGFloat((sin(time * 1.2) + 1) * 0.5)
 
         ZStack {
             LinearGradient(
@@ -467,12 +505,17 @@ private struct GraphiteRidgeScene: View {
                     to: CGPoint(x: canvas.width * 0.382, y: ridgeY - 2),
                     control: CGPoint(x: canvas.width * 0.34, y: canvas.height * 0.77)
                 )
-                context.stroke(route, with: .color(Color(hex: colorScheme == .dark ? "#C0C6CD" : "#626A73").opacity(0.72)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                context.stroke(
+                    route,
+                    with: .color(Color(hex: colorScheme == .dark ? "#C0C6CD" : "#626A73").opacity(0.78)),
+                    style: StrokeStyle(lineWidth: 1.7, lineCap: .round, dash: [6, 5], dashPhase: -CGFloat(time * 8))
+                )
             }
 
             Circle()
                 .fill(Color(hex: colorScheme == .dark ? "#E6AD72" : "#C87938"))
-                .frame(width: 6, height: 6)
+                .frame(width: 8 + pulse * 4, height: 8 + pulse * 4)
+                .shadow(color: Color(hex: "#E6AD72").opacity(0.35 + Double(pulse) * 0.35), radius: 4 + pulse * 3)
                 .position(x: size.width * 0.382 + shift, y: size.height * 0.59)
         }
     }
@@ -485,8 +528,10 @@ private struct MintGreenhouseScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let sway = CGFloat(sin(time * 0.46)) * 1.8
-        let dropletTravel = CGFloat((sin(time * 0.72) + 1) * 0.5)
+        let sway = CGFloat(sin(time * 0.72)) * 5.5
+        let dropletTravel = CGFloat((time * 0.32).truncatingRemainder(dividingBy: 1.0))
+        let rippleProgress = max(0, (dropletTravel - 0.82) / 0.18)
+        let rippleOpacity = rippleProgress > 0 ? 1 - rippleProgress : 0
         let glassX = size.width * 0.43
 
         ZStack {
@@ -571,13 +616,14 @@ private struct MintGreenhouseScene: View {
                 .overlay(Circle().stroke(Color(hex: "#A7F3DE").opacity(0.70), lineWidth: 0.8))
                 .position(
                     x: glassX + 42,
-                    y: size.height * 0.31 + dropletTravel * size.height * 0.34
+                    y: size.height * 0.24 + dropletTravel * size.height * 0.58
                 )
 
             Ellipse()
                 .stroke(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.52), lineWidth: 1)
-                .frame(width: 30 + dropletTravel * 9, height: 6 + dropletTravel * 2)
+                .frame(width: 24 + rippleProgress * 22, height: 5 + rippleProgress * 5)
                 .position(x: glassX + 3, y: size.height * 0.82)
+                .opacity(Double(rippleOpacity))
         }
     }
 
@@ -605,7 +651,7 @@ private struct MidnightAuroraScene: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let drift = CGFloat(sin(time * 0.20)) * 8
+        let drift = CGFloat(sin(time * 0.28)) * 14
         let horizonY = size.height * 0.68
 
         ZStack {
@@ -622,26 +668,33 @@ private struct MidnightAuroraScene: View {
                     let x = CGFloat((index * 37) % 101) / 100 * canvas.width
                     let y = CGFloat((index * 19) % 47) / 47 * canvas.height * 0.52
                     let radius: CGFloat = index % 3 == 0 ? 1.4 : 0.8
+                    let twinkle = 0.34 + (sin(time * 1.3 + Double(index) * 0.8) + 1) * 0.20
                     context.fill(
                         Path(ellipseIn: CGRect(x: x, y: y, width: radius, height: radius)),
-                        with: .color(Color.white.opacity(colorScheme == .dark ? 0.50 : 0.34))
+                        with: .color(Color.white.opacity(colorScheme == .dark ? twinkle : twinkle * 0.72))
                     )
                 }
 
                 for band in 0..<3 {
                     let y = canvas.height * (0.24 + CGFloat(band) * 0.10)
+                    let wave = CGFloat(sin(time * 0.64 + Double(band) * 0.9)) * 10
                     var path = Path()
                     path.move(to: CGPoint(x: -20 + drift * CGFloat(band + 1) * 0.35, y: y))
                     path.addCurve(
-                        to: CGPoint(x: canvas.width + 20 + drift, y: y + 5),
-                        control1: CGPoint(x: canvas.width * 0.28, y: y - 14 - CGFloat(band) * 2),
-                        control2: CGPoint(x: canvas.width * 0.70, y: y + 18)
+                        to: CGPoint(x: canvas.width + 20 + drift, y: y + 5 - wave * 0.25),
+                        control1: CGPoint(x: canvas.width * 0.28, y: y - 14 - CGFloat(band) * 2 + wave),
+                        control2: CGPoint(x: canvas.width * 0.70, y: y + 18 - wave)
                     )
                     let tint = band == 1 ? Color(hex: "#7AA8DE") : Color(hex: "#74BFAE")
-                    context.stroke(path, with: .color(tint.opacity(colorScheme == .dark ? 0.22 : 0.16)), style: StrokeStyle(lineWidth: 8 - CGFloat(band) * 1.6, lineCap: .round))
+                    let glow = (sin(time * 0.74 + Double(band)) + 1) * 0.05
+                    context.stroke(
+                        path,
+                        with: .color(tint.opacity((colorScheme == .dark ? 0.28 : 0.21) + glow)),
+                        style: StrokeStyle(lineWidth: 9 - CGFloat(band) * 1.6, lineCap: .round)
+                    )
                 }
             }
-            .blur(radius: 1.2)
+            .blur(radius: 0.8)
 
             Circle()
                 .fill(Color(hex: colorScheme == .dark ? "#E6EEFF" : "#FFF9E7").opacity(0.84))
@@ -690,7 +743,7 @@ private struct SunsetStatusIllustration: View {
         GeometryReader { proxy in
             let size = proxy.size
             let sunX = size.width * 0.382
-            let sunY = size.height * 0.31 + (drift ? 1.3 : -1.3)
+            let sunY = size.height * 0.31 + (drift ? 3.2 : -3.2)
             let horizonY = size.height * 0.58
 
             ZStack {
@@ -779,7 +832,7 @@ private struct SunsetStatusIllustration: View {
             }
             .onAppear {
                 guard shouldAnimate else { return }
-                withAnimation(.easeInOut(duration: 5.8).repeatForever(autoreverses: true)) {
+                withAnimation(.easeInOut(duration: 4.8).repeatForever(autoreverses: true)) {
                     drift = true
                 }
             }
@@ -789,7 +842,7 @@ private struct SunsetStatusIllustration: View {
     @ViewBuilder
     private func stylizedRipples(size: CGSize, horizonY: CGFloat, sunX: CGFloat) -> some View {
         if shouldAnimate {
-            TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
                 rippleCanvas(time: timeline.date.timeIntervalSinceReferenceDate, horizonY: horizonY, sunX: sunX)
             }
         } else {
@@ -807,10 +860,10 @@ private struct SunsetStatusIllustration: View {
                     let progress = CGFloat(index) / CGFloat(max(bandCount - 1, 1))
                     let y = horizonY + CGFloat(index + 1) * verticalStep + CGFloat(index % 2 == 0 ? -1.5 : 0.8)
                     let width = canvasSize.width * (0.14 + progress * 0.44)
-                    let wobble = CGFloat(sin(t * 0.52 + Double(index) * 0.95)) * 2.6
+                    let wobble = CGFloat(sin(t * 0.68 + Double(index) * 0.95)) * 4.8
                     let centerX = sunX + 10 + wobble + CGFloat(index) * 0.7
                     let height = max(0.9, 1.8 - progress * 0.9)
-                    let alpha = max(0.05, 0.27 - Double(progress) * 0.17)
+                    let alpha = max(0.07, 0.34 - Double(progress) * 0.20)
                     let rect = CGRect(x: centerX - width / 2, y: y, width: width, height: height)
                     let path = Path(roundedRect: rect, cornerRadius: height)
                     context.fill(path, with: .color(Color(hex: "#FFD2AE").opacity(alpha)))
@@ -835,7 +888,7 @@ private struct LotrStatusIllustration: View {
     @ViewBuilder
     var body: some View {
         if shouldAnimate {
-            TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
                 GeometryReader { proxy in
                     scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
                 }
@@ -849,7 +902,7 @@ private struct LotrStatusIllustration: View {
 
     private func scene(size: CGSize, time: TimeInterval) -> some View {
         let glint = CGFloat((sin(time * 0.65) + 1) * 0.5)
-        let ringX = size.width * 0.34
+        let ringX = size.width * 0.32
         let ringY = size.height * 0.48
 
         return ZStack {
@@ -893,25 +946,8 @@ private struct LotrStatusIllustration: View {
                         style: StrokeStyle(lineWidth: 3.2, lineCap: .round)
                     )
 
-                    // The weathered gold ring is the unmistakable focal object.
-                    Circle()
-                        .stroke(
-                            AngularGradient(
-                                colors: [Color(hex: "#8E5C21"), Color(hex: "#F5D27A"), Color(hex: "#A76B25"), Color(hex: "#FFE29A"), Color(hex: "#8E5C21")],
-                                center: .center
-                            ),
-                            lineWidth: 8
-                        )
-                        .frame(width: 45, height: 45)
-                        .rotation3DEffect(.degrees(-18), axis: (x: 1, y: 0, z: 0))
-                        .shadow(color: Color(hex: "#E6A348").opacity(colorScheme == .dark ? 0.42 : 0.22), radius: 5)
+                    WeatheredRingView(glint: glint, colorScheme: colorScheme)
                         .position(x: ringX, y: ringY)
-
-                    Capsule()
-                        .fill(Color.white.opacity(colorScheme == .dark ? 0.72 : 0.56))
-                        .frame(width: 11, height: 2.2)
-                        .rotationEffect(.degrees(-38))
-                        .position(x: ringX - 11 + glint * 20, y: ringY - 17 + glint * 5)
 
                     Canvas { context, canvas in
                         for index in 0..<8 {
@@ -924,6 +960,60 @@ private struct LotrStatusIllustration: View {
                         }
                     }
                 }
+    }
+}
+
+private struct WeatheredRingView: View {
+    let glint: CGFloat
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .stroke(Color(hex: "#4D2B10").opacity(0.92), lineWidth: 12)
+                .offset(y: 2.5)
+
+            Ellipse()
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            Color(hex: "#6F4217"),
+                            Color(hex: "#C88A35"),
+                            Color(hex: "#FFE6A0"),
+                            Color(hex: "#9A5F20"),
+                            Color(hex: "#E6B85A"),
+                            Color(hex: "#5F3512")
+                        ],
+                        center: .center
+                    ),
+                    lineWidth: 8
+                )
+
+            Ellipse()
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.18), lineWidth: 1)
+                .padding(3)
+
+            Group {
+                Capsule().frame(width: 7, height: 1.2).rotationEffect(.degrees(16)).position(x: 18, y: 13)
+                Capsule().frame(width: 6, height: 1.2).rotationEffect(.degrees(-10)).position(x: 29, y: 9)
+                Capsule().frame(width: 8, height: 1.2).rotationEffect(.degrees(8)).position(x: 42, y: 10)
+                Capsule().frame(width: 6, height: 1.2).rotationEffect(.degrees(-18)).position(x: 50, y: 16)
+            }
+            .foregroundStyle(Color(hex: "#5B3312").opacity(0.68))
+
+            Capsule()
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.82 : 0.64))
+                .frame(width: 13, height: 2.6)
+                .rotationEffect(.degrees(-12 + Double(glint) * 20))
+                .position(
+                    x: 15 + glint * 34,
+                    y: 14 - CGFloat(sin(Double(glint) * .pi)) * 5
+                )
+        }
+        .frame(width: 66, height: 44)
+        .rotationEffect(.degrees(-10))
+        .shadow(color: Color.black.opacity(0.32), radius: 2, x: 0, y: 3)
+        .shadow(color: Color(hex: "#E6A348").opacity(colorScheme == .dark ? 0.38 : 0.20), radius: 6)
     }
 }
 
