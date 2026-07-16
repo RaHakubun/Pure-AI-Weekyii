@@ -47,7 +47,8 @@ final class ExtensionsViewModel {
         color: String,
         icon: String,
         startDate: Date,
-        endDate: Date
+        endDate: Date,
+        tileSize: ProjectTileSize = .medium
     ) -> ProjectModel? {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
             errorMessage = String(localized: "project.error.name_empty")
@@ -67,6 +68,7 @@ final class ExtensionsViewModel {
             endDate: endDate
         )
         let maxOrder = projects.map(\.tileOrder).max() ?? -1
+        project.tileSize = tileSize
         project.tileOrder = maxOrder + 1
         modelContext.insert(project)
 

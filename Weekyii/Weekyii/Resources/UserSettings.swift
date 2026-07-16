@@ -45,6 +45,14 @@ final class UserSettings: ObservableObject {
         didSet { save() }
     }
 
+    // Project Defaults
+    @Published var defaultProjectDurationDays: Int {
+        didSet { save() }
+    }
+    @Published var defaultProjectTileSizeRaw: String {
+        didSet { save() }
+    }
+
     // Pending Month View Marker Settings
     @Published var pendingMonthShowRegular: Bool {
         didSet { save() }
@@ -130,6 +138,8 @@ final class UserSettings: ObservableObject {
         self.fixedReminderHour = defaults.object(forKey: "fixedReminderHour") as? Int ?? 21
         self.fixedReminderMinute = defaults.object(forKey: "fixedReminderMinute") as? Int ?? 0
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
+        self.defaultProjectDurationDays = defaults.object(forKey: "defaultProjectDurationDays") as? Int ?? 7
+        self.defaultProjectTileSizeRaw = defaults.string(forKey: "defaultProjectTileSize") ?? ProjectTileSize.medium.rawValue
         self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
         self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
         self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
@@ -166,6 +176,8 @@ final class UserSettings: ObservableObject {
         defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
         defaults.set(fixedReminderMinute, forKey: "fixedReminderMinute")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
+        defaults.set(defaultProjectDurationDays, forKey: "defaultProjectDurationDays")
+        defaults.set(defaultProjectTileSizeRaw, forKey: "defaultProjectTileSize")
         defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
         defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
         defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
@@ -223,6 +235,11 @@ final class UserSettings: ObservableObject {
     var defaultExecutionMode: ExecutionMode {
         get { ExecutionMode(rawValue: defaultExecutionModeRaw) ?? .strict }
         set { defaultExecutionModeRaw = newValue.rawValue }
+    }
+
+    var defaultProjectTileSize: ProjectTileSize {
+        get { ProjectTileSize(storedValue: defaultProjectTileSizeRaw) ?? .medium }
+        set { defaultProjectTileSizeRaw = newValue.rawValue }
     }
 
     var effectiveColorScheme: ColorScheme? {

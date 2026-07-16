@@ -36,6 +36,24 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_userSettings_projectDefaultsPersistWithoutSchemaChanges() {
+        let suiteName = "ModelTests.ProjectDefaults.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.defaultProjectDurationDays, 7)
+        XCTAssertEqual(settings.defaultProjectTileSize.rawValue, ProjectTileSize.medium.rawValue)
+
+        settings.defaultProjectDurationDays = 21
+        settings.defaultProjectTileSize = .wide
+
+        XCTAssertEqual(defaults.integer(forKey: "defaultProjectDurationDays"), 21)
+        XCTAssertEqual(defaults.string(forKey: "defaultProjectTileSize"), ProjectTileSize.wide.rawValue)
+    }
+
+    @MainActor
     func test_taskTypeCatalogSeedsBuiltInDefinitions() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
@@ -609,6 +627,26 @@ final class ModelTests: XCTestCase {
 
         values.move(fromOffsets: IndexSet(integer: 1), toOffset: -1)
         XCTAssertEqual(values, ["B", "A", "C"])
+    }
+
+    @MainActor
+    func test_createProjectAppliesRequestedDefaultTileSize() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
+        let viewModel = ExtensionsViewModel(modelContext: context)
+
+        let project = viewModel.createProject(
+            name: "Wide project",
+            description: "",
+            color: "#C46A1A",
+            icon: "folder.fill",
+            startDate: today,
+            endDate: today.addingDays(7),
+            tileSize: .wide
+        )
+
+        XCTAssertEqual(project?.tileSize.rawValue, ProjectTileSize.wide.rawValue)
     }
 
     @MainActor

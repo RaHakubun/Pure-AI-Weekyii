@@ -14,27 +14,35 @@ struct ContentView: View {
     @EnvironmentObject private var userSettings: UserSettings
     @State private var selectedTab: MainTab = .today
 
+    private var visualIdentity: String {
+        "\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)"
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             PastView()
+                .id(visualIdentity)
                 .tabItem {
                     Label(String(localized: "tab.past"), systemImage: "clock.arrow.circlepath")
                 }
                 .tag(MainTab.past)
             
             TodayView()
+                .id(visualIdentity)
                 .tabItem {
                     Label(String(localized: "tab.today"), systemImage: "sun.max")
                 }
                 .tag(MainTab.today)
 
             PendingView()
+                .id(visualIdentity)
                 .tabItem {
                     Label(String(localized: "tab.pending"), systemImage: "calendar.badge.plus")
                 }
                 .tag(MainTab.pending)
 
             ExtensionsHubView()
+                .id(visualIdentity)
                 .tabItem {
                     Label(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
                 }
@@ -46,7 +54,9 @@ struct ContentView: View {
                 }
                 .tag(MainTab.settings)
         }
-        .id("\(appState.dataRevision)-\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)")
+        // Theme and appearance changes already invalidate this view through UserSettings.
+        // Keeping them in the identity destroys every tab's NavigationStack on selection.
+        .id(appState.dataRevision)
         .tint(.weekyiiPrimary)
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { appState.runtimeErrorMessage != nil },

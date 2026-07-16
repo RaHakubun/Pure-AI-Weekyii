@@ -233,18 +233,8 @@ struct PendingView: View {
                 displayMode = displayMode == .weekList ? .month : .weekList
             }
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.backgroundSecondary)
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.weekyiiPrimary.opacity(0.22), lineWidth: 1)
-                Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.weekyiiPrimary)
-            }
-            .frame(width: 36, height: 36)
+            Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(
             displayMode == .weekList
                 ? String(localized: "pending.switch.month", defaultValue: "切换到月视图")

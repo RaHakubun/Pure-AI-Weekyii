@@ -172,7 +172,7 @@ struct SettingsView: View {
                     taskTypeSettingsPage
                 } label: {
                     SettingsNavigationRow(
-                        title: "任务与分类",
+                        title: "任务管理",
                         value: "\(activeTaskTypeDefinitions.count) 个类型",
                         icon: "tag.fill",
                         tint: .teal
@@ -183,10 +183,21 @@ struct SettingsView: View {
                     futureSettingsPage
                 } label: {
                     SettingsNavigationRow(
-                        title: "未来与日历",
+                        title: "未来",
                         value: settings.weekStartsOnMonday ? "周一开始" : nil,
                         icon: "calendar.badge.clock",
                         tint: .blue
+                    )
+                }
+
+                NavigationLink {
+                    ProjectSettingsView()
+                } label: {
+                    SettingsNavigationRow(
+                        title: "项目",
+                        value: "默认 \(settings.defaultProjectDurationDays) 天",
+                        icon: "folder.fill",
+                        tint: .brown
                     )
                 }
             }
@@ -250,14 +261,21 @@ struct SettingsView: View {
             Section("类型管理") {
                 taskTypeManagementSettings
             }
+            if !archivedTaskTypeDefinitions.isEmpty {
+                Section("已归档类型") {
+                    ForEach(archivedTaskTypeDefinitions, id: \.idRaw) { definition in
+                        archivedTaskTypeRow(definition)
+                    }
+                }
+            }
         }
-        .navigationTitle("任务与分类")
+        .navigationTitle("任务管理")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var futureSettingsPage: some View {
         Form { futureSection }
-            .navigationTitle("未来与日历")
+            .navigationTitle("未来")
             .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -353,6 +371,16 @@ struct SettingsView: View {
     @ViewBuilder
     private var pastSection: some View {
         Section {
+            if let startDate = appState.systemStartDate {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "calendar", color: .blue)
+                    Text(String(localized: "settings.about.start_date"))
+                    Spacer()
+                    Text(startDate, format: Date.FormatStyle().year().month().day())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             HStack(spacing: 12) {
                 SettingsIcon(icon: "flag.fill", color: .orange)
                 Text(String(localized: "settings.about.days_started"))
@@ -361,17 +389,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "chart.bar.fill", color: .mint)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.past.summary.title", defaultValue: "统计口径说明"))
-                    Text(String(localized: "settings.past.summary.note", defaultValue: "completed 计入完成详情；expired 仅保留数量，不保留任务详情。"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
         } header: {
-            Text(String(localized: "settings.section.past", defaultValue: "过去"))
+            Text("使用历程")
         }
     }
 
@@ -637,15 +656,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let startDate = appState.systemStartDate {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "calendar", color: .blue)
-                    Text(String(localized: "settings.about.start_date"))
-                    Spacer()
-                    Text(startDate, format: Date.FormatStyle().year().month().day())
-                        .foregroundStyle(.secondary)
-                }
-            }
         } header: {
             Text(String(localized: "settings.about.header"))
         }
@@ -689,25 +699,18 @@ struct SettingsView: View {
     // MARK: - Kill Time Settings
     @ViewBuilder
     private var killTimeSettings: some View {
-        HStack(spacing: 12) {
-            SettingsIcon(icon: "clock.fill", color: .orange)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "settings.default_kill_time"))
-                Text(String(localized: "settings.default_kill_time.guidance", defaultValue: "一天的任务将在截止时间结算"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        DatePicker(selection: pendingDefaultKillTimeDateBinding, displayedComponents: .hourAndMinute) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "clock.fill", color: .orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.default_kill_time"))
+                    Text(String(localized: "settings.default_kill_time.guidance", defaultValue: "一天的任务将在截止时间结算"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
-            Spacer()
-            DatePicker(
-                "",
-                selection: pendingDefaultKillTimeDateBinding,
-                displayedComponents: .hourAndMinute
-            )
-            .labelsHidden()
-            .datePickerStyle(.compact)
-            .background(Color(uiColor: .tertiarySystemFill))
-            .cornerRadius(8)
         }
+        .datePickerStyle(.compact)
 
         if hasPendingDefaultKillTimeChange {
             HStack {
@@ -759,55 +762,80 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var taskTypeManagementSettings: some View {
-        HStack(spacing: 12) {
-            SettingsIcon(icon: "tag.fill", color: .teal)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("任务类型管理")
-                Text("\(activeTaskTypeDefinitions.count) 个类型 · 自定义分类外观")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button {
-                showingCreateTaskType = true
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("新增任务类型")
+        ForEach(activeTaskTypeDefinitions, id: \.idRaw) { definition in
+            taskTypeManagementRow(definition)
         }
 
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(activeTaskTypeDefinitions, id: \.idRaw) { definition in
-                    taskTypePill(definition)
-                }
-            }
-            .padding(.vertical, 2)
+        Button {
+            showingCreateTaskType = true
+        } label: {
+            Label("新增任务类型", systemImage: "plus.circle.fill")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
         }
-        .scrollIndicators(.hidden)
-        .listRowInsets(EdgeInsets(top: 8, leading: 54, bottom: 10, trailing: 16))
+        .accessibilityLabel("新增任务类型")
     }
 
-    private func taskTypePill(_ definition: TaskTypeDefinition) -> some View {
-        Button {
-            guard !definition.isBuiltIn else { return }
-            editingTaskTypeIdRaw = definition.idRaw
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: definition.iconName)
-                    .font(.caption.weight(.semibold))
+    @ViewBuilder
+    private func taskTypeManagementRow(_ definition: TaskTypeDefinition) -> some View {
+        let content = HStack(spacing: 12) {
+            Image(systemName: definition.iconName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(definition.color, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(definition.name)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+                Text(definition.isBuiltIn ? "系统类型" : "自定义类型")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .foregroundStyle(definition.color)
-            .frame(width: 78, height: 34)
-            .background(definition.color.opacity(0.12), in: Capsule())
+
+            Spacer()
+
+            if definition.idRaw == resolvedDefaultTaskTypeId {
+                Text("默认")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(definition.color)
+            }
+
+            if !definition.isBuiltIn {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(definition.isBuiltIn ? definition.name : "编辑 \(definition.name)")
+
+        if definition.isBuiltIn {
+            content
+                .padding(.vertical, 4)
+        } else {
+            Button {
+                editingTaskTypeIdRaw = definition.idRaw
+            } label: {
+                content
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func archivedTaskTypeRow(_ definition: TaskTypeDefinition) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: definition.iconName)
+                .foregroundStyle(definition.color)
+                .frame(width: 28, height: 28)
+            Text(definition.name)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("恢复") {
+                restoreTaskType(definition)
+            }
+            .buttonStyle(.borderless)
+        }
     }
     
     // MARK: - Reminder Settings
@@ -841,20 +869,13 @@ struct SettingsView: View {
         }
 
         if settings.fixedReminderEnabled {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "clock.badge.fill", color: .indigo)
-                Text("提醒时刻")
-                Spacer()
-                DatePicker(
-                    "",
-                    selection: fixedReminderDateBinding,
-                    displayedComponents: .hourAndMinute
-                )
-                .labelsHidden()
-                .datePickerStyle(.compact)
-                .background(Color(uiColor: .tertiarySystemFill))
-                .cornerRadius(8)
+            DatePicker(selection: fixedReminderDateBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "clock.badge.fill", color: .indigo)
+                    Text("提醒时刻")
+                }
             }
+            .datePickerStyle(.compact)
         }
 
         HStack(spacing: 12) {
@@ -890,6 +911,12 @@ struct SettingsView: View {
             if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
+    }
+
+    private var archivedTaskTypeDefinitions: [TaskTypeDefinition] {
+        taskTypeDefinitions
+            .filter { $0.isArchived && !$0.isBuiltIn }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private var resolvedDefaultTaskTypeId: String {
@@ -934,6 +961,12 @@ struct SettingsView: View {
             settings.defaultTaskTypeIdRaw = TaskType.regular.rawValue
             settings.defaultTaskType = .regular
         }
+        try? modelContext.save()
+    }
+
+    private func restoreTaskType(_ definition: TaskTypeDefinition) {
+        guard !definition.isBuiltIn else { return }
+        definition.isArchived = false
         try? modelContext.save()
     }
     
@@ -1451,6 +1484,169 @@ private struct ThemePaletteMark: View {
         .overlay {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+    }
+}
+
+private struct ProjectSettingsView: View {
+    @EnvironmentObject private var settings: UserSettings
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ProjectModel.createdAt, order: .reverse) private var projects: [ProjectModel]
+    @State private var errorMessage: String?
+
+    private var currentProjects: [ProjectModel] {
+        projects.filter { $0.status == .planning || $0.status == .active }
+    }
+
+    private var completedProjects: [ProjectModel] {
+        projects.filter { $0.status == .completed }
+    }
+
+    private var archivedProjects: [ProjectModel] {
+        projects.filter { $0.status == .archived }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Stepper(value: Binding(
+                    get: { settings.defaultProjectDurationDays },
+                    set: { settings.defaultProjectDurationDays = min(max($0, 1), 365) }
+                ), in: 1...365) {
+                    HStack {
+                        Label("默认周期", systemImage: "calendar.badge.clock")
+                        Spacer()
+                        Text("\(settings.defaultProjectDurationDays) 天")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Picker("默认卡片尺寸", selection: Binding(
+                    get: { settings.defaultProjectTileSizeRaw },
+                    set: { settings.defaultProjectTileSizeRaw = $0 }
+                )) {
+                    ForEach(ProjectTileSize.allCases, id: \.rawValue) { size in
+                        Text(tileSizeName(size)).tag(size.rawValue)
+                    }
+                }
+            } header: {
+                Text("新建项目默认值")
+            } footer: {
+                Text("仅影响以后新建的项目，不会修改现有项目。")
+            }
+
+            Section("项目概览") {
+                projectCountRow("进行中", count: currentProjects.count, color: .blue)
+                projectCountRow("已完成", count: completedProjects.count, color: .green)
+                projectCountRow("已归档", count: archivedProjects.count, color: .gray)
+            }
+
+            Section("生命周期") {
+                Label("逾期项目不会自动隐藏或改变状态", systemImage: "eye")
+                Label("完成项目前必须先完成全部开放任务", systemImage: "checkmark.seal")
+                Label("归档始终由你主动执行", systemImage: "archivebox")
+            }
+
+            if !completedProjects.isEmpty {
+                Section("管理已完成项目") {
+                    ForEach(completedProjects) { project in
+                        projectLifecycleRow(project) {
+                            Button("重新打开", systemImage: "arrow.uturn.backward") {
+                                update(project, to: .active)
+                            }
+                            Button("归档", systemImage: "archivebox") {
+                                update(project, to: .archived)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !archivedProjects.isEmpty {
+                Section("管理已归档项目") {
+                    ForEach(archivedProjects) { project in
+                        projectLifecycleRow(project) {
+                            Button("恢复到已完成", systemImage: "arrow.uturn.backward") {
+                                update(project, to: .completed)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("项目")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func projectCountRow(_ title: String, count: Int, color: Color) -> some View {
+        HStack {
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+            Text(title)
+            Spacer()
+            Text("\(count)")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func projectLifecycleRow<MenuContent: View>(
+        _ project: ProjectModel,
+        @ViewBuilder menu: () -> MenuContent
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: project.icon)
+                .foregroundStyle(Color(hex: project.color))
+                .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(project.name)
+                Text("\(project.completedTaskCount)/\(project.totalTaskCount) 个任务")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Menu {
+                menu()
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+        }
+    }
+
+    private func update(_ project: ProjectModel, to status: ProjectStatus) {
+        let allowed: Bool
+        switch (project.status, status) {
+        case (.completed, .active), (.completed, .archived), (.archived, .completed):
+            allowed = true
+        default:
+            allowed = false
+        }
+        guard allowed else {
+            errorMessage = "当前项目状态不能执行该操作。"
+            return
+        }
+        project.status = status
+        do {
+            try modelContext.save()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func tileSizeName(_ size: ProjectTileSize) -> String {
+        switch size {
+        case .mini: "迷你"
+        case .small: "小型"
+        case .medium: "中型"
+        case .wide: "宽幅"
         }
     }
 }

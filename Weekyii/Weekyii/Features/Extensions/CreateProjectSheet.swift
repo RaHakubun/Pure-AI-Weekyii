@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CreateProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: UserSettings
     let viewModel: ExtensionsViewModel
     let projectToEdit: ProjectModel?
 
@@ -12,6 +13,7 @@ struct CreateProjectSheet: View {
     @State private var startDate = Date()
     @State private var endDate = Date().addingDays(7)
     @State private var errorMessage: String?
+    @State private var hasAppliedProjectDefaults = false
 
     private let colorOptions = [
         "#C46A1A", "#3FA67A", "#D05C3E", "#8C6AD9",
@@ -155,6 +157,12 @@ struct CreateProjectSheet: View {
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(projectToEdit == nil ? String(localized: "project.create.title") : "编辑项目")
+            .onAppear {
+                guard projectToEdit == nil, !hasAppliedProjectDefaults else { return }
+                startDate = Date()
+                endDate = Date().addingDays(max(settings.defaultProjectDurationDays, 1))
+                hasAppliedProjectDefaults = true
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(projectToEdit == nil ? String(localized: "action.create") : "保存") {
@@ -179,7 +187,8 @@ struct CreateProjectSheet: View {
                                 color: selectedColor,
                                 icon: selectedIcon,
                                 startDate: startDate,
-                                endDate: endDate
+                                endDate: endDate,
+                                tileSize: settings.defaultProjectTileSize
                             )
                             if project != nil {
                                 dismiss()

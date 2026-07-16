@@ -19,7 +19,7 @@ struct PastView: View {
     @State private var selectedMonth = Date()
     @State private var selectedDate = Date()
     @State private var displayMode: PastDisplayMode = .weekList
-    @State private var showsMonthAnalytics = true
+    @State private var showsMonthAnalytics = false
     private let analyticsService = PastAnalyticsService()
     private let calendar = Calendar(identifier: .iso8601)
 
@@ -28,6 +28,8 @@ struct PastView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                     MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
+
+                    monthReviewCard
 
                     if displayMode == .weekList {
                         let weeks = weeksInSelectedMonth
@@ -109,6 +111,30 @@ struct PastView: View {
         return stats.totalStartedDays > 0 ? stats : nil
     }
 
+    private var previousMonthStats: PastAnalyticsService.OverviewStats? {
+        guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) else { return nil }
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: previousMonth)) ?? previousMonth
+        let next = calendar.date(byAdding: .month, value: 1, to: start) ?? start
+        let end = calendar.date(byAdding: .day, value: -1, to: next) ?? start
+        let days = allDays.filter { day in
+            guard day.week?.status == .past else { return false }
+            let date = calendar.startOfDay(for: day.date)
+            return date >= calendar.startOfDay(for: start) && date <= calendar.startOfDay(for: end)
+        }
+        let stats = analyticsService.getOverviewStats(days: days)
+        return stats.totalStartedDays > 0 ? stats : nil
+    }
+
+    private var monthComparisonText: String? {
+        guard let current = monthStats, let previous = previousMonthStats else { return nil }
+        let delta = current.completionRate - previous.completionRate
+        if abs(delta) < 0.005 {
+            return "完成率与上月持平"
+        }
+        let value = abs(delta).formatted(.percent.precision(.fractionLength(0)))
+        return delta > 0 ? "完成率较上月提升 \(value)" : "完成率较上月下降 \(value)"
+    }
+
     private var monthTrendData: [DayTaskDataPoint] {
         let totalTasks = monthDays.reduce(0) { $0 + $1.completedTasks.count + $1.expiredCount }
         guard totalTasks > 0 else { return [] }
@@ -134,18 +160,8 @@ struct PastView: View {
                 displayMode = displayMode == .weekList ? .month : .weekList
             }
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.backgroundSecondary)
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.weekyiiPrimary.opacity(0.22), lineWidth: 1)
-                Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.weekyiiPrimary)
-            }
-            .frame(width: 36, height: 36)
+            Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(
             displayMode == .weekList
                 ? String(localized: "past.switch.month", defaultValue: "切换到月视图")
@@ -245,7 +261,7 @@ struct PastView: View {
             WeekCard {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
-                        Text(String(localized: "past.analytics.title", defaultValue: "过去分析"))
+                        Text("趋势与洞察")
                             .font(.titleSmall)
                             .foregroundColor(.textPrimary)
                         Text(String(localized: "past.analytics.subtitle", defaultValue: "趋势、热力与效率统计"))
@@ -271,6 +287,10 @@ struct PastView: View {
                             : String(localized: "past.analytics.expand", defaultValue: "展开分析")
                     )
                 }
+
+                Text("完成任务保留详情；过期任务仅保留数量。")
+                    .font(.caption2)
+                    .foregroundStyle(Color.textSecondary)
             }
 
             if showsMonthAnalytics {
@@ -299,6 +319,59 @@ struct PastView: View {
 
     // MARK: - Empty State
 
+    private var monthReviewCard: some View {
+        WeekCard(accentColor: .weekyiiPrimary) {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("本月回顾")
+                            .font(.titleSmall)
+                            .foregroundStyle(Color.textPrimary)
+                        Text(selectedMonth, format: Date.FormatStyle().year().month(.wide))
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .foregroundStyle(Color.weekyiiPrimary)
+                }
+
+                if let stats = monthStats {
+                    HStack(spacing: WeekSpacing.lg) {
+                        reviewMetric("完成", value: "\(stats.totalCompletedTasks)", color: .accentGreen)
+                        reviewMetric("完成率", value: stats.completionRate.formatted(.percent.precision(.fractionLength(0))), color: .weekyiiPrimary)
+                        reviewMetric("专注", value: String(format: "%.1fh", stats.totalFocusHours), color: .orange)
+                        reviewMetric("活跃", value: "\(stats.totalStartedDays)天", color: .blue)
+                    }
+
+                    if let monthComparisonText {
+                        Label(monthComparisonText, systemImage: "arrow.left.arrow.right")
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                } else {
+                    Text("这个月还没有可以回顾的记录。")
+                        .font(.bodyMedium)
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
+        }
+    }
+
+    private func reviewMetric(_ title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(Color.textSecondary)
+            Text(value)
+                .font(.bodyMedium.weight(.semibold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
@@ -326,25 +399,6 @@ struct PastView: View {
 
     private func weeksList(weeks: [WeekModel]) -> some View {
         VStack(spacing: WeekSpacing.md) {
-            WeekCard(accentColor: .accentGreen) {
-                HStack {
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "past.total_weeks"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-                        Text("\(weeks.count)")
-                            .font(.titleLarge)
-                            .foregroundColor(.accentGreen)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.accentGreen.opacity(0.3))
-                }
-            }
-
             ForEach(weeks) { week in
                 PastWeekCard(week: week)
             }
