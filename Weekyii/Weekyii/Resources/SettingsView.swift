@@ -142,119 +142,90 @@ struct SettingsView: View {
     }
 
     private var settingsHome: some View {
-        ScrollView {
-            VStack(spacing: WeekSpacing.lg) {
-                settingsHero
-
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: WeekSpacing.md),
-                        GridItem(.flexible())
-                    ],
-                    spacing: WeekSpacing.md
-                ) {
-                    NavigationLink {
-                        todayRhythmSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "今日节奏",
-                            subtitle: String(format: "%02d:%02d · %@", settings.defaultKillTimeHour, settings.defaultKillTimeMinute, settings.defaultExecutionMode.displayName),
-                            icon: "timer",
-                            tint: .orange
-                        )
-                    }
-
-                    NavigationLink {
-                        appearanceSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "外观与主题",
-                            subtitle: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
-                            icon: "paintpalette.fill",
-                            tint: .purple
-                        )
-                    }
-
-                    NavigationLink {
-                        taskTypeSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "任务与分类",
-                            subtitle: "\(activeTaskTypeDefinitions.count) 个任务类型",
-                            icon: "tag.fill",
-                            tint: .teal
-                        )
-                    }
-
-                    NavigationLink {
-                        futureSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "未来与日历",
-                            subtitle: settings.weekStartsOnMonday ? "周一作为每周开始" : "跟随当前周起始设置",
-                            icon: "calendar.badge.clock",
-                            tint: .blue
-                        )
-                    }
-
-                    NavigationLink {
-                        dataSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "数据与安全",
-                            subtitle: "导出、同步与本地数据",
-                            icon: "lock.shield.fill",
-                            tint: .indigo
-                        )
-                    }
-
-                    NavigationLink {
-                        aboutSettingsPage
-                    } label: {
-                        SettingsNavigationCard(
-                            title: "关于 Weekyii",
-                            subtitle: "版本、历程与高级选项",
-                            icon: "info.circle.fill",
-                            tint: .mint
-                        )
-                    }
+        List {
+            Section("个性化") {
+                NavigationLink {
+                    appearanceSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "外观与主题",
+                        value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
+                        icon: "paintpalette.fill",
+                        tint: .purple
+                    )
                 }
-                .buttonStyle(.plain)
             }
-            .padding(.horizontal, WeekSpacing.base)
-            .padding(.vertical, WeekSpacing.md)
+
+            Section("使用方式") {
+                NavigationLink {
+                    todayRhythmSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "今日节奏",
+                        value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
+                        icon: "timer",
+                        tint: .orange
+                    )
+                }
+
+                NavigationLink {
+                    taskTypeSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "任务与分类",
+                        value: "\(activeTaskTypeDefinitions.count) 个类型",
+                        icon: "tag.fill",
+                        tint: .teal
+                    )
+                }
+
+                NavigationLink {
+                    futureSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "未来与日历",
+                        value: settings.weekStartsOnMonday ? "周一开始" : nil,
+                        icon: "calendar.badge.clock",
+                        tint: .blue
+                    )
+                }
+            }
+
+            Section("数据") {
+                NavigationLink {
+                    dataSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "数据与安全",
+                        icon: "lock.shield.fill",
+                        tint: .indigo
+                    )
+                }
+            }
+
+            Section("应用") {
+                NavigationLink {
+                    aboutSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "关于 Weekyii",
+                        icon: "info.circle.fill",
+                        tint: .mint
+                    )
+                }
+
+                NavigationLink {
+                    developerSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: "开发者与诊断",
+                        icon: "hammer.fill",
+                        tint: .gray
+                    )
+                }
+            }
         }
-        .background(Color.backgroundPrimary.ignoresSafeArea())
-    }
-
-    private var settingsHero: some View {
-        ThemeStatusArtwork(theme: settings.selectedTheme)
-            .frame(height: 132)
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
-            .overlay(alignment: .bottomLeading) {
-                LinearGradient(
-                    colors: [Color.clear, Color.black.opacity(0.62)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
-                .overlay(alignment: .bottomLeading) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(settings.selectedTheme.displayName)
-                            .font(.titleMedium)
-                            .foregroundStyle(.white)
-                        Text("让 Weekyii 按照你的节奏与审美运行")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.82))
-                    }
-                    .padding(WeekSpacing.md)
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .listStyle(.insetGrouped)
     }
 
     private var todayRhythmSettingsPage: some View {
@@ -300,21 +271,6 @@ struct SettingsView: View {
         Form {
             pastSection
             aboutSection
-            Section("高级") {
-                NavigationLink {
-                    developerSettingsPage
-                } label: {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "hammer.fill", color: .gray)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("开发者与诊断")
-                            Text("测试数据、状态诊断与备份恢复")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
         }
         .navigationTitle("关于 Weekyii")
         .navigationBarTitleDisplayMode(.inline)
@@ -327,65 +283,68 @@ struct SettingsView: View {
     }
 
     private var appearanceSettingsPage: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                WeekCard {
-                    VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                        Label("显示模式", systemImage: "circle.lefthalf.filled")
-                            .font(.titleSmall)
-                            .foregroundStyle(Color.textPrimary)
-                        Picker(
-                            "显示模式",
-                            selection: Binding(
-                                get: { settings.appearanceModeRaw },
-                                set: { settings.appearanceModeRaw = $0 }
-                            )
-                        ) {
-                            ForEach(AppearanceMode.allCases) { mode in
-                                Text(appearanceDisplayName(for: mode)).tag(mode.rawValue)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    Text("选择主题")
-                        .font(.titleMedium)
-                        .foregroundStyle(Color.textPrimary)
-                    Text("每套主题都拥有独立的色彩、明暗关系与印象画。")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                }
-
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: WeekSpacing.md),
-                        GridItem(.flexible())
-                    ],
-                    spacing: WeekSpacing.md
+        Form {
+            Section("显示模式") {
+                Picker(
+                    "显示模式",
+                    selection: Binding(
+                        get: { settings.appearanceModeRaw },
+                        set: { settings.appearanceModeRaw = $0 }
+                    )
                 ) {
-                    ForEach(WeekTheme.allCases) { theme in
-                        Button {
-                            guard canSelect(theme) else { return }
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                settings.selectedThemeRaw = theme.rawValue
-                            }
-                        } label: {
-                            ThemeSelectionCard(
-                                theme: theme,
-                                isSelected: settings.selectedTheme == theme,
-                                isLocked: theme.isPremiumTheme && !settings.premiumThemeUnlocked
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(theme.isPremiumTheme && !settings.premiumThemeUnlocked)
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(appearanceDisplayName(for: mode)).tag(mode.rawValue)
                     }
                 }
+                .pickerStyle(.segmented)
             }
-            .padding(WeekSpacing.base)
+
+            Section {
+                ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
+                    .frame(height: 112)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } header: {
+                Text("当前主题")
+            } footer: {
+                Text("设置中的预览保持静止；动态印象画仅在“今日”页面播放。")
+            }
+
+            Section {
+                ForEach(WeekTheme.allCases) { theme in
+                    let isLocked = theme.isPremiumTheme && !settings.premiumThemeUnlocked
+                    Button {
+                        guard canSelect(theme) else { return }
+                        settings.selectedThemeRaw = theme.rawValue
+                    } label: {
+                        HStack(spacing: 12) {
+                            ThemePaletteMark(theme: theme)
+
+                            Text(theme.displayName)
+                                .foregroundStyle(isLocked ? .secondary : .primary)
+
+                            Spacer()
+
+                            if isLocked {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if settings.selectedTheme == theme {
+                                Image(systemName: "checkmark")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLocked)
+                }
+            } header: {
+                Text("主题")
+            } footer: {
+                Text("每套主题仍保留独立的色彩与印象画。")
+            }
         }
-        .background(Color.backgroundPrimary.ignoresSafeArea())
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1456,95 +1415,43 @@ private struct TaskTypeDefinitionEditorSheet: View {
     }
 }
 
-private struct SettingsNavigationCard: View {
+private struct SettingsNavigationRow: View {
     let title: String
-    let subtitle: String
+    var value: String? = nil
     let icon: String
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.textTertiary)
-            }
+        HStack(spacing: 12) {
+            SettingsIcon(icon: icon, color: tint)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.titleSmall)
-                    .foregroundStyle(Color.textPrimary)
+            Text(title)
+
+            if let value {
+                Spacer(minLength: 8)
+                Text(value)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
-        .padding(WeekSpacing.md)
-        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                .stroke(tint.opacity(0.13), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
 
-private struct ThemeSelectionCard: View {
+private struct ThemePaletteMark: View {
     let theme: WeekTheme
-    let isSelected: Bool
-    let isLocked: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            ThemeStatusArtwork(theme: theme)
-                .frame(height: 76)
-                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous))
-                .overlay(alignment: .topTrailing) {
-                    if isLocked {
-                        Image(systemName: "lock.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(7)
-                            .background(.black.opacity(0.46), in: Circle())
-                            .padding(6)
-                    }
-                }
-
-            HStack(spacing: WeekSpacing.xs) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(theme.displayName)
-                        .font(.bodyMedium.weight(.semibold))
-                        .foregroundStyle(Color.textPrimary)
-                    HStack(spacing: 4) {
-                        Circle().fill(theme.primaryColor).frame(width: 7, height: 7)
-                        Circle().fill(theme.accentColor).frame(width: 7, height: 7)
-                    }
-                }
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(theme.primaryColor)
-                }
-            }
+        HStack(spacing: 0) {
+            Rectangle().fill(theme.primaryColor)
+            Rectangle().fill(theme.accentColor)
         }
-        .padding(8)
-        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                .stroke(isSelected ? theme.primaryColor : Color.clear, lineWidth: 2)
-        )
-        .opacity(isLocked ? 0.66 : 1)
+        .frame(width: 30, height: 30)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
     }
 }
 

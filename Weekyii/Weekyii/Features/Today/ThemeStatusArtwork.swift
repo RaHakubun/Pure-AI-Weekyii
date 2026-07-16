@@ -1,19 +1,30 @@
 import SwiftUI
 
+enum ThemeStatusArtworkRenderingMode: Equatable {
+    case animated
+    case staticImage
+}
+
 /// A single entry point for the framed narrative artwork shown in Today status cards.
 /// Business state stays in `TodayView`; this file owns theme-specific visual storytelling only.
 struct ThemeStatusArtwork: View {
     let theme: WeekTheme
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
+    init(theme: WeekTheme, renderingMode: ThemeStatusArtworkRenderingMode = .animated) {
+        self.theme = theme
+        self.renderingMode = renderingMode
+    }
 
     var body: some View {
         Group {
             switch theme {
             case .sunset:
-                SunsetStatusIllustration()
+                SunsetStatusIllustration(renderingMode: renderingMode)
             case .lotr:
-                LotrStatusIllustration()
+                LotrStatusIllustration(renderingMode: renderingMode)
             case .amber, .ocean, .forest, .rose, .lavender, .graphite, .mint, .midnight:
-                NarrativeThemeStatusIllustration(theme: theme)
+                NarrativeThemeStatusIllustration(theme: theme, renderingMode: renderingMode)
             }
         }
         .accessibilityHidden(true)
@@ -23,16 +34,25 @@ struct ThemeStatusArtwork: View {
 
 private struct NarrativeThemeStatusIllustration: View {
     let theme: WeekTheme
+    let renderingMode: ThemeStatusArtworkRenderingMode
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
+
+    @ViewBuilder
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 18.0)) { timeline in
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
+                GeometryReader { proxy in
+                    scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            }
+        } else {
             GeometryReader { proxy in
-                scene(
-                    size: proxy.size,
-                    time: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-                )
+                scene(size: proxy.size, time: 0)
             }
         }
     }
@@ -656,9 +676,15 @@ private struct MidnightAuroraScene: View {
 
 // Existing Sunset composition, moved out of TodayView without changing its visual language.
 private struct SunsetStatusIllustration: View {
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var drift = false
+
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -752,7 +778,7 @@ private struct SunsetStatusIllustration: View {
                 stylizedRipples(size: size, horizonY: horizonY, sunX: sunX)
             }
             .onAppear {
-                guard !reduceMotion else { return }
+                guard shouldAnimate else { return }
                 withAnimation(.easeInOut(duration: 5.8).repeatForever(autoreverses: true)) {
                     drift = true
                 }
@@ -760,10 +786,20 @@ private struct SunsetStatusIllustration: View {
         }
     }
 
+    @ViewBuilder
     private func stylizedRipples(size: CGSize, horizonY: CGFloat, sunX: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 20.0)) { timeline in
-            Canvas { context, canvasSize in
-                let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { timeline in
+                rippleCanvas(time: timeline.date.timeIntervalSinceReferenceDate, horizonY: horizonY, sunX: sunX)
+            }
+        } else {
+            rippleCanvas(time: 0, horizonY: horizonY, sunX: sunX)
+        }
+    }
+
+    private func rippleCanvas(time: TimeInterval, horizonY: CGFloat, sunX: CGFloat) -> some View {
+        Canvas { context, canvasSize in
+                let t = time
                 let bandCount = 8
                 let verticalStep = max((canvasSize.height - horizonY) / CGFloat(bandCount + 1), 6.0)
 
@@ -780,27 +816,43 @@ private struct SunsetStatusIllustration: View {
                     context.fill(path, with: .color(Color(hex: "#FFD2AE").opacity(alpha)))
                     context.stroke(path, with: .color(Color.white.opacity(alpha * 0.42)), lineWidth: 0.45)
                 }
-            }
-            .blendMode(.screen)
         }
+        .blendMode(.screen)
     }
 }
 
 // A no-green Middle-earth impression built around weathered gold, volcanic rock and embers.
 private struct LotrStatusIllustration: View {
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 18.0)) { timeline in
-            GeometryReader { proxy in
-                let size = proxy.size
-                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-                let glint = CGFloat((sin(time * 0.65) + 1) * 0.5)
-                let ringX = size.width * 0.34
-                let ringY = size.height * 0.48
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
 
-                ZStack {
+    @ViewBuilder
+    var body: some View {
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
+                GeometryReader { proxy in
+                    scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            }
+        } else {
+            GeometryReader { proxy in
+                scene(size: proxy.size, time: 0)
+            }
+        }
+    }
+
+    private func scene(size: CGSize, time: TimeInterval) -> some View {
+        let glint = CGFloat((sin(time * 0.65) + 1) * 0.5)
+        let ringX = size.width * 0.34
+        let ringY = size.height * 0.48
+
+        return ZStack {
                     LinearGradient(
                         colors: colorScheme == .dark
                             ? [Color(hex: "#090909"), Color(hex: "#231512"), Color(hex: "#4B1E15")]
@@ -872,8 +924,6 @@ private struct LotrStatusIllustration: View {
                         }
                     }
                 }
-            }
-        }
     }
 }
 
