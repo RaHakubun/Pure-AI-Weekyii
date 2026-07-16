@@ -779,10 +779,8 @@ struct TodayView: View {
                 title: String(localized: "draft.add_title"),
                 initialType: userSettings.defaultTaskType,
                 initialTypeIdRaw: userSettings.defaultTaskTypeIdRaw,
-                allowsProjectSelection: true,
-                projectDate: viewModel?.today?.date ?? Date(),
                 onSave: { _, _, _, _, _ in },
-                onSaveWithProject: { title, description, type, typeIdRaw, steps, attachments, project in
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
                     guard let viewModel else { return }
                     do {
                         switch context {
@@ -793,8 +791,7 @@ struct TodayView: View {
                                 type: type,
                                 taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
-                                attachments: attachments,
-                                project: project
+                                attachments: attachments
                             )
                         case .flexibleExecution:
                             try viewModel.addExecutionTask(
@@ -803,8 +800,7 @@ struct TodayView: View {
                                 type: type,
                                 taskTypeIdRaw: typeIdRaw,
                                 steps: steps,
-                                attachments: attachments,
-                                project: project
+                                attachments: attachments
                             )
                         }
                         draftTaskEditorMode = nil
