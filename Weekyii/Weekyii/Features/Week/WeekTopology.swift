@@ -37,6 +37,7 @@ struct WeekTopologyTaskNode: Identifiable, Equatable {
     let dayID: String
     let title: String
     let taskType: TaskType
+    let taskTypeIdRaw: String
     let zone: TaskZone
     let isFocus: Bool
 }
@@ -120,6 +121,7 @@ struct WeekTopologySnapshot: Equatable {
                     dayID: day.dayId,
                     title: task.title,
                     taskType: task.taskType,
+                    taskTypeIdRaw: task.taskTypeIdRaw,
                     zone: task.zone,
                     isFocus: task.zone == .focus
                 )
@@ -132,6 +134,7 @@ struct WeekTopologySnapshot: Equatable {
                 dayID: day.dayId,
                 title: task.title,
                 taskType: task.taskType,
+                taskTypeIdRaw: task.taskTypeIdRaw,
                 zone: task.zone,
                 isFocus: false
             )

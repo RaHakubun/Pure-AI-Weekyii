@@ -10,6 +10,11 @@ struct TaskRowView: View {
     let titleAccessibilityIdentifier: String?
     let showsProjectOrigin: Bool
     let renderContext: RenderContext
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+
+    private var taskType: TaskTypePresentation {
+        taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+    }
 
     init(
         task: TaskItem,
@@ -27,14 +32,14 @@ struct TaskRowView: View {
         HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
             // Left Accent Bar
             RoundedRectangle(cornerRadius: 2)
-                .fill(task.taskType.color)
+                .fill(taskType.color)
                 .frame(width: 4, height: 28)
                 .padding(.top, 2)
             
             // Icon
-            Image(systemName: task.taskType.iconName)
+            Image(systemName: taskType.iconName)
                 .font(.headline)
-                .foregroundColor(task.taskType.color)
+                .foregroundColor(taskType.color)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 4) {

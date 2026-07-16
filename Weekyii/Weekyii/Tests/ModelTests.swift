@@ -111,6 +111,21 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(task.taskTypeIdRaw, "custom-writing")
         XCTAssertEqual(task.taskType, .ddl)
+
+        let customDefinition = TaskTypeDefinition(
+            idRaw: "custom-writing",
+            name: "写作",
+            iconName: "pencil.line",
+            colorHex: "#AA5500",
+            baseKind: .ddl,
+            sortOrder: 10
+        )
+        let presentation = TaskTypePresentationCatalog(definitions: [customDefinition])
+            .resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
+        XCTAssertEqual(presentation.name, "写作")
+        XCTAssertEqual(presentation.iconName, "pencil.line")
+        XCTAssertEqual(presentation.baseKind, .ddl)
     }
 
     @MainActor

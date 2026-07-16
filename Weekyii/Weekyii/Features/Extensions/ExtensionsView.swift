@@ -279,6 +279,7 @@ private struct ProjectInlineCard: View {
 
     private let maxVisibleTasks = 4
     @State private var appeared = false
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
     private var projectColor: Color { Color(hex: project.color) }
     private var isFinished: Bool { project.status == .completed || project.status == .archived }
@@ -414,6 +415,8 @@ private struct ProjectInlineCard: View {
     }
 
     private func taskRow(_ task: TaskItem) -> some View {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
         HStack(spacing: WeekSpacing.sm) {
             ZStack {
                 Circle()
@@ -447,13 +450,13 @@ private struct ProjectInlineCard: View {
                             .font(.system(size: 10))
                     }
 
-                    if task.taskType == .ddl {
-                        Text(task.taskType.displayName)
+                    if taskType.baseKind == .ddl {
+                        Text(taskType.name)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(task.taskType.color)
+                            .background(taskType.color)
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }

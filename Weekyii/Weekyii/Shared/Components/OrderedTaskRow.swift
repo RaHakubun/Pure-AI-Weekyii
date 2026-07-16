@@ -5,15 +5,20 @@ struct OrderedTaskRow: View {
     let index: Int
     var showsChevron = true
     var accessibilityIdentifier: String?
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+
+    private var taskType: TaskTypePresentation {
+        taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+    }
 
     var body: some View {
         HStack(spacing: WeekSpacing.md) {
             ZStack {
                 Circle()
-                    .fill(task.taskType.color.opacity(0.12))
+                    .fill(taskType.color.opacity(0.12))
                 Text(String(format: "%02d", index + 1))
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(task.taskType.color)
+                    .foregroundStyle(taskType.color)
             }
             .frame(width: 36, height: 36)
 
@@ -24,8 +29,8 @@ struct OrderedTaskRow: View {
                     .lineLimit(2)
 
                 HStack(spacing: WeekSpacing.sm) {
-                    Label(task.taskType.displayName, systemImage: task.taskType.iconName)
-                        .foregroundStyle(task.taskType.color)
+                    Label(taskType.name, systemImage: taskType.iconName)
+                        .foregroundStyle(taskType.color)
 
                     if !task.steps.isEmpty {
                         let completedSteps = task.steps.filter(\.isCompleted).count

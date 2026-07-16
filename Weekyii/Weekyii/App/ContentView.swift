@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 private enum MainTab: Hashable {
     case past
@@ -12,6 +13,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var selectedTab: MainTab = .today
 
     private var visualIdentity: String {
@@ -57,6 +59,10 @@ struct ContentView: View {
         // Theme and appearance changes already invalidate this view through UserSettings.
         // Keeping them in the identity destroys every tab's NavigationStack on selection.
         .id(appState.dataRevision)
+        .environment(
+            \.taskTypePresentationCatalog,
+            TaskTypePresentationCatalog(definitions: taskTypeDefinitions)
+        )
         .tint(.weekyiiPrimary)
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { appState.runtimeErrorMessage != nil },

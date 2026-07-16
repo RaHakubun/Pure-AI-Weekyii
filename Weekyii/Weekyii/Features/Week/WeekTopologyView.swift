@@ -10,6 +10,7 @@ struct WeekTopologyView: View {
     let onOpenTask: (UUID) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
     @State private var dragOrigin: CGSize?
     @State private var scaleOrigin: CGFloat?
 
@@ -313,6 +314,7 @@ struct WeekTopologyView: View {
     private func taskButton(_ task: WeekTopologyTaskNode) -> some View {
         let selected = viewport.selectedNodeID == task.id
         let resultColor: Color = task.zone == .complete ? .accentGreen : .accentOrange
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
 
         return Button {
             select(nodeID: task.id, dayID: task.dayID)
@@ -320,10 +322,10 @@ struct WeekTopologyView: View {
             VStack(spacing: 3) {
                 ZStack {
                     Circle()
-                        .fill(task.taskType.color.opacity(0.18))
+                        .fill(taskType.color.opacity(0.18))
                     Circle()
-                        .stroke(selected ? Color.weekyiiPrimary : task.taskType.color.opacity(0.7), lineWidth: selected ? 2 : 1)
-                    Image(systemName: task.isFocus ? "scope" : task.taskType.iconName)
+                        .stroke(selected ? Color.weekyiiPrimary : taskType.color.opacity(0.7), lineWidth: selected ? 2 : 1)
+                    Image(systemName: task.isFocus ? "scope" : taskType.iconName)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(task.isFocus ? Color.weekyiiPrimary : resultColor)
                 }
@@ -338,7 +340,7 @@ struct WeekTopologyView: View {
             .frame(width: 68, height: 48)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(task.title)，\(task.taskType.displayName)")
+        .accessibilityLabel("\(task.title)，\(taskType.name)")
     }
 
     private func forgottenButton(_ forgotten: WeekTopologyForgottenNode) -> some View {
@@ -458,18 +460,20 @@ struct WeekTopologyView: View {
     }
 
     private func taskInspector(_ task: WeekTopologyTaskNode) -> some View {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
         HStack(spacing: WeekSpacing.md) {
-            Image(systemName: task.isFocus ? "scope" : task.taskType.iconName)
-                .foregroundStyle(task.taskType.color)
+            Image(systemName: task.isFocus ? "scope" : taskType.iconName)
+                .foregroundStyle(taskType.color)
                 .frame(width: 30, height: 30)
-                .background(task.taskType.color.opacity(0.12), in: Circle())
+                .background(taskType.color.opacity(0.12), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                     .font(.bodyMedium.weight(.semibold))
                     .foregroundStyle(Color.textPrimary)
                     .lineLimit(1)
-                Text("\(task.taskType.displayName) · \(task.zone.displayName)")
+                Text("\(taskType.name) · \(task.zone.displayName)")
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
             }

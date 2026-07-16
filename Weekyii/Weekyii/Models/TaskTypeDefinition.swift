@@ -127,3 +127,49 @@ struct TaskTypeCatalog {
         definition(for: idRaw).baseKind
     }
 }
+
+struct TaskTypePresentation {
+    let name: String
+    let iconName: String
+    let color: Color
+    let baseKind: TaskType
+
+    init(definition: TaskTypeDefinition) {
+        name = definition.name
+        iconName = definition.iconName
+        color = definition.color
+        baseKind = definition.baseKind
+    }
+
+    init(fallback: TaskType) {
+        name = fallback.displayName
+        iconName = fallback.iconName
+        color = fallback.color
+        baseKind = fallback
+    }
+}
+
+struct TaskTypePresentationCatalog {
+    private let presentationsByID: [String: TaskTypePresentation]
+
+    init(definitions: [TaskTypeDefinition] = []) {
+        presentationsByID = definitions.reduce(into: [:]) { result, definition in
+            result[definition.idRaw] = TaskTypePresentation(definition: definition)
+        }
+    }
+
+    func resolve(idRaw: String, fallback: TaskType) -> TaskTypePresentation {
+        presentationsByID[idRaw] ?? TaskTypePresentation(fallback: fallback)
+    }
+}
+
+private struct TaskTypePresentationCatalogKey: EnvironmentKey {
+    static let defaultValue = TaskTypePresentationCatalog()
+}
+
+extension EnvironmentValues {
+    var taskTypePresentationCatalog: TaskTypePresentationCatalog {
+        get { self[TaskTypePresentationCatalogKey.self] }
+        set { self[TaskTypePresentationCatalogKey.self] = newValue }
+    }
+}

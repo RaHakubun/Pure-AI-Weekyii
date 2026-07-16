@@ -235,6 +235,7 @@ private struct SuspendedTasksFullView: View {
     @State private var deletingTask: SuspendedTaskItem?
     @State private var assigningTask: SuspendedTaskItem?
     @State private var errorMessage: String?
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -462,13 +463,15 @@ private struct SuspendedTasksFullView: View {
     }
 
     private func suspendedTaskCard(_ task: SuspendedTaskItem) -> some View {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             HStack(alignment: .top, spacing: WeekSpacing.sm) {
-                Image(systemName: task.taskType.iconName)
+                Image(systemName: taskType.iconName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(task.taskType.color)
+                    .foregroundColor(taskType.color)
                     .frame(width: 32, height: 32)
-                    .background(task.taskType.color.opacity(0.12))
+                    .background(taskType.color.opacity(0.12))
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -532,13 +535,15 @@ private struct SuspendedTasksFullView: View {
     }
 
     private func suspendedMetaRow(_ task: SuspendedTaskItem) -> some View {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
         HStack(spacing: 6) {
-            Text(task.taskType.displayName)
+            Text(taskType.name)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(task.taskType.color)
+                .foregroundColor(taskType.color)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(task.taskType.color.opacity(0.12))
+                .background(taskType.color.opacity(0.12))
                 .clipShape(Capsule())
 
             Text("·")
