@@ -417,7 +417,7 @@ private struct ProjectInlineCard: View {
     private func taskRow(_ task: TaskItem) -> some View {
         let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
 
-        HStack(spacing: WeekSpacing.sm) {
+        return HStack(spacing: WeekSpacing.sm) {
             ZStack {
                 Circle()
                     .strokeBorder(

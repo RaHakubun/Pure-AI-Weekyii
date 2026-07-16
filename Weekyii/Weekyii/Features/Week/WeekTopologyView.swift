@@ -462,7 +462,7 @@ struct WeekTopologyView: View {
     private func taskInspector(_ task: WeekTopologyTaskNode) -> some View {
         let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
 
-        HStack(spacing: WeekSpacing.md) {
+        return HStack(spacing: WeekSpacing.md) {
             Image(systemName: task.isFocus ? "scope" : taskType.iconName)
                 .foregroundStyle(taskType.color)
                 .frame(width: 30, height: 30)

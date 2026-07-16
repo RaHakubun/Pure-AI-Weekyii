@@ -465,7 +465,7 @@ private struct SuspendedTasksFullView: View {
     private func suspendedTaskCard(_ task: SuspendedTaskItem) -> some View {
         let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
 
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+        return VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             HStack(alignment: .top, spacing: WeekSpacing.sm) {
                 Image(systemName: taskType.iconName)
                     .font(.system(size: 14, weight: .semibold))
@@ -537,7 +537,7 @@ private struct SuspendedTasksFullView: View {
     private func suspendedMetaRow(_ task: SuspendedTaskItem) -> some View {
         let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
 
-        HStack(spacing: 6) {
+        return HStack(spacing: 6) {
             Text(taskType.name)
                 .font(.caption2.weight(.semibold))
                 .foregroundColor(taskType.color)
