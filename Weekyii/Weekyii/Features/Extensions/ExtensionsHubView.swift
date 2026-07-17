@@ -301,11 +301,12 @@ private struct SuspendedTasksFullView: View {
         .sheet(isPresented: $showingCreateSheet, onDismiss: {
             viewModel.refresh()
         }) {
-            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, countdownDays, steps, attachments in
+            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, typeIdRaw, countdownDays, steps, attachments in
                 _ = viewModel.createSuspendedTask(
                     title: title,
                     description: description,
                     type: type,
+                    taskTypeIdRaw: typeIdRaw,
                     countdownDays: countdownDays,
                     steps: steps,
                     attachments: attachments
@@ -320,15 +321,17 @@ private struct SuspendedTasksFullView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialCountdownDays: task.preferredCountdownDays,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments
-            ) { title, description, type, countdownDays, steps, attachments in
+            ) { title, description, type, typeIdRaw, countdownDays, steps, attachments in
                 viewModel.updateSuspendedTask(
                     task,
                     title: title,
                     description: description,
                     type: type,
+                    taskTypeIdRaw: typeIdRaw,
                     countdownDays: countdownDays,
                     steps: steps,
                     attachments: attachments
@@ -582,15 +585,18 @@ private struct SuspendedTaskEditorSheet: View {
     let initialTitle: String
     let initialDescription: String
     let initialType: TaskType
+    let initialTypeIdRaw: String
     let initialCountdownDays: Int
     let initialSteps: [TaskStep]
     let initialAttachments: [TaskAttachment]
-    let onSave: (String, String, TaskType, Int, [TaskStep], [TaskAttachment]) -> Void
+    let onSave: (String, String, TaskType, String, Int, [TaskStep], [TaskAttachment]) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var taskTitle: String
     @State private var taskDescription: String
     @State private var taskType: TaskType
+    @State private var taskTypeIdRaw: String
     @State private var countdownDays: Int
     @State private var stepDrafts: [SuspendedStepDraft]
     @State private var attachments: [TaskAttachment]
@@ -604,15 +610,17 @@ private struct SuspendedTaskEditorSheet: View {
         initialTitle: String = "",
         initialDescription: String = "",
         initialType: TaskType = .regular,
+        initialTypeIdRaw: String? = nil,
         initialCountdownDays: Int = 10,
         initialSteps: [TaskStep] = [],
         initialAttachments: [TaskAttachment] = [],
-        onSave: @escaping (String, String, TaskType, Int, [TaskStep], [TaskAttachment]) -> Void
+        onSave: @escaping (String, String, TaskType, String, Int, [TaskStep], [TaskAttachment]) -> Void
     ) {
         self.title = title
         self.initialTitle = initialTitle
         self.initialDescription = initialDescription
         self.initialType = initialType
+        self.initialTypeIdRaw = initialTypeIdRaw ?? initialType.rawValue
         self.initialCountdownDays = initialCountdownDays
         self.initialSteps = initialSteps
         self.initialAttachments = initialAttachments
@@ -620,6 +628,7 @@ private struct SuspendedTaskEditorSheet: View {
         _taskTitle = State(initialValue: initialTitle)
         _taskDescription = State(initialValue: initialDescription)
         _taskType = State(initialValue: initialType)
+        _taskTypeIdRaw = State(initialValue: initialTypeIdRaw ?? initialType.rawValue)
         _countdownDays = State(initialValue: initialCountdownDays)
         _stepDrafts = State(
             initialValue: initialSteps
@@ -655,7 +664,7 @@ private struct SuspendedTaskEditorSheet: View {
                         }
                     }
 
-                    WeekCard(accentColor: taskType.color) {
+                    WeekCard(accentColor: selectedTaskTypeColor) {
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
                             TextField("输入任务名称", text: $taskTitle)
                                 .font(.titleSmall)
@@ -677,8 +686,8 @@ private struct SuspendedTaskEditorSheet: View {
                                     .foregroundColor(.textSecondary)
                                 ScrollView(.horizontal) {
                                     HStack(spacing: WeekSpacing.xs) {
-                                        ForEach(TaskType.allCases, id: \.self) { type in
-                                            suspendedTypeChip(type)
+                                        ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
+                                            suspendedTypeChip(definition)
                                         }
                                     }
                                 }
@@ -806,6 +815,7 @@ private struct SuspendedTaskEditorSheet: View {
                             taskTitle,
                             taskDescription,
                             taskType,
+                            taskTypeIdRaw,
                             countdownDays,
                             normalizedSteps,
                             attachments
@@ -822,26 +832,40 @@ private struct SuspendedTaskEditorSheet: View {
         }
     }
 
-    private func suspendedTypeChip(_ type: TaskType) -> some View {
-        let isSelected = taskType == type
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        if active.isEmpty { return TaskTypeDefinition.builtInDefinitions() }
+        if active.contains(where: { $0.idRaw == taskTypeIdRaw }) { return active }
+        if let selected = taskTypeDefinitions.first(where: { $0.idRaw == taskTypeIdRaw }) { return active + [selected] }
+        return active
+    }
+
+    private var selectedTaskTypeColor: Color {
+        taskTypeDefinitions.first { $0.idRaw == taskTypeIdRaw }?.color ?? taskType.color
+    }
+
+    private func suspendedTypeChip(_ definition: TaskTypeDefinition) -> some View {
+        let isSelected = taskTypeIdRaw == definition.idRaw
         return Button {
-            taskType = type
+            taskType = definition.baseKind
+            taskTypeIdRaw = definition.idRaw
         } label: {
             HStack(spacing: WeekSpacing.xs) {
-                Image(systemName: type.iconName)
+                Image(systemName: definition.iconName)
                     .font(.caption)
-                Text(type.displayName)
+                Text(definition.name)
                     .font(.captionBold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
-            .foregroundColor(isSelected ? type.color : .textSecondary)
-            .frame(width: 78, height: 34)
-            .background(isSelected ? type.color.opacity(0.15) : Color.backgroundTertiary)
+            .foregroundColor(isSelected ? definition.color : .textSecondary)
+            .frame(minWidth: 78, minHeight: 36)
+            .padding(.horizontal, 8)
+            .background(isSelected ? definition.color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(isSelected ? type.color : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? definition.color : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -951,7 +975,6 @@ private struct SuspendedTaskEditorSheet: View {
     @ViewBuilder
     private func attachmentTile(_ attachment: TaskAttachment) -> some View {
         let fileLabel = attachment.fileName.isEmpty ? "附件" : attachment.fileName
-        let previewImage = attachment.data.flatMap { UIImage(data: $0) }
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
@@ -965,13 +988,11 @@ private struct SuspendedTaskEditorSheet: View {
                         .padding(8)
                 }
 
-            if let data = attachment.data, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let data = attachment.data {
+                AttachmentThumbnail(data: data)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
             }
 
             Button {
@@ -985,7 +1006,7 @@ private struct SuspendedTaskEditorSheet: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard let previewImage else { return }
+            guard let data = attachment.data, let previewImage = UIImage(data: data) else { return }
             imagePreviewItem = ImagePreviewItem(image: previewImage)
         }
     }

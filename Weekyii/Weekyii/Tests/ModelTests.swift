@@ -1710,6 +1710,7 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
             title: "Wait for venue",
             description: "Need a concrete day later.",
             type: .regular,
+            taskTypeIdRaw: "custom-waiting",
             countdownDays: 10,
             steps: steps,
             attachments: attachments,
@@ -1718,6 +1719,7 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
 
         XCTAssertEqual(task.title, "Wait for venue")
         XCTAssertEqual(task.preferredCountdownDays, 10)
+        XCTAssertEqual(task.taskTypeIdRaw, "custom-waiting")
         XCTAssertEqual(
             task.steps.sorted(by: { $0.sortOrder < $1.sortOrder }).map(\.title),
             ["S0", "S1"]
@@ -1769,6 +1771,7 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
             title: "Hold for later",
             description: "Put it on a real day when ready.",
             type: .leisure,
+            taskTypeIdRaw: "custom-someday",
             countdownDays: 10,
             steps: steps,
             attachments: attachments,
@@ -1782,6 +1785,7 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
         XCTAssertEqual(assigned?.steps.map(\.title), ["Step A"])
         XCTAssertEqual(assigned?.attachments.first?.fileName, "proof.jpg")
         XCTAssertEqual(assigned?.attachments.first?.fileType, "image/jpeg")
+        XCTAssertEqual(assigned?.taskTypeIdRaw, "custom-someday")
         let suspended = try context.fetch(FetchDescriptor<SuspendedTaskItem>())
         XCTAssertTrue(suspended.isEmpty)
         XCTAssertEqual(notifications.cancelledTaskIDs, [task.id])

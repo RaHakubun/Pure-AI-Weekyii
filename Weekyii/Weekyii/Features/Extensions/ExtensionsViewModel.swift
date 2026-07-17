@@ -401,6 +401,7 @@ final class ExtensionsViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         countdownDays: Int,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = [],
@@ -412,6 +413,7 @@ final class ExtensionsViewModel {
                 title: title,
                 description: description,
                 type: type,
+                taskTypeIdRaw: taskTypeIdRaw,
                 countdownDays: countdownDays,
                 steps: steps,
                 attachments: attachments,
@@ -430,6 +432,7 @@ final class ExtensionsViewModel {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         countdownDays: Int,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = [],
@@ -442,6 +445,7 @@ final class ExtensionsViewModel {
                 title: title,
                 description: description,
                 type: type,
+                taskTypeIdRaw: taskTypeIdRaw,
                 countdownDays: countdownDays,
                 steps: steps,
                 attachments: attachments,
@@ -791,6 +795,7 @@ struct SuspendedTaskLifecycleService {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         countdownDays: Int,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = [],
@@ -812,6 +817,7 @@ struct SuspendedTaskLifecycleService {
             decisionDeadline: endOfDecisionWindow(from: now, countdownDays: countdownDays),
             preferredCountdownDays: countdownDays
         )
+        task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         replaceSteps(for: task, with: steps)
         replaceAttachments(for: task, with: attachments)
         modelContext.insert(task)
@@ -825,6 +831,7 @@ struct SuspendedTaskLifecycleService {
         title: String,
         description: String,
         type: TaskType,
+        taskTypeIdRaw: String? = nil,
         countdownDays: Int,
         steps: [TaskStep] = [],
         attachments: [TaskAttachment] = [],
@@ -841,6 +848,7 @@ struct SuspendedTaskLifecycleService {
         task.title = normalizedTitle
         task.taskDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         task.taskType = type
+        task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         task.preferredCountdownDays = countdownDays
         task.decisionDeadline = endOfDecisionWindow(from: now, countdownDays: countdownDays)
         replaceSteps(for: task, with: steps)

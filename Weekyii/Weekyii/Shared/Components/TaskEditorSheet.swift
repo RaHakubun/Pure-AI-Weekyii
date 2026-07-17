@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 import Photos
 import SwiftData
+import ImageIO
+@preconcurrency import UIKit
 
 struct TaskEditorSheet: View {
     let title: String
@@ -302,7 +304,8 @@ struct TaskEditorSheet: View {
                     .minimumScaleFactor(0.78)
             }
             .foregroundColor(isSelected ? color : .textSecondary)
-            .frame(width: 78, height: 34)
+            .frame(minWidth: 78, minHeight: 36)
+            .padding(.horizontal, 8)
             .background(isSelected ? color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(
@@ -435,7 +438,6 @@ struct TaskEditorSheet: View {
     @ViewBuilder
     private func attachmentTile(_ attachment: TaskAttachment) -> some View {
         let fileLabel = attachment.fileName.isEmpty ? "Attachment" : attachment.fileName
-        let previewImage = attachment.data.flatMap { UIImage(data: $0) }
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
@@ -449,13 +451,11 @@ struct TaskEditorSheet: View {
                         .padding(8)
                 }
 
-            if let data = attachment.data, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let data = attachment.data {
+                AttachmentThumbnail(data: data)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
                     .overlay(alignment: .bottomLeading) {
                         Rectangle()
                             .fill(.black.opacity(0.32))
@@ -483,9 +483,53 @@ struct TaskEditorSheet: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard let previewImage else { return }
-            imagePreviewItem = ImagePreviewItem(image: previewImage)
+            guard let data = attachment.data else { return }
+            Task {
+                let image = await Task.detached(priority: .userInitiated) {
+                    UIImage(data: data)?.preparingForDisplay()
+                }.value
+                if let image { imagePreviewItem = ImagePreviewItem(image: image) }
+            }
         }
+    }
+}
+
+struct AttachmentThumbnail: View {
+    let data: Data
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+            } else {
+                ZStack {
+                    Color.accentOrangeLight.opacity(0.12)
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+        .task(id: data.count) {
+            image = await Task.detached(priority: .utility) {
+                downsampledImage(from: data, maxPixelSize: 320)
+            }.value
+        }
+    }
+
+    private nonisolated func downsampledImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 

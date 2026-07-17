@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct AddProjectTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: UserSettings
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     let project: ProjectModel
     let viewModel: ExtensionsViewModel
 
@@ -53,26 +55,27 @@ struct AddProjectTaskSheet: View {
 
                             ScrollView(.horizontal) {
                                 HStack(spacing: WeekSpacing.xs) {
-                                    ForEach(TaskType.allCases, id: \.self) { type in
+                                    ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
                                         Button {
-                                            taskType = type
-                                            taskTypeIdRaw = type.rawValue
+                                            taskType = definition.baseKind
+                                            taskTypeIdRaw = definition.idRaw
                                         } label: {
                                             HStack(spacing: WeekSpacing.xs) {
-                                                Image(systemName: type.iconName)
+                                                Image(systemName: definition.iconName)
                                                     .font(.caption)
-                                                Text(type.displayName)
+                                                Text(definition.name)
                                                     .font(.captionBold)
                                                     .lineLimit(1)
                                                     .minimumScaleFactor(0.78)
                                             }
-                                            .foregroundColor(taskType == type ? type.color : .textSecondary)
-                                            .frame(width: 78, height: 34)
-                                            .background(taskType == type ? type.color.opacity(0.15) : Color.backgroundTertiary)
+                                            .foregroundColor(taskTypeIdRaw == definition.idRaw ? definition.color : .textSecondary)
+                                            .frame(minWidth: 78, minHeight: 36)
+                                            .padding(.horizontal, 8)
+                                            .background(taskTypeIdRaw == definition.idRaw ? definition.color.opacity(0.15) : Color.backgroundTertiary)
                                             .clipShape(Capsule())
                                             .overlay(
                                                 Capsule()
-                                                    .stroke(taskType == type ? type.color : Color.clear, lineWidth: 1)
+                                                    .stroke(taskTypeIdRaw == definition.idRaw ? definition.color : Color.clear, lineWidth: 1)
                                             )
                                         }
                                         .buttonStyle(.plain)
@@ -213,6 +216,16 @@ struct AddProjectTaskSheet: View {
             let d2 = calendar.date(from: $1) ?? Date.distantPast
             return d1 < d2
         }
+    }
+
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        if active.isEmpty { return TaskTypeDefinition.builtInDefinitions() }
+        if active.contains(where: { $0.idRaw == taskTypeIdRaw }) { return active }
+        if let selected = taskTypeDefinitions.first(where: { $0.idRaw == taskTypeIdRaw }) {
+            return active + [selected]
+        }
+        return active
     }
 
     private func createTasks() {

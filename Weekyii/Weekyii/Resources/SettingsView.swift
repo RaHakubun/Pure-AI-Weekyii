@@ -155,8 +155,10 @@ struct SettingsView: View {
             handleArchiveSelection(result)
         }
         .sheet(isPresented: $showingCreateTaskType) {
-            TaskTypeDefinitionEditorSheet { name, iconName, colorHex in
-                createTaskType(name: name, iconName: iconName, colorHex: colorHex)
+            TaskTypeDefinitionEditorSheet(
+                reservedNames: Set(taskTypeDefinitions.map { $0.name.lowercased() })
+            ) { name, iconName, colorHex, baseKind in
+                createTaskType(name: name, iconName: iconName, colorHex: colorHex, baseKind: baseKind)
             }
         }
         .sheet(isPresented: Binding(
@@ -164,8 +166,11 @@ struct SettingsView: View {
             set: { if !$0 { editingTaskTypeIdRaw = nil } }
         )) {
             if let definition = taskTypeDefinitions.first(where: { $0.idRaw == editingTaskTypeIdRaw }) {
-                TaskTypeDefinitionEditorSheet(definition: definition) { name, iconName, colorHex in
-                    updateTaskType(definition, name: name, iconName: iconName, colorHex: colorHex)
+                TaskTypeDefinitionEditorSheet(
+                    definition: definition,
+                    reservedNames: Set(taskTypeDefinitions.filter { $0.idRaw != definition.idRaw }.map { $0.name.lowercased() })
+                ) { name, iconName, colorHex, baseKind in
+                    updateTaskType(definition, name: name, iconName: iconName, colorHex: colorHex, baseKind: baseKind)
                     editingTaskTypeIdRaw = nil
                 } onArchive: {
                     archiveTaskType(definition)
@@ -906,7 +911,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(definition.name)
                     .foregroundStyle(.primary)
-                Text(definition.isBuiltIn ? "系统类型" : "自定义类型")
+                Text("\(definition.isBuiltIn ? "系统类型" : "自定义类型") · \(definition.baseKind.displayName)行为")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1050,7 +1055,7 @@ struct SettingsView: View {
             ?? TaskTypeCatalog.builtInFallback
     }
 
-    private func createTaskType(name: String, iconName: String, colorHex: String) {
+    private func createTaskType(name: String, iconName: String, colorHex: String, baseKind: TaskType) {
         let nextOrder = ((try? modelContext.fetch(FetchDescriptor<TaskTypeDefinition>())) ?? [])
             .map(\.sortOrder)
             .max() ?? 2
@@ -1058,17 +1063,29 @@ struct SettingsView: View {
             name: name,
             iconName: iconName,
             colorHex: colorHex,
-            baseKind: .regular,
+            baseKind: baseKind,
             sortOrder: nextOrder + 1
         ))
         try? modelContext.save()
     }
 
-    private func updateTaskType(_ definition: TaskTypeDefinition, name: String, iconName: String, colorHex: String) {
+    private func updateTaskType(_ definition: TaskTypeDefinition, name: String, iconName: String, colorHex: String, baseKind: TaskType) {
         guard !definition.isBuiltIn else { return }
         definition.name = name
         definition.iconName = iconName
         definition.colorHex = colorHex
+        definition.baseKind = baseKind
+        let tasks = (try? modelContext.fetch(FetchDescriptor<TaskItem>())) ?? []
+        for task in tasks where task.taskTypeIdRaw == definition.idRaw {
+            task.taskType = baseKind
+        }
+        let suspendedTasks = (try? modelContext.fetch(FetchDescriptor<SuspendedTaskItem>())) ?? []
+        for task in suspendedTasks where task.taskTypeIdRaw == definition.idRaw {
+            task.taskType = baseKind
+        }
+        if settings.defaultTaskTypeIdRaw == definition.idRaw {
+            settings.defaultTaskType = baseKind
+        }
         try? modelContext.save()
     }
 
@@ -1469,35 +1486,80 @@ private struct SeedOptions {
 
 private struct TaskTypeDefinitionEditorSheet: View {
     let definition: TaskTypeDefinition?
-    let onSave: (String, String, String) -> Void
+    let reservedNames: Set<String>
+    let onSave: (String, String, String, TaskType) -> Void
     let onArchive: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var iconName: String
     @State private var colorHex: String
+    @State private var baseKind: TaskType
 
-    private let icons = ["checkmark.circle", "scope", "pencil.line", "book.closed", "hammer", "bolt", "flame", "calendar.badge.clock", "leaf", "sparkles", "star", "heart"]
-    private let colors = ["#4A90A4", "#C46A1A", "#8B5A83", "#4D9DE0", "#59A14F", "#E15759", "#B07AA1", "#F28E2B"]
+    private let icons = ["checkmark.circle", "scope", "pencil.line", "book.closed", "hammer", "bolt", "flame", "calendar.badge.clock", "leaf", "sparkles", "star", "heart", "figure.run", "briefcase", "graduationcap", "music.note", "paintbrush", "cup.and.saucer"]
+    private let colors = ["#4A90A4", "#C46A1A", "#8B5A83", "#4D9DE0", "#59A14F", "#E15759", "#B07AA1", "#F28E2B", "#2A9D8F", "#6C5CE7"]
 
     init(
         definition: TaskTypeDefinition? = nil,
-        onSave: @escaping (String, String, String) -> Void,
+        reservedNames: Set<String> = [],
+        onSave: @escaping (String, String, String, TaskType) -> Void,
         onArchive: (() -> Void)? = nil
     ) {
         self.definition = definition
+        self.reservedNames = reservedNames
         self.onSave = onSave
         self.onArchive = onArchive
         _name = State(initialValue: definition?.name ?? "")
         _iconName = State(initialValue: definition?.iconName ?? "tag.fill")
         _colorHex = State(initialValue: definition?.colorHex ?? "#4A90A4")
+        _baseKind = State(initialValue: definition?.baseKind ?? .regular)
     }
+
+    private var normalizedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var hasDuplicateName: Bool { reservedNames.contains(normalizedName.lowercased()) }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("基础") {
+                Section {
+                    HStack(spacing: 16) {
+                        Image(systemName: iconName)
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 54, height: 54)
+                            .background(Color(hex: colorHex), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(normalizedName.isEmpty ? "新任务类型" : normalizedName)
+                                .font(.headline)
+                            Label(baseKindLabel, systemImage: baseKind.iconName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+
+                Section("名称") {
                     TextField("类型名称", text: $name)
+                    if hasDuplicateName {
+                        Label("已有同名类型，请换一个名称", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                Section {
+                    Picker("任务行为", selection: $baseKind) {
+                        ForEach(TaskType.allCases, id: \.self) { kind in
+                            Text(kind.displayName).tag(kind)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("任务行为")
+                } footer: {
+                    Text("决定该类型在截止提醒、未来标记和统计中的归类；名称、图标和颜色仍保持自定义。")
                 }
 
                 Section("图标") {
@@ -1556,12 +1618,20 @@ private struct TaskTypeDefinitionEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "action.save")) {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), iconName, colorHex)
+                        onSave(normalizedName, iconName, colorHex, baseKind)
                         dismiss()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(normalizedName.isEmpty || hasDuplicateName)
                 }
             }
+        }
+    }
+
+    private var baseKindLabel: String {
+        switch baseKind {
+        case .regular: return "按普通任务运行"
+        case .ddl: return "按截止任务运行"
+        case .leisure: return "按休闲任务运行"
         }
     }
 }
