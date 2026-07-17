@@ -61,6 +61,41 @@ struct TodayView: View {
         case immediateExpire(expiredCount: Int)
     }
     private let floatingStartOverlayReserveHeight: CGFloat = 120
+    let animationsActive: Bool
+
+    init(animationsActive: Bool = true) {
+        self.animationsActive = animationsActive
+    }
+
+    private static let dayIDFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let longDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    private static let postponeDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
@@ -863,19 +898,12 @@ struct TodayView: View {
     }
     
     private func formatDate(_ dayId: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: dayId) else { return dayId }
-        
-        formatter.dateStyle = .long
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        guard let date = Self.dayIDFormatter.date(from: dayId) else { return dayId }
+        return Self.longDateFormatter.string(from: date)
     }
     
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        Self.timeFormatter.string(from: date)
     }
 
     private var postponeConfirmMessage: String {
@@ -941,10 +969,7 @@ struct TodayView: View {
     }
 
     private func formatPostponeDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        Self.postponeDateFormatter.string(from: date)
     }
 
     private var todayKillTimeConfirmTitle: String {
@@ -1035,10 +1060,10 @@ struct TodayView: View {
         ZStack {
             Color.backgroundPrimary
             if userSettings.selectedTheme == .sunset {
-                SunsetWaterReflectionBackground()
+                SunsetWaterReflectionBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             } else if userSettings.selectedTheme == .lotr {
-                LotrRainNightBackground()
+                LotrRainNightBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
         }
@@ -1470,9 +1495,12 @@ private struct SectionToggleView: View {
 
 /// Lightweight animated scene used only by the Sunset theme on Today page.
 private struct SunsetWaterReflectionBackground: View {
+    let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var sunDrift = false
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
 
     var body: some View {
         GeometryReader { proxy in
@@ -1494,10 +1522,10 @@ private struct SunsetWaterReflectionBackground: View {
             }
             .drawingGroup(opaque: false, colorMode: .linear)
             .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
-                    sunDrift = true
-                }
+                updateSunAnimation()
+            }
+            .onChange(of: shouldAnimate) { _, _ in
+                updateSunAnimation()
             }
         }
         .ignoresSafeArea()
@@ -1528,8 +1556,20 @@ private struct SunsetWaterReflectionBackground: View {
 
     private func sunCenterY(for size: CGSize) -> CGFloat {
         let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
-        guard !reduceMotion else { return base }
+        guard shouldAnimate else { return base }
         return base + (sunDrift ? 5 : -5)
+    }
+
+    private func updateSunAnimation() {
+        if shouldAnimate {
+            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
+                sunDrift = true
+            }
+        } else {
+            withAnimation(nil) {
+                sunDrift = false
+            }
+        }
     }
 
     private func sunCenterX(for size: CGSize) -> CGFloat {
@@ -1612,7 +1652,7 @@ private struct SunsetWaterReflectionBackground: View {
     }
 
     private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
             Canvas { context, canvasSize in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let lineCount = 13
@@ -1654,9 +1694,11 @@ private struct SunsetWaterReflectionBackground: View {
 }
 
 private struct LotrRainNightBackground: View {
+    let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @State private var rainDrift = false
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
 
     var body: some View {
         GeometryReader { proxy in
@@ -1686,12 +1728,6 @@ private struct LotrRainNightBackground: View {
                 coldRain(size: size, fromY: horizonY - 120)
             }
             .drawingGroup(opaque: false, colorMode: .linear)
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.linear(duration: 5.8).repeatForever(autoreverses: false)) {
-                    rainDrift = true
-                }
-            }
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -1725,7 +1761,7 @@ private struct LotrRainNightBackground: View {
     }
 
     private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 24.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimate)) { timeline in
             Canvas { context, canvas in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let columns = 24

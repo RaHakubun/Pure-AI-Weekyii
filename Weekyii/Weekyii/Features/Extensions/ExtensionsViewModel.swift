@@ -24,18 +24,20 @@ final class ExtensionsViewModel {
 
     // MARK: - Refresh
 
-    func refresh() {
+    func refresh(rebuildProjectSnapshots: Bool = true) {
         errorMessage = nil
-        let descriptor = FetchDescriptor<ProjectModel>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        projects = (try? modelContext.fetch(descriptor)) ?? []
+        if rebuildProjectSnapshots {
+            let descriptor = FetchDescriptor<ProjectModel>(
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+            projects = (try? modelContext.fetch(descriptor)) ?? []
+            rebuildTileSnapshots()
+        }
         let suspendedDescriptor = FetchDescriptor<SuspendedTaskItem>(
             sortBy: [SortDescriptor(\.decisionDeadline), SortDescriptor(\.createdAt)]
         )
         suspendedTasks = ((try? modelContext.fetch(suspendedDescriptor)) ?? [])
             .filter { $0.status == .active }
-        rebuildTileSnapshots()
     }
 
     // MARK: - Create Project
@@ -419,7 +421,7 @@ final class ExtensionsViewModel {
                 attachments: attachments,
                 now: now
             )
-            refresh()
+            refresh(rebuildProjectSnapshots: false)
             return task
         } catch {
             errorMessage = error.localizedDescription
@@ -451,7 +453,7 @@ final class ExtensionsViewModel {
                 attachments: attachments,
                 now: now
             )
-            refresh()
+            refresh(rebuildProjectSnapshots: false)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -461,7 +463,7 @@ final class ExtensionsViewModel {
         let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
         do {
             try service.extendTask(task, by: additionalDays, now: now)
-            refresh()
+            refresh(rebuildProjectSnapshots: false)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -481,7 +483,7 @@ final class ExtensionsViewModel {
         let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
         do {
             try service.deleteTask(task)
-            refresh()
+            refresh(rebuildProjectSnapshots: false)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -589,40 +591,6 @@ final class ExtensionsViewModel {
     private func isTaskEditableFromProject(_ task: TaskItem) -> Bool {
         guard let day = task.day else { return false }
         return (day.status == .empty || day.status == .draft) && task.zone == .draft
-    }
-
-    private func replaceProjectTaskSteps(for task: TaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        let ordered = steps
-            .sorted { lhs, rhs in
-                if lhs.sortOrder != rhs.sortOrder {
-                    return lhs.sortOrder < rhs.sortOrder
-                }
-                return lhs.createdAt < rhs.createdAt
-            }
-            .enumerated()
-            .map { index, step in
-                TaskStep(
-                    title: step.title,
-                    isCompleted: step.isCompleted,
-                    sortOrder: index
-                )
-            }
-        task.steps.append(contentsOf: ordered)
-    }
-
-    private func replaceProjectTaskAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        let copies = attachments.map { attachment in
-            TaskAttachment(
-                data: attachment.data,
-                fileName: attachment.fileName,
-                fileType: attachment.fileType
-            )
-        }
-        task.attachments.append(contentsOf: copies)
     }
 
     private func rebuildTileSnapshots() {

@@ -252,15 +252,28 @@ enum WeekyiiDataArchiveService {
     }
 
     private static func deleteAllData(in context: ModelContext) throws {
-        try context.fetch(FetchDescriptor<TaskAttachment>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<TaskStep>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<TaskItem>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<DayModel>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<WeekModel>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<ProjectModel>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<MindStampItem>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<SuspendedTaskItem>()).forEach { context.delete($0) }
-        try context.fetch(FetchDescriptor<TaskTypeDefinition>()).forEach { context.delete($0) }
+        // Keep deletions registered in this context so rollback can still discard
+        // the complete replacement, but enumerate in bounded batches instead of
+        // materializing every stored model in nine large arrays.
+        try deleteAll(TaskAttachment.self, in: context)
+        try deleteAll(TaskStep.self, in: context)
+        try deleteAll(TaskItem.self, in: context)
+        try deleteAll(DayModel.self, in: context)
+        try deleteAll(WeekModel.self, in: context)
+        try deleteAll(ProjectModel.self, in: context)
+        try deleteAll(MindStampItem.self, in: context)
+        try deleteAll(SuspendedTaskItem.self, in: context)
+        try deleteAll(TaskTypeDefinition.self, in: context)
+    }
+
+    private static func deleteAll<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
+        try context.enumerate(
+            FetchDescriptor<T>(),
+            batchSize: 256,
+            allowEscapingMutations: true
+        ) { item in
+            context.delete(item)
+        }
     }
 
     private static func insert(_ payload: Payload, into context: ModelContext) throws {

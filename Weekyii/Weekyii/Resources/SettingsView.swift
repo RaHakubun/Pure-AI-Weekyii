@@ -3,6 +3,14 @@ import SwiftData
 import UIKit
 
 struct SettingsView: View {
+    private static let archiveFilenameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd-HHmm"
+        return formatter
+    }()
+
     @EnvironmentObject private var settings: UserSettings
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
@@ -554,9 +562,7 @@ struct SettingsView: View {
     }
 
     private var archiveDefaultFilename: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        return "Weekyii-\(formatter.string(from: Date()))"
+        "Weekyii-\(Self.archiveFilenameFormatter.string(from: Date()))"
     }
 
     private func exportArchive() {

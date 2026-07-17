@@ -10,6 +10,7 @@ private enum MainTab: Hashable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
@@ -29,7 +30,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.past)
             
-            TodayView()
+            TodayView(animationsActive: selectedTab == .today && scenePhase == .active)
                 .id(visualIdentity)
                 .tabItem {
                     Label(String(localized: "tab.today"), systemImage: "sun.max")

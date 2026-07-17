@@ -229,6 +229,11 @@ private struct ProjectsModulePreview: View {
 // MARK: - Suspended Tasks Full View
 
 private struct SuspendedTasksFullView: View {
+    private struct TaskGroups {
+        var dueSoon: [SuspendedTaskItem] = []
+        var later: [SuspendedTaskItem] = []
+    }
+
     @State private var viewModel: ExtensionsViewModel
     @State private var showingCreateSheet = false
     @State private var editingTask: SuspendedTaskItem?
@@ -245,21 +250,21 @@ private struct SuspendedTasksFullView: View {
         viewModel.suspendedTaskStats()
     }
 
-    private var dueSoonTasks: [SuspendedTaskItem] {
+    private var taskGroups: TaskGroups {
         let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
         let upperBound = today.addingDays(7)
-        return viewModel.suspendedTasks.filter { task in
+        return viewModel.suspendedTasks.reduce(into: TaskGroups()) { groups, task in
             let deadline = Calendar(identifier: .iso8601).startOfDay(for: task.decisionDeadline)
-            return deadline >= today && deadline <= upperBound
+            if deadline >= today && deadline <= upperBound {
+                groups.dueSoon.append(task)
+            } else {
+                groups.later.append(task)
+            }
         }
     }
 
-    private var laterTasks: [SuspendedTaskItem] {
-        let dueSoonIds = Set(dueSoonTasks.map(\.id))
-        return viewModel.suspendedTasks.filter { !dueSoonIds.contains($0.id) }
-    }
-
     var body: some View {
+        let groups = taskGroups
         ScrollView {
             VStack(spacing: WeekSpacing.md) {
                 guidanceCard
@@ -268,11 +273,11 @@ private struct SuspendedTasksFullView: View {
                 if viewModel.suspendedTasks.isEmpty {
                     emptyState
                 } else {
-                    if !dueSoonTasks.isEmpty {
-                        section(title: "即将到期", tasks: dueSoonTasks)
+                    if !groups.dueSoon.isEmpty {
+                        section(title: "即将到期", tasks: groups.dueSoon)
                     }
-                    if !laterTasks.isEmpty {
-                        section(title: "其他悬置", tasks: laterTasks)
+                    if !groups.later.isEmpty {
+                        section(title: "其他悬置", tasks: groups.later)
                     }
 
                     footerCreateButton
@@ -299,7 +304,7 @@ private struct SuspendedTasksFullView: View {
             if let newValue { errorMessage = newValue }
         }
         .sheet(isPresented: $showingCreateSheet, onDismiss: {
-            viewModel.refresh()
+            viewModel.refresh(rebuildProjectSnapshots: false)
         }) {
             SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, typeIdRaw, countdownDays, steps, attachments in
                 _ = viewModel.createSuspendedTask(
@@ -314,7 +319,7 @@ private struct SuspendedTasksFullView: View {
             }
         }
         .sheet(item: $editingTask, onDismiss: {
-            viewModel.refresh()
+            viewModel.refresh(rebuildProjectSnapshots: false)
         }) { task in
             SuspendedTaskEditorSheet(
                 title: "编辑悬置任务",
