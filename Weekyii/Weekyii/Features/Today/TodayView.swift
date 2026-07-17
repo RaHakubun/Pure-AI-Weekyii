@@ -72,6 +72,7 @@ struct TodayView: View {
     @State private var errorMessage: String?
     @State private var startFlowCoordinator = TodayStartFlowCoordinator()
     @State private var startFlowStamp: MindStampItem?
+    @State private var startFlowDetent: PresentationDetent = .fraction(0.5)
     @State private var pendingTodayKillTimeHour: Int?
     @State private var pendingTodayKillTimeMinute: Int?
     @State private var showingTodayKillTimeConfirm = false
@@ -164,10 +165,17 @@ struct TodayView: View {
         .sheet(item: $draftTaskEditorMode) { mode in
             draftTaskEditorSheet(mode: mode)
         }
-        .sheet(isPresented: $startFlowCoordinator.isPresented) {
+        .sheet(isPresented: $startFlowCoordinator.isPresented, onDismiss: {
+            startFlowStamp = nil
+            startFlowCoordinator.cancel()
+            startFlowDetent = .fraction(0.5)
+        }) {
             if let viewModel {
                 startFlowSheet(viewModel: viewModel)
-                    .presentationDetents([.fraction(0.5), .large])
+                    .presentationDetents(
+                        [.fraction(0.5), .fraction(0.62), .large],
+                        selection: $startFlowDetent
+                    )
                     .presentationDragIndicator(.visible)
                     .presentationBackground(Color.backgroundPrimary)
             }
@@ -758,6 +766,7 @@ struct TodayView: View {
                     icon: "play.circle.fill",
                     style: .primary
                 ) {
+                    startFlowDetent = .fraction(0.5)
                     startFlowCoordinator.present()
                 }
                 .frame(maxWidth: .infinity)
@@ -987,11 +996,15 @@ struct TodayView: View {
                     killTimeText: killTimeText,
                     onCancel: {
                         startFlowStamp = nil
+                        startFlowDetent = .fraction(0.5)
                         startFlowCoordinator.cancel()
                     },
                     onContinue: {
                         startFlowStamp = viewModel.pickStartRitualStamp()
                         startFlowCoordinator.chooseDirectEnter()
+                        withAnimation(.easeInOut(duration: 0.24)) {
+                            startFlowDetent = .fraction(0.62)
+                        }
                     }
                 )
             } else {
@@ -1001,6 +1014,7 @@ struct TodayView: View {
                         do {
                             try viewModel.startDay()
                             startFlowStamp = nil
+                            startFlowDetent = .fraction(0.5)
                             startFlowCoordinator.cancel()
                         } catch {
                             errorMessage = error.localizedDescription
@@ -1232,76 +1246,95 @@ private struct StartFlowRitualStepView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.base) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    Text("阶段 2/2 · 呆胶布")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.textSecondary)
-                    Text("把注意力收束到唯一入口，然后开始今天。")
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                }
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack(alignment: .top, spacing: WeekSpacing.md) {
-                    if let blob = stamp?.imageBlob, let uiImage = UIImage(data: blob) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 72, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
-                            )
-                    }
-
-                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                        Text("今日呆胶布")
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: WeekSpacing.base) {
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text("阶段 2/2 · 呆胶布")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.textSecondary)
+                        Text("把注意力收束到唯一入口，然后开始今天。")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
-                        ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                        Label("今日呆胶布", systemImage: "bandage.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.weekyiiPrimary)
+
+                        if let blob = stamp?.imageBlob, let uiImage = UIImage(data: blob) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 112)
+                                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                        .stroke(Color.backgroundTertiary, lineWidth: 1)
+                                )
+                        }
+
+                        ZStack(alignment: .topLeading) {
+                            Text("“")
+                                .font(.system(size: 38, weight: .bold, design: .serif))
+                                .foregroundStyle(Color.weekyiiPrimary.opacity(0.20))
+                                .offset(x: -2, y: -8)
+
                             Text(contentText)
                                 .font(.bodyLarge.weight(.medium))
                                 .foregroundColor(quoteText == nil ? .textSecondary : .textPrimary)
                                 .multilineTextAlignment(.leading)
-                                .lineSpacing(2)
+                                .lineSpacing(4)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, WeekSpacing.lg)
                         }
-                        .frame(maxHeight: 120)
+                        .padding(WeekSpacing.md)
+                        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+                        .background(
+                            Color.weekyiiPrimary.opacity(0.07),
+                            in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .stroke(Color.weekyiiPrimary.opacity(0.18), lineWidth: 1)
+                        )
+                        .accessibilityIdentifier("startFlowRitualText")
                     }
+                    .padding(WeekSpacing.md)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.backgroundSecondary,
+                        in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(Color.weekyiiPrimary.opacity(0.12), lineWidth: 1)
+                    )
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("呆胶布内容：\(contentText)")
+                    .accessibilityIdentifier("startFlowRitualCard")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, WeekSpacing.base)
             }
-            .padding(WeekSpacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.backgroundTertiary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                    .stroke(Color.backgroundTertiary.opacity(0.9), lineWidth: 1)
-            )
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("呆胶布内容")
-            .accessibilityIdentifier("startFlowRitualCard")
+            .scrollIndicators(.hidden)
 
-            VStack(spacing: WeekSpacing.sm) {
-                WeekButton("确认开始", style: .primary, action: onConfirm)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("startFlowPrimaryButton")
-            }
-            .padding(.top, WeekSpacing.xs)
-            .padding(.bottom, WeekSpacing.sm)
+            WeekButton("确认开始", style: .primary, action: onConfirm)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("startFlowPrimaryButton")
+                .padding(.top, WeekSpacing.xs)
+                .padding(.bottom, WeekSpacing.sm)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var contentText: String {
         if let quoteText {
-            return "“\(quoteText)”"
+            return quoteText
         }
         return "给自己一个清晰而坚定的开始。"
     }
