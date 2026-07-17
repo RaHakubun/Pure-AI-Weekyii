@@ -1132,6 +1132,7 @@ final class ModelTests: XCTestCase {
 
 @MainActor
 final class TaskPostponeServiceTests: XCTestCase {
+    private static var retainedUserSettings: [UserSettings] = []
     private var container: ModelContainer!
 
     private static func makeContainer() throws -> ModelContainer {
@@ -1560,6 +1561,67 @@ final class TaskPostponeServiceTests: XCTestCase {
                 return
             }
         }
+    }
+
+    @MainActor
+    func test_dataArchiveRoundTripsAndUsesReplacementSemantics() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let suiteName = "ModelTests.Archive.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        let appState = AppState()
+
+        let customType = TaskTypeDefinition(idRaw: "custom-writing", name: "写作", iconName: "pencil", colorHex: "#123456", baseKind: .ddl, sortOrder: 10)
+        let project = ProjectModel(name: "归档测试", startDate: Date(), endDate: Date().addingTimeInterval(86_400))
+        let week = WeekModel(weekId: "archive-week", startDate: Date(), endDate: Date().addingTimeInterval(604_800), status: .present)
+        let day = DayModel(dayId: "archive-day", date: Date(), status: .draft)
+        let task = TaskItem(title: "保留任务", taskType: .ddl, order: 1)
+        task.taskTypeIdRaw = customType.idRaw
+        task.attachments = [TaskAttachment(data: Data([0x01, 0x02, 0x03]), fileName: "proof.bin", fileType: "application/octet-stream")]
+        task.day = day
+        task.project = project
+        day.week = week
+        context.insert(customType)
+        context.insert(project)
+        context.insert(week)
+        context.insert(day)
+        context.insert(task)
+        try context.save()
+
+        let archive = try WeekyiiDataArchiveService.export(modelContext: context, settings: settings, appState: appState)
+        let inspection = try WeekyiiDataArchiveService.inspect(archive)
+        XCTAssertEqual(inspection.taskCount, 1)
+        XCTAssertEqual(inspection.projectCount, 1)
+
+        context.insert(TaskItem(title: "应被替换", order: 99))
+        try context.save()
+        _ = try WeekyiiDataArchiveService.importReplacing(
+            archive,
+            modelContext: context,
+            settings: settings,
+            appState: appState,
+            storeURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("store")
+        )
+
+        let restoredTasks = try context.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(restoredTasks.map(\.title), ["保留任务"])
+        XCTAssertEqual(restoredTasks.first?.taskTypeIdRaw, "custom-writing")
+        XCTAssertEqual(restoredTasks.first?.attachments.first?.data, Data([0x01, 0x02, 0x03]))
+        XCTAssertEqual(restoredTasks.first?.project?.name, "归档测试")
+    }
+
+    @MainActor
+    func test_dataArchiveRejectsModifiedFile() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let suiteName = "ModelTests.ArchiveCorruption.\(UUID().uuidString)"
+        let settings = UserSettings(defaults: UserDefaults(suiteName: suiteName)!)
+        Self.retainedUserSettings.append(settings)
+        var data = try WeekyiiDataArchiveService.export(modelContext: container.mainContext, settings: settings, appState: AppState())
+        data[data.count / 2] ^= 0x01
+        XCTAssertThrowsError(try WeekyiiDataArchiveService.inspect(data))
     }
 
     private func requireDay(in week: WeekModel, date: Date) -> DayModel {

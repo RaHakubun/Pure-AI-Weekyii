@@ -111,6 +111,7 @@
 		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
 		F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A100102F6A000100AAA001 /* ProjectTileSize.swift */; };
 		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
+		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
 		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
 /* End PBXBuildFile section */
 
@@ -263,6 +264,7 @@
 		C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderedTaskRow.swift; sourceTree = "<group>"; };
 		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
 		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
+		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -455,6 +457,7 @@
 		944E58352F2B593A00DB2DEE /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
 				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
 				944E58322F2B593A00DB2DEE /* StateMachine.swift */,
 				A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */,
@@ -828,6 +831,7 @@
 				944E58742F2B593A00DB2DEE /* WeekCalculator.swift in Sources */,
 				944E58752F2B593A00DB2DEE /* WeekyiiApp.swift in Sources */,
 				F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */,
+				D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */,
 				94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */,
 				9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */,
 				9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */,

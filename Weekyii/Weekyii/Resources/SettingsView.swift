@@ -18,6 +18,12 @@ struct SettingsView: View {
     @State private var showingRestoreBackupConfirm = false
     @State private var showingCreateTaskType = false
     @State private var editingTaskTypeIdRaw: String?
+    @State private var archiveDocument = WeekyiiArchiveDocument()
+    @State private var showingArchiveExporter = false
+    @State private var showingArchiveImporter = false
+    @State private var pendingImportData: Data?
+    @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
+    @State private var showingImportConfirm = false
     
     var body: some View {
         NavigationStack {
@@ -119,6 +125,34 @@ struct SettingsView: View {
             }
         } message: {
             Text("将直接替换当前数据库文件，可能丢失最新数据。")
+        }
+        .alert("完整替换当前数据？", isPresented: $showingImportConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                pendingImportData = nil
+                pendingImportInspection = nil
+            }
+            Button("建立恢复点并导入", role: .destructive) {
+                performPendingArchiveImport()
+            }
+        } message: {
+            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。")
+        }
+        .fileExporter(
+            isPresented: $showingArchiveExporter,
+            document: archiveDocument,
+            contentType: .json,
+            defaultFilename: archiveDefaultFilename
+        ) { result in
+            if case .failure(let error) = result {
+                seedAlertMessage = "导出失败：\(error.localizedDescription)"
+            }
+        }
+        .fileImporter(
+            isPresented: $showingArchiveImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleArchiveSelection(result)
         }
         .sheet(isPresented: $showingCreateTaskType) {
             TaskTypeDefinitionEditorSheet { name, iconName, colorHex in
@@ -471,15 +505,99 @@ struct SettingsView: View {
             }
             .disabled(true)
 
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "square.and.arrow.up.fill", color: .indigo)
-                Text(String(localized: "settings.data.export"))
-                Spacer()
-                Text(String(localized: "settings.data.export.coming_soon"))
-                    .foregroundStyle(.tertiary)
+            Button {
+                exportArchive()
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "square.and.arrow.up.fill", color: .indigo)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("导出 Weekyii 数据")
+                        Text("单文件包含任务、项目、标签、图片与设置")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Button {
+                showingArchiveImporter = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "square.and.arrow.down.fill", color: .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("从归档恢复")
+                        Text("校验完成后完整替换当前数据")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            NavigationLink {
+                RecoveryPointsView()
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "clock.arrow.circlepath", color: .teal)
+                    Text("本地恢复点")
+                }
             }
         } header: {
             Text(String(localized: "settings.section.data"))
+        } footer: {
+            Text("归档采用带版本与 SHA-256 校验的 JSON 格式。导入不会合并数据。")
+        }
+    }
+
+    private var archiveDefaultFilename: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HHmm"
+        return "Weekyii-\(formatter.string(from: Date()))"
+    }
+
+    private func exportArchive() {
+        do {
+            archiveDocument = WeekyiiArchiveDocument(data: try WeekyiiDataArchiveService.export(
+                modelContext: modelContext,
+                settings: settings,
+                appState: appState
+            ))
+            showingArchiveExporter = true
+        } catch {
+            seedAlertMessage = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func handleArchiveSelection(_ result: Result<[URL], Error>) {
+        do {
+            guard let url = try result.get().first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let data = try Data(contentsOf: url)
+            pendingImportInspection = try WeekyiiDataArchiveService.inspect(data)
+            pendingImportData = data
+            showingImportConfirm = true
+        } catch {
+            pendingImportData = nil
+            pendingImportInspection = nil
+            seedAlertMessage = "无法导入：\(error.localizedDescription)"
+        }
+    }
+
+    private func performPendingArchiveImport() {
+        guard let data = pendingImportData else { return }
+        do {
+            let result = try WeekyiiDataArchiveService.importReplacing(
+                data,
+                modelContext: modelContext,
+                settings: settings,
+                appState: appState,
+                storeURL: WeekyiiPersistence.persistentStoreURL()
+            )
+            pendingImportData = nil
+            pendingImportInspection = nil
+            seedAlertMessage = "恢复完成：\(result.conciseSummary)"
+        } catch {
+            seedAlertMessage = "恢复失败，当前数据未替换：\(error.localizedDescription)"
         }
     }
 
@@ -1662,5 +1780,80 @@ struct SettingsIcon: View {
             .frame(width: 28, height: 28)
             .background(color)
             .cornerRadius(7)
+    }
+}
+
+private struct RecoveryPointsView: View {
+    @State private var snapshots: [BackupRecoveryService.SnapshotSummary] = []
+    @State private var pendingSnapshot: BackupRecoveryService.SnapshotSummary?
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            if snapshots.isEmpty {
+                ContentUnavailableView("暂无本地恢复点", systemImage: "clock.arrow.circlepath", description: Text("应用启动和数据导入前会自动建立恢复点。"))
+            } else {
+                Section {
+                    ForEach(snapshots, id: \.folderName) { snapshot in
+                        Button {
+                            guard snapshot.isValid else {
+                                message = "该恢复点校验失败，不能使用。"
+                                return
+                            }
+                            pendingSnapshot = snapshot
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: snapshot.isValid ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundStyle(snapshot.isValid ? .green : .red)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(snapshot.createdAt, format: .dateTime.year().month().day().hour().minute())
+                                        .foregroundStyle(.primary)
+                                    Text("\(snapshot.fileCount) 个数据库文件")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。")
+                }
+            }
+        }
+        .navigationTitle("本地恢复点")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { reload() }
+        .alert("恢复这个时间点？", isPresented: Binding(
+            get: { pendingSnapshot != nil },
+            set: { if !$0 { pendingSnapshot = nil } }
+        )) {
+            Button("取消", role: .cancel) { pendingSnapshot = nil }
+            Button("完整恢复", role: .destructive) { restorePendingSnapshot() }
+        } message: {
+            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。")
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { message != nil },
+            set: { if !$0 { message = nil } }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(message ?? "")
+        }
+    }
+
+    private func reload() {
+        snapshots = BackupRecoveryService.listSnapshots(storeURL: WeekyiiPersistence.persistentStoreURL())
+    }
+
+    private func restorePendingSnapshot() {
+        guard let snapshot = pendingSnapshot else { return }
+        pendingSnapshot = nil
+        do {
+            try BackupRecoveryService.restoreSnapshot(named: snapshot.folderName, to: WeekyiiPersistence.persistentStoreURL())
+            message = "恢复完成。请立即完全退出并重新打开 Weekyii。"
+        } catch {
+            message = "恢复失败：\(error.localizedDescription)"
+        }
     }
 }

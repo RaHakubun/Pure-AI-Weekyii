@@ -50,32 +50,19 @@ enum WeekyiiPersistence {
     }
 
     static func backupPersistentStoreIfExists(storeURL: URL) {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: storeURL.path) else { return }
+        _ = try? BackupRecoveryService.createSnapshot(storeURL: storeURL)
+    }
 
-        let backupFolder = storeURL.deletingLastPathComponent().appendingPathComponent("Backups", isDirectory: true)
-        try? fileManager.createDirectory(at: backupFolder, withIntermediateDirectories: true)
-
-        let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let snapshotFolder = backupFolder.appendingPathComponent("snapshot-\(timestamp)", isDirectory: true)
-        try? fileManager.createDirectory(at: snapshotFolder, withIntermediateDirectories: true)
-
-        let candidates = [
-            storeURL,
-            URL(fileURLWithPath: storeURL.path + "-wal"),
-            URL(fileURLWithPath: storeURL.path + "-shm"),
-        ]
-
-        var manifestFiles: [BackupManifest.FileEntry] = []
-        for source in candidates where fileManager.fileExists(atPath: source.path) {
-            let destination = snapshotFolder.appendingPathComponent(source.lastPathComponent)
-            try? fileManager.copyItem(at: source, to: destination)
-            if let entry = makeFileEntry(for: destination) {
-                manifestFiles.append(entry)
-            }
-        }
-        writeManifest(for: snapshotFolder, files: manifestFiles)
+    fileprivate static func pruneSnapshots(in backupFolder: URL) {
         pruneBackups(in: backupFolder)
+    }
+
+    fileprivate static func fileEntry(for fileURL: URL) -> BackupManifest.FileEntry? {
+        makeFileEntry(for: fileURL)
+    }
+
+    fileprivate static func persistManifest(in folder: URL, files: [BackupManifest.FileEntry]) {
+        writeManifest(for: folder, files: files)
     }
 
     static func failureDiagnostics() -> String {
@@ -175,7 +162,7 @@ enum WeekyiiPersistenceError: LocalizedError {
     }
 }
 
-private struct BackupManifest: Codable {
+fileprivate struct BackupManifest: Codable {
     struct FileEntry: Codable {
         let fileName: String
         let fileSize: Int64
@@ -194,6 +181,53 @@ enum BackupRecoveryService {
         let createdAt: Date
         let fileCount: Int
         let isValid: Bool
+    }
+
+    @discardableResult
+    static func createSnapshot(storeURL: URL, reason: String? = nil) throws -> SnapshotSummary? {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: storeURL.path) else { return nil }
+
+        let backupFolder = storeURL.deletingLastPathComponent().appendingPathComponent("Backups", isDirectory: true)
+        try fileManager.createDirectory(at: backupFolder, withIntermediateDirectories: true)
+        let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let suffix = reason.map { "-\($0)" } ?? ""
+        let snapshotFolder = backupFolder.appendingPathComponent("snapshot-\(timestamp)\(suffix)", isDirectory: true)
+        try fileManager.createDirectory(at: snapshotFolder, withIntermediateDirectories: true)
+
+        do {
+            let candidates = [
+                storeURL,
+                URL(fileURLWithPath: storeURL.path + "-wal"),
+                URL(fileURLWithPath: storeURL.path + "-shm"),
+            ]
+            var entries: [BackupManifest.FileEntry] = []
+            for source in candidates where fileManager.fileExists(atPath: source.path) {
+                let destination = snapshotFolder.appendingPathComponent(source.lastPathComponent)
+                try fileManager.copyItem(at: source, to: destination)
+                guard let entry = WeekyiiPersistence.fileEntry(for: destination) else {
+                    throw WeekyiiPersistenceError.inconsistentState("无法计算恢复点校验摘要。")
+                }
+                entries.append(entry)
+            }
+            guard !entries.isEmpty else {
+                throw WeekyiiPersistenceError.inconsistentState("没有可写入恢复点的数据库文件。")
+            }
+            WeekyiiPersistence.persistManifest(in: snapshotFolder, files: entries)
+            guard verifySnapshot(folder: snapshotFolder) else {
+                throw WeekyiiPersistenceError.inconsistentState("导入前恢复点校验失败。")
+            }
+            WeekyiiPersistence.pruneSnapshots(in: backupFolder)
+            return SnapshotSummary(
+                folderName: snapshotFolder.lastPathComponent,
+                createdAt: Date(),
+                fileCount: entries.count,
+                isValid: true
+            )
+        } catch {
+            try? fileManager.removeItem(at: snapshotFolder)
+            throw error
+        }
     }
 
     static func listSnapshots(storeURL: URL) -> [SnapshotSummary] {
