@@ -12,10 +12,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun StatusBadge(text: String, color: Color, contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+fun StatusBadge(
+    text: String,
+    color: Color,
+    contentColor: Color = Color.White,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+) {
     Text(
         text = text,
-        color = Color.White,
+        color = contentColor,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
             .background(color, RoundedCornerShape(12.dp))

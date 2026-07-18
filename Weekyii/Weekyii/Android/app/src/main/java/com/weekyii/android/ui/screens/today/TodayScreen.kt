@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
@@ -44,7 +45,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,6 +82,8 @@ import com.weekyii.android.ui.components.WeekyiiHeader
 import com.weekyii.android.ui.components.WeekyiiSegmentedControl
 import com.weekyii.android.ui.components.WeekyiiStatusArtwork
 import com.weekyii.android.ui.components.WeekyiiTaskRow
+import com.weekyii.android.ui.components.WeekyiiErrorState
+import com.weekyii.android.ui.components.StatusBadge
 import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
@@ -190,7 +192,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                     WeekyiiEmptyState(
                         title = "今日无任务",
                         subtitle = "创建今日任务流以开始。",
-                        icon = Icons.Filled.Edit
+                        icon = Icons.Outlined.EditNote
                     )
                 }
                 item {
@@ -394,16 +396,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
 
         state.error?.let { message ->
             item {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text(
-                        message,
-                        modifier = Modifier.padding(14.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
+                WeekyiiErrorState(message)
             }
         }
 
@@ -518,17 +511,12 @@ private fun StatusPill(status: DayStatus) {
         DayStatus.COMPLETED -> "已完成"
         DayStatus.EXPIRED -> "已过期"
     }
-    Surface(
+    StatusBadge(
+        text = label,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        shape = MaterialTheme.shapes.extraLarge
-    ) {
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @Composable

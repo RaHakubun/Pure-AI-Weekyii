@@ -25,7 +25,7 @@ fun WeekyiiEmptyState(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 48.dp),
+                .padding(vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

@@ -134,7 +134,7 @@ class WeekyiiRepository(
             dayId = dayId,
             date = java.util.Date.from(date.atStartOfDay(zoneId).toInstant()),
             dayOfWeek = date.dayOfWeek.name.take(3),
-            status = DayStatus.DRAFT,
+            status = DayStatus.EMPTY,
             weekOwnerId = week.weekId
         )
         dayDao.upsert(day)

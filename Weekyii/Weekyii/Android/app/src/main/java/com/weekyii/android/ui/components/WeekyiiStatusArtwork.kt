@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.ui.theme.WeekyiiDimensions
+import com.weekyii.android.ui.theme.LocalWeekyiiThemeId
 
 @Composable
 fun WeekyiiStatusArtwork(
@@ -29,6 +30,17 @@ fun WeekyiiStatusArtwork(
     val accent = MaterialTheme.colorScheme.tertiary
     val success = MaterialTheme.colorScheme.secondary
     val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    val themeId = LocalWeekyiiThemeId.current
+    val window = when (themeId) {
+        "ocean", "midnight" -> Color(0xFFDCEFFF)
+        "forest", "mint" -> Color(0xFFDFF5E7)
+        "rose", "lavender" -> Color(0xFFFFE4ED)
+        "graphite" -> Color(0xFFE7EBF0)
+        "sunset" -> Color(0xFFFFE0B9)
+        "lotr" -> Color(0xFFE9D9AE)
+        else -> Color(0xFFFFE7A9)
+    }
+    val ink = lerp(primary, Color.Black, 0.48f)
     val (start, end, ground) = when (status) {
         DayStatus.EMPTY -> Triple(lerp(Color.White, primary, 0.34f), lerp(primary, accent, 0.36f), lerp(primary, neutral, 0.46f))
         DayStatus.DRAFT -> Triple(lerp(Color.White, primary, 0.42f), primary, lerp(primary, neutral, 0.40f))
@@ -39,7 +51,7 @@ fun WeekyiiStatusArtwork(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(88.dp)
+            .height(72.dp)
             .clip(RoundedCornerShape(WeekyiiDimensions.radiusMedium))
             .background(Brush.horizontalGradient(listOf(start, end)))
     ) {
@@ -51,7 +63,7 @@ fun WeekyiiStatusArtwork(
         val windowLeft = size.width * 0.52f
         val windowTop = size.height * 0.10f
         drawRoundRect(
-            color = Color(0xFFFFE7A9).copy(alpha = 0.84f),
+            color = window.copy(alpha = 0.84f),
             topLeft = Offset(windowLeft, windowTop),
             size = Size(windowWidth, windowHeight),
             cornerRadius = CornerRadius(windowWidth * 0.25f, windowWidth * 0.25f)
@@ -60,13 +72,13 @@ fun WeekyiiStatusArtwork(
         drawLine(Color.White.copy(alpha = 0.36f), Offset(windowLeft + 8f, windowTop + windowHeight / 2), Offset(windowLeft + windowWidth - 8f, windowTop + windowHeight / 2), 1.5f)
 
         val tableY = size.height * 0.63f
-        drawLine(Color(0xFF6E321B), Offset(size.width * 0.20f, tableY), Offset(size.width * 0.57f, tableY), 3f)
-        drawLine(Color(0xFFFFE1B5), Offset(size.width * 0.47f, tableY + 5f), Offset(size.width * 0.67f, tableY + 2f), 4f)
+        drawLine(ink, Offset(size.width * 0.20f, tableY), Offset(size.width * 0.57f, tableY), 3f)
+        drawLine(window.copy(alpha = 0.86f), Offset(size.width * 0.47f, tableY + 5f), Offset(size.width * 0.67f, tableY + 2f), 4f)
         val arcPath = Path().apply {
             moveTo(size.width * 0.27f, tableY)
             quadraticBezierTo(size.width * 0.37f, tableY - size.height * 0.28f, size.width * 0.47f, tableY)
         }
-        drawPath(arcPath, Color(0xFF6E321B), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f))
-        drawRoundRect(Color(0xFFFFF1B9), Offset(size.width * 0.34f, tableY - size.height * 0.40f), Size(size.width * 0.025f, size.height * 0.22f), CornerRadius(8f, 8f))
+        drawPath(arcPath, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f))
+        drawRoundRect(window.copy(alpha = 0.95f), Offset(size.width * 0.34f, tableY - size.height * 0.40f), Size(size.width * 0.025f, size.height * 0.22f), CornerRadius(8f, 8f))
     }
 }

@@ -5,6 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+
+val LocalWeekyiiThemeId = staticCompositionLocalOf { "amber" }
 
 @Composable
 fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
@@ -51,9 +55,11 @@ fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkT
         )
     })
 
-    MaterialTheme(
-        colorScheme = colors,
-        typography = WeekyiiTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalWeekyiiThemeId provides themeId) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = WeekyiiTypography,
+            content = content
+        )
+    }
 }

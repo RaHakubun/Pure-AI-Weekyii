@@ -94,6 +94,20 @@ class WeekyiiRepositoryBehaviorTest {
     }
 
     @Test
+    fun creatingDraftDayForNewDateKeepsItEmptyUntilTasksAreAdded() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val days = FakeDayDao()
+        val repository = repository(
+            weekDao = FakeWeekDao(),
+            dayDao = days
+        )
+
+        repository.createDraftDayIfNeeded(date)
+
+        assertEquals(DayStatus.EMPTY, days.findById(date.toString())?.status)
+    }
+
+    @Test
     fun invalidKillTimeIsRejectedBeforePersistence() = runBlocking {
         val day = day("2026-07-20", DayStatus.DRAFT)
         val days = FakeDayDao(mutableMapOf(day.dayId to day))
