@@ -5,17 +5,23 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,6 +29,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,11 +45,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.ProjectStatus
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
@@ -55,11 +65,22 @@ import com.weekyii.android.ui.components.WeekyiiCard
 import com.weekyii.android.ui.components.WeekyiiBottomSheet
 import com.weekyii.android.ui.components.WeekyiiButton
 import com.weekyii.android.ui.components.WeekyiiButtonStyle
+import com.weekyii.android.ui.components.WeekyiiHeader
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Healing
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
+
+private enum class ExtensionModule { MIND_STAMPS, SUSPENDED, PROJECTS }
 
 @Composable
 fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val palette = LocalWeekyiiPalette.current
     state.projectDetail?.let { detail ->
         LaunchedEffect(state.selectedProjectId) { viewModel.refreshSelectedProject() }
         ProjectDetailScreen(
@@ -109,6 +130,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     var showProjectComposer by remember { mutableStateOf(false) }
     var showStampComposer by remember { mutableStateOf(false) }
     var showSuspendedComposer by remember { mutableStateOf(false) }
+    var selectedModule by remember { mutableStateOf<ExtensionModule?>(null) }
+    BackHandler(enabled = selectedModule != null) { selectedModule = null }
     val today = LocalDate.now()
     val stampImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) stampImage = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -117,52 +140,76 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
         uri?.let { loadAttachment(context, it) }?.let(suspendedAttachments::add)
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    if (selectedModule == null) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("拓展", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("项目和 MindStamp 独立于每日任务流，但可以作为长期上下文。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            WeekyiiHeader()
         }
         item {
-            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
-                ModulePreview(
-                    title = "项目",
-                    body = "把跨天目标放进独立工作台，保留自己的进度和任务上下文。",
-                    detail = if (state.projects.isEmpty()) "还没有项目" else "${state.projects.size} 个项目",
-                    actionLabel = "新建项目",
-                    onAction = { showProjectComposer = true }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ShortcutModuleCard(
+                    modifier = Modifier.weight(1f),
+                    title = "呆胶布",
+                    count = state.mindStamps.size,
+                    countLabel = "张呆胶布",
+                    icon = Icons.Outlined.Healing,
+                    accentColor = palette.accentPink,
+                    onClick = { selectedModule = ExtensionModule.MIND_STAMPS }
+                )
+                ShortcutModuleCard(
+                    modifier = Modifier.weight(1f),
+                    title = "悬置箱",
+                    count = state.suspendedTasks.size,
+                    countLabel = "项未决任务",
+                    icon = Icons.Outlined.HourglassEmpty,
+                    accentColor = palette.accentOrange,
+                    onClick = { selectedModule = ExtensionModule.SUSPENDED }
                 )
             }
         }
         item {
-            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
-                ModulePreview(
-                    title = "MindStamp",
-                    body = "为开始今天留下一个简短的启动仪式，文字和图片都可以保存。",
-                    detail = if (state.mindStamps.isEmpty()) "还没有保存的仪式" else "已保存 ${state.mindStamps.size} 条",
-                    actionLabel = "添加 MindStamp",
-                    onAction = { showStampComposer = true }
-                )
-            }
-        }
-        item {
-            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
-                ModulePreview(
-                    title = "悬置任务",
-                    body = "暂时不安排到某一天，到期前再决定去向。",
-                    detail = if (state.suspendedTasks.isEmpty()) "悬置箱为空" else "${state.suspendedTasks.size} 项等待决定",
-                    actionLabel = "悬置新任务",
-                    onAction = { showSuspendedComposer = true }
-                )
+            WeekyiiCard(modifier = Modifier.fillMaxWidth().height(260.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = palette.accentOrange)
+                        Text("项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            "查看全部 ›",
+                            modifier = Modifier.weight(1f).clickable { selectedModule = ExtensionModule.PROJECTS },
+                            color = palette.accentOrange,
+                            textAlign = TextAlign.End
+                        )
+                    }
+                    Text("管理跨天任务与进度", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.projects.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(
+                                    Icons.Outlined.CreateNewFolder,
+                                    contentDescription = null,
+                                    tint = palette.accentOrange,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Text("暂无项目", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                WeekyiiButton(
+                                    text = "新建项目",
+                                    style = WeekyiiButtonStyle.Primary,
+                                    onClick = { showProjectComposer = true }
+                                )
+                            }
+                        }
+                    } else {
+                        Text("${state.projects.size} 个项目", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
         state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Text("悬置箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        if (state.suspendedTasks.isNotEmpty()) item { Text("悬置箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.suspendedTasks, key = { it.id }) { task ->
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -186,11 +233,11 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                 }
             }
         }
-        item { Text("项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        if (state.projects.isNotEmpty()) item { Text("项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         itemsIndexed(state.projects, key = { _, project -> project.id }) { index, project ->
             ProjectCard(project, viewModel, index > 0, index < state.projects.lastIndex, onOpen = { viewModel.openProject(project.id) })
         }
-        item { Text("已保存的 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        if (state.mindStamps.isNotEmpty()) item { Text("已保存的呆胶布", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.mindStamps, key = { it.id }) { stamp ->
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -202,6 +249,35 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                 }
             }
         }
+        }
+    }
+
+    when (selectedModule) {
+        ExtensionModule.MIND_STAMPS -> MindStampsModuleScreen(
+            state = state,
+            padding = padding,
+            onBack = { selectedModule = null },
+            onCreate = { showStampComposer = true },
+            onDelete = viewModel::deleteMindStamp
+        )
+        ExtensionModule.SUSPENDED -> SuspendedModuleScreen(
+            state = state,
+            padding = padding,
+            onBack = { selectedModule = null },
+            onCreate = { showSuspendedComposer = true },
+            onEdit = { editingSuspended = it },
+            onAssign = { id, date -> viewModel.assignSuspendedTask(id, date) },
+            onExtend = { viewModel.extendSuspendedTask(it, 10) },
+            onDelete = { viewModel.deleteSuspendedTask(it) }
+        )
+        ExtensionModule.PROJECTS -> ProjectsModuleScreen(
+            state = state,
+            padding = padding,
+            viewModel = viewModel,
+            onBack = { selectedModule = null },
+            onCreate = { showProjectComposer = true }
+        )
+        null -> Unit
     }
 
     editingSuspended?.let { task ->
@@ -296,19 +372,190 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
 }
 
 @Composable
-private fun ModulePreview(
+private fun ShortcutModuleCard(
+    modifier: Modifier,
     title: String,
-    body: String,
-    detail: String,
-    actionLabel: String,
-    onAction: () -> Unit
+    count: Int,
+    countLabel: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accentColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(detail, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            WeekyiiButton(text = actionLabel, style = WeekyiiButtonStyle.Secondary, onClick = onAction)
+    WeekyiiCard(modifier = modifier.aspectRatio(1f).clickable(onClick = onClick)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.14f))
+                    .padding(11.dp)
+            )
+            Text("↗", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Column(modifier = Modifier.padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(count.toString(), style = MaterialTheme.typography.headlineMedium, color = accentColor, fontWeight = FontWeight.Bold)
+                Text(" $countLabel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExtensionModuleHeader(
+    title: String,
+    onBack: () -> Unit,
+    onCreate: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+        }
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        TextButton(onClick = onCreate) { Text("新增") }
+    }
+}
+
+@Composable
+private fun MindStampsModuleScreen(
+    state: ExtensionsViewModel.UiState,
+    padding: PaddingValues,
+    onBack: () -> Unit,
+    onCreate: () -> Unit,
+    onDelete: (java.util.UUID) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { ExtensionModuleHeader("呆胶布", onBack, onCreate) }
+        if (state.mindStamps.isEmpty()) {
+            item {
+                WeekyiiCard {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Outlined.Healing, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(42.dp))
+                        Text("暂无呆胶布", style = MaterialTheme.typography.titleMedium)
+                        Text("右上角点 + 新建呆胶布", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        } else {
+            items(state.mindStamps, key = { it.id }) { stamp ->
+                WeekyiiCard {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        stamp.imageBlob?.let { bytes ->
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmap ->
+                                Image(bitmap.asImageBitmap(), "呆胶布图片", modifier = Modifier.size(56.dp), contentScale = ContentScale.Crop)
+                            }
+                        }
+                        Text(stamp.text.ifBlank { "图片呆胶布" }, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onDelete(stamp.id) }) { Text("删除") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuspendedModuleScreen(
+    state: ExtensionsViewModel.UiState,
+    padding: PaddingValues,
+    onBack: () -> Unit,
+    onCreate: () -> Unit,
+    onEdit: (SuspendedTaskUi) -> Unit,
+    onAssign: (java.util.UUID, LocalDate) -> Unit,
+    onExtend: (java.util.UUID) -> Unit,
+    onDelete: (java.util.UUID) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { ExtensionModuleHeader("悬置箱", onBack, onCreate) }
+        if (state.suspendedTasks.isEmpty()) {
+            item {
+                WeekyiiCard {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Outlined.HourglassEmpty, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(42.dp))
+                        Text("悬置箱为空", style = MaterialTheme.typography.titleMedium)
+                        Text("先把暂时无法承诺日期的任务放在这里。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        items(state.suspendedTasks, key = { it.id }) { task ->
+            WeekyiiCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        state.taskTypeDefinitions.firstOrNull { it.idRaw == task.taskTypeIdRaw }?.name ?: task.taskType.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text("${task.decisionDeadline.toLocalDate()} 到期 · 已延期 ${task.snoozeCount} 次")
+                    if (task.description.isNotBlank()) Text(task.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssignSuspendedButton { date -> onAssign(task.id, date) }
+                        OutlinedButton(onClick = { onEdit(task) }) { Text("编辑") }
+                        OutlinedButton(onClick = { onExtend(task.id) }) { Text("延长 10 天") }
+                        OutlinedButton(onClick = { onDelete(task.id) }) { Text("删除") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectsModuleScreen(
+    state: ExtensionsViewModel.UiState,
+    padding: PaddingValues,
+    viewModel: ExtensionsViewModel,
+    onBack: () -> Unit,
+    onCreate: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { ExtensionModuleHeader("项目", onBack, onCreate) }
+        if (state.projects.isEmpty()) {
+            item {
+                WeekyiiCard {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(48.dp))
+                        Text("暂无项目", style = MaterialTheme.typography.titleMedium)
+                        WeekyiiButton(text = "新建项目", style = WeekyiiButtonStyle.Primary, onClick = onCreate)
+                    }
+                }
+            }
+        }
+        itemsIndexed(state.projects, key = { _, project -> project.id }) { index, project ->
+            ProjectCard(project, viewModel, index > 0, index < state.projects.lastIndex, onOpen = { viewModel.openProject(project.id) })
         }
     }
 }

@@ -17,6 +17,18 @@ This baseline is taken from the current `online-chatgpt-develop` iOS build on th
 
 The pre-refactor Android screenshot was captured at `/tmp/weekyii-android-current.png`. It demonstrates the main mismatches to remove: plain text branding, a compact two-button row, a flat rectangular status gradient, dense/incorrect hierarchy, green selected navigation treatment, and default Material spacing.
 
+## Extensions baseline observed
+
+- The hub uses the centered Weekyii wordmark followed by two equal square shortcut cards in one row: 呆胶布 and 悬置箱.
+- The projects module is one wide rounded card below the shortcuts. Its header contains the folder icon, title, and a right-aligned 查看全部入口; the empty state is centered inside the same card with a folder-plus icon and 新建项目 action.
+- The hub does not repeat empty section headings below the module cards. Detail lists belong to the module destination opened from a shortcut or 查看全部.
+- iOS reference: `/tmp/weekyii-ios-extensions-baseline.png`.
+- Android acceptance capture: `/tmp/weekyii-android-extensions-ios-aligned-final5.png`.
+
+## Expired Today acceptance
+
+The Pixel 9 Pro expired-state capture is `/tmp/weekyii-android-expired-audit.png`. It verifies the red expired status artwork, the forgotten-task count, and the disabled past kill-time control without retaining expired task details.
+
 ## Acceptance rule
 
 Every Android screen must be checked against the corresponding iOS screen in the simulator. A screen is not accepted because it compiles or because its ViewModel behavior passes; it must also match the baseline's hierarchy, palette, geometry, density, and state communication at the same user-visible state.

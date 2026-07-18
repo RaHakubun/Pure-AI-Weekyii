@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 
 val LocalWeekyiiThemeId = staticCompositionLocalOf { "amber" }
+val LocalWeekyiiPalette = staticCompositionLocalOf { WeekyiiPalettes.forTheme("amber", false) }
 
 @Composable
 fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
@@ -55,7 +56,10 @@ fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkT
         )
     })
 
-    CompositionLocalProvider(LocalWeekyiiThemeId provides themeId) {
+    CompositionLocalProvider(
+        LocalWeekyiiThemeId provides themeId,
+        LocalWeekyiiPalette provides palette
+    ) {
         MaterialTheme(
             colorScheme = colors,
             typography = WeekyiiTypography,
