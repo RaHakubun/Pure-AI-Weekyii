@@ -79,4 +79,11 @@ class ExtensionsViewModel(
     fun deleteSuspendedTask(id: UUID) {
         viewModelScope.launch { suspendedTasks.delete(id) }
     }
+
+    fun assignSuspendedTask(id: UUID, targetDate: LocalDate) {
+        viewModelScope.launch {
+            runCatching { suspendedTasks.assign(id, targetDate, LocalDate.now()) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
 }

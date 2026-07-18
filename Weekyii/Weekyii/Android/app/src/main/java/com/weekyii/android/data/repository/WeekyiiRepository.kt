@@ -283,6 +283,37 @@ class WeekyiiRepository(
         )
     }
 
+    suspend fun appendDraftTask(
+        dayId: String,
+        title: String,
+        description: String,
+        taskType: TaskType,
+        taskTypeIdRaw: String,
+        stepTitles: List<String> = emptyList(),
+        attachments: List<TaskAttachmentDraft> = emptyList()
+    ): UUID {
+        require(title.isNotBlank()) { "Task title cannot be empty" }
+        val day = dayDao.findWithTasks(dayId) ?: error("Target day not found")
+        require(day.day.status == DayStatus.EMPTY || day.day.status == DayStatus.DRAFT) {
+            "Target day is unavailable"
+        }
+        val task = TaskEntity(
+            title = title.trim(),
+            description = description.trim(),
+            taskType = taskType,
+            taskTypeIdRaw = taskTypeIdRaw,
+            order = (day.tasks.filter { it.zone == TaskZone.DRAFT }.maxOfOrNull { it.order } ?: 0) + 1,
+            zone = TaskZone.DRAFT,
+            dayOwnerId = dayId
+        )
+        taskDao.upsert(task)
+        if (stepTitles.isNotEmpty() || attachments.isNotEmpty()) {
+            replaceDraftTaskResources(dayId, task.id, stepTitles, attachments)
+        }
+        dayDao.upsert(day.day.copy(status = DayStatus.DRAFT))
+        return task.id
+    }
+
     suspend fun exchangeFocusWithFirstFrozen(dayId: String, now: java.util.Date) {
         val day = dayDao.findWithTasks(dayId) ?: return
         require(day.day.status == DayStatus.EXECUTE) { "Day is not executing" }

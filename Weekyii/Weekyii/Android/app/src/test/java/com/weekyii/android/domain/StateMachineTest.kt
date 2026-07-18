@@ -421,11 +421,11 @@ private class RecordingTaskDao(
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = tasks.values.flatten().firstOrNull { it.id == id }?.let {
         TaskWithSteps(it, steps[id].orEmpty(), attachments[id].orEmpty())
     }
-    override suspend fun upsertSteps(values: List<TaskStepEntity>) {
-        values.forEach { value -> steps.getOrPut(value.taskOwnerId) { mutableListOf() }.add(value) }
+    override suspend fun upsertSteps(steps: List<TaskStepEntity>) {
+        steps.forEach { value -> this.steps.getOrPut(value.taskOwnerId) { mutableListOf() }.add(value) }
     }
-    override suspend fun upsertAttachments(values: List<TaskAttachmentEntity>) {
-        values.forEach { value -> attachments.getOrPut(value.attachmentOwnerId) { mutableListOf() }.add(value) }
+    override suspend fun upsertAttachments(attachments: List<TaskAttachmentEntity>) {
+        attachments.forEach { value -> this.attachments.getOrPut(value.attachmentOwnerId) { mutableListOf() }.add(value) }
     }
     override suspend fun deleteSteps(taskId: UUID) { steps.remove(taskId) }
     override suspend fun deleteAttachments(taskId: UUID) { attachments.remove(taskId) }

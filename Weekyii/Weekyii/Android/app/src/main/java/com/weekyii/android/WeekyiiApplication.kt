@@ -1,6 +1,9 @@
 package com.weekyii.android
 
 import android.app.Application
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.room.Room
 import com.weekyii.android.data.db.AppDatabase
 import com.weekyii.android.data.db.MIGRATION_1_2
@@ -13,6 +16,9 @@ import com.weekyii.android.domain.StateMachine
 import com.weekyii.android.domain.TimeProvider
 import com.weekyii.android.domain.DataStoreUserSettingsStore
 import java.time.ZoneId
+import java.util.concurrent.TimeUnit
+import com.weekyii.android.platform.WeekyiiNotificationService
+import com.weekyii.android.platform.WeekyiiReconcileWorker
 
 class WeekyiiApplication : Application() {
     lateinit var database: AppDatabase
@@ -28,6 +34,8 @@ class WeekyiiApplication : Application() {
     lateinit var settingsStore: DataStoreUserSettingsStore
         private set
     lateinit var suspendedTaskRepository: SuspendedTaskRepository
+        private set
+    lateinit var notificationService: WeekyiiNotificationService
         private set
     var startupError: String? = null
         private set
@@ -50,7 +58,9 @@ class WeekyiiApplication : Application() {
             )
             appStateStore = DataStoreAppStateStore(this)
             settingsStore = DataStoreUserSettingsStore(this)
-            suspendedTaskRepository = SuspendedTaskRepository(database.suspendedTaskDao(), zone)
+            suspendedTaskRepository = SuspendedTaskRepository(database.suspendedTaskDao(), zone, repository)
+            notificationService = WeekyiiNotificationService(this)
+            notificationService.ensureChannel()
             stateMachine = StateMachine(
                 repo = repository,
                 timeProvider = timeProvider,
@@ -59,6 +69,11 @@ class WeekyiiApplication : Application() {
                 suspendedTaskSweeper = suspendedTaskRepository
             )
             stateMachine.processStateTransitions()
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "weekyii-reconcile",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<WeekyiiReconcileWorker>(15, TimeUnit.MINUTES).build()
+            )
         } catch (error: Exception) {
             startupError = "本地数据无法打开：${error.localizedMessage ?: "未知错误"}"
         }

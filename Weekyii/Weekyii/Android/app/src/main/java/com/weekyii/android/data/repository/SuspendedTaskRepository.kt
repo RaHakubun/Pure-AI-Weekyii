@@ -20,7 +20,8 @@ interface SuspendedTaskSweeper {
 
 class SuspendedTaskRepository(
     private val dao: SuspendedTaskDao,
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val weekyiiRepository: WeekyiiRepository? = null
 ) : SuspendedTaskSweeper {
     fun observeActive(): Flow<List<SuspendedTaskUi>> = dao.observeByStatus(SuspendedTaskStatus.ACTIVE)
         .map { tasks -> tasks.map { it.task.toUi(zoneId) }.sortedBy { it.decisionDeadline } }
@@ -70,6 +71,32 @@ class SuspendedTaskRepository(
         val task = dao.findWithDetails(id)?.task ?: return
         dao.delete(task)
     }
+
+    suspend fun assign(id: UUID, targetDate: LocalDate, today: LocalDate): UUID {
+        require(!targetDate.isBefore(today)) { "Assignment target must not be in the past" }
+        val task = dao.findWithDetails(id) ?: error("Suspended task not found")
+        require(task.task.status == SuspendedTaskStatus.ACTIVE) { "Suspended task is no longer active" }
+        val repository = weekyiiRepository ?: error("Task assignment is not configured")
+        val weekStatus = if (repositoryWeekId(targetDate) == repositoryWeekId(today)) {
+            com.weekyii.android.data.db.entities.WeekStatus.PRESENT
+        } else {
+            com.weekyii.android.data.db.entities.WeekStatus.PENDING
+        }
+        repository.ensureWeek(targetDate, weekStatus)
+        val newTaskId = repository.appendDraftTask(
+            dayId = targetDate.toString(),
+            title = task.task.title,
+            description = task.task.description,
+            taskType = task.task.taskType,
+            taskTypeIdRaw = task.task.taskTypeIdRaw,
+            stepTitles = task.steps.sortedBy { it.sortOrder }.map { it.title },
+            attachments = task.attachments.map { TaskAttachmentDraft(it.fileName, it.fileType, it.data) }
+        )
+        dao.delete(task.task)
+        return newTaskId
+    }
+
+    private fun repositoryWeekId(date: LocalDate): String = WeekCalculator().weekId(date)
 
     override suspend fun sweep(now: Date): Int {
         val due = dao.listDue(SuspendedTaskStatus.ACTIVE, now)

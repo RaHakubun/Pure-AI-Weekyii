@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.ProjectStatus
@@ -97,6 +98,7 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("${task.decisionDeadline.toLocalDate()} 到期 · 已延期 ${task.snoozeCount} 次")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssignSuspendedButton { date -> viewModel.assignSuspendedTask(task.id, date) }
                         OutlinedButton(onClick = { viewModel.extendSuspendedTask(task.id, 10) }) { Text("延长 10 天") }
                         OutlinedButton(onClick = { viewModel.deleteSuspendedTask(task.id) }) { Text("删除") }
                     }
@@ -115,6 +117,21 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             }
         }
     }
+}
+
+@Composable
+private fun AssignSuspendedButton(onAssign: (LocalDate) -> Unit) {
+    val context = LocalContext.current
+    OutlinedButton(onClick = {
+        val tomorrow = LocalDate.now().plusDays(1)
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, day -> onAssign(LocalDate.of(year, month + 1, day)) },
+            tomorrow.year,
+            tomorrow.monthValue - 1,
+            tomorrow.dayOfMonth
+        ).show()
+    }) { Text("指派") }
 }
 
 @Composable
