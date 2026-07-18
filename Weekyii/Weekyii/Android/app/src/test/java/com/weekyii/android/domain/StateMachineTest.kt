@@ -66,6 +66,49 @@ class StateMachineTest {
     }
 
     @Test
+    fun reconcileNormalizesMultipleFocusTasksAndExecutionOrder() = runBlocking {
+        val now = Instant.parse("2026-07-20T10:00:00Z")
+        val today = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(today, WeekStatus.PRESENT)
+        val todayDay = day(today, currentWeek.weekId, DayStatus.EXECUTE)
+        val firstFocus = task(todayDay.dayId, 3, TaskZone.FOCUS)
+        val secondFocus = task(todayDay.dayId, 1, TaskZone.FOCUS)
+        val frozen = task(todayDay.dayId, 9, TaskZone.FROZEN)
+        val tasks = mutableMapOf(todayDay.dayId to mutableListOf(firstFocus, secondFocus, frozen))
+        val days = RecordingDayDao(mutableMapOf(todayDay.dayId to todayDay), tasks)
+        val weeks = RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() }
+        val repository = repository(weeks, days, RecordingTaskDao(tasks))
+
+        StateMachine(repository, FixedTimeProvider(now, zone), InMemoryAppStateStore()).reconcile(force = true)
+
+        val normalized = tasks.getValue(todayDay.dayId).sortedBy { it.order }
+        assertEquals(listOf(TaskZone.FOCUS, TaskZone.FROZEN, TaskZone.FROZEN), normalized.map { it.zone })
+        assertEquals(listOf(1, 2, 3), normalized.map { it.order })
+        assertEquals(secondFocus.id, normalized.first().id)
+    }
+
+    @Test
+    fun reconcilePromotesFirstFrozenTaskWhenExecutingDayHasNoFocus() = runBlocking {
+        val now = Instant.parse("2026-07-20T10:00:00Z")
+        val today = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(today, WeekStatus.PRESENT)
+        val todayDay = day(today, currentWeek.weekId, DayStatus.EXECUTE)
+        val later = task(todayDay.dayId, 7, TaskZone.FROZEN)
+        val first = task(todayDay.dayId, 2, TaskZone.FROZEN)
+        val tasks = mutableMapOf(todayDay.dayId to mutableListOf(later, first))
+        val days = RecordingDayDao(mutableMapOf(todayDay.dayId to todayDay), tasks)
+        val weeks = RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() }
+        val repository = repository(weeks, days, RecordingTaskDao(tasks))
+
+        StateMachine(repository, FixedTimeProvider(now, zone), InMemoryAppStateStore()).reconcile(force = true)
+
+        val normalized = tasks.getValue(todayDay.dayId).sortedBy { it.order }
+        assertEquals(TaskZone.FOCUS, normalized.first().zone)
+        assertEquals(first.id, normalized.first().id)
+        assertEquals(listOf(1, 2), normalized.map { it.order })
+    }
+
+    @Test
     fun reconcilePromotesCurrentPendingWeekAndArchivesOldPresentAndStalePendingWeeks() = runBlocking {
         val now = Instant.parse("2026-07-20T02:00:00Z")
         val current = week(LocalDate.of(2026, 7, 20), WeekStatus.PENDING)

@@ -43,6 +43,23 @@ class WeekyiiRepositoryBehaviorTest {
     }
 
     @Test
+    fun existingWeekIsFilledWithMissingDayRows() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val weekId = "2026-W30"
+        val weeks = FakeWeekDao(mutableMapOf(weekId to week(weekId, WeekStatus.PRESENT)))
+        val days = FakeDayDao()
+        val repository = repository(weekDao = weeks, dayDao = days)
+
+        repository.ensureWeek(date, WeekStatus.PRESENT)
+
+        assertEquals(7, days.listByWeek(weekId).size)
+        assertEquals(
+            (0L..6L).map { date.plusDays(it).toString() },
+            days.listByWeek(weekId).sortedBy { it.date }.map { it.dayId }
+        )
+    }
+
+    @Test
     fun invalidKillTimeIsRejectedBeforePersistence() = runBlocking {
         val day = day("2026-07-20", DayStatus.DRAFT)
         val days = FakeDayDao(mutableMapOf(day.dayId to day))

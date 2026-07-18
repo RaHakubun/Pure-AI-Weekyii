@@ -51,6 +51,7 @@ class StateMachine(
         val crossDay = processCrossDay()
         val crossWeek = processCrossWeek()
         syncTodayDefaultKillTime(lastProcessedBeforeRun)
+        repo.normalizeExecutionState(timeProvider.today.toString(), timeProvider.now)
         val killTime = processKillTime()
         val suspendedDeleted = suspendedTaskSweeper?.sweep(timeProvider.now) ?: 0
         refreshWeekSummaryMetrics()

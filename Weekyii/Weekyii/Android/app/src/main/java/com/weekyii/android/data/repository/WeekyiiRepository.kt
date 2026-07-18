@@ -62,12 +62,15 @@ class WeekyiiRepository(
         val weekId = weekCalculator.weekId(date)
         val existing = weekDao.findById(weekId)
         if (existing != null) {
-            if (status == WeekStatus.PRESENT && existing.status != WeekStatus.PRESENT) {
+            val resolved = if (status == WeekStatus.PRESENT && existing.status != WeekStatus.PRESENT) {
                 val promoted = existing.copy(status = WeekStatus.PRESENT)
                 weekDao.upsert(promoted)
-                return promoted
+                promoted
+            } else {
+                existing
             }
-            return existing
+            ensureWeekDays(resolved, date)
+            return resolved
         }
         val (start, end) = weekCalculator.weekRange(date)
         val week = WeekEntity(
@@ -77,19 +80,25 @@ class WeekyiiRepository(
             status = status
         )
         weekDao.upsert(week)
-        // create 7 empty days
+        ensureWeekDays(week, date)
+        return week
+    }
+
+    private suspend fun ensureWeekDays(week: WeekEntity, date: LocalDate) {
+        val start = weekCalculator.weekRange(date).first
+        val existingDayIds = dayDao.listByWeek(week.weekId).mapTo(mutableSetOf()) { it.dayId }
         repeat(7) { offset ->
             val dayDate = start.plusDays(offset.toLong())
+            if (dayDate.toString() in existingDayIds) return@repeat
             val day = DayEntity(
                 dayId = dayDate.toString(),
                 date = java.util.Date.from(dayDate.atStartOfDay(zoneId).toInstant()),
                 dayOfWeek = dayDate.dayOfWeek.name.take(3),
                 status = DayStatus.EMPTY,
-                weekOwnerId = weekId
+                weekOwnerId = week.weekId
             )
             dayDao.upsert(day)
         }
-        return week
     }
 
     // Simple fetch helpers used by StateMachine
@@ -346,6 +355,47 @@ class WeekyiiRepository(
         )
         frozen.drop(1).forEachIndexed { index, task ->
             taskDao.upsert(task.copy(order = index + 3))
+        }
+    }
+
+    suspend fun normalizeExecutionState(dayId: String, now: java.util.Date) {
+        val dayWithTasks = dayDao.findWithTasks(dayId) ?: return
+        if (dayWithTasks.day.status != DayStatus.EXECUTE) return
+
+        val activeTasks = dayWithTasks.tasks
+            .filter { it.zone == TaskZone.FOCUS || it.zone == TaskZone.FROZEN }
+            .sortedWith(compareBy<TaskEntity> { it.order }.thenBy { it.id.toString() })
+        if (activeTasks.isEmpty()) {
+            dayDao.upsert(
+                dayWithTasks.day.copy(
+                    status = DayStatus.COMPLETED,
+                    closedAt = dayWithTasks.day.closedAt ?: now,
+                    isDraftZoneUnlocked = false
+                )
+            )
+            return
+        }
+
+        val focus = activeTasks.firstOrNull { it.zone == TaskZone.FOCUS } ?: activeTasks.first()
+        taskDao.upsert(
+            focus.copy(
+                zone = TaskZone.FOCUS,
+                order = 1,
+                startedAt = focus.startedAt ?: now,
+                endedAt = null,
+                completedOrder = 0
+            )
+        )
+        activeTasks.filter { it.id != focus.id }.forEachIndexed { index, task ->
+            taskDao.upsert(
+                task.copy(
+                    zone = TaskZone.FROZEN,
+                    order = index + 2,
+                    startedAt = null,
+                    endedAt = null,
+                    completedOrder = 0
+                )
+            )
         }
     }
 
