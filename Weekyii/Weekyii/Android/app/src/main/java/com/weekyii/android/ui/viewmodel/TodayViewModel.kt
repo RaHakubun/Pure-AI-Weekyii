@@ -114,6 +114,56 @@ class TodayViewModel(
         }
     }
 
+    fun updateFrozenTask(
+        task: TaskUi,
+        title: String,
+        description: String = "",
+        stepTitles: List<String> = task.steps.map { it.title },
+        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments
+    ) {
+        viewModelScope.launch {
+            try {
+                repo.updateFrozenTask(
+                    dayId = timeProvider.today.toString(),
+                    taskId = task.id,
+                    title = title,
+                    description = description,
+                    taskType = task.taskType,
+                    taskTypeIdRaw = task.taskTypeIdRaw,
+                    stepTitles = stepTitles,
+                    attachments = attachments.map { attachment ->
+                        TaskAttachmentDraft(attachment.fileName, attachment.fileType, attachment.data)
+                    }
+                )
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteFrozenTask(task: TaskUi) {
+        viewModelScope.launch {
+            try {
+                repo.deleteFrozenTask(timeProvider.today.toString(), task.id)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun moveFrozenTask(fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            try {
+                repo.moveFrozenTask(timeProvider.today.toString(), fromIndex, toIndex)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun exchangeFocusWithFirstFrozen() {
         viewModelScope.launch {
             try {

@@ -267,6 +267,114 @@ class StateMachineTest {
     }
 
     @Test
+    fun flexibleUnlockedExecutionCanEditFrozenTaskDetails() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EXECUTE).copy(
+            executionModeRaw = ExecutionMode.FLEXIBLE.name.lowercase(),
+            isDraftZoneUnlocked = true
+        )
+        val focus = task(today.dayId, 1, TaskZone.FOCUS)
+        val frozen = task(today.dayId, 2, TaskZone.FROZEN)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(focus, frozen))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.updateFrozenTask(
+            today.dayId,
+            frozen.id,
+            "Updated frozen",
+            "Details",
+            stepTitles = listOf("Step one")
+        )
+
+        val updated = tasks.getValue(today.dayId).single { it.id == frozen.id }
+        assertEquals("Updated frozen", updated.title)
+        assertEquals("Details", updated.description)
+        assertEquals(listOf("Step one"), repository.getTaskUi(frozen.id)?.steps?.map { it.title })
+    }
+
+    @Test
+    fun flexibleUnlockedExecutionCanDeleteFrozenTaskAndRepairQueueOrder() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EXECUTE).copy(
+            executionModeRaw = ExecutionMode.FLEXIBLE.name.lowercase(),
+            isDraftZoneUnlocked = true
+        )
+        val focus = task(today.dayId, 1, TaskZone.FOCUS)
+        val firstFrozen = task(today.dayId, 2, TaskZone.FROZEN)
+        val secondFrozen = task(today.dayId, 3, TaskZone.FROZEN)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(focus, firstFrozen, secondFrozen))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.deleteFrozenTask(today.dayId, firstFrozen.id)
+
+        val remaining = tasks.getValue(today.dayId).sortedBy { it.order }
+        assertEquals(listOf(TaskZone.FOCUS, TaskZone.FROZEN), remaining.map { it.zone })
+        assertEquals(listOf(1, 2), remaining.map { it.order })
+        assertEquals(secondFrozen.id, remaining.last().id)
+    }
+
+    @Test
+    fun flexibleUnlockedExecutionCanMoveFrozenTaskWithinQueue() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EXECUTE).copy(
+            executionModeRaw = ExecutionMode.FLEXIBLE.name.lowercase(),
+            isDraftZoneUnlocked = true
+        )
+        val focus = task(today.dayId, 1, TaskZone.FOCUS)
+        val firstFrozen = task(today.dayId, 2, TaskZone.FROZEN)
+        val secondFrozen = task(today.dayId, 3, TaskZone.FROZEN)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(focus, firstFrozen, secondFrozen))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.moveFrozenTask(today.dayId, fromIndex = 1, toIndex = 0)
+
+        val reordered = tasks.getValue(today.dayId).sortedBy { it.order }
+        assertEquals(listOf(focus.id, secondFrozen.id, firstFrozen.id), reordered.map { it.id })
+        assertEquals(listOf(1, 2, 3), reordered.map { it.order })
+    }
+
+    @Test
+    fun lockedExecutionCannotMutateFrozenQueue() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EXECUTE).copy(
+            executionModeRaw = ExecutionMode.FLEXIBLE.name.lowercase(),
+            isDraftZoneUnlocked = false
+        )
+        val frozen = task(today.dayId, 2, TaskZone.FROZEN)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(task(today.dayId, 1, TaskZone.FOCUS), frozen))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.deleteFrozenTask(today.dayId, frozen.id) }
+        }
+        assertEquals(2, tasks.getValue(today.dayId).size)
+    }
+
+    @Test
     fun reconcileSyncsDefaultKillTimeOnlyWhenTheDayRollsOver() = runBlocking {
         val now = Instant.parse("2026-07-20T02:00:00Z")
         val today = LocalDate.of(2026, 7, 20)

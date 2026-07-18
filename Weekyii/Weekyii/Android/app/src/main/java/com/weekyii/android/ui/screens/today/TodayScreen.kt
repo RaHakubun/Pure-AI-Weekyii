@@ -209,9 +209,35 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                     }
                 }
                 if (state.frozen.isNotEmpty()) {
-                    item { SectionHeader("冻结区", "后续 ${state.frozen.size} 项已锁定") }
+                    val frozenEditable = day?.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase() &&
+                        day.isDraftZoneUnlocked
+                    item {
+                        SectionHeader(
+                            "冻结区",
+                            if (frozenEditable) "后续 ${state.frozen.size} 项可调整，Focus 仍保持锁定"
+                            else "后续 ${state.frozen.size} 项已锁定"
+                        )
+                    }
                     itemsIndexed(state.frozen, key = { _, task -> task.id }) { index, task ->
-                        CompactTaskRow(number = index + 2, task = task, onPostpone = { date -> viewModel.postponeTask(task, date) })
+                        CompactTaskRow(
+                            number = index + 2,
+                            task = task,
+                            editable = frozenEditable,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < state.frozen.lastIndex,
+                            onMoveUp = { viewModel.moveFrozenTask(index, index - 1) },
+                            onMoveDown = { viewModel.moveFrozenTask(index, index + 1) },
+                            onDelete = { viewModel.deleteFrozenTask(task) },
+                            onEdit = {
+                                editingTask = task
+                                editingTitle = task.title
+                                editingDescription = task.description
+                                editingStepsText = task.steps.sortedBy { it.sortOrder }.joinToString("\n") { it.title }
+                                editingAttachments.clear()
+                                editingAttachments.addAll(task.attachments)
+                            },
+                            onPostpone = { date -> viewModel.postponeTask(task, date) }
+                        )
                     }
                 }
                 if (state.complete.isNotEmpty()) {
@@ -301,13 +327,23 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                 TextButton(
                     enabled = editingTitle.isNotBlank(),
                     onClick = {
-                        viewModel.updateDraftTask(
-                            task,
-                            editingTitle,
-                            editingDescription,
-                            editingStepsText.lines(),
-                            editingAttachments.toList()
-                        )
+                        if (task.zone.name == "FROZEN") {
+                            viewModel.updateFrozenTask(
+                                task,
+                                editingTitle,
+                                editingDescription,
+                                editingStepsText.lines(),
+                                editingAttachments.toList()
+                            )
+                        } else {
+                            viewModel.updateDraftTask(
+                                task,
+                                editingTitle,
+                                editingDescription,
+                                editingStepsText.lines(),
+                                editingAttachments.toList()
+                            )
+                        }
                         editingTask = null
                     }
                 ) { Text("保存") }
@@ -470,12 +506,37 @@ private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit, onPostpone: (Ta
 }
 
 @Composable
-private fun CompactTaskRow(number: Int, task: TaskUi, onPostpone: (LocalDate) -> Unit) {
+private fun CompactTaskRow(
+    number: Int,
+    task: TaskUi,
+    editable: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onPostpone: (LocalDate) -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("T${number.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
-            Text(task.title, modifier = Modifier.padding(start = 14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            PostponeButton(onPostpone)
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("T${number.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
+                Text(
+                    task.title,
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                PostponeButton(onPostpone)
+            }
+            if (editable) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "编辑") }
+                    IconButton(onClick = onMoveUp, enabled = canMoveUp) { Icon(Icons.Filled.ArrowUpward, "上移") }
+                    IconButton(onClick = onMoveDown, enabled = canMoveDown) { Icon(Icons.Filled.ArrowDownward, "下移") }
+                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "删除") }
+                }
+            }
         }
     }
 }

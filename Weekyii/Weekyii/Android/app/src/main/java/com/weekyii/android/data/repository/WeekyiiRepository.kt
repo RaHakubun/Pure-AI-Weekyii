@@ -175,6 +175,14 @@ class WeekyiiRepository(
         require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
         val task = taskDao.findById(taskId) ?: return
         require(task.dayOwnerId == dayId && task.zone == TaskZone.DRAFT)
+        replaceTaskResources(taskId, stepTitles, attachments)
+    }
+
+    private suspend fun replaceTaskResources(
+        taskId: UUID,
+        stepTitles: List<String>,
+        attachments: List<TaskAttachmentDraft>
+    ) {
         taskDao.deleteSteps(taskId)
         taskDao.deleteAttachments(taskId)
         taskDao.upsertSteps(
@@ -290,6 +298,74 @@ class WeekyiiRepository(
                 dayOwnerId = dayId
             )
         )
+    }
+
+    suspend fun updateFrozenTask(
+        dayId: String,
+        taskId: UUID,
+        title: String,
+        description: String = "",
+        taskType: TaskType = TaskType.REGULAR,
+        taskTypeIdRaw: String = taskType.name.lowercase(),
+        stepTitles: List<String> = emptyList(),
+        attachments: List<TaskAttachmentDraft> = emptyList()
+    ) {
+        require(title.isNotBlank()) { "Task title cannot be empty" }
+        val day = dayDao.findWithTasks(dayId) ?: return
+        require(day.day.status == DayStatus.EXECUTE) { "Day is not executing" }
+        require(day.day.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
+            "Strict execution cannot edit the task queue"
+        }
+        require(day.day.isDraftZoneUnlocked) { "Task queue is locked" }
+        val task = taskDao.findById(taskId) ?: return
+        require(task.dayOwnerId == dayId && task.zone == TaskZone.FROZEN) {
+            "Only Frozen tasks can be edited"
+        }
+        taskDao.upsert(
+            task.copy(
+                title = title.trim(),
+                description = description.trim(),
+                taskType = taskType,
+                taskTypeIdRaw = taskTypeIdRaw
+            )
+        )
+        replaceTaskResources(taskId, stepTitles, attachments)
+    }
+
+    suspend fun deleteFrozenTask(dayId: String, taskId: UUID) {
+        val day = dayDao.findWithTasks(dayId) ?: return
+        require(day.day.status == DayStatus.EXECUTE) { "Day is not executing" }
+        require(day.day.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
+            "Strict execution cannot edit the task queue"
+        }
+        require(day.day.isDraftZoneUnlocked) { "Task queue is locked" }
+        val task = taskDao.findById(taskId) ?: return
+        require(task.dayOwnerId == dayId && task.zone == TaskZone.FROZEN) {
+            "Only Frozen tasks can be deleted"
+        }
+        taskDao.delete(task)
+        renumberFrozenTasks(dayId)
+    }
+
+    suspend fun moveFrozenTask(dayId: String, fromIndex: Int, toIndex: Int) {
+        val day = dayDao.findWithTasks(dayId) ?: return
+        require(day.day.status == DayStatus.EXECUTE) { "Day is not executing" }
+        require(day.day.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
+            "Strict execution cannot edit the task queue"
+        }
+        require(day.day.isDraftZoneUnlocked) { "Task queue is locked" }
+        val frozen = day.tasks.filter { it.zone == TaskZone.FROZEN }.sortedBy { it.order }.toMutableList()
+        if (fromIndex !in frozen.indices || toIndex !in 0..frozen.size) return
+        val item = frozen.removeAt(fromIndex)
+        frozen.add(toIndex.coerceAtMost(frozen.size), item)
+        frozen.forEachIndexed { index, task -> taskDao.upsert(task.copy(order = index + 2)) }
+    }
+
+    private suspend fun renumberFrozenTasks(dayId: String) {
+        dayDao.findWithTasks(dayId)?.tasks
+            ?.filter { it.zone == TaskZone.FROZEN }
+            ?.sortedBy { it.order }
+            ?.forEachIndexed { index, task -> taskDao.upsert(task.copy(order = index + 2)) }
     }
 
     suspend fun appendDraftTask(
