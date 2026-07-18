@@ -252,6 +252,7 @@ private class RecordingTaskDao : TaskDao {
     override suspend fun delete(task: TaskEntity) { values.remove(task.id) }
     override suspend fun findById(id: UUID): TaskEntity? = values[id]
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> = MutableStateFlow(values.values.filter { it.dayOwnerId == dayId })
+    override fun observeAll(): Flow<List<TaskEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = values[id]?.let { TaskWithSteps(it, emptyList(), emptyList()) }
     override suspend fun upsertSteps(steps: List<TaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<TaskAttachmentEntity>) = Unit

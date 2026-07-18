@@ -597,6 +597,7 @@ private class RecordingTaskDao(
     override suspend fun findById(id: UUID): TaskEntity? = tasks.values.flatten().firstOrNull { it.id == id }
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> =
         MutableStateFlow(tasks[dayId].orEmpty())
+    override fun observeAll(): Flow<List<TaskEntity>> = MutableStateFlow(tasks.values.flatten())
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = tasks.values.flatten().firstOrNull { it.id == id }?.let {
         TaskWithSteps(it, steps[id].orEmpty(), attachments[id].orEmpty())
     }

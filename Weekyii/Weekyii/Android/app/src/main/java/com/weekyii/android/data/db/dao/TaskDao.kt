@@ -38,6 +38,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE day_owner_id = :dayId ORDER BY `order`")
     fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks ORDER BY day_owner_id, `order`")
+    fun observeAll(): Flow<List<TaskEntity>>
+
     @Transaction
     @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
     suspend fun findWithSteps(id: UUID): TaskWithSteps?

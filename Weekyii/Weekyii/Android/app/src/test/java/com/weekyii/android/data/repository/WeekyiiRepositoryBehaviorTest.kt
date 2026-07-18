@@ -19,6 +19,7 @@ import com.weekyii.android.data.db.entities.WeekStatus
 import com.weekyii.android.data.db.entities.WeekWithDays
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -40,6 +41,39 @@ class WeekyiiRepositoryBehaviorTest {
         repository.ensureWeek(LocalDate.of(2026, 7, 20), WeekStatus.PRESENT)
 
         assertEquals(WeekStatus.PRESENT, weeks.findById(weekId)?.status)
+    }
+
+    @Test
+    fun observedWeekIncludesTasksGroupedUnderTheirDay() = runBlocking {
+        val weekId = "2026-W30"
+        val day = day("2026-07-20", DayStatus.DRAFT, weekId)
+        val task = TaskEntity(
+            title = "Plan the week",
+            order = 1,
+            dayOwnerId = day.dayId
+        )
+        val repository = repository(
+            weekDao = FakeWeekDao(mutableMapOf(weekId to week(weekId, WeekStatus.PRESENT))),
+            dayDao = FakeDayDao(mutableMapOf(day.dayId to day)),
+            taskDao = FakeTaskDao(listOf(task))
+        )
+
+        val observed = repository.observePresentWeek().first()
+
+        assertEquals("Plan the week", observed.single().days.single().tasks.single().title)
+    }
+
+    @Test
+    fun planningWeeksIncludePresentAndPendingWeeks() = runBlocking {
+        val present = week("2026-W30", WeekStatus.PRESENT)
+        val pending = week("2026-W31", WeekStatus.PENDING)
+        val repository = repository(
+            weekDao = FakeWeekDao(mutableMapOf(present.weekId to present, pending.weekId to pending))
+        )
+
+        val observed = repository.observePlanningWeeks().first()
+
+        assertEquals(listOf("2026-W30", "2026-W31"), observed.map { it.weekId })
     }
 
     @Test
@@ -171,13 +205,14 @@ private class FakeDayDao(
     override suspend fun deleteAll() { values.clear() }
 }
 
-private class FakeTaskDao : TaskDao {
+private class FakeTaskDao(private val values: List<TaskEntity> = emptyList()) : TaskDao {
     override suspend fun insert(task: TaskEntity): Long = 1L
     override suspend fun upsert(task: TaskEntity) = Unit
     override suspend fun update(task: TaskEntity) = Unit
     override suspend fun delete(task: TaskEntity) = Unit
     override suspend fun findById(id: UUID): TaskEntity? = null
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> = MutableStateFlow(emptyList())
+    override fun observeAll(): Flow<List<TaskEntity>> = MutableStateFlow(values)
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = null
     override suspend fun upsertSteps(steps: List<TaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<TaskAttachmentEntity>) = Unit

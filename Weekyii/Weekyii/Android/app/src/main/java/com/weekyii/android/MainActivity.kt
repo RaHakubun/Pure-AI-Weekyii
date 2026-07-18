@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                 val todayVm = remember {
                     TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore, app.taskTypeDefinitionRepository)
                 }
-                val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider) }
+                val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider, app.taskTypeDefinitionRepository) }
                 val pastVm = remember { PastViewModel(repo) }
                 val extVm = remember {
                     ExtensionsViewModel(

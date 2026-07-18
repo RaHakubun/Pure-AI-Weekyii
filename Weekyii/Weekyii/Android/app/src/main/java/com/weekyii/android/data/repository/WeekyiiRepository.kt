@@ -43,15 +43,24 @@ class WeekyiiRepository(
         return weekDao.observeWeeksByStatus(WeekStatus.PENDING).combineObserveDays()
     }
 
+    fun observePlanningWeeks(): Flow<List<WeekUi>> {
+        return combine(observePresentWeek(), observePendingWeeks()) { present, pending ->
+            (present + pending).distinctBy { it.weekId }.sortedBy { it.startDate }
+        }
+    }
+
     fun observePastWeeks(): Flow<List<WeekUi>> {
         return weekDao.observeWeeksByStatus(WeekStatus.PAST).combineObserveDays()
     }
 
     private fun Flow<List<WeekEntity>>.combineObserveDays(): Flow<List<WeekUi>> =
         this.combine(dayDao.observeAll()) { weeks, days -> weeks to days }
-            .map { weeks ->
-                weeks.first.map { week ->
-                    val weekDays = weeks.second.filter { it.weekOwnerId == week.weekId }.map { day -> day.toUi() }
+            .combine(taskDao.observeAll()) { (weeks, days), tasks -> Triple(weeks, days, tasks) }
+            .map { (weeks, days, tasks) ->
+                weeks.map { week ->
+                    val weekDays = days.filter { it.weekOwnerId == week.weekId }.map { day ->
+                        day.toUi(tasks.filter { it.dayOwnerId == day.dayId }.sortedBy { it.order }.map { it.toUi() })
+                    }
                     week.toUi(weekDays)
                 }
             }
