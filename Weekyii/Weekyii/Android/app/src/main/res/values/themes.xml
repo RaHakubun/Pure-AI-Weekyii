@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Weekyii" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/weekyii_primary_dark</item>
+        <item name="android:navigationBarColor">@color/weekyii_primary_dark</item>
+        <item name="colorPrimary">@color/weekyii_primary</item>
+        <item name="colorPrimaryVariant">@color/weekyii_primary_dark</item>
+        <item name="colorSecondary">@color/accent_green</item>
+        <item name="android:windowBackground">@color/background_secondary</item>
+    </style>
+</resources>

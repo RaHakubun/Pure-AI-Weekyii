@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="weekyii_primary">#C46A1A</color>
+    <color name="weekyii_primary_light">#E0A35B</color>
+    <color name="weekyii_primary_dark">#8A4A13</color>
+
+    <color name="accent_orange">#F08A3C</color>
+    <color name="accent_orange_light">#F4AE77</color>
+    <color name="accent_green">#3FA67A</color>
+    <color name="accent_green_light">#6DC7A3</color>
+    <color name="accent_pink">#D97A6C</color>
+
+    <color name="background_primary">#FFF7EE</color>
+    <color name="background_secondary">#FFFDF9</color>
+    <color name="background_tertiary">#F6EDE3</color>
+
+    <color name="text_primary">#2A1D16</color>
+    <color name="text_secondary">#6B5A4F</color>
+    <color name="text_tertiary">#9B887C</color>
+
+    <color name="task_regular">#2F7E79</color>
+    <color name="task_regular_bg">#D9F0EC</color>
+    <color name="task_ddl">#D05C3E</color>
+    <color name="task_ddl_bg">#F8E1DB</color>
+    <color name="task_leisure">#8C6AD9</color>
+    <color name="task_leisure_bg">#EFE8FB</color>
+</resources>

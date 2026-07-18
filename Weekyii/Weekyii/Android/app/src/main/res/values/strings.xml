@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Weekyii</string>
+    <string name="tab_today">今天</string>
+    <string name="tab_pending">未来</string>
+    <string name="tab_past">过去</string>
+    <string name="tab_extensions">拓展</string>
+    <string name="tab_settings">设置</string>
+    <string name="action_start_day">开始今天</string>
+    <string name="action_done_focus">完成当前</string>
+    <string name="action_change_kill_time">调整截止</string>
+</resources>
