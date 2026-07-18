@@ -116,6 +116,8 @@ private class TaskTypeRecordingSuspendedDao : SuspendedTaskDao {
     override suspend fun upsert(task: SuspendedTaskEntity) = Unit
     override suspend fun upsertSteps(steps: List<SuspendedTaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<SuspendedTaskAttachmentEntity>) = Unit
+    override suspend fun deleteSteps(taskId: UUID) = Unit
+    override suspend fun deleteAttachments(taskId: UUID) = Unit
     override suspend fun delete(task: SuspendedTaskEntity) = Unit
     override suspend fun findWithDetails(id: UUID): SuspendedTaskWithDetails? = null
     override fun observeByStatus(status: SuspendedTaskStatus): Flow<List<SuspendedTaskWithDetails>> = MutableStateFlow(emptyList())

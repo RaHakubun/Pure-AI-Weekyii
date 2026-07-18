@@ -113,5 +113,7 @@ data class SuspendedTaskUi(
     val taskTypeIdRaw: String,
     val decisionDeadline: LocalDateTime,
     val preferredCountdownDays: Int,
-    val snoozeCount: Int
+    val snoozeCount: Int,
+    val steps: List<TaskStepUi> = emptyList(),
+    val attachments: List<TaskAttachmentUi> = emptyList()
 )

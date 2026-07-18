@@ -1,6 +1,9 @@
 package com.weekyii.android.ui.screens.extensions
 
+import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,8 +46,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.ProjectStatus
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
+import com.weekyii.android.data.repository.TaskAttachmentDraft
 import com.weekyii.android.ui.model.ProjectUi
 import com.weekyii.android.ui.model.SuspendedTaskUi
+import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import java.time.LocalDate
 
@@ -92,11 +98,17 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     var projectDescription by remember { mutableStateOf("") }
     var stampText by remember { mutableStateOf("") }
     var suspendedTitle by remember { mutableStateOf("") }
+    var suspendedDescription by remember { mutableStateOf("") }
+    var suspendedStepsText by remember { mutableStateOf("") }
+    val suspendedAttachments = remember { mutableStateListOf<TaskAttachmentUi>() }
     var stampImage by remember { mutableStateOf<ByteArray?>(null) }
     var editingSuspended by remember { mutableStateOf<SuspendedTaskUi?>(null) }
     val today = LocalDate.now()
     val stampImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) stampImage = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+    }
+    val suspendedAttachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { loadAttachment(context, it) }?.let(suspendedAttachments::add)
     }
 
     LazyColumn(
@@ -145,15 +157,45 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                     Text("悬置任务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("暂时不安排到某一天，到期前再决定去向。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(suspendedDescription, { suspendedDescription = it }, label = { Text("备注") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        suspendedStepsText,
+                        { suspendedStepsText = it },
+                        label = { Text("步骤（每行一个）") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     ExtensionTaskTypePicker(
                         definitions = state.taskTypeDefinitions,
                         selectedId = state.selectedTaskTypeId,
                         onSelect = viewModel::selectTaskType
                     )
-                    Button(
-                        onClick = { viewModel.createSuspendedTask(suspendedTitle, 10); suspendedTitle = "" },
-                        enabled = suspendedTitle.isNotBlank()
-                    ) { Text("悬置 10 天") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { suspendedAttachmentPicker.launch(arrayOf("*/*")) }) {
+                            Text("附件 ${suspendedAttachments.size}")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.createSuspendedTask(
+                                    title = suspendedTitle,
+                                    countdownDays = 10,
+                                    description = suspendedDescription,
+                                    stepTitles = suspendedStepsText.lines(),
+                                    attachments = suspendedAttachments.map { TaskAttachmentDraft(it.fileName, it.fileType, it.data) }
+                                )
+                                suspendedTitle = ""
+                                suspendedDescription = ""
+                                suspendedStepsText = ""
+                                suspendedAttachments.clear()
+                            },
+                            enabled = suspendedTitle.isNotBlank()
+                        ) { Text("悬置 10 天") }
+                    }
+                    suspendedAttachments.forEachIndexed { index, attachment ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(attachment.fileName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { suspendedAttachments.removeAt(index) }) { Text("移除") }
+                        }
+                    }
                 }
             }
         }
@@ -169,6 +211,10 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text("${task.decisionDeadline.toLocalDate()} 到期 · 已延期 ${task.snoozeCount} 次")
+                    if (task.description.isNotBlank()) Text(task.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (task.steps.isNotEmpty() || task.attachments.isNotEmpty()) {
+                        Text("${task.steps.size} 个步骤 · ${task.attachments.size} 个附件", style = MaterialTheme.typography.labelMedium)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssignSuspendedButton { date -> viewModel.assignSuspendedTask(task.id, date) }
                         OutlinedButton(onClick = { editingSuspended = task }) { Text("编辑") }
@@ -201,8 +247,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             task = task,
             definitions = state.taskTypeDefinitions,
             onDismiss = { editingSuspended = null },
-            onSave = { title, description, typeId, days ->
-                viewModel.updateSuspendedTask(task.id, title, description, typeId, days)
+            onSave = { title, description, typeId, days, steps, attachments ->
+                viewModel.updateSuspendedTask(task.id, title, description, typeId, days, steps, attachments)
                 editingSuspended = null
             }
         )
@@ -214,12 +260,18 @@ private fun SuspendedTaskEditorDialog(
     task: SuspendedTaskUi,
     definitions: List<TaskTypeDefinitionEntity>,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Int) -> Unit
+    onSave: (String, String, String, Int, List<String>, List<TaskAttachmentDraft>) -> Unit
 ) {
     var title by remember(task.id) { mutableStateOf(task.title) }
     var description by remember(task.id) { mutableStateOf(task.description) }
     var typeId by remember(task.id) { mutableStateOf(task.taskTypeIdRaw) }
     var daysText by remember(task.id) { mutableStateOf(task.preferredCountdownDays.toString()) }
+    var stepsText by remember(task.id) { mutableStateOf(task.steps.sortedBy { it.sortOrder }.joinToString("\n") { it.title }) }
+    val attachments = remember(task.id) { mutableStateListOf<TaskAttachmentUi>().apply { addAll(task.attachments) } }
+    val context = LocalContext.current
+    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { loadAttachment(context, it) }?.let(attachments::add)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("编辑悬置任务") },
@@ -227,16 +279,36 @@ private fun SuspendedTaskEditorDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(title, { title = it }, label = { Text("标题") }, singleLine = true)
                 OutlinedTextField(description, { description = it }, label = { Text("备注") })
+                OutlinedTextField(stepsText, { stepsText = it }, label = { Text("步骤（每行一个）") })
                 OutlinedTextField(daysText, { daysText = it.filter(Char::isDigit) }, label = { Text("倒计时天数") }, singleLine = true)
                 androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(if (definitions.isEmpty()) listOf("regular", "ddl", "leisure") else definitions.map { it.idRaw }) { id ->
                         FilterChip(selected = typeId == id, onClick = { typeId = id }, label = { Text(id) })
                     }
                 }
+                OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) { Text("添加附件（${attachments.size}）") }
+                attachments.forEachIndexed { index, attachment ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(attachment.fileName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { attachments.removeAt(index) }) { Text("移除") }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(title, description, typeId, daysText.toIntOrNull() ?: 0) }, enabled = title.isNotBlank() && (daysText.toIntOrNull() ?: 0) > 0) { Text("保存") }
+            TextButton(
+                onClick = {
+                    onSave(
+                        title,
+                        description,
+                        typeId,
+                        daysText.toIntOrNull() ?: 0,
+                        stepsText.lines(),
+                        attachments.map { TaskAttachmentDraft(it.fileName, it.fileType, it.data) }
+                    )
+                },
+                enabled = title.isNotBlank() && (daysText.toIntOrNull() ?: 0) > 0
+            ) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
@@ -292,4 +364,16 @@ private fun ProjectCard(project: ProjectUi, viewModel: ExtensionsViewModel, canM
             }
         }
     }
+}
+
+private fun loadAttachment(context: Context, uri: Uri): TaskAttachmentUi? {
+    val data = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    val fileName = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0) else null
+    } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
+    return TaskAttachmentUi(
+        fileName = fileName,
+        fileType = context.contentResolver.getType(uri) ?: "application/octet-stream",
+        data = data
+    )
 }

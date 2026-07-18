@@ -175,4 +175,6 @@ private class EditingSuspendedTaskDao : SuspendedTaskDao {
     override suspend fun deleteAll() { values.clear() }
     override suspend fun upsertSteps(steps: List<com.weekyii.android.data.db.entities.SuspendedTaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<com.weekyii.android.data.db.entities.SuspendedTaskAttachmentEntity>) = Unit
+    override suspend fun deleteSteps(taskId: UUID) = Unit
+    override suspend fun deleteAttachments(taskId: UUID) = Unit
 }

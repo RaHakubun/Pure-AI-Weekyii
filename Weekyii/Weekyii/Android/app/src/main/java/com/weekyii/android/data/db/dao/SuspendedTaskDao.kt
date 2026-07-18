@@ -36,6 +36,12 @@ interface SuspendedTaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAttachments(attachments: List<SuspendedTaskAttachmentEntity>)
 
+    @Query("DELETE FROM suspended_task_steps WHERE suspended_task_owner_id = :taskId")
+    suspend fun deleteSteps(taskId: UUID)
+
+    @Query("DELETE FROM suspended_task_attachments WHERE suspended_task_owner_id = :taskId")
+    suspend fun deleteAttachments(taskId: UUID)
+
     @Delete
     suspend fun delete(task: SuspendedTaskEntity)
 

@@ -6,6 +6,7 @@ import com.weekyii.android.data.db.entities.ProjectStatus
 import com.weekyii.android.data.repository.MindStampRepository
 import com.weekyii.android.data.repository.ProjectRepository
 import com.weekyii.android.data.repository.SuspendedTaskRepository
+import com.weekyii.android.data.repository.TaskAttachmentDraft
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.data.db.entities.TaskType
@@ -188,17 +189,25 @@ class ExtensionsViewModel(
         _state.value = _state.value.copy(selectedTaskTypeId = idRaw)
     }
 
-    fun createSuspendedTask(title: String, countdownDays: Int) {
+    fun createSuspendedTask(
+        title: String,
+        countdownDays: Int,
+        description: String = "",
+        stepTitles: List<String> = emptyList(),
+        attachments: List<TaskAttachmentDraft> = emptyList()
+    ) {
         viewModelScope.launch {
             val definition = taskTypes?.resolve(_state.value.selectedTaskTypeId)
             runCatching {
                 suspendedTasks.create(
                     title,
-                    "",
+                    description,
                     definition?.baseKind ?: TaskType.REGULAR,
                     countdownDays,
                     java.util.Date(),
-                    definition?.idRaw ?: TaskType.REGULAR.name.lowercase()
+                    definition?.idRaw ?: TaskType.REGULAR.name.lowercase(),
+                    stepTitles,
+                    attachments
                 )
             }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
@@ -209,7 +218,15 @@ class ExtensionsViewModel(
         viewModelScope.launch { suspendedTasks.extend(id, days, java.util.Date()) }
     }
 
-    fun updateSuspendedTask(id: UUID, title: String, description: String, typeIdRaw: String, countdownDays: Int) {
+    fun updateSuspendedTask(
+        id: UUID,
+        title: String,
+        description: String,
+        typeIdRaw: String,
+        countdownDays: Int,
+        stepTitles: List<String> = emptyList(),
+        attachments: List<TaskAttachmentDraft> = emptyList()
+    ) {
         viewModelScope.launch {
             val definition = taskTypes?.resolve(typeIdRaw)
             runCatching {
@@ -220,7 +237,9 @@ class ExtensionsViewModel(
                     taskType = definition?.baseKind ?: TaskType.REGULAR,
                     countdownDays = countdownDays,
                     now = java.util.Date(),
-                    taskTypeIdRaw = definition?.idRaw ?: typeIdRaw
+                    taskTypeIdRaw = definition?.idRaw ?: typeIdRaw,
+                    stepTitles = stepTitles,
+                    attachments = attachments
                 )
             }.onFailure { _state.value = _state.value.copy(error = it.message) }
         }

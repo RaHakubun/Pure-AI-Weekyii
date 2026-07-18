@@ -65,7 +65,9 @@ class WeekyiiApplication : Application() {
             )
             appStateStore = DataStoreAppStateStore(this)
             settingsStore = DataStoreUserSettingsStore(this)
-            suspendedTaskRepository = SuspendedTaskRepository(database.suspendedTaskDao(), zone, repository)
+            notificationService = WeekyiiNotificationService(this)
+            notificationService.ensureChannel()
+            suspendedTaskRepository = SuspendedTaskRepository(database.suspendedTaskDao(), zone, repository, notificationService)
             taskTypeDefinitionRepository = TaskTypeDefinitionRepository(
                 database.taskTypeDefinitionDao(),
                 database.taskDao(),
@@ -78,8 +80,6 @@ class WeekyiiApplication : Application() {
                 backupRecovery = BackupRecoveryService(this),
                 zoneId = zone
             )
-            notificationService = WeekyiiNotificationService(this)
-            notificationService.ensureChannel()
             stateMachine = StateMachine(
                 repo = repository,
                 timeProvider = timeProvider,
