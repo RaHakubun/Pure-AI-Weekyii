@@ -130,7 +130,7 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                     OutlinedTextField(projectDescription, { projectDescription = it }, label = { Text("项目说明") }, modifier = Modifier.fillMaxWidth())
                     Button(
                         onClick = {
-                            viewModel.createProject(projectName, projectDescription, today, today.plusDays(30))
+                            viewModel.createProject(projectName, projectDescription, today)
                             projectName = ""
                             projectDescription = ""
                         },

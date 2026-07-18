@@ -7,6 +7,7 @@ import com.weekyii.android.data.repository.MindStampRepository
 import com.weekyii.android.data.repository.ProjectRepository
 import com.weekyii.android.data.repository.SuspendedTaskRepository
 import com.weekyii.android.data.repository.TaskAttachmentDraft
+import com.weekyii.android.domain.UserSettingsStore
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.data.db.entities.TaskType
@@ -26,7 +27,8 @@ class ExtensionsViewModel(
     private val projects: ProjectRepository,
     private val mindStamps: MindStampRepository,
     private val suspendedTasks: SuspendedTaskRepository,
-    private val taskTypes: TaskTypeDefinitionRepository? = null
+    private val taskTypes: TaskTypeDefinitionRepository? = null,
+    private val settings: UserSettingsStore? = null
 ) : ViewModel() {
     data class UiState(
         val projects: List<ProjectUi> = emptyList(),
@@ -66,9 +68,12 @@ class ExtensionsViewModel(
         }
     }
 
-    fun createProject(name: String, description: String, startDate: LocalDate, endDate: LocalDate) {
+    fun createProject(name: String, description: String, startDate: LocalDate, endDate: LocalDate? = null) {
         viewModelScope.launch {
-            runCatching { projects.createProject(name, description, startDate, endDate) }
+            val durationDays = settings?.defaultProjectDurationDays?.value ?: 30
+            val resolvedEndDate = endDate ?: startDate.plusDays((durationDays - 1).toLong())
+            val tileSize = settings?.defaultProjectTileSizeRaw?.value ?: "medium"
+            runCatching { projects.createProject(name, description, startDate, resolvedEndDate, tileSize) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }

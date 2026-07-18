@@ -113,6 +113,35 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("项目默认值", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("只影响之后新建的项目。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("默认周期", style = MaterialTheme.typography.labelLarge)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf(7, 14, 30, 90)) { days ->
+                            FilterChip(
+                                selected = state.defaultProjectDurationDays == days,
+                                onClick = { viewModel.setDefaultProjectDurationDays(days) },
+                                label = { Text("$days 天") }
+                            )
+                        }
+                    }
+                    Text("默认磁贴尺寸", style = MaterialTheme.typography.labelLarge)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf("mini" to "迷你", "small" to "小", "medium" to "中", "wide" to "宽")) { (id, label) ->
+                            FilterChip(
+                                selected = state.defaultProjectTileSizeRaw == id,
+                                onClick = { viewModel.setDefaultProjectTileSize(id) },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("通知提醒", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("设置 Kill Time 前的提前提醒；系统仍会在截止时提醒。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

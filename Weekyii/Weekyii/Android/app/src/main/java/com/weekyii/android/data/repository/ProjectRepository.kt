@@ -43,16 +43,19 @@ class ProjectRepository(
         name: String,
         description: String,
         startDate: LocalDate,
-        endDate: LocalDate
+        endDate: LocalDate,
+        tileSizeRaw: String = "medium"
     ): UUID {
         require(name.isNotBlank()) { "Project name cannot be empty" }
         require(!startDate.isBefore(timeProvider.today)) { "Project cannot start in the past" }
         require(!endDate.isBefore(startDate)) { "Project end date must not precede start date" }
+        require(tileSizeRaw in setOf("mini", "small", "medium", "wide")) { "Unknown project tile size" }
         val project = ProjectEntity(
             name = name.trim(),
             description = description.trim(),
             startDate = startDate.asDate(zoneId),
             endDate = endDate.asDate(zoneId),
+            tileSizeRaw = tileSizeRaw,
             tileOrder = (projectDao.maxTileOrder() ?: -1) + 1
         )
         projectDao.upsert(project)

@@ -86,6 +86,8 @@ class WeekyiiDataArchiveRepository(
                 fixedReminderEnabled = settings.fixedReminderEnabled.value,
                 fixedReminderHour = settings.fixedReminderHour.value,
                 fixedReminderMinute = settings.fixedReminderMinute.value,
+                defaultProjectDurationDays = settings.defaultProjectDurationDays.value,
+                defaultProjectTileSizeRaw = settings.defaultProjectTileSizeRaw.value,
                 selectedThemeRaw = settings.themeId.value,
                 appearanceModeRaw = settings.appearanceMode.value
             ),
@@ -142,6 +144,8 @@ class WeekyiiDataArchiveRepository(
         settings.setKillTimeReminderMinutes(value.killTimeReminderMinutes)
         settings.setFixedReminderEnabled(value.fixedReminderEnabled)
         settings.setFixedReminderTime(value.fixedReminderHour, value.fixedReminderMinute)
+        settings.setDefaultProjectDurationDays(value.defaultProjectDurationDays)
+        settings.setDefaultProjectTileSizeRaw(value.defaultProjectTileSizeRaw)
         settings.setThemeId(value.selectedThemeRaw)
         settings.setAppearanceMode(value.appearanceModeRaw)
     }

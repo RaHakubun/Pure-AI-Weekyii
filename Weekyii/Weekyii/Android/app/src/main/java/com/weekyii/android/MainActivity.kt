@@ -80,7 +80,8 @@ class MainActivity : ComponentActivity() {
                         ),
                         mindStampRepo,
                         app.suspendedTaskRepository,
-                        app.taskTypeDefinitionRepository
+                        app.taskTypeDefinitionRepository,
+                        app.settingsStore
                     )
                 }
                 val settingsVm = remember {

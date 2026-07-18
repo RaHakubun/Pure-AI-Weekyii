@@ -24,6 +24,8 @@ interface UserSettingsStore {
     val fixedReminderEnabled: StateFlow<Boolean>
     val fixedReminderHour: StateFlow<Int>
     val fixedReminderMinute: StateFlow<Int>
+    val defaultProjectDurationDays: StateFlow<Int>
+    val defaultProjectTileSizeRaw: StateFlow<String>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
     suspend fun setDefaultTaskTypeId(idRaw: String)
@@ -32,6 +34,8 @@ interface UserSettingsStore {
     suspend fun setKillTimeReminderMinutes(minutes: Int)
     suspend fun setFixedReminderEnabled(enabled: Boolean)
     suspend fun setFixedReminderTime(hour: Int, minute: Int)
+    suspend fun setDefaultProjectDurationDays(days: Int)
+    suspend fun setDefaultProjectTileSizeRaw(idRaw: String)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -50,6 +54,8 @@ class DataStoreUserSettingsStore(
         val fixedReminderEnabled = stringPreferencesKey("fixed_reminder_enabled")
         val fixedReminderHour = stringPreferencesKey("fixed_reminder_hour")
         val fixedReminderMinute = stringPreferencesKey("fixed_reminder_minute")
+        val defaultProjectDurationDays = stringPreferencesKey("default_project_duration_days")
+        val defaultProjectTileSizeRaw = stringPreferencesKey("default_project_tile_size")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -92,6 +98,14 @@ class DataStoreUserSettingsStore(
         .map { preferences -> preferences[Keys.fixedReminderMinute]?.toIntOrNull()?.coerceIn(0, 59) ?: 0 }
         .stateIn(scope, SharingStarted.Eagerly, 0)
 
+    override val defaultProjectDurationDays: StateFlow<Int> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.defaultProjectDurationDays]?.toIntOrNull()?.coerceIn(1, 365) ?: 7 }
+        .stateIn(scope, SharingStarted.Eagerly, 7)
+
+    override val defaultProjectTileSizeRaw: StateFlow<String> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.defaultProjectTileSizeRaw] ?: "medium" }
+        .stateIn(scope, SharingStarted.Eagerly, "medium")
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
@@ -130,5 +144,15 @@ class DataStoreUserSettingsStore(
             it[Keys.fixedReminderHour] = hour.toString()
             it[Keys.fixedReminderMinute] = minute.toString()
         }
+    }
+
+    override suspend fun setDefaultProjectDurationDays(days: Int) {
+        require(days in 1..365) { "Project duration must be between 1 and 365 days" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.defaultProjectDurationDays] = days.toString() }
+    }
+
+    override suspend fun setDefaultProjectTileSizeRaw(idRaw: String) {
+        require(idRaw in setOf("mini", "small", "medium", "wide")) { "Unknown project tile size" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.defaultProjectTileSizeRaw] = idRaw }
     }
 }

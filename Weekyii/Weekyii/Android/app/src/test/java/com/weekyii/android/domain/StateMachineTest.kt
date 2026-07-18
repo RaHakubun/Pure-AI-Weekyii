@@ -544,6 +544,8 @@ private class InMemorySettingsStore(
     override val fixedReminderEnabled = MutableStateFlow(false)
     override val fixedReminderHour = MutableStateFlow(21)
     override val fixedReminderMinute = MutableStateFlow(0)
+    override val defaultProjectDurationDays = MutableStateFlow(7)
+    override val defaultProjectTileSizeRaw = MutableStateFlow("medium")
     override suspend fun setDefaultKillTime(time: LocalTime) { defaultKillTime.value = time }
     override suspend fun setDefaultExecutionMode(mode: ExecutionMode) { defaultExecutionMode.value = mode }
     override suspend fun setDefaultTaskTypeId(idRaw: String) { defaultTaskTypeId.value = idRaw }
@@ -552,6 +554,8 @@ private class InMemorySettingsStore(
     override suspend fun setKillTimeReminderMinutes(minutes: Int) { killTimeReminderMinutes.value = minutes }
     override suspend fun setFixedReminderEnabled(enabled: Boolean) { fixedReminderEnabled.value = enabled }
     override suspend fun setFixedReminderTime(hour: Int, minute: Int) { fixedReminderHour.value = hour; fixedReminderMinute.value = minute }
+    override suspend fun setDefaultProjectDurationDays(days: Int) { defaultProjectDurationDays.value = days }
+    override suspend fun setDefaultProjectTileSizeRaw(idRaw: String) { defaultProjectTileSizeRaw.value = idRaw }
 }
 
 private class RecordingWeekDao(

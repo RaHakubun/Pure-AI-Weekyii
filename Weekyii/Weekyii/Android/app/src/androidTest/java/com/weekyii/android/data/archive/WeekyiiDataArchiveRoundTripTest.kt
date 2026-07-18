@@ -80,6 +80,8 @@ class WeekyiiDataArchiveRoundTripTest {
         settings.setKillTimeReminderMinutes(30)
         settings.setFixedReminderEnabled(true)
         settings.setFixedReminderTime(19, 45)
+        settings.setDefaultProjectDurationDays(14)
+        settings.setDefaultProjectTileSizeRaw("wide")
 
         val archive = repository.exportArchive()
         database.taskDao().deleteAll()
@@ -99,5 +101,7 @@ class WeekyiiDataArchiveRoundTripTest {
         assertEquals(true, settings.fixedReminderEnabled.value)
         assertEquals(19, settings.fixedReminderHour.value)
         assertEquals(45, settings.fixedReminderMinute.value)
+        assertEquals(14, settings.defaultProjectDurationDays.value)
+        assertEquals("wide", settings.defaultProjectTileSizeRaw.value)
     }
 }

@@ -30,6 +30,8 @@ class SettingsViewModel(
         val fixedReminderEnabled: Boolean = false,
         val fixedReminderHour: Int = 21,
         val fixedReminderMinute: Int = 0,
+        val defaultProjectDurationDays: Int = 7,
+        val defaultProjectTileSizeRaw: String = "medium",
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val importInspection: WeekyiiArchiveService.Inspection? = null,
         val isImporting: Boolean = false,
@@ -63,7 +65,11 @@ class SettingsViewModel(
             val fixedReminder = combine(settings.fixedReminderEnabled, settings.fixedReminderHour, settings.fixedReminderMinute) { enabled, hour, minute ->
                 FixedReminderSnapshot(enabled, hour, minute)
             }
-            combine(preferences, settings.killTimeReminderMinutes, fixedReminder, taskTypes.observeAll()) { pref, reminderMinutes, fixed, definitions ->
+            data class ProjectDefaultsSnapshot(val durationDays: Int, val tileSizeRaw: String)
+            val projectDefaults = combine(settings.defaultProjectDurationDays, settings.defaultProjectTileSizeRaw) { durationDays, tileSizeRaw ->
+                ProjectDefaultsSnapshot(durationDays, tileSizeRaw)
+            }
+            combine(preferences, settings.killTimeReminderMinutes, fixedReminder, projectDefaults, taskTypes.observeAll()) { pref, reminderMinutes, fixed, project, definitions ->
                 UiState(
                     defaultKillTime = pref.killTime,
                     defaultExecutionMode = pref.executionMode,
@@ -74,6 +80,8 @@ class SettingsViewModel(
                     fixedReminderEnabled = fixed.enabled,
                     fixedReminderHour = fixed.hour,
                     fixedReminderMinute = fixed.minute,
+                    defaultProjectDurationDays = project.durationDays,
+                    defaultProjectTileSizeRaw = project.tileSizeRaw,
                     taskTypeDefinitions = definitions
                 )
             }.collect { next -> _state.value = next }
@@ -135,6 +143,20 @@ class SettingsViewModel(
     fun setFixedReminderTime(hour: Int, minute: Int) {
         viewModelScope.launch {
             runCatching { settings.setFixedReminderTime(hour, minute) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setDefaultProjectDurationDays(days: Int) {
+        viewModelScope.launch {
+            runCatching { settings.setDefaultProjectDurationDays(days) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setDefaultProjectTileSize(idRaw: String) {
+        viewModelScope.launch {
+            runCatching { settings.setDefaultProjectTileSizeRaw(idRaw) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }
