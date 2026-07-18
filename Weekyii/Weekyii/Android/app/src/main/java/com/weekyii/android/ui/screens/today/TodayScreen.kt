@@ -59,12 +59,15 @@ import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.TodayViewModel
+import com.weekyii.android.ui.viewmodel.WeekViewModel
+import com.weekyii.android.ui.screens.week.WeekScreen
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
 
 @Composable
-fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
+fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel: WeekViewModel? = null) {
     val state by viewModel.state.collectAsState()
+    var showWeek by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
     var executionTaskTitle by remember { mutableStateOf("") }
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
@@ -89,6 +92,14 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
     }
     val day = state.day
 
+    if (showWeek && weekViewModel != null) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            TodayWeekSwitcher(showWeek = true, onChange = { showWeek = it })
+            WeekScreen(weekViewModel, modifier = Modifier.weight(1f))
+        }
+        return
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -96,6 +107,9 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        item {
+            TodayWeekSwitcher(showWeek = false, onChange = { showWeek = it })
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Weekyii", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -386,6 +400,14 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
             },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("取消") } }
         )
+    }
+}
+
+@Composable
+private fun TodayWeekSwitcher(showWeek: Boolean, onChange: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = !showWeek, onClick = { onChange(false) }, label = { Text("今天") })
+        FilterChip(selected = showWeek, onClick = { onChange(true) }, label = { Text("本周") })
     }
 }
 

@@ -26,6 +26,7 @@ import com.weekyii.android.ui.viewmodel.PendingViewModel
 import com.weekyii.android.ui.viewmodel.PastViewModel
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import com.weekyii.android.ui.viewmodel.SettingsViewModel
+import com.weekyii.android.ui.viewmodel.WeekViewModel
 import com.weekyii.android.data.repository.WeekCalculator
 import com.weekyii.android.data.repository.ProjectRepository
 import com.weekyii.android.data.repository.MindStampRepository
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
                     TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore, app.taskTypeDefinitionRepository)
                 }
                 val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider, app.taskTypeDefinitionRepository) }
+                val weekVm = remember { WeekViewModel(repo, timeProvider, app.taskTypeDefinitionRepository) }
                 val pastVm = remember { PastViewModel(repo) }
                 val extVm = remember {
                     ExtensionsViewModel(
@@ -88,7 +90,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 ) { padding ->
                     NavHost(navController, startDestination = NavItem.Today.route) {
-                        composable(NavItem.Today.route) { TodayScreen(todayVm, padding) }
+                        composable(NavItem.Today.route) { TodayScreen(todayVm, padding, weekVm) }
                         composable(NavItem.Pending.route) { PendingScreen(pendingVm, padding) }
                         composable(NavItem.Past.route) { PastScreen(pastVm, padding) }
                         composable(NavItem.Extensions.route) { ExtensionsScreen(extVm, padding) }
