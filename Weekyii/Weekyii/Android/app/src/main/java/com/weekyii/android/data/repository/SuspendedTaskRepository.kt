@@ -31,7 +31,8 @@ class SuspendedTaskRepository(
         description: String,
         taskType: TaskType,
         countdownDays: Int,
-        now: Date
+        now: Date,
+        taskTypeIdRaw: String = taskType.name.lowercase()
     ): UUID {
         require(title.isNotBlank()) { "Task title cannot be empty" }
         require(countdownDays > 0) { "Countdown must be positive" }
@@ -39,7 +40,7 @@ class SuspendedTaskRepository(
             title = title.trim(),
             description = description.trim(),
             taskType = taskType,
-            taskTypeIdRaw = taskType.name.lowercase(),
+            taskTypeIdRaw = taskTypeIdRaw,
             createdAt = now,
             decisionDeadline = deadlineFrom(now, countdownDays),
             preferredCountdownDays = countdownDays
@@ -118,6 +119,7 @@ private fun SuspendedTaskEntity.toUi(zoneId: ZoneId) = SuspendedTaskUi(
     title = title,
     description = description,
     taskType = taskType,
+    taskTypeIdRaw = taskTypeIdRaw,
     decisionDeadline = decisionDeadline.toInstant().atZone(zoneId).toLocalDateTime(),
     preferredCountdownDays = preferredCountdownDays,
     snoozeCount = snoozeCount

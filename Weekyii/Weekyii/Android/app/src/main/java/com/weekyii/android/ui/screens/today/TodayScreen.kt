@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -27,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.data.db.entities.ExecutionMode
+import com.weekyii.android.data.db.entities.TaskType
+import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.TodayViewModel
@@ -66,6 +71,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
     var editingTitle by remember { mutableStateOf("") }
     var editingDescription by remember { mutableStateOf("") }
     var editingStepsText by remember { mutableStateOf("") }
+    var editingTaskTypeId by remember { mutableStateOf("regular") }
     val editingAttachments = remember { mutableStateListOf<TaskAttachmentUi>() }
     val context = LocalContext.current
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -126,9 +132,17 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                         )
                     }
                 }
+                item {
+                    TaskTypePicker(
+                        definitions = state.taskTypeDefinitions,
+                        selectedId = state.selectedTaskTypeId,
+                        onSelect = viewModel::selectTaskType
+                    )
+                }
                 itemsIndexed(state.draft, key = { _, task -> task.id }) { index, task ->
                     DraftTaskCard(
                         task = task,
+                        typeLabel = taskTypeLabel(task, state.taskTypeDefinitions),
                         canMoveUp = index > 0,
                         canMoveDown = index < state.draft.lastIndex,
                         onMoveUp = { viewModel.moveDraftTask(index, index - 1) },
@@ -138,6 +152,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                             editingTask = task
                             editingTitle = task.title
                             editingDescription = task.description
+                            editingTaskTypeId = task.taskTypeIdRaw
                             editingStepsText = task.steps.sortedBy { it.sortOrder }.joinToString("\n") { it.title }
                             editingAttachments.clear()
                             editingAttachments.addAll(task.attachments)
@@ -191,7 +206,12 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
             DayStatus.EXECUTE -> {
                 item { SectionHeader("专注区", "现在只做这一件事。完成后下一项才会解冻。") }
                 item {
-                    FocusTaskCard(task = state.focus, onComplete = viewModel::doneFocus, onPostpone = { task, date -> viewModel.postponeTask(task, date) })
+                    FocusTaskCard(
+                        task = state.focus,
+                        typeLabel = state.focus?.let { taskTypeLabel(it, state.taskTypeDefinitions) },
+                        onComplete = viewModel::doneFocus,
+                        onPostpone = { task, date -> viewModel.postponeTask(task, date) }
+                    )
                 }
                 if (day?.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
                     item {
@@ -204,7 +224,10 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                                 viewModel.addExecutionTask(executionTaskTitle.trim())
                                 executionTaskTitle = ""
                             },
-                            onExchange = viewModel::exchangeFocusWithFirstFrozen
+                            onExchange = viewModel::exchangeFocusWithFirstFrozen,
+                            taskTypes = state.taskTypeDefinitions,
+                            selectedTaskTypeId = state.selectedTaskTypeId,
+                            onTaskTypeSelect = viewModel::selectTaskType
                         )
                     }
                 }
@@ -222,6 +245,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                         CompactTaskRow(
                             number = index + 2,
                             task = task,
+                            typeLabel = taskTypeLabel(task, state.taskTypeDefinitions),
                             editable = frozenEditable,
                             canMoveUp = index > 0,
                             canMoveDown = index < state.frozen.lastIndex,
@@ -232,6 +256,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                                 editingTask = task
                                 editingTitle = task.title
                                 editingDescription = task.description
+                                editingTaskTypeId = task.taskTypeIdRaw
                                 editingStepsText = task.steps.sortedBy { it.sortOrder }.joinToString("\n") { it.title }
                                 editingAttachments.clear()
                                 editingAttachments.addAll(task.attachments)
@@ -243,7 +268,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                 if (state.complete.isNotEmpty()) {
                     item { SectionHeader("已完成", "今天已经推进 ${state.complete.size} 项") }
                     itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                        CompletedTaskRow(index + 1, task)
+                        CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
                     }
                 }
             }
@@ -256,7 +281,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                     )
                 }
                 itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                    CompletedTaskRow(index + 1, task)
+                    CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
                 }
             }
 
@@ -268,7 +293,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                     )
                 }
                 itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                    CompletedTaskRow(index + 1, task)
+                    CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
                 }
             }
         }
@@ -318,6 +343,11 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    TaskTypePicker(
+                        definitions = state.taskTypeDefinitions,
+                        selectedId = editingTaskTypeId,
+                        onSelect = { editingTaskTypeId = it }
+                    )
                     OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) {
                         Text("添加附件 (${editingAttachments.size})")
                     }
@@ -328,20 +358,26 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                     enabled = editingTitle.isNotBlank(),
                     onClick = {
                         if (task.zone.name == "FROZEN") {
+                            val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
                             viewModel.updateFrozenTask(
                                 task,
                                 editingTitle,
                                 editingDescription,
                                 editingStepsText.lines(),
-                                editingAttachments.toList()
+                                editingAttachments.toList(),
+                                taskType = definition?.baseKind ?: task.taskType,
+                                taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
                             )
                         } else {
+                            val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
                             viewModel.updateDraftTask(
                                 task,
                                 editingTitle,
                                 editingDescription,
                                 editingStepsText.lines(),
-                                editingAttachments.toList()
+                                editingAttachments.toList(),
+                                taskType = definition?.baseKind ?: task.taskType,
+                                taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
                             )
                         }
                         editingTask = null
@@ -422,7 +458,10 @@ private fun FlexibleExecutionControls(
     onTitleChange: (String) -> Unit,
     onToggleUnlock: () -> Unit,
     onAdd: () -> Unit,
-    onExchange: () -> Unit
+    onExchange: () -> Unit,
+    taskTypes: List<TaskTypeDefinitionEntity>,
+    selectedTaskTypeId: String,
+    onTaskTypeSelect: (String) -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -448,6 +487,11 @@ private fun FlexibleExecutionControls(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                TaskTypePicker(
+                    definitions = taskTypes,
+                    selectedId = selectedTaskTypeId,
+                    onSelect = onTaskTypeSelect
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilledTonalButton(onClick = onAdd, enabled = title.isNotBlank()) { Text("追加任务") }
                     OutlinedButton(onClick = onExchange) { Text("交换 Focus") }
@@ -458,8 +502,30 @@ private fun FlexibleExecutionControls(
 }
 
 @Composable
+private fun TaskTypePicker(
+    definitions: List<TaskTypeDefinitionEntity>,
+    selectedId: String,
+    onSelect: (String) -> Unit
+) {
+    if (definitions.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("任务类型", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(definitions, key = { it.idRaw }) { definition ->
+                FilterChip(
+                    selected = definition.idRaw == selectedId,
+                    onClick = { onSelect(definition.idRaw) },
+                    label = { Text(definition.name) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DraftTaskCard(
     task: TaskUi,
+    typeLabel: String,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMoveUp: () -> Unit,
@@ -474,7 +540,10 @@ private fun DraftTaskCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("T${task.order.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
-            Text(task.title, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(task.title)
+                Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "编辑") }
             IconButton(onClick = onMoveUp, enabled = canMoveUp) { Icon(Icons.Filled.ArrowUpward, "上移") }
             IconButton(onClick = onMoveDown, enabled = canMoveDown) { Icon(Icons.Filled.ArrowDownward, "下移") }
@@ -485,7 +554,12 @@ private fun DraftTaskCard(
 }
 
 @Composable
-private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit, onPostpone: (TaskUi, LocalDate) -> Unit) {
+private fun FocusTaskCard(
+    task: TaskUi?,
+    typeLabel: String?,
+    onComplete: () -> Unit,
+    onPostpone: (TaskUi, LocalDate) -> Unit
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -493,6 +567,7 @@ private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit, onPostpone: (Ta
         Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("FOCUS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            typeLabel?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
             if (!task?.description.isNullOrBlank()) Text(task!!.description)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(onClick = onComplete, enabled = task != null, modifier = Modifier.weight(1f)) {
@@ -509,6 +584,7 @@ private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit, onPostpone: (Ta
 private fun CompactTaskRow(
     number: Int,
     task: TaskUi,
+    typeLabel: String,
     editable: Boolean,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
@@ -522,11 +598,10 @@ private fun CompactTaskRow(
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("T${number.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
-                Text(
-                    task.title,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(task.title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 PostponeButton(onPostpone)
             }
             if (editable) {
@@ -565,15 +640,26 @@ private fun TimePickerDateDialog(
 }
 
 @Composable
-private fun CompletedTaskRow(number: Int, task: TaskUi) {
+private fun CompletedTaskRow(number: Int, task: TaskUi, typeLabel: String) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Row(modifier = Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-            Text("T${number.toString().padStart(2, '0')}  ${task.title}", modifier = Modifier.padding(start = 10.dp))
+            Column(modifier = Modifier.padding(start = 10.dp)) {
+                Text("T${number.toString().padStart(2, '0')}  ${task.title}")
+                Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         HorizontalDivider()
     }
 }
+
+private fun taskTypeLabel(task: TaskUi, definitions: List<TaskTypeDefinitionEntity>): String =
+    definitions.firstOrNull { it.idRaw == task.taskTypeIdRaw }?.name
+        ?: when (task.taskType) {
+            TaskType.REGULAR -> "常规"
+            TaskType.DDL -> "DDL"
+            TaskType.LEISURE -> "休闲"
+        }
 
 @Composable
 private fun CompletionCard(title: String, body: String) {

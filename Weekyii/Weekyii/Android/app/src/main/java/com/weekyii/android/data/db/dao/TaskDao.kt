@@ -11,6 +11,7 @@ import com.weekyii.android.data.db.entities.TaskEntity
 import com.weekyii.android.data.db.entities.TaskStepEntity
 import com.weekyii.android.data.db.entities.TaskAttachmentEntity
 import com.weekyii.android.data.db.entities.TaskWithSteps
+import com.weekyii.android.data.db.entities.TaskType
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -50,4 +51,7 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE day_owner_id = :dayId AND zone IN (:zones)")
     suspend fun deleteByZones(dayId: String, zones: List<String>)
+
+    @Query("UPDATE tasks SET task_type = :baseKind WHERE task_type_id_raw = :typeIdRaw")
+    suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType)
 }

@@ -90,6 +90,7 @@ data class SuspendedTaskUi(
     val title: String,
     val description: String,
     val taskType: TaskType,
+    val taskTypeIdRaw: String,
     val decisionDeadline: LocalDateTime,
     val preferredCountdownDays: Int,
     val snoozeCount: Int

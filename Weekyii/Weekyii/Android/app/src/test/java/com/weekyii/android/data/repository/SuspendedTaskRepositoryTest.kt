@@ -76,4 +76,7 @@ private class RecordingSuspendedTaskDao : SuspendedTaskDao {
         MutableStateFlow(values.values.filter { it.status == status }.map { SuspendedTaskWithDetails(it, emptyList(), emptyList()) })
     override suspend fun listDue(status: SuspendedTaskStatus, deadline: Date): List<SuspendedTaskEntity> =
         values.values.filter { it.status == status && !it.decisionDeadline.after(deadline) }
+    override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType) {
+        values.replaceAll { _, task -> if (task.taskTypeIdRaw == typeIdRaw) task.copy(taskType = baseKind) else task }
+    }
 }

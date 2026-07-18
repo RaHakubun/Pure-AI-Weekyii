@@ -49,17 +49,20 @@ class MainActivity : ComponentActivity() {
                 val repo = app.repository
                 val timeProvider = app.timeProvider
 
-                val todayVm = remember { TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore) }
+                val todayVm = remember {
+                    TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore, app.taskTypeDefinitionRepository)
+                }
                 val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider) }
                 val pastVm = remember { PastViewModel(repo) }
                 val extVm = remember {
                     ExtensionsViewModel(
                         ProjectRepository(app.database.projectDao(), timeProvider),
                         MindStampRepository(app.database.mindStampDao()),
-                        app.suspendedTaskRepository
+                        app.suspendedTaskRepository,
+                        app.taskTypeDefinitionRepository
                     )
                 }
-                val settingsVm = remember { SettingsViewModel(app.settingsStore) }
+                val settingsVm = remember { SettingsViewModel(app.settingsStore, app.taskTypeDefinitionRepository) }
 
                 Scaffold(
                     bottomBar = {

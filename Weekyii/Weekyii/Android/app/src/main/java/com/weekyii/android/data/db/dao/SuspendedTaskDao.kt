@@ -11,6 +11,7 @@ import com.weekyii.android.data.db.entities.SuspendedTaskEntity
 import com.weekyii.android.data.db.entities.SuspendedTaskStatus
 import com.weekyii.android.data.db.entities.SuspendedTaskStepEntity
 import com.weekyii.android.data.db.entities.SuspendedTaskWithDetails
+import com.weekyii.android.data.db.entities.TaskType
 import kotlinx.coroutines.flow.Flow
 import java.util.Date
 import java.util.UUID
@@ -39,4 +40,7 @@ interface SuspendedTaskDao {
 
     @Query("SELECT * FROM suspended_tasks WHERE status = :status AND decision_deadline <= :deadline")
     suspend fun listDue(status: SuspendedTaskStatus, deadline: Date): List<SuspendedTaskEntity>
+
+    @Query("UPDATE suspended_tasks SET task_type = :baseKind WHERE task_type_id_raw = :typeIdRaw")
+    suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType)
 }

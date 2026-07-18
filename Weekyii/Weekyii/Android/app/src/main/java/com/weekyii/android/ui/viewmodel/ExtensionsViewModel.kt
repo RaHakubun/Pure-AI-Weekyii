@@ -6,12 +6,16 @@ import com.weekyii.android.data.db.entities.ProjectStatus
 import com.weekyii.android.data.repository.MindStampRepository
 import com.weekyii.android.data.repository.ProjectRepository
 import com.weekyii.android.data.repository.SuspendedTaskRepository
+import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
+import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
+import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.ui.model.MindStampUi
 import com.weekyii.android.ui.model.ProjectUi
 import com.weekyii.android.ui.model.SuspendedTaskUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
@@ -19,12 +23,15 @@ import java.util.UUID
 class ExtensionsViewModel(
     private val projects: ProjectRepository,
     private val mindStamps: MindStampRepository,
-    private val suspendedTasks: SuspendedTaskRepository
+    private val suspendedTasks: SuspendedTaskRepository,
+    private val taskTypes: TaskTypeDefinitionRepository? = null
 ) : ViewModel() {
     data class UiState(
         val projects: List<ProjectUi> = emptyList(),
         val mindStamps: List<MindStampUi> = emptyList(),
         val suspendedTasks: List<SuspendedTaskUi> = emptyList(),
+        val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
+        val selectedTaskTypeId: String = "regular",
         val error: String? = null
     )
 
@@ -33,9 +40,15 @@ class ExtensionsViewModel(
 
     init {
         viewModelScope.launch {
-            combine(projects.observeProjects(), mindStamps.observeAll(), suspendedTasks.observeActive()) { projectList, stamps, suspended ->
+            taskTypes?.seedBuiltIns()
+            val base = combine(projects.observeProjects(), mindStamps.observeAll(), suspendedTasks.observeActive()) { projectList, stamps, suspended ->
                 Triple(projectList, stamps, suspended)
-            }.collect { (projectList, stamps, suspended) -> _state.value = UiState(projectList, stamps, suspended) }
+            }
+            combine(base, taskTypes?.observeActive() ?: flowOf(emptyList())) { (projectList, stamps, suspended), definitions ->
+                val selected = _state.value.selectedTaskTypeId.takeIf { id -> definitions.any { it.idRaw == id } }
+                    ?: definitions.firstOrNull()?.idRaw ?: "regular"
+                UiState(projectList, stamps, suspended, definitions, selected)
+            }.collect { next -> _state.value = next }
         }
     }
 
@@ -65,9 +78,23 @@ class ExtensionsViewModel(
         viewModelScope.launch { mindStamps.delete(id) }
     }
 
+    fun selectTaskType(idRaw: String) {
+        _state.value = _state.value.copy(selectedTaskTypeId = idRaw)
+    }
+
     fun createSuspendedTask(title: String, countdownDays: Int) {
         viewModelScope.launch {
-            runCatching { suspendedTasks.create(title, "", com.weekyii.android.data.db.entities.TaskType.REGULAR, countdownDays, java.util.Date()) }
+            val definition = taskTypes?.resolve(_state.value.selectedTaskTypeId)
+            runCatching {
+                suspendedTasks.create(
+                    title,
+                    "",
+                    definition?.baseKind ?: TaskType.REGULAR,
+                    countdownDays,
+                    java.util.Date(),
+                    definition?.idRaw ?: TaskType.REGULAR.name.lowercase()
+                )
+            }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }

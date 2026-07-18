@@ -17,8 +17,10 @@ import java.time.LocalTime
 interface UserSettingsStore {
     val defaultKillTime: StateFlow<LocalTime>
     val defaultExecutionMode: StateFlow<ExecutionMode>
+    val defaultTaskTypeId: StateFlow<String>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
+    suspend fun setDefaultTaskTypeId(idRaw: String)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -30,6 +32,7 @@ class DataStoreUserSettingsStore(
     private object Keys {
         val defaultKillTime = stringPreferencesKey("default_kill_time")
         val defaultExecutionMode = stringPreferencesKey("default_execution_mode")
+        val defaultTaskTypeId = stringPreferencesKey("default_task_type_id")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -44,11 +47,20 @@ class DataStoreUserSettingsStore(
         }
         .stateIn(scope, SharingStarted.Eagerly, ExecutionMode.STRICT)
 
+    override val defaultTaskTypeId: StateFlow<String> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.defaultTaskTypeId] ?: "regular" }
+        .stateIn(scope, SharingStarted.Eagerly, "regular")
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
 
     override suspend fun setDefaultExecutionMode(mode: ExecutionMode) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultExecutionMode] = mode.name }
+    }
+
+    override suspend fun setDefaultTaskTypeId(idRaw: String) {
+        require(idRaw.isNotBlank()) { "Default task type cannot be empty" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.defaultTaskTypeId] = idRaw }
     }
 }

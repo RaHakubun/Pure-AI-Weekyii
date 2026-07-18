@@ -15,6 +15,9 @@ interface TaskTypeDefinitionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfMissing(definitions: List<TaskTypeDefinitionEntity>)
 
+    @Query("SELECT * FROM task_type_definitions WHERE id_raw = :idRaw LIMIT 1")
+    suspend fun findById(idRaw: String): TaskTypeDefinitionEntity?
+
     @Query("SELECT * FROM task_type_definitions ORDER BY sort_order, name")
     fun observeAll(): Flow<List<TaskTypeDefinitionEntity>>
 

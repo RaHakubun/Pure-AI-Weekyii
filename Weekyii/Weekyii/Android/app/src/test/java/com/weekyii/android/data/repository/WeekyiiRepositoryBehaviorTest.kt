@@ -179,6 +179,7 @@ private class FakeTaskDao : TaskDao {
     override suspend fun deleteSteps(taskId: UUID) = Unit
     override suspend fun deleteAttachments(taskId: UUID) = Unit
     override suspend fun deleteByZones(dayId: String, zones: List<String>) = Unit
+    override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: com.weekyii.android.data.db.entities.TaskType) = Unit
 }
 
 private class FakeProjectDao : ProjectDao {

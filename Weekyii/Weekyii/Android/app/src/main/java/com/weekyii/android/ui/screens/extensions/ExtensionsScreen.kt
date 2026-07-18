@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.ProjectStatus
+import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.model.ProjectUi
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import java.time.LocalDate
@@ -83,6 +86,11 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                     Text("悬置任务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("暂时不安排到某一天，到期前再决定去向。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
+                    ExtensionTaskTypePicker(
+                        definitions = state.taskTypeDefinitions,
+                        selectedId = state.selectedTaskTypeId,
+                        onSelect = viewModel::selectTaskType
+                    )
                     Button(
                         onClick = { viewModel.createSuspendedTask(suspendedTitle, 10); suspendedTitle = "" },
                         enabled = suspendedTitle.isNotBlank()
@@ -96,6 +104,11 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        state.taskTypeDefinitions.firstOrNull { it.idRaw == task.taskTypeIdRaw }?.name ?: task.taskType.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Text("${task.decisionDeadline.toLocalDate()} 到期 · 已延期 ${task.snoozeCount} 次")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssignSuspendedButton { date -> viewModel.assignSuspendedTask(task.id, date) }
@@ -115,6 +128,24 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                     OutlinedButton(onClick = { viewModel.deleteMindStamp(stamp.id) }) { Text("删除") }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExtensionTaskTypePicker(
+    definitions: List<TaskTypeDefinitionEntity>,
+    selectedId: String,
+    onSelect: (String) -> Unit
+) {
+    if (definitions.isEmpty()) return
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(definitions, key = { it.idRaw }) { definition ->
+            FilterChip(
+                selected = definition.idRaw == selectedId,
+                onClick = { onSelect(definition.idRaw) },
+                label = { Text(definition.name) }
+            )
         }
     }
 }

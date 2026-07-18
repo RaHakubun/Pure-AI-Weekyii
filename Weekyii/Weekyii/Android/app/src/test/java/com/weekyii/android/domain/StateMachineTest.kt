@@ -13,6 +13,7 @@ import com.weekyii.android.data.db.entities.TaskEntity
 import com.weekyii.android.data.db.entities.TaskWithSteps
 import com.weekyii.android.data.db.entities.TaskStepEntity
 import com.weekyii.android.data.db.entities.TaskAttachmentEntity
+import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.data.db.entities.WeekEntity
 import com.weekyii.android.data.db.entities.WeekStatus
@@ -186,6 +187,26 @@ class StateMachineTest {
             runBlocking { repository.addDraftTasks(today.dayId, listOf("  ")) }
         }
         assertTrue(days.findWithTasks(today.dayId)?.tasks.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun draftTaskRetainsCustomTypeIdAndUsesItsBaseKind() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EMPTY)
+        val tasks = mutableMapOf<String, MutableList<TaskEntity>>()
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.addDraftTasks(today.dayId, listOf("Ship release"), TaskType.DDL, "release-sprint")
+
+        val created = tasks.getValue(today.dayId).single()
+        assertEquals(TaskType.DDL, created.taskType)
+        assertEquals("release-sprint", created.taskTypeIdRaw)
     }
 
     @Test
@@ -516,8 +537,10 @@ private class InMemorySettingsStore(
 ) : UserSettingsStore {
     override val defaultKillTime = MutableStateFlow(killTime)
     override val defaultExecutionMode = MutableStateFlow(executionMode)
+    override val defaultTaskTypeId = MutableStateFlow("regular")
     override suspend fun setDefaultKillTime(time: LocalTime) { defaultKillTime.value = time }
     override suspend fun setDefaultExecutionMode(mode: ExecutionMode) { defaultExecutionMode.value = mode }
+    override suspend fun setDefaultTaskTypeId(idRaw: String) { defaultTaskTypeId.value = idRaw }
 }
 
 private class RecordingWeekDao(
@@ -582,6 +605,13 @@ private class RecordingTaskDao(
     override suspend fun deleteAttachments(taskId: UUID) { attachments.remove(taskId) }
     override suspend fun deleteByZones(dayId: String, zones: List<String>) {
         tasks[dayId]?.removeAll { it.zone.name in zones }
+    }
+    override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType) {
+        tasks.values.forEach { dayTasks ->
+            dayTasks.replaceAll { task ->
+                if (task.taskTypeIdRaw == typeIdRaw) task.copy(taskType = baseKind) else task
+            }
+        }
     }
 }
 

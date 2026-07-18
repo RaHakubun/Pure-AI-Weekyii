@@ -131,7 +131,12 @@ class WeekyiiRepository(
         dayDao.upsert(day)
     }
 
-    suspend fun addDraftTasks(dayId: String, titles: List<String>) {
+    suspend fun addDraftTasks(
+        dayId: String,
+        titles: List<String>,
+        taskType: TaskType = TaskType.REGULAR,
+        taskTypeIdRaw: String = taskType.name.lowercase()
+    ) {
         val day = dayDao.findById(dayId) ?: return
         require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
         require(titles.isNotEmpty() && titles.all { it.isNotBlank() }) { "Task title cannot be empty" }
@@ -139,6 +144,8 @@ class WeekyiiRepository(
         titles.forEachIndexed { idx, title ->
             val task = TaskEntity(
                 title = title.trim(),
+                taskType = taskType,
+                taskTypeIdRaw = taskTypeIdRaw,
                 order = currentMax + idx + 1,
                 dayOwnerId = dayId,
                 zone = TaskZone.DRAFT

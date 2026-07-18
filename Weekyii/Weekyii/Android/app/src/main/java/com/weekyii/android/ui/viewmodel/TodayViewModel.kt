@@ -6,6 +6,9 @@ import com.weekyii.android.data.repository.WeekyiiRepository
 import com.weekyii.android.data.repository.toUi
 import com.weekyii.android.data.repository.TaskAttachmentDraft
 import com.weekyii.android.data.db.entities.ExecutionMode
+import com.weekyii.android.data.db.entities.TaskType
+import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
+import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.domain.TimeProvider
@@ -21,7 +24,8 @@ class TodayViewModel(
     private val repo: WeekyiiRepository,
     private val timeProvider: TimeProvider,
     private val appState: AppStateStore,
-    private val settings: UserSettingsStore? = null
+    private val settings: UserSettingsStore? = null,
+    private val taskTypeRepository: TaskTypeDefinitionRepository? = null
 ) : ViewModel() {
 
     data class UiState(
@@ -32,6 +36,8 @@ class TodayViewModel(
         val frozen: List<TaskUi> = emptyList(),
         val complete: List<TaskUi> = emptyList(),
         val startExecutionMode: ExecutionMode = ExecutionMode.STRICT,
+        val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
+        val selectedTaskTypeId: String = "regular",
         val error: String? = null
     )
 
@@ -50,6 +56,13 @@ class TodayViewModel(
             repo.createDraftDayIfNeeded(today)
             val day = repo.getDayWithTasks(today.toString())
             val tasks = day?.tasks?.sortedBy { it.order } ?: emptyList()
+            val definitions = taskTypeRepository?.listActive().orEmpty()
+            val preferredTypeId = _state.value.selectedTaskTypeId
+                .takeIf { candidate -> definitions.any { it.idRaw == candidate } }
+                ?: settings?.defaultTaskTypeId?.value
+                    ?.takeIf { candidate -> definitions.any { it.idRaw == candidate } }
+                ?: definitions.firstOrNull()?.idRaw
+                ?: "regular"
             val taskUi = tasks.associate { task -> task.id to (repo.getTaskUi(task.id) ?: task.toUi()) }
             val focus = tasks.firstOrNull { it.zone.name == "FOCUS" }?.let { taskUi.getValue(it.id) }
             val frozen = tasks.filter { it.zone.name == "FROZEN" }.sortedBy { it.order }.map { taskUi.getValue(it.id) }
@@ -63,6 +76,8 @@ class TodayViewModel(
                 frozen = frozen,
                 complete = complete,
                 startExecutionMode = selectedMode,
+                taskTypeDefinitions = definitions,
+                selectedTaskTypeId = preferredTypeId,
                 error = null
             )
         }
@@ -71,9 +86,19 @@ class TodayViewModel(
     fun createDraft(titles: List<String>) {
         viewModelScope.launch {
             repo.createDraftDayIfNeeded(timeProvider.today)
-            repo.addDraftTasks(timeProvider.today.toString(), titles)
+            val definition = taskTypeRepository?.resolve(_state.value.selectedTaskTypeId)
+            repo.addDraftTasks(
+                timeProvider.today.toString(),
+                titles,
+                definition?.baseKind ?: TaskType.REGULAR,
+                definition?.idRaw ?: TaskType.REGULAR.name.lowercase()
+            )
             refresh()
         }
+    }
+
+    fun selectTaskType(idRaw: String) {
+        _state.update { it.copy(selectedTaskTypeId = idRaw) }
     }
 
     fun startDay() {
@@ -106,7 +131,13 @@ class TodayViewModel(
     fun addExecutionTask(title: String) {
         viewModelScope.launch {
             try {
-                repo.addExecutionTask(timeProvider.today.toString(), title)
+                val definition = taskTypeRepository?.resolve(_state.value.selectedTaskTypeId)
+                repo.addExecutionTask(
+                    timeProvider.today.toString(),
+                    title,
+                    taskType = definition?.baseKind ?: TaskType.REGULAR,
+                    taskTypeIdRaw = definition?.idRaw ?: TaskType.REGULAR.name.lowercase()
+                )
                 refresh()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
@@ -119,7 +150,9 @@ class TodayViewModel(
         title: String,
         description: String = "",
         stepTitles: List<String> = task.steps.map { it.title },
-        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments
+        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments,
+        taskType: TaskType = task.taskType,
+        taskTypeIdRaw: String = task.taskTypeIdRaw
     ) {
         viewModelScope.launch {
             try {
@@ -128,8 +161,8 @@ class TodayViewModel(
                     taskId = task.id,
                     title = title,
                     description = description,
-                    taskType = task.taskType,
-                    taskTypeIdRaw = task.taskTypeIdRaw,
+                    taskType = taskType,
+                    taskTypeIdRaw = taskTypeIdRaw,
                     stepTitles = stepTitles,
                     attachments = attachments.map { attachment ->
                         TaskAttachmentDraft(attachment.fileName, attachment.fileType, attachment.data)
@@ -213,11 +246,13 @@ class TodayViewModel(
         title: String,
         description: String = "",
         stepTitles: List<String> = task.steps.map { it.title },
-        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments
+        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments,
+        taskType: TaskType = task.taskType,
+        taskTypeIdRaw: String = task.taskTypeIdRaw
     ) {
         viewModelScope.launch {
             try {
-                repo.updateDraftTask(timeProvider.today.toString(), task.id, title, description, task.taskType, task.taskTypeIdRaw)
+                repo.updateDraftTask(timeProvider.today.toString(), task.id, title, description, taskType, taskTypeIdRaw)
                 repo.replaceDraftTaskResources(
                     timeProvider.today.toString(),
                     task.id,
