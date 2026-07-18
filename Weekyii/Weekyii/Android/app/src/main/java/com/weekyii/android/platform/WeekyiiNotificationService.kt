@@ -72,6 +72,7 @@ class WeekyiiNotificationService(private val context: Context) : SuspendedNotifi
             val preAt = at.minusMinutes(reminderMinutes.toLong())
             schedule(preAt, dayId.hashCode() + 1, preReminder = true)
         }
+        WeekyiiTodayWidgetProvider.requestRefresh(context)
     }
 
     fun cancelKillTime(dayId: String) {
@@ -81,6 +82,7 @@ class WeekyiiNotificationService(private val context: Context) : SuspendedNotifi
             val pending = PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             alarmManager.cancel(pending)
         }
+        WeekyiiTodayWidgetProvider.requestRefresh(context)
     }
 
     override fun scheduleSuspendedTask(taskId: UUID, decisionDeadline: LocalDateTime) {

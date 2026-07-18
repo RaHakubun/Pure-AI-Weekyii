@@ -13,6 +13,7 @@ class WeekyiiReconcileWorker(
         val app = applicationContext as? WeekyiiApplication ?: return Result.failure()
         return runCatching {
             app.stateMachine.reconcile(force = false)
+            WeekyiiTodayWidgetProvider.requestRefresh(applicationContext)
             Result.success()
         }.getOrElse { Result.retry() }
     }
