@@ -35,37 +35,52 @@ class WeekyiiNotificationService(private val context: Context) : SuspendedNotifi
         )
     }
 
-    fun notifyKillTime(dayId: String, killTimeText: String, unfinishedCount: Int) {
+    fun notifyKillTime(dayId: String, killTimeText: String, unfinishedCount: Int, preReminder: Boolean = false) {
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Weekyii Kill Time")
-            .setContentText("今天还有 $unfinishedCount 项，截止时间 $killTimeText")
+            .setContentTitle(if (preReminder) "Weekyii 提前提醒" else "Weekyii Kill Time")
+            .setContentText(
+                if (preReminder) "距离截止还有 $killTimeText，当前还有 $unfinishedCount 项"
+                else "今天还有 $unfinishedCount 项，截止时间 $killTimeText"
+            )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(dayId.hashCode(), notification)
     }
 
-    fun scheduleKillTime(dayId: String, at: LocalDateTime, unfinishedCount: Int) {
+    fun scheduleKillTime(dayId: String, at: LocalDateTime, unfinishedCount: Int, reminderMinutes: Int = 0) {
+        cancelKillTime(dayId)
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val intent = Intent(context, WeekyiiAlarmReceiver::class.java).apply {
-            action = WeekyiiAlarmReceiver.ACTION_KILL_TIME
-            putExtra(WeekyiiAlarmReceiver.EXTRA_DAY_ID, dayId)
-            putExtra(WeekyiiAlarmReceiver.EXTRA_KILL_TIME, "%02d:%02d".format(at.hour, at.minute))
-            putExtra(WeekyiiAlarmReceiver.EXTRA_UNFINISHED_COUNT, unfinishedCount)
+        fun schedule(triggerAt: LocalDateTime, requestCode: Int, preReminder: Boolean) {
+            val intent = Intent(context, WeekyiiAlarmReceiver::class.java).apply {
+                action = WeekyiiAlarmReceiver.ACTION_KILL_TIME
+                putExtra(WeekyiiAlarmReceiver.EXTRA_DAY_ID, dayId)
+                putExtra(WeekyiiAlarmReceiver.EXTRA_KILL_TIME, "%02d:%02d".format(at.hour, at.minute))
+                putExtra(WeekyiiAlarmReceiver.EXTRA_UNFINISHED_COUNT, unfinishedCount)
+                putExtra(WeekyiiAlarmReceiver.EXTRA_PRE_REMINDER, preReminder)
+            }
+            val pending = PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val trigger = triggerAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            if (trigger > System.currentTimeMillis()) alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
         }
-        val pending = PendingIntent.getBroadcast(context, dayId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val trigger = at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
+        schedule(at, dayId.hashCode(), preReminder = false)
+        if (unfinishedCount > 0 && reminderMinutes > 0) {
+            val preAt = at.minusMinutes(reminderMinutes.toLong())
+            schedule(preAt, dayId.hashCode() + 1, preReminder = true)
+        }
     }
 
     fun cancelKillTime(dayId: String) {
         val intent = Intent(context, WeekyiiAlarmReceiver::class.java).apply { action = WeekyiiAlarmReceiver.ACTION_KILL_TIME }
-        val pending = PendingIntent.getBroadcast(context, dayId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        context.getSystemService(AlarmManager::class.java).cancel(pending)
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        listOf(dayId.hashCode(), dayId.hashCode() + 1).forEach { requestCode ->
+            val pending = PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            alarmManager.cancel(pending)
+        }
     }
 
     override fun scheduleSuspendedTask(taskId: UUID, decisionDeadline: LocalDateTime) {

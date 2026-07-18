@@ -19,10 +19,14 @@ interface UserSettingsStore {
     val defaultExecutionMode: StateFlow<ExecutionMode>
     val defaultTaskTypeId: StateFlow<String>
     val themeId: StateFlow<String>
+    val appearanceMode: StateFlow<String>
+    val killTimeReminderMinutes: StateFlow<Int>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
     suspend fun setDefaultTaskTypeId(idRaw: String)
     suspend fun setThemeId(idRaw: String)
+    suspend fun setAppearanceMode(idRaw: String)
+    suspend fun setKillTimeReminderMinutes(minutes: Int)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -36,6 +40,8 @@ class DataStoreUserSettingsStore(
         val defaultExecutionMode = stringPreferencesKey("default_execution_mode")
         val defaultTaskTypeId = stringPreferencesKey("default_task_type_id")
         val themeId = stringPreferencesKey("theme_id")
+        val appearanceMode = stringPreferencesKey("appearance_mode")
+        val killTimeReminderMinutes = stringPreferencesKey("kill_time_reminder_minutes")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -58,6 +64,14 @@ class DataStoreUserSettingsStore(
         .map { preferences -> preferences[Keys.themeId] ?: "amber" }
         .stateIn(scope, SharingStarted.Eagerly, "amber")
 
+    override val appearanceMode: StateFlow<String> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.appearanceMode] ?: "system" }
+        .stateIn(scope, SharingStarted.Eagerly, "system")
+
+    override val killTimeReminderMinutes: StateFlow<Int> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.killTimeReminderMinutes]?.toIntOrNull()?.coerceIn(0, 120) ?: 60 }
+        .stateIn(scope, SharingStarted.Eagerly, 60)
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
@@ -74,5 +88,15 @@ class DataStoreUserSettingsStore(
     override suspend fun setThemeId(idRaw: String) {
         require(idRaw.isNotBlank()) { "Theme cannot be empty" }
         context.weekyiiSettingsDataStore.edit { it[Keys.themeId] = idRaw }
+    }
+
+    override suspend fun setAppearanceMode(idRaw: String) {
+        require(idRaw in setOf("system", "light", "dark")) { "Unknown appearance mode" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.appearanceMode] = idRaw }
+    }
+
+    override suspend fun setKillTimeReminderMinutes(minutes: Int) {
+        require(minutes in 0..120) { "Reminder minutes must be between 0 and 120" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.killTimeReminderMinutes] = minutes.toString() }
     }
 }

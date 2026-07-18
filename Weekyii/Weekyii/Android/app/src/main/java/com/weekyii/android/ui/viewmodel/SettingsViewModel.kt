@@ -25,6 +25,8 @@ class SettingsViewModel(
         val defaultExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val defaultTaskTypeId: String = "regular",
         val themeId: String = "amber",
+        val appearanceMode: String = "system",
+        val killTimeReminderMinutes: Int = 60,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val importInspection: WeekyiiArchiveService.Inspection? = null,
         val isImporting: Boolean = false,
@@ -38,14 +40,32 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             taskTypes.seedBuiltIns()
-            combine(
+            data class PreferenceSnapshot(
+                val killTime: LocalTime,
+                val executionMode: ExecutionMode,
+                val taskTypeId: String,
+                val themeId: String,
+                val appearanceMode: String
+            )
+            val preferences = combine(
                 settings.defaultKillTime,
                 settings.defaultExecutionMode,
                 settings.defaultTaskTypeId,
                 settings.themeId,
-                taskTypes.observeAll()
-            ) { time, mode, defaultTypeId, themeId, definitions ->
-                UiState(time, mode, defaultTypeId, themeId, definitions)
+                settings.appearanceMode
+            ) { time, mode, defaultTypeId, themeId, appearanceMode ->
+                PreferenceSnapshot(time, mode, defaultTypeId, themeId, appearanceMode)
+            }
+            combine(preferences, settings.killTimeReminderMinutes, taskTypes.observeAll()) { pref, reminderMinutes, definitions ->
+                UiState(
+                    defaultKillTime = pref.killTime,
+                    defaultExecutionMode = pref.executionMode,
+                    defaultTaskTypeId = pref.taskTypeId,
+                    themeId = pref.themeId,
+                    appearanceMode = pref.appearanceMode,
+                    killTimeReminderMinutes = reminderMinutes,
+                    taskTypeDefinitions = definitions
+                )
             }.collect { next -> _state.value = next }
         }
     }
@@ -77,6 +97,20 @@ class SettingsViewModel(
     fun setTheme(idRaw: String) {
         viewModelScope.launch {
             runCatching { settings.setThemeId(idRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setAppearanceMode(idRaw: String) {
+        viewModelScope.launch {
+            runCatching { settings.setAppearanceMode(idRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setKillTimeReminderMinutes(minutes: Int) {
+        viewModelScope.launch {
+            runCatching { settings.setKillTimeReminderMinutes(minutes) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }

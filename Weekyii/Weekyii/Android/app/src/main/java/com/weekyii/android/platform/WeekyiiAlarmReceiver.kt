@@ -20,7 +20,8 @@ class WeekyiiAlarmReceiver : BroadcastReceiver() {
             notifyKillTime(
                 dayId = intent.getStringExtra(EXTRA_DAY_ID) ?: return,
                 killTimeText = intent.getStringExtra(EXTRA_KILL_TIME) ?: "20:00",
-                unfinishedCount = intent.getIntExtra(EXTRA_UNFINISHED_COUNT, 0)
+                unfinishedCount = intent.getIntExtra(EXTRA_UNFINISHED_COUNT, 0),
+                preReminder = intent.getBooleanExtra(EXTRA_PRE_REMINDER, false)
             )
         }
     }
@@ -31,6 +32,7 @@ class WeekyiiAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_DAY_ID = "day_id"
         const val EXTRA_KILL_TIME = "kill_time"
         const val EXTRA_UNFINISHED_COUNT = "unfinished_count"
+        const val EXTRA_PRE_REMINDER = "pre_reminder"
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_CHECKPOINT = "checkpoint"
         const val EXTRA_MESSAGE = "message"

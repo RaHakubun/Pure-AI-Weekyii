@@ -92,7 +92,8 @@ class TodayViewModel(
                 notificationService?.scheduleKillTime(
                     dayId = currentDay.dayId,
                     at = today.atTime(currentDay.killHour, currentDay.killMinute),
-                    unfinishedCount = unfinished
+                    unfinishedCount = unfinished,
+                    reminderMinutes = settings?.killTimeReminderMinutes?.value ?: 0
                 )
             } else {
                 notificationService?.cancelKillTime(today.toString())

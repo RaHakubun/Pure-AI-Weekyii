@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -42,7 +43,13 @@ class MainActivity : ComponentActivity() {
         val app = application as WeekyiiApplication
         setContent {
             val themeId by app.settingsStore.themeId.collectAsState()
-            WeekyiiTheme(themeId = themeId) {
+            val appearanceMode by app.settingsStore.appearanceMode.collectAsState()
+            val darkTheme = when (appearanceMode) {
+                "light" -> false
+                "dark" -> true
+                else -> isSystemInDarkTheme()
+            }
+            WeekyiiTheme(themeId = themeId, darkTheme = darkTheme) {
                 if (app.startupError != null) {
                     Text(text = app.startupError!!, modifier = Modifier.fillMaxSize())
                     return@WeekyiiTheme

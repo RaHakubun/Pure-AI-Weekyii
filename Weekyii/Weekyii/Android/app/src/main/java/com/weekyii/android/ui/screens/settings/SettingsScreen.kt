@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -92,9 +94,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("主题", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("主题只改变 Android 外观，不改变任务逻辑。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("amber" to "琥珀", "ocean" to "海洋", "forest" to "森林", "rose" to "玫瑰", "lavender" to "薰衣草", "graphite" to "石墨", "mint" to "薄荷", "midnight" to "午夜").forEach { (id, label) ->
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf("amber" to "琥珀", "ocean" to "海洋", "forest" to "森林", "rose" to "玫瑰", "lavender" to "薰衣草", "graphite" to "石墨", "mint" to "薄荷", "midnight" to "午夜")) { (id, label) ->
                             FilterChip(selected = state.themeId == id, onClick = { viewModel.setTheme(id) }, label = { Text(label) })
+                        }
+                    }
+                    Text("外观模式", style = MaterialTheme.typography.labelLarge)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")) { (id, label) ->
+                            FilterChip(selected = state.appearanceMode == id, onClick = { viewModel.setAppearanceMode(id) }, label = { Text(label) })
                         }
                     }
                 }
@@ -102,11 +110,21 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            if (Build.VERSION.SDK_INT >= 33) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("通知提醒", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text("允许后，Today 会在 Kill Time 到达时提醒未完成任务。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("通知提醒", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("设置 Kill Time 前的提前提醒；系统仍会在截止时提醒。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(listOf(0, 15, 30, 60, 90, 120)) { minutes ->
+                            val label = if (minutes == 0) "不提前" else "提前 $minutes 分钟"
+                            FilterChip(
+                                selected = state.killTimeReminderMinutes == minutes,
+                                onClick = { viewModel.setKillTimeReminderMinutes(minutes) },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= 33) {
                         OutlinedButton(onClick = { notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("请求通知权限") }
                     }
                 }
