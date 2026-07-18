@@ -21,12 +21,17 @@ interface UserSettingsStore {
     val themeId: StateFlow<String>
     val appearanceMode: StateFlow<String>
     val killTimeReminderMinutes: StateFlow<Int>
+    val fixedReminderEnabled: StateFlow<Boolean>
+    val fixedReminderHour: StateFlow<Int>
+    val fixedReminderMinute: StateFlow<Int>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
     suspend fun setDefaultTaskTypeId(idRaw: String)
     suspend fun setThemeId(idRaw: String)
     suspend fun setAppearanceMode(idRaw: String)
     suspend fun setKillTimeReminderMinutes(minutes: Int)
+    suspend fun setFixedReminderEnabled(enabled: Boolean)
+    suspend fun setFixedReminderTime(hour: Int, minute: Int)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -42,6 +47,9 @@ class DataStoreUserSettingsStore(
         val themeId = stringPreferencesKey("theme_id")
         val appearanceMode = stringPreferencesKey("appearance_mode")
         val killTimeReminderMinutes = stringPreferencesKey("kill_time_reminder_minutes")
+        val fixedReminderEnabled = stringPreferencesKey("fixed_reminder_enabled")
+        val fixedReminderHour = stringPreferencesKey("fixed_reminder_hour")
+        val fixedReminderMinute = stringPreferencesKey("fixed_reminder_minute")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -72,6 +80,18 @@ class DataStoreUserSettingsStore(
         .map { preferences -> preferences[Keys.killTimeReminderMinutes]?.toIntOrNull()?.coerceIn(0, 120) ?: 60 }
         .stateIn(scope, SharingStarted.Eagerly, 60)
 
+    override val fixedReminderEnabled: StateFlow<Boolean> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.fixedReminderEnabled]?.toBoolean() ?: false }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
+    override val fixedReminderHour: StateFlow<Int> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.fixedReminderHour]?.toIntOrNull()?.coerceIn(0, 23) ?: 21 }
+        .stateIn(scope, SharingStarted.Eagerly, 21)
+
+    override val fixedReminderMinute: StateFlow<Int> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.fixedReminderMinute]?.toIntOrNull()?.coerceIn(0, 59) ?: 0 }
+        .stateIn(scope, SharingStarted.Eagerly, 0)
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
@@ -98,5 +118,17 @@ class DataStoreUserSettingsStore(
     override suspend fun setKillTimeReminderMinutes(minutes: Int) {
         require(minutes in 0..120) { "Reminder minutes must be between 0 and 120" }
         context.weekyiiSettingsDataStore.edit { it[Keys.killTimeReminderMinutes] = minutes.toString() }
+    }
+
+    override suspend fun setFixedReminderEnabled(enabled: Boolean) {
+        context.weekyiiSettingsDataStore.edit { it[Keys.fixedReminderEnabled] = enabled.toString() }
+    }
+
+    override suspend fun setFixedReminderTime(hour: Int, minute: Int) {
+        require(hour in 0..23 && minute in 0..59) { "Fixed reminder time is invalid" }
+        context.weekyiiSettingsDataStore.edit {
+            it[Keys.fixedReminderHour] = hour.toString()
+            it[Keys.fixedReminderMinute] = minute.toString()
+        }
     }
 }

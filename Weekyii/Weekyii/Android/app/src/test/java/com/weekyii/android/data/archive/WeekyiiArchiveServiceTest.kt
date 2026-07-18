@@ -84,6 +84,9 @@ class WeekyiiArchiveServiceTest {
         val payload = WeekyiiArchiveService.Payload(
             settings = WeekyiiArchiveService.SettingsRecord(
                 killTimeReminderMinutes = 30,
+                fixedReminderEnabled = true,
+                fixedReminderHour = 19,
+                fixedReminderMinute = 45,
                 selectedThemeRaw = "ocean",
                 appearanceModeRaw = "dark"
             )
@@ -92,6 +95,9 @@ class WeekyiiArchiveServiceTest {
         val restored = WeekyiiArchiveService.decodePayload(WeekyiiArchiveService.encode(payload)).settings
 
         assertEquals(30, restored.killTimeReminderMinutes)
+        assertEquals(true, restored.fixedReminderEnabled)
+        assertEquals(19, restored.fixedReminderHour)
+        assertEquals(45, restored.fixedReminderMinute)
         assertEquals("ocean", restored.selectedThemeRaw)
         assertEquals("dark", restored.appearanceModeRaw)
     }

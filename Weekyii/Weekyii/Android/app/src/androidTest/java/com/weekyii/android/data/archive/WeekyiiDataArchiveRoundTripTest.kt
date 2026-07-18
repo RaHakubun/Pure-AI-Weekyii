@@ -78,6 +78,8 @@ class WeekyiiDataArchiveRoundTripTest {
         settings.setThemeId("ocean")
         settings.setAppearanceMode("dark")
         settings.setKillTimeReminderMinutes(30)
+        settings.setFixedReminderEnabled(true)
+        settings.setFixedReminderTime(19, 45)
 
         val archive = repository.exportArchive()
         database.taskDao().deleteAll()
@@ -94,5 +96,8 @@ class WeekyiiDataArchiveRoundTripTest {
         assertEquals("ocean", settings.themeId.value)
         assertEquals("dark", settings.appearanceMode.value)
         assertEquals(30, settings.killTimeReminderMinutes.value)
+        assertEquals(true, settings.fixedReminderEnabled.value)
+        assertEquals(19, settings.fixedReminderHour.value)
+        assertEquals(45, settings.fixedReminderMinute.value)
     }
 }

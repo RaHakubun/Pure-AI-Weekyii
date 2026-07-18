@@ -93,7 +93,11 @@ class TodayViewModel(
                     dayId = currentDay.dayId,
                     at = today.atTime(currentDay.killHour, currentDay.killMinute),
                     unfinishedCount = unfinished,
-                    reminderMinutes = settings?.killTimeReminderMinutes?.value ?: 0
+                    reminderMinutes = settings?.killTimeReminderMinutes?.value ?: 0,
+                    fixedReminderEnabled = settings?.fixedReminderEnabled?.value ?: false,
+                    fixedReminderAt = settings?.let {
+                        if (it.fixedReminderEnabled.value) today.atTime(it.fixedReminderHour.value, it.fixedReminderMinute.value) else null
+                    }
                 )
             } else {
                 notificationService?.cancelKillTime(today.toString())

@@ -83,6 +83,9 @@ class WeekyiiDataArchiveRepository(
                 defaultTaskTypeRaw = taskTypeBaseFor(settings.defaultTaskTypeId.value),
                 defaultExecutionModeRaw = settings.defaultExecutionMode.value.name.lowercase(),
                 killTimeReminderMinutes = settings.killTimeReminderMinutes.value,
+                fixedReminderEnabled = settings.fixedReminderEnabled.value,
+                fixedReminderHour = settings.fixedReminderHour.value,
+                fixedReminderMinute = settings.fixedReminderMinute.value,
                 selectedThemeRaw = settings.themeId.value,
                 appearanceModeRaw = settings.appearanceMode.value
             ),
@@ -137,6 +140,8 @@ class WeekyiiDataArchiveRepository(
         settings.setDefaultExecutionMode(enum(value.defaultExecutionModeRaw, "execution mode"))
         settings.setDefaultTaskTypeId(value.defaultTaskTypeIdRaw)
         settings.setKillTimeReminderMinutes(value.killTimeReminderMinutes)
+        settings.setFixedReminderEnabled(value.fixedReminderEnabled)
+        settings.setFixedReminderTime(value.fixedReminderHour, value.fixedReminderMinute)
         settings.setThemeId(value.selectedThemeRaw)
         settings.setAppearanceMode(value.appearanceModeRaw)
     }

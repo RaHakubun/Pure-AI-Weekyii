@@ -27,6 +27,9 @@ class SettingsViewModel(
         val themeId: String = "amber",
         val appearanceMode: String = "system",
         val killTimeReminderMinutes: Int = 60,
+        val fixedReminderEnabled: Boolean = false,
+        val fixedReminderHour: Int = 21,
+        val fixedReminderMinute: Int = 0,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val importInspection: WeekyiiArchiveService.Inspection? = null,
         val isImporting: Boolean = false,
@@ -56,7 +59,11 @@ class SettingsViewModel(
             ) { time, mode, defaultTypeId, themeId, appearanceMode ->
                 PreferenceSnapshot(time, mode, defaultTypeId, themeId, appearanceMode)
             }
-            combine(preferences, settings.killTimeReminderMinutes, taskTypes.observeAll()) { pref, reminderMinutes, definitions ->
+            data class FixedReminderSnapshot(val enabled: Boolean, val hour: Int, val minute: Int)
+            val fixedReminder = combine(settings.fixedReminderEnabled, settings.fixedReminderHour, settings.fixedReminderMinute) { enabled, hour, minute ->
+                FixedReminderSnapshot(enabled, hour, minute)
+            }
+            combine(preferences, settings.killTimeReminderMinutes, fixedReminder, taskTypes.observeAll()) { pref, reminderMinutes, fixed, definitions ->
                 UiState(
                     defaultKillTime = pref.killTime,
                     defaultExecutionMode = pref.executionMode,
@@ -64,6 +71,9 @@ class SettingsViewModel(
                     themeId = pref.themeId,
                     appearanceMode = pref.appearanceMode,
                     killTimeReminderMinutes = reminderMinutes,
+                    fixedReminderEnabled = fixed.enabled,
+                    fixedReminderHour = fixed.hour,
+                    fixedReminderMinute = fixed.minute,
                     taskTypeDefinitions = definitions
                 )
             }.collect { next -> _state.value = next }
@@ -111,6 +121,20 @@ class SettingsViewModel(
     fun setKillTimeReminderMinutes(minutes: Int) {
         viewModelScope.launch {
             runCatching { settings.setKillTimeReminderMinutes(minutes) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setFixedReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { settings.setFixedReminderEnabled(enabled) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setFixedReminderTime(hour: Int, minute: Int) {
+        viewModelScope.launch {
+            runCatching { settings.setFixedReminderTime(hour, minute) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }

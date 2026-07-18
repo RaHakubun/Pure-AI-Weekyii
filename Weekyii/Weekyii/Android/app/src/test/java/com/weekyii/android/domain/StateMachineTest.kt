@@ -541,12 +541,17 @@ private class InMemorySettingsStore(
     override val themeId = MutableStateFlow("amber")
     override val appearanceMode = MutableStateFlow("system")
     override val killTimeReminderMinutes = MutableStateFlow(60)
+    override val fixedReminderEnabled = MutableStateFlow(false)
+    override val fixedReminderHour = MutableStateFlow(21)
+    override val fixedReminderMinute = MutableStateFlow(0)
     override suspend fun setDefaultKillTime(time: LocalTime) { defaultKillTime.value = time }
     override suspend fun setDefaultExecutionMode(mode: ExecutionMode) { defaultExecutionMode.value = mode }
     override suspend fun setDefaultTaskTypeId(idRaw: String) { defaultTaskTypeId.value = idRaw }
     override suspend fun setThemeId(idRaw: String) { themeId.value = idRaw }
     override suspend fun setAppearanceMode(idRaw: String) { appearanceMode.value = idRaw }
     override suspend fun setKillTimeReminderMinutes(minutes: Int) { killTimeReminderMinutes.value = minutes }
+    override suspend fun setFixedReminderEnabled(enabled: Boolean) { fixedReminderEnabled.value = enabled }
+    override suspend fun setFixedReminderTime(hour: Int, minute: Int) { fixedReminderHour.value = hour; fixedReminderMinute.value = minute }
 }
 
 private class RecordingWeekDao(

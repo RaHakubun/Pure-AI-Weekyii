@@ -273,6 +273,9 @@ object WeekyiiArchiveService {
         if (payload.settings.killTimeReminderMinutes !in 0..120) {
             throw WeekyiiArchiveException.InvalidData("提前提醒分钟数超出范围")
         }
+        if (payload.settings.fixedReminderHour !in 0..23 || payload.settings.fixedReminderMinute !in 0..59) {
+            throw WeekyiiArchiveException.InvalidData("固定提醒时间超出范围")
+        }
         if (payload.settings.appearanceModeRaw !in setOf("system", "light", "dark")) {
             throw WeekyiiArchiveException.InvalidData("外观模式未知")
         }

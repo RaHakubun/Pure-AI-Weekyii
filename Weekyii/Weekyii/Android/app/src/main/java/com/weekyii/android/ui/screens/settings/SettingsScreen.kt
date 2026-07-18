@@ -27,6 +27,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -122,6 +123,33 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
                                 onClick = { viewModel.setKillTimeReminderMinutes(minutes) },
                                 label = { Text(label) }
                             )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("固定时刻提醒", style = MaterialTheme.typography.labelLarge)
+                            Text("在每天指定时间补充一次提醒", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = state.fixedReminderEnabled,
+                            onCheckedChange = viewModel::setFixedReminderEnabled
+                        )
+                    }
+                    if (state.fixedReminderEnabled) {
+                        OutlinedButton(onClick = {
+                            TimePickerDialog(
+                                context,
+                                { _, hour, minute -> viewModel.setFixedReminderTime(hour, minute) },
+                                state.fixedReminderHour,
+                                state.fixedReminderMinute,
+                                true
+                            ).show()
+                        }) {
+                            Text("固定提醒 %02d:%02d".format(state.fixedReminderHour, state.fixedReminderMinute))
                         }
                     }
                     if (Build.VERSION.SDK_INT >= 33) {
