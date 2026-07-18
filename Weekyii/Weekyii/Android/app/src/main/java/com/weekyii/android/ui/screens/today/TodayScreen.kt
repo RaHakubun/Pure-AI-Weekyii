@@ -1,6 +1,8 @@
 package com.weekyii.android.ui.screens.today
 
 import android.app.TimePickerDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,8 +52,10 @@ import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.ui.model.TaskUi
+import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.TodayViewModel
 import java.time.format.DateTimeFormatter
+import java.time.LocalDate
 
 @Composable
 fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
@@ -60,6 +65,22 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
     var editingTitle by remember { mutableStateOf("") }
     var editingDescription by remember { mutableStateOf("") }
+    var editingStepsText by remember { mutableStateOf("") }
+    val editingAttachments = remember { mutableStateListOf<TaskAttachmentUi>() }
+    val context = LocalContext.current
+    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
+            editingAttachments.add(
+                TaskAttachmentUi(
+                    fileName = name,
+                    fileType = context.contentResolver.getType(uri) ?: "application/octet-stream",
+                    data = bytes
+                )
+            )
+        }
+    }
     val day = state.day
 
     LazyColumn(
@@ -117,7 +138,11 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                             editingTask = task
                             editingTitle = task.title
                             editingDescription = task.description
-                        }
+                            editingStepsText = task.steps.sortedBy { it.sortOrder }.joinToString("\n") { it.title }
+                            editingAttachments.clear()
+                            editingAttachments.addAll(task.attachments)
+                        },
+                        onPostpone = { date -> viewModel.postponeTask(task, date) }
                     )
                 }
                 item {
@@ -166,7 +191,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
             DayStatus.EXECUTE -> {
                 item { SectionHeader("专注区", "现在只做这一件事。完成后下一项才会解冻。") }
                 item {
-                    FocusTaskCard(task = state.focus, onComplete = viewModel::doneFocus)
+                    FocusTaskCard(task = state.focus, onComplete = viewModel::doneFocus, onPostpone = { task, date -> viewModel.postponeTask(task, date) })
                 }
                 if (day?.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
                     item {
@@ -186,7 +211,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                 if (state.frozen.isNotEmpty()) {
                     item { SectionHeader("冻结区", "后续 ${state.frozen.size} 项已锁定") }
                     itemsIndexed(state.frozen, key = { _, task -> task.id }) { index, task ->
-                        CompactTaskRow(number = index + 2, task = task)
+                        CompactTaskRow(number = index + 2, task = task, onPostpone = { date -> viewModel.postponeTask(task, date) })
                     }
                 }
                 if (state.complete.isNotEmpty()) {
@@ -260,13 +285,29 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues) {
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    OutlinedTextField(
+                        value = editingStepsText,
+                        onValueChange = { editingStepsText = it },
+                        label = { Text("子任务（每行一项）") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) {
+                        Text("添加附件 (${editingAttachments.size})")
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     enabled = editingTitle.isNotBlank(),
                     onClick = {
-                        viewModel.updateDraftTask(task, editingTitle, editingDescription)
+                        viewModel.updateDraftTask(
+                            task,
+                            editingTitle,
+                            editingDescription,
+                            editingStepsText.lines(),
+                            editingAttachments.toList()
+                        )
                         editingTask = null
                     }
                 ) { Text("保存") }
@@ -388,7 +429,8 @@ private fun DraftTaskCard(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onPostpone: (LocalDate) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -401,12 +443,13 @@ private fun DraftTaskCard(
             IconButton(onClick = onMoveUp, enabled = canMoveUp) { Icon(Icons.Filled.ArrowUpward, "上移") }
             IconButton(onClick = onMoveDown, enabled = canMoveDown) { Icon(Icons.Filled.ArrowDownward, "下移") }
             IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "删除") }
+            PostponeButton(onPostpone)
         }
     }
 }
 
 @Composable
-private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit) {
+private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit, onPostpone: (TaskUi, LocalDate) -> Unit) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -415,22 +458,49 @@ private fun FocusTaskCard(task: TaskUi?, onComplete: () -> Unit) {
             Text("FOCUS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             if (!task?.description.isNullOrBlank()) Text(task!!.description)
-            Button(onClick = onComplete, enabled = task != null, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Check, contentDescription = null)
-                Text("完成当前任务")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onComplete, enabled = task != null, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Check, contentDescription = null)
+                    Text("完成")
+                }
+                if (task != null) PostponeButton { date -> onPostpone(task, date) }
             }
         }
     }
 }
 
 @Composable
-private fun CompactTaskRow(number: Int, task: TaskUi) {
+private fun CompactTaskRow(number: Int, task: TaskUi, onPostpone: (LocalDate) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("T${number.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
             Text(task.title, modifier = Modifier.padding(start = 14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PostponeButton(onPostpone)
         }
     }
+}
+
+@Composable
+private fun PostponeButton(onPostpone: (LocalDate) -> Unit) {
+    val context = LocalContext.current
+    OutlinedButton(onClick = {
+        val tomorrow = LocalDate.now().plusDays(1)
+        TimePickerDateDialog(context, tomorrow) { onPostpone(it) }
+    }) { Text("后移") }
+}
+
+private fun TimePickerDateDialog(
+    context: android.content.Context,
+    initial: LocalDate,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    android.app.DatePickerDialog(
+        context,
+        { _, year, month, day -> onDateSelected(LocalDate.of(year, month + 1, day)) },
+        initial.year,
+        initial.monthValue - 1,
+        initial.dayOfMonth
+    ).show()
 }
 
 @Composable

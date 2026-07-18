@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.weekyii.android.data.repository.WeekyiiRepository
 import com.weekyii.android.data.repository.toUi
+import com.weekyii.android.data.repository.TaskAttachmentDraft
 import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
@@ -49,14 +50,15 @@ class TodayViewModel(
             repo.createDraftDayIfNeeded(today)
             val day = repo.getDayWithTasks(today.toString())
             val tasks = day?.tasks?.sortedBy { it.order } ?: emptyList()
-            val focus = tasks.firstOrNull { it.zone.name == "FOCUS" }?.toUi()
-            val frozen = tasks.filter { it.zone.name == "FROZEN" }.sortedBy { it.order }.map { it.toUi() }
-            val complete = tasks.filter { it.zone.name == "COMPLETE" }.sortedBy { it.completedOrder }.map { it.toUi() }
+            val taskUi = tasks.associate { task -> task.id to (repo.getTaskUi(task.id) ?: task.toUi()) }
+            val focus = tasks.firstOrNull { it.zone.name == "FOCUS" }?.let { taskUi.getValue(it.id) }
+            val frozen = tasks.filter { it.zone.name == "FROZEN" }.sortedBy { it.order }.map { taskUi.getValue(it.id) }
+            val complete = tasks.filter { it.zone.name == "COMPLETE" }.sortedBy { it.completedOrder }.map { taskUi.getValue(it.id) }
             val selectedMode = _state.value.startExecutionMode
             _state.value = UiState(
                 date = today,
-                day = day?.day?.toUi(tasks = tasks.map { it.toUi() }),
-                draft = tasks.filter { it.zone.name == "DRAFT" }.sortedBy { it.order }.map { it.toUi() },
+                day = day?.day?.toUi(tasks = tasks.map { taskUi.getValue(it.id) }),
+                draft = tasks.filter { it.zone.name == "DRAFT" }.sortedBy { it.order }.map { taskUi.getValue(it.id) },
                 focus = focus,
                 frozen = frozen,
                 complete = complete,
@@ -123,6 +125,17 @@ class TodayViewModel(
         }
     }
 
+    fun postponeTask(task: TaskUi, targetDate: LocalDate) {
+        viewModelScope.launch {
+            try {
+                repo.postponeTask(task.id, targetDate, timeProvider.today, timeProvider.now)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun doneFocus() {
         viewModelScope.launch {
             try {
@@ -145,10 +158,22 @@ class TodayViewModel(
         }
     }
 
-    fun updateDraftTask(task: TaskUi, title: String, description: String = "") {
+    fun updateDraftTask(
+        task: TaskUi,
+        title: String,
+        description: String = "",
+        stepTitles: List<String> = task.steps.map { it.title },
+        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi> = task.attachments
+    ) {
         viewModelScope.launch {
             try {
                 repo.updateDraftTask(timeProvider.today.toString(), task.id, title, description, task.taskType, task.taskTypeIdRaw)
+                repo.replaceDraftTaskResources(
+                    timeProvider.today.toString(),
+                    task.id,
+                    stepTitles,
+                    attachments.map { attachment -> TaskAttachmentDraft(attachment.fileName, attachment.fileType, attachment.data) }
+                )
                 refresh()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }

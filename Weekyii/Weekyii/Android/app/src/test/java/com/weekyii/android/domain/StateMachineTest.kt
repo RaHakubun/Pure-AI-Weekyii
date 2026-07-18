@@ -11,12 +11,15 @@ import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.ProjectEntity
 import com.weekyii.android.data.db.entities.TaskEntity
 import com.weekyii.android.data.db.entities.TaskWithSteps
+import com.weekyii.android.data.db.entities.TaskStepEntity
+import com.weekyii.android.data.db.entities.TaskAttachmentEntity
 import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.data.db.entities.WeekEntity
 import com.weekyii.android.data.db.entities.WeekStatus
 import com.weekyii.android.data.db.entities.WeekWithDays
 import com.weekyii.android.data.repository.WeekCalculator
 import com.weekyii.android.data.repository.WeekyiiRepository
+import com.weekyii.android.data.repository.TaskAttachmentDraft
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -252,6 +255,62 @@ class StateMachineTest {
         assertFalse(days.findById(todayDay.dayId)?.followsDefaultKillTime == true)
     }
 
+    @Test
+    fun postponingFocusMovesItToFutureDraftAndPromotesNextFrozenTask() = runBlocking {
+        val todayDate = LocalDate.of(2026, 7, 20)
+        val targetDate = todayDate.plusDays(1)
+        val currentWeek = week(todayDate, WeekStatus.PRESENT)
+        val today = day(todayDate, currentWeek.weekId, DayStatus.EXECUTE).copy(initiatedAt = Date(500))
+        val target = day(targetDate, currentWeek.weekId, DayStatus.EMPTY)
+        val focus = task(today.dayId, 1, TaskZone.FOCUS).copy(startedAt = Date(1_000))
+        val frozen = task(today.dayId, 2, TaskZone.FROZEN)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(focus, frozen), target.dayId to mutableListOf())
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today, target.dayId to target), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.postponeTask(focus.id, targetDate, todayDate, Date(2_000))
+
+        val sourceTasks = tasks.getValue(today.dayId).sortedBy { it.order }
+        val targetTasks = tasks.getValue(target.dayId)
+        assertEquals(listOf(TaskZone.FOCUS), sourceTasks.map { it.zone })
+        assertEquals(frozen.id, sourceTasks.single().id)
+        assertEquals(Date(2_000), sourceTasks.single().startedAt)
+        assertEquals(TaskZone.DRAFT, targetTasks.single().zone)
+        assertEquals(focus.id, targetTasks.single().id)
+        assertEquals(DayStatus.DRAFT, days.findById(target.dayId)?.status)
+    }
+
+    @Test
+    fun draftTaskResourcesRoundTripThroughRepository() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.DRAFT)
+        val draft = task(today.dayId, 1, TaskZone.DRAFT)
+        val taskMap = mutableMapOf(today.dayId to mutableListOf(draft))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), taskMap)
+        val taskDao = RecordingTaskDao(taskMap)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            taskDao
+        )
+
+        repository.replaceDraftTaskResources(
+            today.dayId,
+            draft.id,
+            listOf("First step", "Second step"),
+            listOf(TaskAttachmentDraft("proof.txt", "text/plain", byteArrayOf(1, 2, 3)))
+        )
+        val ui = repository.getTaskUi(draft.id)!!
+
+        assertEquals(listOf("First step", "Second step"), ui.steps.map { it.title })
+        assertEquals("proof.txt", ui.attachments.single().fileName)
+    }
+
     private fun repository(
         weekDao: RecordingWeekDao,
         dayDao: RecordingDayDao,
@@ -345,9 +404,11 @@ private class RecordingDayDao(
 private class RecordingTaskDao(
     private val tasks: MutableMap<String, MutableList<TaskEntity>> = mutableMapOf()
 ) : TaskDao {
+    private val steps = mutableMapOf<UUID, MutableList<TaskStepEntity>>()
+    private val attachments = mutableMapOf<UUID, MutableList<TaskAttachmentEntity>>()
     override suspend fun upsert(task: TaskEntity) {
+        tasks.values.forEach { dayTasks -> dayTasks.removeAll { it.id == task.id } }
         val dayTasks = tasks.getOrPut(task.dayOwnerId) { mutableListOf() }
-        dayTasks.removeAll { it.id == task.id }
         dayTasks += task
     }
     override suspend fun update(task: TaskEntity) = upsert(task)
@@ -357,7 +418,17 @@ private class RecordingTaskDao(
     override suspend fun findById(id: UUID): TaskEntity? = tasks.values.flatten().firstOrNull { it.id == id }
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> =
         MutableStateFlow(tasks[dayId].orEmpty())
-    override suspend fun findWithSteps(id: UUID): TaskWithSteps? = null
+    override suspend fun findWithSteps(id: UUID): TaskWithSteps? = tasks.values.flatten().firstOrNull { it.id == id }?.let {
+        TaskWithSteps(it, steps[id].orEmpty(), attachments[id].orEmpty())
+    }
+    override suspend fun upsertSteps(values: List<TaskStepEntity>) {
+        values.forEach { value -> steps.getOrPut(value.taskOwnerId) { mutableListOf() }.add(value) }
+    }
+    override suspend fun upsertAttachments(values: List<TaskAttachmentEntity>) {
+        values.forEach { value -> attachments.getOrPut(value.attachmentOwnerId) { mutableListOf() }.add(value) }
+    }
+    override suspend fun deleteSteps(taskId: UUID) { steps.remove(taskId) }
+    override suspend fun deleteAttachments(taskId: UUID) { attachments.remove(taskId) }
     override suspend fun deleteByZones(dayId: String, zones: List<String>) {
         tasks[dayId]?.removeAll { it.zone.name in zones }
     }

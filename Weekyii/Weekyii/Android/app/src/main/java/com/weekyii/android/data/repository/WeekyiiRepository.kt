@@ -8,6 +8,8 @@ import com.weekyii.android.data.db.entities.DayEntity
 import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.TaskEntity
+import com.weekyii.android.data.db.entities.TaskAttachmentEntity
+import com.weekyii.android.data.db.entities.TaskStepEntity
 import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.WeekEntity
@@ -21,6 +23,8 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+
+data class TaskAttachmentDraft(val fileName: String, val fileType: String, val data: ByteArray?)
 
 class WeekyiiRepository(
     val weekDao: WeekDao,
@@ -152,6 +156,45 @@ class WeekyiiRepository(
         taskDao.upsert(task.copy(title = title.trim(), description = description.trim(), taskType = taskType, taskTypeIdRaw = taskTypeIdRaw))
     }
 
+    suspend fun replaceDraftTaskResources(
+        dayId: String,
+        taskId: UUID,
+        stepTitles: List<String>,
+        attachments: List<TaskAttachmentDraft>
+    ) {
+        val day = dayDao.findById(dayId) ?: return
+        require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
+        val task = taskDao.findById(taskId) ?: return
+        require(task.dayOwnerId == dayId && task.zone == TaskZone.DRAFT)
+        taskDao.deleteSteps(taskId)
+        taskDao.deleteAttachments(taskId)
+        taskDao.upsertSteps(
+            stepTitles.mapIndexedNotNull { index, title ->
+                title.trim().takeIf { it.isNotEmpty() }?.let {
+                    TaskStepEntity(title = it, sortOrder = index, taskOwnerId = taskId)
+                }
+            }
+        )
+        taskDao.upsertAttachments(
+            attachments.map { attachment ->
+                TaskAttachmentEntity(
+                    data = attachment.data,
+                    fileName = attachment.fileName,
+                    fileType = attachment.fileType,
+                    attachmentOwnerId = taskId
+                )
+            }
+        )
+    }
+
+    suspend fun getTaskUi(taskId: UUID): TaskUi? {
+        val details = taskDao.findWithSteps(taskId) ?: return null
+        return details.task.toUi(
+            steps = details.steps.sortedBy { it.sortOrder }.map { it.toUi() },
+            attachments = details.attachments.map { it.toUi() }
+        )
+    }
+
     suspend fun deleteDraftTasks(dayId: String, taskIds: List<UUID>) {
         val day = dayDao.findById(dayId) ?: return
         require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
@@ -272,6 +315,70 @@ class WeekyiiRepository(
         )
         frozen.drop(1).forEachIndexed { index, task ->
             taskDao.upsert(task.copy(order = index + 3))
+        }
+    }
+
+    suspend fun postponeTask(
+        taskId: UUID,
+        targetDate: LocalDate,
+        today: LocalDate,
+        now: java.util.Date
+    ) {
+        require(targetDate.isAfter(today)) { "Postpone target must be in the future" }
+        val task = taskDao.findById(taskId) ?: return
+        require(task.dayOwnerId == today.toString()) { "Only today's task can be postponed" }
+        require(task.zone != TaskZone.COMPLETE) { "Completed task cannot be postponed" }
+        val source = dayDao.findWithTasks(today.toString()) ?: return
+        val targetWeekStatus = if (weekCalculator.weekId(targetDate) == weekCalculator.weekId(today)) {
+            WeekStatus.PRESENT
+        } else {
+            WeekStatus.PENDING
+        }
+        ensureWeek(targetDate, targetWeekStatus)
+        val targetDay = dayDao.findWithTasks(targetDate.toString()) ?: return
+        require(targetDay.day.status == DayStatus.EMPTY || targetDay.day.status == DayStatus.DRAFT) {
+            "Postpone target day is unavailable"
+        }
+
+        val targetOrder = (targetDay.tasks.filter { it.zone == TaskZone.DRAFT }.maxOfOrNull { it.order } ?: 0) + 1
+        taskDao.upsert(
+            task.copy(
+                dayOwnerId = targetDate.toString(),
+                zone = TaskZone.DRAFT,
+                order = targetOrder,
+                startedAt = null,
+                endedAt = null,
+                completedOrder = 0
+            )
+        )
+        dayDao.upsert(targetDay.day.copy(status = DayStatus.DRAFT))
+
+        val remaining = source.tasks.filter { it.id != taskId }
+        when (task.zone) {
+            TaskZone.DRAFT -> {
+                remaining.filter { it.zone == TaskZone.DRAFT }.sortedBy { it.order }
+                    .forEachIndexed { index, item -> taskDao.upsert(item.copy(order = index + 1)) }
+                if (remaining.none { it.zone == TaskZone.DRAFT }) dayDao.upsert(source.day.copy(status = DayStatus.EMPTY))
+            }
+            TaskZone.FOCUS -> {
+                val next = remaining.filter { it.zone == TaskZone.FROZEN }.minByOrNull { it.order }
+                if (next != null) {
+                    taskDao.upsert(next.copy(zone = TaskZone.FOCUS, order = 1, startedAt = now))
+                    remaining.filter { it.zone == TaskZone.FROZEN && it.id != next.id }
+                        .sortedBy { it.order }
+                        .forEachIndexed { index, item -> taskDao.upsert(item.copy(order = index + 2)) }
+                } else {
+                    dayDao.upsert(source.day.copy(status = DayStatus.COMPLETED, closedAt = now))
+                }
+            }
+            TaskZone.FROZEN -> {
+                remaining.filter { it.zone == TaskZone.FROZEN }.sortedBy { it.order }
+                    .forEachIndexed { index, item -> taskDao.upsert(item.copy(order = index + 2)) }
+                if (remaining.none { it.zone == TaskZone.FOCUS || it.zone == TaskZone.FROZEN }) {
+                    dayDao.upsert(source.day.copy(status = DayStatus.COMPLETED, closedAt = now))
+                }
+            }
+            TaskZone.COMPLETE -> error("Completed task cannot be postponed")
         }
     }
 

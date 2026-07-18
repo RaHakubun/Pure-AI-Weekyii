@@ -12,6 +12,8 @@ import com.weekyii.android.data.db.entities.MindStampEntity
 import com.weekyii.android.data.db.entities.ProjectEntity
 import com.weekyii.android.data.db.entities.TaskEntity
 import com.weekyii.android.data.db.entities.TaskWithSteps
+import com.weekyii.android.data.db.entities.TaskStepEntity
+import com.weekyii.android.data.db.entities.TaskAttachmentEntity
 import com.weekyii.android.data.db.entities.WeekEntity
 import com.weekyii.android.data.db.entities.WeekStatus
 import com.weekyii.android.data.db.entities.WeekWithDays
@@ -155,6 +157,10 @@ private class FakeTaskDao : TaskDao {
     override suspend fun findById(id: UUID): TaskEntity? = null
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> = MutableStateFlow(emptyList())
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = null
+    override suspend fun upsertSteps(steps: List<TaskStepEntity>) = Unit
+    override suspend fun upsertAttachments(attachments: List<TaskAttachmentEntity>) = Unit
+    override suspend fun deleteSteps(taskId: UUID) = Unit
+    override suspend fun deleteAttachments(taskId: UUID) = Unit
     override suspend fun deleteByZones(dayId: String, zones: List<String>) = Unit
 }
 
