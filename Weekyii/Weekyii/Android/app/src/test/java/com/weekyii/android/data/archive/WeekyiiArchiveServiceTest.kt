@@ -80,6 +80,23 @@ class WeekyiiArchiveServiceTest {
     }
 
     @Test
+    fun settingsThemeAppearanceAndReminderRoundTrip() {
+        val payload = WeekyiiArchiveService.Payload(
+            settings = WeekyiiArchiveService.SettingsRecord(
+                killTimeReminderMinutes = 30,
+                selectedThemeRaw = "ocean",
+                appearanceModeRaw = "dark"
+            )
+        )
+
+        val restored = WeekyiiArchiveService.decodePayload(WeekyiiArchiveService.encode(payload)).settings
+
+        assertEquals(30, restored.killTimeReminderMinutes)
+        assertEquals("ocean", restored.selectedThemeRaw)
+        assertEquals("dark", restored.appearanceModeRaw)
+    }
+
+    @Test
     fun unsupportedFormatVersionIsRejectedBeforePayloadImport() {
         val archive = WeekyiiArchiveService.encode(WeekyiiArchiveService.Payload()).decodeToString()
         val future = archive.replace("\"formatVersion\":1", "\"formatVersion\":99").encodeToByteArray()

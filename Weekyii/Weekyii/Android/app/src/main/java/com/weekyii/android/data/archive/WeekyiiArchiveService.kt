@@ -255,6 +255,8 @@ object WeekyiiArchiveService {
         requireUnique(payload.days.map { it.dayId }, "日期 ID")
         requireUnique(payload.tasks.map { it.id }, "任务 ID")
         requireUnique(payload.projects.map { it.id }, "项目 ID")
+        requireUnique(payload.mindStamps.map { it.id }, "MindStamp ID")
+        requireUnique(payload.suspendedTasks.map { it.id }, "悬置任务 ID")
         requireUnique(payload.taskTypes.map { it.idRaw }, "任务类型 ID")
         val weekIds = payload.weeks.mapTo(hashSetOf()) { it.weekId }
         val dayIds = payload.days.mapTo(hashSetOf()) { it.dayId }
@@ -267,6 +269,15 @@ object WeekyiiArchiveService {
         }
         if (payload.days.any { it.killTimeHour !in 0..23 || it.killTimeMinute !in 0..59 }) {
             throw WeekyiiArchiveException.InvalidData("日期截止时间超出范围")
+        }
+        if (payload.settings.killTimeReminderMinutes !in 0..120) {
+            throw WeekyiiArchiveException.InvalidData("提前提醒分钟数超出范围")
+        }
+        if (payload.settings.appearanceModeRaw !in setOf("system", "light", "dark")) {
+            throw WeekyiiArchiveException.InvalidData("外观模式未知")
+        }
+        if (payload.settings.selectedThemeRaw.isBlank()) {
+            throw WeekyiiArchiveException.InvalidData("主题不能为空")
         }
         val validTaskTypes = setOf("regular", "ddl", "leisure")
         if (payload.taskTypes.any { it.baseKindRaw !in validTaskTypes }) throw WeekyiiArchiveException.InvalidData("任务类型行为未知")

@@ -81,7 +81,10 @@ class WeekyiiDataArchiveRepository(
                 defaultKillTimeMinute = settings.defaultKillTime.value.minute,
                 defaultTaskTypeIdRaw = settings.defaultTaskTypeId.value,
                 defaultTaskTypeRaw = taskTypeBaseFor(settings.defaultTaskTypeId.value),
-                defaultExecutionModeRaw = settings.defaultExecutionMode.value.name.lowercase()
+                defaultExecutionModeRaw = settings.defaultExecutionMode.value.name.lowercase(),
+                killTimeReminderMinutes = settings.killTimeReminderMinutes.value,
+                selectedThemeRaw = settings.themeId.value,
+                appearanceModeRaw = settings.appearanceMode.value
             ),
             appState = WeekyiiArchiveService.AppStateRecord(
                 daysStartedCount = appState.daysStartedCount.value,
@@ -133,6 +136,9 @@ class WeekyiiDataArchiveRepository(
         settings.setDefaultKillTime(java.time.LocalTime.of(value.defaultKillTimeHour, value.defaultKillTimeMinute))
         settings.setDefaultExecutionMode(enum(value.defaultExecutionModeRaw, "execution mode"))
         settings.setDefaultTaskTypeId(value.defaultTaskTypeIdRaw)
+        settings.setKillTimeReminderMinutes(value.killTimeReminderMinutes)
+        settings.setThemeId(value.selectedThemeRaw)
+        settings.setAppearanceMode(value.appearanceModeRaw)
     }
 
     private suspend fun applyAppState(value: WeekyiiArchiveService.AppStateRecord) {
