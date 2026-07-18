@@ -1,6 +1,7 @@
 package com.weekyii.android.data.db.entities
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Relation
@@ -19,6 +20,7 @@ data class WeekEntity(
 
 // Aggregated view for convenience
 data class WeekWithDays(
+    @Embedded
     val week: WeekEntity,
     @Relation(parentColumn = "week_id", entityColumn = "week_owner_id")
     val days: List<DayEntity>

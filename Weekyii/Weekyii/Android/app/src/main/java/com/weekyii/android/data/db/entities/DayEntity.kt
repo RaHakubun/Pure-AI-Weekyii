@@ -1,6 +1,7 @@
 package com.weekyii.android.data.db.entities
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -34,6 +35,7 @@ data class DayEntity(
 )
 
 data class DayWithTasks(
+    @Embedded
     val day: DayEntity,
     @Relation(parentColumn = "day_id", entityColumn = "day_owner_id")
     val tasks: List<TaskEntity>

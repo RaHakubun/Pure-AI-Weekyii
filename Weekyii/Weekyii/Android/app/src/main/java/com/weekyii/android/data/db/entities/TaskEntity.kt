@@ -1,6 +1,7 @@
 package com.weekyii.android.data.db.entities
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -42,6 +43,7 @@ data class TaskEntity(
 )
 
 data class TaskWithSteps(
+    @Embedded
     val task: TaskEntity,
     @Relation(parentColumn = "id", entityColumn = "task_owner_id")
     val steps: List<TaskStepEntity>,

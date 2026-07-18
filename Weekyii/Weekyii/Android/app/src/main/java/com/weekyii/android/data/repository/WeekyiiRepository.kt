@@ -55,7 +55,14 @@ class WeekyiiRepository(
     suspend fun ensureWeek(date: LocalDate, status: WeekStatus): WeekEntity {
         val weekId = weekCalculator.weekId(date)
         val existing = weekDao.findById(weekId)
-        if (existing != null) return existing
+        if (existing != null) {
+            if (status == WeekStatus.PRESENT && existing.status != WeekStatus.PRESENT) {
+                val promoted = existing.copy(status = WeekStatus.PRESENT)
+                weekDao.upsert(promoted)
+                return promoted
+            }
+            return existing
+        }
         val (start, end) = weekCalculator.weekRange(date)
         val week = WeekEntity(
             weekId = weekId,
@@ -143,6 +150,8 @@ class WeekyiiRepository(
     }
 
     suspend fun changeKillTime(dayId: String, hour: Int, minute: Int) {
+        require(hour in 0..23) { "Kill Time hour must be between 0 and 23" }
+        require(minute in 0..59) { "Kill Time minute must be between 0 and 59" }
         val day = dayDao.findById(dayId) ?: return
         if (day.status == DayStatus.EXPIRED || day.status == DayStatus.COMPLETED) return
         dayDao.upsert(day.copy(killHour = hour, killMinute = minute))
@@ -158,7 +167,7 @@ class WeekyiiRepository(
         val week = weekDao.findWithDays(weekId) ?: return
         val completed = week.days.sumOf { day -> dayDao.findWithTasks(day.dayId)?.tasks?.count { it.zone == TaskZone.COMPLETE } ?: 0 }
         val expired = week.days.sumOf { it.expiredCount }
-        val started = week.days.count { it.status == DayStatus.EXECUTE || it.status == DayStatus.COMPLETED || it.status == DayStatus.EXPIRED }
+        val started = week.days.count { it.initiatedAt != null }
         val updated = week.week.copy(
             completedTasksCount = completed,
             expiredTasksCount = expired,
