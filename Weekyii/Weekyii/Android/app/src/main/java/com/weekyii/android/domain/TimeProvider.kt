@@ -8,7 +8,7 @@ import java.util.Date
 interface TimeProvider {
     val nowInstant: Instant
     val now: Date get() = Date.from(nowInstant)
-    val today: LocalDate get() = LocalDate.ofInstant(nowInstant, zoneId)
+    val today: LocalDate get() = nowInstant.atZone(zoneId).toLocalDate()
     val zoneId: ZoneId
     val currentWeekId: String
 }
