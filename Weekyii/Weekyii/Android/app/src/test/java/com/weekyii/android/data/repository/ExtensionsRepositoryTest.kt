@@ -82,6 +82,8 @@ private class RecordingProjectDao : ProjectDao {
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun delete(project: ProjectEntity) { values.remove(project.projectId) }
     override suspend fun maxTileOrder(): Int? = values.values.maxOfOrNull { it.tileOrder }
+    override suspend fun allProjects(): List<ProjectEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }
 
 private class RecordingMindStampDao : MindStampDao {
@@ -90,4 +92,6 @@ private class RecordingMindStampDao : MindStampDao {
     override fun observeAll(): Flow<List<MindStampEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun findById(id: UUID): MindStampEntity? = values[id]
     override suspend fun delete(mindStamp: MindStampEntity) { values.remove(mindStamp.id) }
+    override suspend fun allMindStamps(): List<MindStampEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }

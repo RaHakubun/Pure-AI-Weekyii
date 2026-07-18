@@ -22,4 +22,10 @@ interface MindStampDao {
 
     @Delete
     suspend fun delete(mindStamp: MindStampEntity)
+
+    @Query("SELECT * FROM mindstamps")
+    suspend fun allMindStamps(): List<MindStampEntity>
+
+    @Query("DELETE FROM mindstamps")
+    suspend fun deleteAll()
 }

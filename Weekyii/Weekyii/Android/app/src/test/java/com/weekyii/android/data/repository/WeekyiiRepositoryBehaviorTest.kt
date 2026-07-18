@@ -151,6 +151,7 @@ private class FakeWeekDao(
     override fun observeWeeksByStatus(status: WeekStatus): Flow<List<WeekEntity>> =
         MutableStateFlow(values.values.filter { it.status == status })
     override suspend fun allWeeks(): List<WeekEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }
 
 private class FakeDayDao(
@@ -165,6 +166,7 @@ private class FakeDayDao(
     override fun observeAll(): Flow<List<DayEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun listByWeek(weekId: String): List<DayEntity> = values.values.filter { it.weekOwnerId == weekId }
     override suspend fun allDays(): List<DayEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }
 
 private class FakeTaskDao : TaskDao {
@@ -180,6 +182,8 @@ private class FakeTaskDao : TaskDao {
     override suspend fun deleteAttachments(taskId: UUID) = Unit
     override suspend fun deleteByZones(dayId: String, zones: List<String>) = Unit
     override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: com.weekyii.android.data.db.entities.TaskType) = Unit
+    override suspend fun allTasks(): List<TaskEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }
 
 private class FakeProjectDao : ProjectDao {
@@ -188,6 +192,8 @@ private class FakeProjectDao : ProjectDao {
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())
     override suspend fun delete(project: ProjectEntity) = Unit
     override suspend fun maxTileOrder(): Int? = null
+    override suspend fun allProjects(): List<ProjectEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }
 
 private class FakeMindStampDao : MindStampDao {
@@ -195,4 +201,6 @@ private class FakeMindStampDao : MindStampDao {
     override fun observeAll(): Flow<List<MindStampEntity>> = MutableStateFlow(emptyList())
     override suspend fun findById(id: UUID): MindStampEntity? = null
     override suspend fun delete(mindStamp: MindStampEntity) = Unit
+    override suspend fun allMindStamps(): List<MindStampEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }

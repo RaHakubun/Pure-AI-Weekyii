@@ -49,16 +49,22 @@ class DataStoreAppStateStore(
     override val daysStartedCount: StateFlow<Int> = snapshot.mapState(scope) { it.daysStartedCount }
     override val stateTransitionRevision: StateFlow<Int> = snapshot.mapState(scope) { it.stateTransitionRevision }
 
-    override suspend fun setSystemStartDate(date: LocalDate) {
-        context.weekyiiDataStore.edit { it[Keys.systemStartDate] = date.toString() }
+    override suspend fun setSystemStartDate(date: LocalDate?) {
+        context.weekyiiDataStore.edit { preferences ->
+            if (date == null) preferences.remove(Keys.systemStartDate) else preferences[Keys.systemStartDate] = date.toString()
+        }
     }
 
-    override suspend fun setLastProcessedDate(date: LocalDate) {
-        context.weekyiiDataStore.edit { it[Keys.lastProcessedDate] = date.toString() }
+    override suspend fun setLastProcessedDate(date: LocalDate?) {
+        context.weekyiiDataStore.edit { preferences ->
+            if (date == null) preferences.remove(Keys.lastProcessedDate) else preferences[Keys.lastProcessedDate] = date.toString()
+        }
     }
 
-    override suspend fun setLastRollover(at: LocalDateTime) {
-        context.weekyiiDataStore.edit { it[Keys.lastRolloverAt] = at.toString() }
+    override suspend fun setLastRollover(at: LocalDateTime?) {
+        context.weekyiiDataStore.edit { preferences ->
+            if (at == null) preferences.remove(Keys.lastRolloverAt) else preferences[Keys.lastRolloverAt] = at.toString()
+        }
     }
 
     override suspend fun setRuntimeError(message: String?) {
@@ -77,6 +83,14 @@ class DataStoreAppStateStore(
         context.weekyiiDataStore.edit { preferences ->
             preferences[Keys.stateTransitionRevision] = (preferences[Keys.stateTransitionRevision] ?: 0) + 1
         }
+    }
+
+    override suspend fun setDaysStartedCount(value: Int) {
+        context.weekyiiDataStore.edit { it[Keys.daysStartedCount] = value.coerceAtLeast(0) }
+    }
+
+    override suspend fun setStateTransitionRevision(value: Int) {
+        context.weekyiiDataStore.edit { it[Keys.stateTransitionRevision] = value.coerceAtLeast(0) }
     }
 
     private data class Snapshot(

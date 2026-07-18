@@ -25,4 +25,10 @@ interface ProjectDao {
 
     @Query("SELECT MAX(tile_order) FROM projects")
     suspend fun maxTileOrder(): Int?
+
+    @Query("SELECT * FROM projects")
+    suspend fun allProjects(): List<ProjectEntity>
+
+    @Query("DELETE FROM projects")
+    suspend fun deleteAll()
 }

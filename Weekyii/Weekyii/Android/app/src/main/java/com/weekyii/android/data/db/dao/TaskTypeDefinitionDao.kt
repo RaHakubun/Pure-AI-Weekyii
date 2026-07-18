@@ -23,4 +23,7 @@ interface TaskTypeDefinitionDao {
 
     @Query("SELECT * FROM task_type_definitions ORDER BY sort_order, name")
     suspend fun listAll(): List<TaskTypeDefinitionEntity>
+
+    @Query("DELETE FROM task_type_definitions")
+    suspend fun deleteAll()
 }

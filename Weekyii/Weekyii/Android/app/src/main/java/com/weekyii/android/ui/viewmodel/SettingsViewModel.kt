@@ -6,6 +6,8 @@ import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
+import com.weekyii.android.data.archive.WeekyiiArchiveService
+import com.weekyii.android.data.archive.WeekyiiDataArchiveRepository
 import com.weekyii.android.domain.UserSettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,13 +17,17 @@ import java.time.LocalTime
 
 class SettingsViewModel(
     private val settings: UserSettingsStore,
-    private val taskTypes: TaskTypeDefinitionRepository
+    private val taskTypes: TaskTypeDefinitionRepository,
+    private val archiveRepository: WeekyiiDataArchiveRepository? = null
 ) : ViewModel() {
     data class UiState(
         val defaultKillTime: LocalTime = LocalTime.of(20, 0),
         val defaultExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val defaultTaskTypeId: String = "regular",
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
+        val importInspection: WeekyiiArchiveService.Inspection? = null,
+        val isImporting: Boolean = false,
+        val archiveMessage: String? = null,
         val error: String? = null
     )
 
@@ -97,4 +103,41 @@ class SettingsViewModel(
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }
+
+    fun exportArchive(onReady: (ByteArray) -> Unit) {
+        viewModelScope.launch {
+            runCatching { archiveRepository?.exportArchive() ?: error("数据归档服务未配置") }
+                .onSuccess(onReady)
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun inspectImport(data: ByteArray) {
+        runCatching { archiveRepository?.inspect(data) ?: error("数据归档服务未配置") }
+            .onSuccess { inspection ->
+                pendingImportData = data
+                _state.value = _state.value.copy(importInspection = inspection, archiveMessage = null, error = null)
+            }
+            .onFailure { _state.value = _state.value.copy(error = it.message) }
+    }
+
+    fun confirmImport() {
+        val data = pendingImportData ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isImporting = true, error = null)
+            runCatching { archiveRepository?.importReplacing(data) ?: error("数据归档服务未配置") }
+                .onSuccess { inspection ->
+                    pendingImportData = null
+                    _state.value = _state.value.copy(isImporting = false, importInspection = null, archiveMessage = "已恢复 ${inspection.weekCount} 周数据")
+                }
+                .onFailure { _state.value = _state.value.copy(isImporting = false, error = it.message) }
+        }
+    }
+
+    fun cancelImport() {
+        pendingImportData = null
+        _state.value = _state.value.copy(importInspection = null)
+    }
+
+    private var pendingImportData: ByteArray? = null
 }

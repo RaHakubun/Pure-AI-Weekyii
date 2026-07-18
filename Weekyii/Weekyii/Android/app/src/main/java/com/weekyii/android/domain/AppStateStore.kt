@@ -12,12 +12,14 @@ interface AppStateStore {
     val runtimeErrorMessage: StateFlow<String?>
     val stateTransitionRevision: StateFlow<Int>
 
-    suspend fun setSystemStartDate(date: LocalDate)
-    suspend fun setLastProcessedDate(date: LocalDate)
-    suspend fun setLastRollover(at: LocalDateTime)
+    suspend fun setSystemStartDate(date: LocalDate?)
+    suspend fun setLastProcessedDate(date: LocalDate?)
+    suspend fun setLastRollover(at: LocalDateTime?)
     suspend fun setRuntimeError(message: String?)
     suspend fun incrementDaysStarted()
     suspend fun bumpStateTransitionRevision()
+    suspend fun setDaysStartedCount(value: Int)
+    suspend fun setStateTransitionRevision(value: Int)
     val daysStartedCount: StateFlow<Int>
 }
 
@@ -36,10 +38,12 @@ class InMemoryAppStateStore : AppStateStore {
     override val daysStartedCount: StateFlow<Int> = _daysStartedCount
     override val stateTransitionRevision: StateFlow<Int> = _stateTransitionRevision
 
-    override suspend fun setSystemStartDate(date: LocalDate) { _systemStartDate.value = date }
-    override suspend fun setLastProcessedDate(date: LocalDate) { _lastProcessedDate.value = date }
-    override suspend fun setLastRollover(at: LocalDateTime) { _lastRolloverAt.value = at }
+    override suspend fun setSystemStartDate(date: LocalDate?) { _systemStartDate.value = date }
+    override suspend fun setLastProcessedDate(date: LocalDate?) { _lastProcessedDate.value = date }
+    override suspend fun setLastRollover(at: LocalDateTime?) { _lastRolloverAt.value = at }
     override suspend fun setRuntimeError(message: String?) { _runtimeErrorMessage.value = message }
     override suspend fun incrementDaysStarted() { _daysStartedCount.value = _daysStartedCount.value + 1 }
     override suspend fun bumpStateTransitionRevision() { _stateTransitionRevision.value = _stateTransitionRevision.value + 1 }
+    override suspend fun setDaysStartedCount(value: Int) { _daysStartedCount.value = value.coerceAtLeast(0) }
+    override suspend fun setStateTransitionRevision(value: Int) { _stateTransitionRevision.value = value.coerceAtLeast(0) }
 }

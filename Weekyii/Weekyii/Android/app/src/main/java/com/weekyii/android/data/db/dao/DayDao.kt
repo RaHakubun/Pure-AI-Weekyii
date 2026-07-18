@@ -38,4 +38,7 @@ interface DayDao {
 
     @Query("SELECT * FROM days")
     suspend fun allDays(): List<DayEntity>
+
+    @Query("DELETE FROM days")
+    suspend fun deleteAll()
 }

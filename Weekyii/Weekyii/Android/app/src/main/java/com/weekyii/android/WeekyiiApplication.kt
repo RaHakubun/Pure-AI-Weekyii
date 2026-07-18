@@ -11,6 +11,8 @@ import com.weekyii.android.data.repository.WeekCalculator
 import com.weekyii.android.data.repository.WeekyiiRepository
 import com.weekyii.android.data.repository.SuspendedTaskRepository
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
+import com.weekyii.android.data.archive.BackupRecoveryService
+import com.weekyii.android.data.archive.WeekyiiDataArchiveRepository
 import com.weekyii.android.domain.DataStoreAppStateStore
 import com.weekyii.android.domain.DefaultTimeProvider
 import com.weekyii.android.domain.StateMachine
@@ -37,6 +39,8 @@ class WeekyiiApplication : Application() {
     lateinit var suspendedTaskRepository: SuspendedTaskRepository
         private set
     lateinit var taskTypeDefinitionRepository: TaskTypeDefinitionRepository
+        private set
+    lateinit var dataArchiveRepository: WeekyiiDataArchiveRepository
         private set
     lateinit var notificationService: WeekyiiNotificationService
         private set
@@ -66,6 +70,13 @@ class WeekyiiApplication : Application() {
                 database.taskTypeDefinitionDao(),
                 database.taskDao(),
                 database.suspendedTaskDao()
+            )
+            dataArchiveRepository = WeekyiiDataArchiveRepository(
+                database = database,
+                settings = settingsStore,
+                appState = appStateStore,
+                backupRecovery = BackupRecoveryService(this),
+                zoneId = zone
             )
             notificationService = WeekyiiNotificationService(this)
             notificationService.ensureChannel()

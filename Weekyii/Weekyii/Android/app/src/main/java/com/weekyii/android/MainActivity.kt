@@ -62,7 +62,9 @@ class MainActivity : ComponentActivity() {
                         app.taskTypeDefinitionRepository
                     )
                 }
-                val settingsVm = remember { SettingsViewModel(app.settingsStore, app.taskTypeDefinitionRepository) }
+                val settingsVm = remember {
+                    SettingsViewModel(app.settingsStore, app.taskTypeDefinitionRepository, app.dataArchiveRepository)
+                }
 
                 Scaffold(
                     bottomBar = {

@@ -79,4 +79,6 @@ private class RecordingSuspendedTaskDao : SuspendedTaskDao {
     override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType) {
         values.replaceAll { _, task -> if (task.taskTypeIdRaw == typeIdRaw) task.copy(taskType = baseKind) else task }
     }
+    override suspend fun allTasks(): List<SuspendedTaskEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }

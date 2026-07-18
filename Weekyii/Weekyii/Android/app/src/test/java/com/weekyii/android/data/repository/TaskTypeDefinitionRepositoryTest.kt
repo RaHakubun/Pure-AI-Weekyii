@@ -84,6 +84,7 @@ private class RecordingTaskTypeDefinitionDao : TaskTypeDefinitionDao {
     override fun observeAll(): Flow<List<TaskTypeDefinitionEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun listAll(): List<TaskTypeDefinitionEntity> = values.values.toList()
     override suspend fun findById(idRaw: String): TaskTypeDefinitionEntity? = values[idRaw]
+    override suspend fun deleteAll() { values.clear() }
 }
 
 private class TaskTypeRecordingTaskDao : TaskDao {
@@ -102,6 +103,8 @@ private class TaskTypeRecordingTaskDao : TaskDao {
     override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType) {
         lastTypeUpdate = typeIdRaw to baseKind
     }
+    override suspend fun allTasks(): List<TaskEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }
 
 private class TaskTypeRecordingSuspendedDao : SuspendedTaskDao {
@@ -116,4 +119,6 @@ private class TaskTypeRecordingSuspendedDao : SuspendedTaskDao {
     override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType) {
         lastTypeUpdate = typeIdRaw to baseKind
     }
+    override suspend fun allTasks(): List<SuspendedTaskEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }

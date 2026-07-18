@@ -1,6 +1,8 @@
 package com.weekyii.android.ui.screens.settings
 
 import android.app.TimePickerDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +41,8 @@ import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.viewmodel.SettingsViewModel
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
@@ -46,6 +50,24 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
     val context = LocalContext.current
     var editingDefinition by remember { mutableStateOf<TaskTypeDefinitionEntity?>(null) }
     var creatingType by remember { mutableStateOf(false) }
+    var pendingExportData by remember { mutableStateOf<ByteArray?>(null) }
+    var localArchiveMessage by remember { mutableStateOf<String?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val data = pendingExportData
+        if (uri != null && data != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(data) } }
+                .onSuccess { localArchiveMessage = "归档已保存" }
+                .onFailure { localArchiveMessage = "保存失败：${it.message}" }
+        }
+        pendingExportData = null
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("无法读取文件") }
+                .onSuccess(viewModel::inspectImport)
+                .onFailure { localArchiveMessage = "读取失败：${it.message}" }
+        }
+    }
     val activeTypes = state.taskTypeDefinitions.filterNot { it.isArchived }.sortedBy { it.sortOrder }
     val archivedTypes = state.taskTypeDefinitions.filter { it.isArchived && !it.isBuiltIn }.sortedBy { it.name }
     val resolvedDefaultId = state.defaultTaskTypeId.takeIf { id -> activeTypes.any { it.idRaw == id } } ?: "regular"
@@ -75,6 +97,28 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
                             true
                         ).show()
                     }) { Text(String.format("%02d:%02d", state.defaultKillTime.hour, state.defaultKillTime.minute)) }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("数据归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("导出包含任务、周、项目、MindStamp、悬置箱、任务类型和核心设置。导入会先创建本地恢复点，再替换当前数据。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            viewModel.exportArchive { bytes ->
+                                pendingExportData = bytes
+                                val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
+                                exportLauncher.launch("weekyii-$stamp.json")
+                            }
+                        }) { Text("导出 JSON") }
+                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/json", "text/plain")) }) {
+                            Text("导入归档")
+                        }
+                    }
+                    (state.archiveMessage ?: localArchiveMessage)?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 }
             }
         }
@@ -159,6 +203,24 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
                 viewModel.updateTaskType(definition.idRaw, name, icon, color, baseKind)
                 editingDefinition = null
             }
+        )
+    }
+
+    state.importInspection?.let { inspection ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelImport,
+            title = { Text("确认替换本地数据") },
+            text = {
+                Text(
+                    "归档包含 ${inspection.weekCount} 周、${inspection.dayCount} 天、${inspection.taskCount} 个任务、${inspection.projectCount} 个项目和 ${inspection.taskTypeCount} 个任务类型。导入前会自动创建恢复点。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmImport, enabled = !state.isImporting) {
+                    Text(if (state.isImporting) "正在导入…" else "确认导入")
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::cancelImport) { Text("取消") } }
         )
     }
 }

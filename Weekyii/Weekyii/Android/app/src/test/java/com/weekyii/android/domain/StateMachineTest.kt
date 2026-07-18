@@ -555,6 +555,7 @@ private class RecordingWeekDao(
     override fun observeWeeksByStatus(status: WeekStatus): Flow<List<WeekEntity>> =
         MutableStateFlow(values.values.filter { it.status == status })
     override suspend fun allWeeks(): List<WeekEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
 }
 
 private class RecordingDayDao(
@@ -573,6 +574,7 @@ private class RecordingDayDao(
     override suspend fun listByWeek(weekId: String): List<DayEntity> =
         values.values.filter { it.weekOwnerId == weekId }
     override suspend fun allDays(): List<DayEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear(); tasks.clear() }
 }
 
 private class RecordingTaskDao(
@@ -613,6 +615,8 @@ private class RecordingTaskDao(
             }
         }
     }
+    override suspend fun allTasks(): List<TaskEntity> = tasks.values.flatten()
+    override suspend fun deleteAll() { tasks.clear() }
 }
 
 private class RecordingProjectDao : ProjectDao {
@@ -621,6 +625,8 @@ private class RecordingProjectDao : ProjectDao {
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())
     override suspend fun delete(project: ProjectEntity) = Unit
     override suspend fun maxTileOrder(): Int? = null
+    override suspend fun allProjects(): List<ProjectEntity> = emptyList()
+    override suspend fun deleteAll() = Unit
 }
 
 private fun LocalDate.asDate(zoneId: ZoneId): Date = Date.from(atStartOfDay(zoneId).toInstant())

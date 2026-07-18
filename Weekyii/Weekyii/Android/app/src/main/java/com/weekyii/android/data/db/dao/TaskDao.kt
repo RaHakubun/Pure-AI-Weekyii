@@ -54,4 +54,10 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET task_type = :baseKind WHERE task_type_id_raw = :typeIdRaw")
     suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: TaskType)
+
+    @Query("SELECT * FROM tasks")
+    suspend fun allTasks(): List<TaskEntity>
+
+    @Query("DELETE FROM tasks")
+    suspend fun deleteAll()
 }

@@ -33,4 +33,7 @@ interface WeekDao {
     @Transaction
     @Query("SELECT * FROM weeks")
     suspend fun allWeeks(): List<WeekEntity>
+
+    @Query("DELETE FROM weeks")
+    suspend fun deleteAll()
 }
