@@ -1,24 +1,47 @@
-# Weekyii Android 子工程（草案版）
+# Weekyii Android
 
-> 当前仅落盘代码与目录，无构建依赖下载；待接入 Room/Hilt 等后再运行。
+这是 `online-chatgpt-develop` 行为的 Android 原生实现。业务规则保持一致，界面与系统交互使用 Jetpack Compose、Material 3、Room、DataStore、WorkManager、AlarmManager 和 AppWidget。
 
-## 结构
-- `Android/app/src/main/java/com/weekyii/android/` 主代码
-  - `data/db/entities` Room 实体（Week/Day/Task/Step/Attachment/Project/MindStamp + 枚举）
-  - `data/db/dao` DAO 接口
-  - `data/db/AppDatabase.kt` + `Converters.kt`
-  - `data/repository` Repository、WeekCalculator、实体到 UI 模型映射
-  - `domain` StateMachine、TimeProvider、AppStateStore（内存版）
-  - `ui` Compose 主题、导航、各页占位 UI、ViewModel 骨架
-- `Android/app/src/main/res/values` 颜色/字符串/主题资源
-- `Android/app/build.gradle.kts`、`settings.gradle.kts` 等（未下载 wrapper）
+## 打开项目
 
-## 构建（稍后）
-- 安装 Android Studio Iguana+，JDK 21。
-- 在 `Android/` 目录执行 `./gradlew :app:assembleDebug`（需要补齐 gradle wrapper 后）。
+Android Studio 打开目录：
 
-## 待办
-- 接入 Room 实例和 DI（Hilt/手动单例），替换 `StubRepoFactory`。
-- 按 iOS 逻辑完善 StateMachine 定时触发、通知。
-- UI 细化：Today/Pending/Past 真实交互，Extensions/Settings 填充。
-- 本地化 key 对齐 iOS。
+`Weekyii/Weekyii/Android`
+
+等待 Gradle Sync 完成后，选择 `app` 配置与模拟器/真机即可运行。
+
+## 构建与验证
+
+项目使用 Android Studio 自带 JBR（JDK 21）与仓库内 Gradle Wrapper：
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' \
+ANDROID_HOME="$HOME/Library/Android/sdk" \
+./gradlew \
+  :app:testDebugUnitTest \
+  :app:compileDebugAndroidTestKotlin \
+  :app:lintDebug \
+  :app:assembleDebug \
+  --no-daemon
+```
+
+Debug APK：
+
+`app/build/outputs/apk/debug/app-debug.apk`
+
+设备已连接时运行 instrumentation：
+
+```bash
+./gradlew :app:connectedDebugAndroidTest --no-daemon
+```
+
+## 实现范围
+
+- Today、当前周、Pending 月历/周计划、Past 统计与详情
+- 严格/灵活执行、延期、步骤与附件、自定义任务类型
+- Projects、MindStamp、悬置任务及其提醒生命周期
+- 主题、系统/浅色/深色、默认项目值、Kill Time 提前与固定提醒
+- 版本化 JSON 归档、导入前恢复点、Room 迁移、后台 reconcile
+- Android 主屏 Today Widget
+
+通知在 Android 13 及以上需要用户在 Settings 页面授予通知权限。
