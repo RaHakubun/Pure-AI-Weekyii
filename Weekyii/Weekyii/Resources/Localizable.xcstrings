@@ -4,16 +4,62 @@
     "" : {
 
     },
-    ":" : {
-
-    },
     "·" : {
 
     },
     "%" : {
 
     },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %lld 项" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld 项"
+          }
+        }
+      }
+    },
+    "%@ · 不保留任务详情" : {
+
+    },
+    "%@，%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@，%2$@"
+          }
+        }
+      }
+    },
+    "%@，%@ %lld 项" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@，%2$@ %3$lld 项"
+          }
+        }
+      }
+    },
     "%lld" : {
+
+    },
+    "%lld 个类型 · 自定义分类外观" : {
+
+    },
+    "%lld 分钟" : {
 
     },
     "%lld/%lld" : {
@@ -38,10 +84,16 @@
     "%lld%%" : {
 
     },
+    "+%lld天" : {
+
+    },
     "~" : {
 
     },
     "1.0.0" : {
+
+    },
+    "99+" : {
 
     },
     "action.add" : {
@@ -92,6 +144,22 @@
         }
       }
     },
+    "action.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
     "action.done_focus" : {
       "localizations" : {
         "en" : {
@@ -104,6 +172,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成专注"
+          }
+        }
+      }
+    },
+    "action.edit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
           }
         }
       }
@@ -141,6 +225,7 @@
       }
     },
     "action.start" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -222,6 +307,9 @@
           }
         }
       }
+    },
+    "D-%lld" : {
+
     },
     "Day" : {
 
@@ -418,6 +506,17 @@
         }
       }
     },
+    "error.task_not_found" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Task not found."
+          }
+        }
+      }
+    },
     "Expired" : {
 
     },
@@ -454,6 +553,7 @@
       }
     },
     "extensions.module.mindstamps.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -480,7 +580,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "思想钢印"
+            "value" : "呆胶布"
           }
         }
       }
@@ -544,7 +644,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "思想钢印"
+            "value" : "呆胶布"
           }
         }
       }
@@ -657,7 +757,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建钢印"
+            "value" : "新建呆胶布"
           }
         }
       }
@@ -689,7 +789,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此思想钢印将被永久删除。"
+            "value" : "此呆胶布将被永久删除。"
           }
         }
       }
@@ -705,7 +805,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除钢印？"
+            "value" : "删除呆胶布？"
           }
         }
       }
@@ -738,7 +838,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "创建思想钢印"
+            "value" : "创建呆胶布"
           }
         }
       }
@@ -755,7 +855,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "编辑思想钢印"
+            "value" : "编辑呆胶布"
           }
         }
       }
@@ -803,7 +903,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写下你的思想钢印..."
+            "value" : "写下这张呆胶布..."
           }
         }
       }
@@ -819,7 +919,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刻下你的信念，在每次开始时重温。"
+            "value" : "贴下想记住的文字与图像，开始一天时再看一眼。"
           }
         }
       }
@@ -835,7 +935,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暂无思想钢印"
+            "value" : "暂无呆胶布"
           }
         }
       }
@@ -851,12 +951,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "钢印内容不能为空。"
+            "value" : "呆胶布内容不能为空。"
           }
         }
       }
     },
     "mindstamp.placeholder" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -899,7 +1000,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "思想钢印"
+            "value" : "呆胶布"
           }
         }
       }
@@ -932,6 +1033,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Weekyii"
+          }
+        }
+      }
+    },
+    "past.analytics.collapse" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "收起分析"
+          }
+        }
+      }
+    },
+    "past.analytics.expand" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "展开分析"
+          }
+        }
+      }
+    },
+    "past.analytics.subtitle" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "趋势、热力与效率统计"
+          }
+        }
+      }
+    },
+    "past.analytics.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "过去分析"
           }
         }
       }
@@ -1028,6 +1173,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "过期任务详情不可查看。"
+          }
+        }
+      }
+    },
+    "past.month.legend.completed" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "有完成"
+          }
+        }
+      }
+    },
+    "past.month.legend.expired" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "有过期"
+          }
+        }
+      }
+    },
+    "past.month.selected" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "已选日期"
+          }
+        }
+      }
+    },
+    "past.switch.month" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "切换到月视图"
+          }
+        }
+      }
+    },
+    "past.switch.week" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "切换到周列表"
           }
         }
       }
@@ -1275,6 +1475,7 @@
       }
     },
     "pending.days_count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1318,6 +1519,128 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无未来周"
+          }
+        }
+      }
+    },
+    "pending.month.ddl_count" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "DDL"
+          }
+        }
+      }
+    },
+    "pending.month.selected" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "已选日期"
+          }
+        }
+      }
+    },
+    "pending.month.task_count" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "任务"
+          }
+        }
+      }
+    },
+    "pending.switch.month" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "切换到月视图"
+          }
+        }
+      }
+    },
+    "pending.switch.week" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "切换到周列表"
+          }
+        }
+      }
+    },
+    "pending.timeline.empty_hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start adding tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始添加任务"
+          }
+        }
+      }
+    },
+    "pending.timeline.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Week Schedule"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本周日程"
+          }
+        }
+      }
+    },
+    "pending.timeline.view_all" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View all %d tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部 %d 个任务"
+          }
+        }
+      }
+    },
+    "pending.timeline.view_day" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看详情"
           }
         }
       }
@@ -1405,6 +1728,7 @@
       }
     },
     "pending.week.draft_tasks_count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1432,6 +1756,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空白天数"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "周预报"
           }
         }
       }
@@ -2449,6 +2784,22 @@
         }
       }
     },
+    "project.tiles.edit_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag tiles to reorder, delete from the top-right, resize from the bottom-right."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖拽磁贴可重排，右上角删除，右下角改尺寸"
+          }
+        }
+      }
+    },
     "settings.about.days_started" : {
       "localizations" : {
         "en" : {
@@ -2509,6 +2860,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本"
+          }
+        }
+      }
+    },
+    "settings.appearance.dark" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        }
+      }
+    },
+    "settings.appearance.light" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        }
+      }
+    },
+    "settings.appearance.mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示模式"
+          }
+        }
+      }
+    },
+    "settings.appearance.system" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
           }
         }
       }
@@ -2931,6 +3346,17 @@
         }
       }
     },
+    "settings.default_kill_time.guidance" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一天的任务将在截止时间结算"
+          }
+        }
+      }
+    },
     "settings.default_task_type" : {
       "localizations" : {
         "en" : {
@@ -3041,6 +3467,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "包含数据填充与清空等高级选项。"
+          }
+        }
+      }
+    },
+    "settings.developer.unlock_lotr" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "解锁魔戒主题"
+          }
+        }
+      }
+    },
+    "settings.developer.unlock_lotr.subtitle" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "本地调试用，不代表真实购买状态"
+          }
+        }
+      }
+    },
+    "settings.future.month_markers.ddl" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "截止任务"
+          }
+        }
+      }
+    },
+    "settings.future.month_markers.leisure" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "休闲任务"
+          }
+        }
+      }
+    },
+    "settings.future.month_markers.regular" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "常规任务"
+          }
+        }
+      }
+    },
+    "settings.future.month_markers.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "在月视图上显示"
           }
         }
       }
@@ -3162,6 +3654,7 @@
       }
     },
     "settings.kill_time_reminder.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3173,6 +3666,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在截止时间前提醒我"
+          }
+        }
+      }
+    },
+    "settings.past.summary.note" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "completed 计入完成详情；expired 仅保留数量，不保留任务详情。"
+          }
+        }
+      }
+    },
+    "settings.past.summary.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "统计口径说明"
           }
         }
       }
@@ -3257,7 +3772,52 @@
         }
       }
     },
+    "settings.section.display_theme" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "显示与主题"
+          }
+        }
+      }
+    },
+    "settings.section.future" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未来"
+          }
+        }
+      }
+    },
+    "settings.section.past" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "过去"
+          }
+        }
+      }
+    },
+    "settings.section.present" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "当下"
+          }
+        }
+      }
+    },
     "settings.section.tasks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3274,6 +3834,7 @@
       }
     },
     "settings.section.week" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3285,6 +3846,82 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "周与统计"
+          }
+        }
+      }
+    },
+    "settings.theme.color" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题色"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.badge" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Premium"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.footer" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "解锁后可切换到魔戒主题；当前会回落到普通主题。"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.locked" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "魔戒 为 Premium 主题"
+          }
+        }
+      }
+    },
+    "settings.theme.premium.locked_short" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "锁定"
+          }
+        }
+      }
+    },
+    "settings.theme.preview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme Preview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题预览"
           }
         }
       }
@@ -3781,13 +4418,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Settings"
+            "value" : "Me"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设置"
+            "value" : "我的"
           }
         }
       }
@@ -3797,13 +4434,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today"
+            "value" : "Now"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今日"
+            "value" : "当下"
           }
         }
       }
@@ -3888,6 +4525,17 @@
         }
       }
     },
+    "task.project.origin" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "来自 %@"
+          }
+        }
+      }
+    },
     "task.step.add" : {
       "localizations" : {
         "en" : {
@@ -3921,6 +4569,7 @@
       }
     },
     "task.steps.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4292,13 +4941,430 @@
         }
       }
     },
-    "主题色" : {
+    "七天详情已折叠" : {
+
+    },
+    "上方拓扑仍可使用；需要展开详情时，切回“当前状态”或“信息横条”。" : {
+
+    },
+    "上移" : {
+
+    },
+    "下一步" : {
+
+    },
+    "下移" : {
+
+    },
+    "严格模式：开始后按固定顺序逐项推进。" : {
+
+    },
+    "临近截止" : {
+
+    },
+    "交换" : {
+
+    },
+    "仅对明日以后生效" : {
+
+    },
+    "今日任务流已过期，无法同步到今天。本次提交已取消。" : {
+
+    },
+    "今日呆胶布" : {
+
+    },
+    "今日已过期" : {
+
+    },
+    "任务已遗忘" : {
+
+    },
+    "任务类型" : {
+
+    },
+    "任务类型管理" : {
+
+    },
+    "你可以选择同步今日，或只让新默认值从明日开始生效。" : {
+
+    },
+    "保存" : {
+
+    },
+    "保存到相册" : {
+
+    },
+    "保存图片" : {
+
+    },
+    "修改将在下一次开始任务流时生效" : {
+
+    },
+    "倒计时" : {
+
+    },
+    "倒计时 %lld 天" : {
+
+    },
+    "全局视图" : {
+
+    },
+    "关闭全屏" : {
+
+    },
+    "冻结" : {
+
+    },
+    "冻结草稿区" : {
+
+    },
+    "分配到某天" : {
+
+    },
+    "列出最近备份摘要" : {
+
+    },
+    "创建并移动" : {
+
+    },
+    "删除" : {
+
+    },
+    "删除悬置任务" : {
+
+    },
+    "到期" : {
+
+    },
+    "取消" : {
+
+    },
+    "取消更改" : {
+
+    },
+    "右上角点 + 新建呆胶布" : {
+
+    },
+    "同意后无法撤回，需要在截止时间前完成，未完成项将被过期遗忘。" : {
+
+    },
+    "同步至今日及以后" : {
+
+    },
+    "后移" : {
+
+    },
+    "后移 %lld 天" : {
+
+    },
+    "后移任务" : {
+
+    },
+    "后移方式" : {
+
+    },
+    "含图片" : {
+
+    },
+    "呆胶布内容" : {
+
+    },
+    "回滚到最新备份" : {
+
+    },
+    "回滚到最新备份（危险）" : {
+
+    },
+    "固定时刻提醒" : {
+
+    },
+    "图例" : {
+
+    },
+    "图标" : {
+
+    },
+    "在冻结和解冻状态之间切换" : {
+
+    },
+    "在这里记录任务思绪" : {
+
+    },
+    "在这里记录未决定具体时限的任务" : {
+
+    },
+    "基础" : {
+
+    },
+    "完成率 %lld%%" : {
+
+    },
+    "完成编辑" : {
+
+    },
+    "导出状态诊断" : {
+
+    },
+    "导出诊断信息" : {
+
+    },
+    "将直接替换当前数据库文件，可能丢失最新数据。" : {
+
+    },
+    "将移动到" : {
+
+    },
+    "已遗忘任务，无详情" : {
+
+    },
+    "应用新的默认截止时间" : {
+
+    },
+    "开始 %@" : {
+
+    },
+    "开始任务流头部信息" : {
+
+    },
+    "开始任务流风险提示" : {
+
+    },
+    "归档类型" : {
+
+    },
+    "当前仅可选择 23:59，请使用时间选择器确认。" : {
+
+    },
+    "快捷选择" : {
+
+    },
+    "悬置箱" : {
+
+    },
+    "悬置箱不是回收站。删除后不会保留后路。" : {
+
+    },
+    "执行模式" : {
+
+    },
+    "把暂时无法承诺到特定日期的任务放这里。" : {
+
+    },
+    "把注意力收束到唯一入口，然后开始今天。" : {
+
+    },
+    "把这项悬置任务真正落到某一天。若那一天或所属周不存在，系统会自动补齐。" : {
+
+    },
+    "按当前顺序执行，共 %lld 项" : {
+
+    },
+    "提交修改" : {
+
+    },
+    "提交后今日未完成内容会立即过期，是否继续？" : {
+
+    },
+    "提前 90 分钟" : {
+
+    },
+    "提前 120 分钟" : {
+
+    },
+    "提醒时刻" : {
+
+    },
+    "数据库不可用" : {
+
+    },
+    "整周概览" : {
+
+    },
+    "新增" : {
+
+    },
+    "新增任务" : {
+
+    },
+    "新增任务类型" : {
+
+    },
+    "新增悬置任务" : {
+
+    },
+    "新增步骤" : {
+
+    },
+    "新截止时间会导致今日任务立即过期" : {
+
+    },
+    "日程详情" : {
+
+    },
+    "明天" : {
+
+    },
+    "是否开始今日任务流？" : {
+
+    },
+    "暂存未分配日期的任务。到期前可续期、分配或删除。" : {
+
+    },
+    "暂无步骤" : {
+
+    },
+    "暂时不属于任何一天、须在倒计时内再次决策。" : {
 
     },
     "月趋势" : {
 
     },
-    "本周时间线" : {
+    "本周拓扑" : {
+
+    },
+    "本周详情" : {
+
+    },
+    "查看任务详情" : {
+
+    },
+    "查看当天" : {
+
+    },
+    "步骤" : {
+
+    },
+    "步骤 %lld" : {
+
+    },
+    "步骤全文" : {
+
+    },
+    "步骤内容" : {
+
+    },
+    "添加" : {
+
+    },
+    "灵动模式：开始后可解冻草稿区，调整任务并与专注任务交换。" : {
+
+    },
+    "点击任务可编辑；进入编辑模式后可删除并拖拽排序。" : {
+
+    },
+    "目标周尚未创建" : {
+
+    },
+    "目标日期" : {
+
+    },
+    "确认" : {
+
+    },
+    "确认分配" : {
+
+    },
+    "确认后移" : {
+
+    },
+    "确认后移任务" : {
+
+    },
+    "确认回滚" : {
+
+    },
+    "立即重算状态" : {
+
+    },
+    "类型名称" : {
+
+    },
+    "系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。" : {
+
+    },
+    "结束 %@" : {
+
+    },
+    "续期 10 天" : {
+
+    },
+    "续期 30 天" : {
+
+    },
+    "编辑" : {
+
+    },
+    "编辑任务" : {
+
+    },
+    "编辑任务类型" : {
+
+    },
+    "缩放后展开结果组和任务" : {
+
+    },
+    "草稿任务" : {
+
+    },
+    "草稿区已冻结，解冻后可调整待执行任务。" : {
+
+    },
+    "草稿区已解冻，可新增、编辑、删除、排序，并与当前专注任务交换。" : {
+
+    },
+    "解冻" : {
+
+    },
+    "解冻草稿区" : {
+
+    },
+    "诊断信息已复制到剪贴板" : {
+
+    },
+    "该日期暂无任务。" : {
+
+    },
+    "该日期暂无任务记录。" : {
+
+    },
+    "调整顺序或删除任务" : {
+
+    },
+    "轻点选择，轻点两次聚焦当天分支" : {
+
+    },
+    "输入任务名称" : {
+
+    },
+    "输入任务描述" : {
+
+    },
+    "过去日期仅可查看，不可新增。" : {
+
+    },
+    "进入后将按任务顺序推进，直到完成或截止。" : {
+
+    },
+    "阶段 2/2 · 呆胶布" : {
+
+    },
+    "附件" : {
+
+    },
+    "附件 %lld" : {
+
+    },
+    "项目暂无待办" : {
+
+    },
+    "项目概览" : {
+
+    },
+    "预览呆胶布图片" : {
+
+    },
+    "颜色" : {
 
     }
   },

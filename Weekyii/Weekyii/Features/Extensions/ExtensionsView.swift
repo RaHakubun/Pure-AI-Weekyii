@@ -15,7 +15,7 @@ private enum ExtensionTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .projects: "folder.fill"
-        case .mindStamps: "seal.fill"
+        case .mindStamps: "bandage.fill"
         }
     }
 }
@@ -52,6 +52,21 @@ struct ExtensionsView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .small, animated: false)
+                }
+
+                if selectedTab == .mindStamps {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showingMindStampEditor = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.weekyiiPrimary)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityLabel(String(localized: "mindstamp.add"))
+                        .accessibilityIdentifier("mindstampsToolbarCreateButton")
+                    }
                 }
             }
             .sheet(isPresented: $showingCreateSheet, onDismiss: {
@@ -201,30 +216,8 @@ struct ExtensionsView: View {
     private var mindStampsContent: some View {
         Group {
             if let mindStampViewModel {
-                VStack(spacing: WeekSpacing.md) {
-                    MindStampListView(viewModel: mindStampViewModel)
-                        .padding(.horizontal, WeekSpacing.base)
-
-                    // Add stamp button
-                    Button {
-                        showingMindStampEditor = true
-                    } label: {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 14))
-                            Text(String(localized: "mindstamp.add"))
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, WeekSpacing.xl)
-                        .padding(.vertical, WeekSpacing.md)
-                        .background(Color.weekyiiGradient)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.bottom, WeekSpacing.lg)
-                }
+                MindStampListView(viewModel: mindStampViewModel)
+                    .padding(.horizontal, WeekSpacing.xl)
                 .padding(.top, WeekSpacing.sm)
             } else {
                 ProgressView()
@@ -286,6 +279,7 @@ private struct ProjectInlineCard: View {
 
     private let maxVisibleTasks = 4
     @State private var appeared = false
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
     private var projectColor: Color { Color(hex: project.color) }
     private var isFinished: Bool { project.status == .completed || project.status == .archived }
@@ -421,7 +415,9 @@ private struct ProjectInlineCard: View {
     }
 
     private func taskRow(_ task: TaskItem) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
+        return HStack(spacing: WeekSpacing.sm) {
             ZStack {
                 Circle()
                     .strokeBorder(
@@ -454,13 +450,13 @@ private struct ProjectInlineCard: View {
                             .font(.system(size: 10))
                     }
 
-                    if task.taskType == .ddl {
-                        Text(task.taskType.displayName)
+                    if taskType.baseKind == .ddl {
+                        Text(taskType.name)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(task.taskType.color)
+                            .background(taskType.color)
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }

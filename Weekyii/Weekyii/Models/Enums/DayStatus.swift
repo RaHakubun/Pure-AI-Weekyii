@@ -27,3 +27,19 @@ enum DayStatus: String, Codable {
         }
     }
 }
+
+enum ExecutionMode: String, Codable, CaseIterable, Identifiable {
+    case strict
+    case flexible
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .strict:
+            return "严格模式"
+        case .flexible:
+            return "灵动模式"
+        }
+    }
+}

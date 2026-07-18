@@ -60,7 +60,7 @@ struct WeekShadow {
     
     /// 轻微阴影 - 用于卡片
     static let light = WeekShadow(
-        color: Color(hex: "#3A2A22").opacity(0.06),
+        color: Color.dynamic(lightHex: "#3A2A22", darkHex: "#000000").opacity(0.08),
         radius: 10,
         x: 0,
         y: 3
@@ -68,7 +68,7 @@ struct WeekShadow {
     
     /// 中等阴影 - 用于浮动元素
     static let medium = WeekShadow(
-        color: Color(hex: "#3A2A22").opacity(0.12),
+        color: Color.dynamic(lightHex: "#3A2A22", darkHex: "#000000").opacity(0.16),
         radius: 18,
         x: 0,
         y: 5
@@ -76,7 +76,7 @@ struct WeekShadow {
     
     /// 强阴影 - 用于 Modal
     static let strong = WeekShadow(
-        color: Color(hex: "#3A2A22").opacity(0.18),
+        color: Color.dynamic(lightHex: "#3A2A22", darkHex: "#000000").opacity(0.24),
         radius: 26,
         x: 0,
         y: 8

@@ -1,5 +1,9 @@
 import Foundation
 import Combine
+import SwiftUI
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 final class UserSettings: ObservableObject {
     // Default Kill Time
@@ -14,14 +18,49 @@ final class UserSettings: ObservableObject {
     @Published var defaultTaskType: TaskType {
         didSet { save() }
     }
+    @Published var defaultTaskTypeIdRaw: String {
+        didSet { save() }
+    }
+
+    @Published var defaultExecutionModeRaw: String {
+        didSet { save() }
+    }
     
     // Notification Settings
     @Published var killTimeReminderMinutes: Int {
         didSet { save() }
     }
+    @Published var fixedReminderEnabled: Bool {
+        didSet { save() }
+    }
+    @Published var fixedReminderHour: Int {
+        didSet { save() }
+    }
+    @Published var fixedReminderMinute: Int {
+        didSet { save() }
+    }
     
     // Week Settings
     @Published var weekStartsOnMonday: Bool {
+        didSet { save() }
+    }
+
+    // Project Defaults
+    @Published var defaultProjectDurationDays: Int {
+        didSet { save() }
+    }
+    @Published var defaultProjectTileSizeRaw: String {
+        didSet { save() }
+    }
+
+    // Pending Month View Marker Settings
+    @Published var pendingMonthShowRegular: Bool {
+        didSet { save() }
+    }
+    @Published var pendingMonthShowDDL: Bool {
+        didSet { save() }
+    }
+    @Published var pendingMonthShowLeisure: Bool {
         didSet { save() }
     }
     
@@ -32,6 +71,12 @@ final class UserSettings: ObservableObject {
 
     // Theme Settings
     @Published var selectedThemeRaw: String {
+        didSet { save() }
+    }
+    @Published var appearanceModeRaw: String {
+        didSet { save() }
+    }
+    @Published var premiumThemeUnlocked: Bool {
         didSet { save() }
     }
     
@@ -69,24 +114,39 @@ final class UserSettings: ObservableObject {
         didSet { save() }
     }
     
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         // Load saved values or use defaults
-        self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 20
-        self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 0
+        self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
+        self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
         
+        let resolvedDefaultTaskType: TaskType
         if let rawTaskType = defaults.string(forKey: "defaultTaskType"),
            let taskType = TaskType(rawValue: rawTaskType) {
-            self.defaultTaskType = taskType
+            resolvedDefaultTaskType = taskType
         } else {
-            self.defaultTaskType = .regular
+            resolvedDefaultTaskType = .regular
         }
+        self.defaultTaskType = resolvedDefaultTaskType
+        self.defaultTaskTypeIdRaw = defaults.string(forKey: "defaultTaskTypeId") ?? resolvedDefaultTaskType.rawValue
+        self.defaultExecutionModeRaw = defaults.string(forKey: "defaultExecutionMode") ?? ExecutionMode.strict.rawValue
         
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
+        self.fixedReminderEnabled = defaults.object(forKey: "fixedReminderEnabled") as? Bool ?? false
+        self.fixedReminderHour = defaults.object(forKey: "fixedReminderHour") as? Int ?? 21
+        self.fixedReminderMinute = defaults.object(forKey: "fixedReminderMinute") as? Int ?? 0
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
+        self.defaultProjectDurationDays = defaults.object(forKey: "defaultProjectDurationDays") as? Int ?? 7
+        self.defaultProjectTileSizeRaw = defaults.string(forKey: "defaultProjectTileSize") ?? ProjectTileSize.medium.rawValue
+        self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
+        self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
+        self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
         self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
+        self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
         
         self.seedPastWeeks = defaults.object(forKey: "seedPastWeeks") as? Int ?? 8
@@ -98,16 +158,33 @@ final class UserSettings: ObservableObject {
         self.seedIncludeAttachments = defaults.object(forKey: "seedIncludeAttachments") as? Bool ?? false
         self.seedIncludeDescriptions = defaults.object(forKey: "seedIncludeDescriptions") as? Bool ?? true
         self.seedAllowExisting = defaults.object(forKey: "seedAllowExisting") as? Bool ?? false
+
+        let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
+        sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
+        sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
+        sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
     }
     
     func save() {
         defaults.set(defaultKillTimeHour, forKey: "defaultKillTimeHour")
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
+        defaults.set(defaultTaskTypeIdRaw, forKey: "defaultTaskTypeId")
+        defaults.set(defaultExecutionModeRaw, forKey: "defaultExecutionMode")
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
+        defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
+        defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
+        defaults.set(fixedReminderMinute, forKey: "fixedReminderMinute")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
+        defaults.set(defaultProjectDurationDays, forKey: "defaultProjectDurationDays")
+        defaults.set(defaultProjectTileSizeRaw, forKey: "defaultProjectTileSize")
+        defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
+        defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
+        defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
         defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
+        defaults.set(appearanceModeRaw, forKey: "appearanceMode")
+        defaults.set(premiumThemeUnlocked, forKey: "premiumThemeUnlocked")
         defaults.set(developerSettingsEnabled, forKey: "developerSettingsEnabled")
         
         defaults.set(seedPastWeeks, forKey: "seedPastWeeks")
@@ -119,6 +196,15 @@ final class UserSettings: ObservableObject {
         defaults.set(seedIncludeAttachments, forKey: "seedIncludeAttachments")
         defaults.set(seedIncludeDescriptions, forKey: "seedIncludeDescriptions")
         defaults.set(seedAllowExisting, forKey: "seedAllowExisting")
+
+        let sharedDefaults = WeekyiiWidgetBridge.sharedDefaults()
+        sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
+        sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
+        sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
+
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
     
     // Validation helpers
@@ -131,8 +217,39 @@ final class UserSettings: ObservableObject {
         killTimeReminderMinutes >= 0 && killTimeReminderMinutes <= 120
     }
 
+    var isFixedReminderValid: Bool {
+        fixedReminderHour >= 0 && fixedReminderHour <= 23 &&
+        fixedReminderMinute >= 0 && fixedReminderMinute <= 59
+    }
+
     var selectedTheme: WeekTheme {
-        get { WeekTheme(rawValue: selectedThemeRaw) ?? .amber }
+        get { WeekTheme.resolvedTheme(rawValue: selectedThemeRaw, premiumThemeUnlocked: premiumThemeUnlocked) }
         set { selectedThemeRaw = newValue.rawValue }
+    }
+
+    var appearanceMode: AppearanceMode {
+        get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
+        set { appearanceModeRaw = newValue.rawValue }
+    }
+
+    var defaultExecutionMode: ExecutionMode {
+        get { ExecutionMode(rawValue: defaultExecutionModeRaw) ?? .strict }
+        set { defaultExecutionModeRaw = newValue.rawValue }
+    }
+
+    var defaultProjectTileSize: ProjectTileSize {
+        get { ProjectTileSize(storedValue: defaultProjectTileSizeRaw) ?? .medium }
+        set { defaultProjectTileSizeRaw = newValue.rawValue }
+    }
+
+    var effectiveColorScheme: ColorScheme? {
+        switch appearanceMode {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
     }
 }

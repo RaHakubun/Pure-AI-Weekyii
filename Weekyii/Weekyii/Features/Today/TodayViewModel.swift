@@ -5,12 +5,34 @@ import SwiftData
 @MainActor
 @Observable
 final class TodayViewModel {
+    enum KillTimeChangeImpact: Equatable {
+        case normal
+        case immediateExpire(expiredCount: Int)
+    }
+
+    struct PostponePreview {
+        let taskID: UUID
+        let taskTitle: String
+        let targetDate: Date
+        let targetDayId: String
+        let targetWeekId: String
+        let requiresWeekCreation: Bool
+    }
+
+    struct PostponeResult {
+        let targetDate: Date
+        let createdWeek: Bool
+    }
+
     private let modelContext: ModelContext
     private let timeProvider: TimeProviding
     private let notificationService: any NotificationScheduling
     private let appState: any AppStateStore
     private let userSettings: UserSettings
     private let randomMindStampProvider: () -> MindStampItem?
+    private let taskPostponeService: TaskPostponeService
+    private let taskMutationService: TaskMutationService
+    private let liveActivityService: (any LiveActivityManaging)?
     private let calendar = Calendar(identifier: .iso8601)
     private let weekCalculator = WeekCalculator()
 
@@ -23,6 +45,7 @@ final class TodayViewModel {
         notificationService: any NotificationScheduling,
         appState: any AppStateStore,
         userSettings: UserSettings,
+        liveActivityService: (any LiveActivityManaging)? = nil,
         randomMindStampProvider: (() -> MindStampItem?)? = nil
     ) {
         self.modelContext = modelContext
@@ -30,6 +53,9 @@ final class TodayViewModel {
         self.notificationService = notificationService
         self.appState = appState
         self.userSettings = userSettings
+        self.liveActivityService = liveActivityService
+        self.taskPostponeService = TaskPostponeService(modelContext: modelContext)
+        self.taskMutationService = TaskMutationService(modelContext: modelContext)
         self.randomMindStampProvider = randomMindStampProvider ?? {
             let descriptor = FetchDescriptor<MindStampItem>()
             let stamps = (try? modelContext.fetch(descriptor)) ?? []
@@ -46,18 +72,19 @@ final class TodayViewModel {
             return
         }
         today = day
-        
-        // Apply default kill time if day is newly created or empty
-        if day.status == .empty {
-            day.killTimeHour = userSettings.defaultKillTimeHour
-            day.killTimeMinute = userSettings.defaultKillTimeMinute
-            persistOrRecordError()
-        }
+
+        var shouldPersist = false
 
         if day.status == .draft || day.status == .execute {
             updateNotificationSchedule(for: day)
+            shouldPersist = true
+        }
+
+        if shouldPersist {
             persistOrRecordError()
         }
+
+        refreshWidgetSnapshot()
     }
 
     func seedDraftTasksForUITestsIfNeeded() {
@@ -79,32 +106,83 @@ final class TodayViewModel {
         }
     }
 
-    func addTask(title: String, description: String = "", type: TaskType, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
+    func seedFlexibleExecutionForUITestsIfNeeded() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-uiTestingSeedFlexibleExecution") else { return }
+        guard let day = fetchOrCreateToday() else { return }
+
+        for task in day.tasks {
+            modelContext.delete(task)
+        }
+        day.tasks.removeAll()
+
+        let focusTask = TaskItem(
+            title: "Flexible Focus Task",
+            taskType: .regular,
+            order: 1,
+            zone: .focus
+        )
+        focusTask.startedAt = timeProvider.now
+        focusTask.day = day
+
+        let queueTask = TaskItem(
+            title: "Flexible Queue Task",
+            taskType: .regular,
+            order: 2,
+            zone: .frozen
+        )
+        queueTask.day = day
+
+        day.tasks.append(contentsOf: [focusTask, queueTask])
+        day.status = .execute
+        day.initiatedAt = timeProvider.now
+        day.closedAt = nil
+        day.executionMode = .flexible
+        day.isDraftZoneUnlocked = false
+        day.expiredCount = 0
+
+        do {
+            try modelContext.save()
+            syncToday()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func pickStartRitualStamp() -> MindStampItem? {
+        randomMindStampProvider()
+    }
+
+    func addTask(title: String, description: String = "", type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep] = [], attachments: [TaskAttachment] = []) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft || day.status == .empty else { throw WeekyiiError.cannotEditStartedDay }
 
-        if day.status == .empty {
-            day.status = .draft
-        }
-
-        let order = (day.sortedDraftTasks.last?.order ?? 0) + 1
-        let task = TaskItem(title: title, taskDescription: description, taskType: type, order: order, zone: .draft)
-        task.steps = normalizedStepCopies(from: steps)
-        task.attachments = attachments
-        day.tasks.append(task)
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
+            steps: steps,
+            attachments: attachments
+        )
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
 
-    func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, steps: [TaskStep], attachments: [TaskAttachment]) throws {
+    func updateTask(_ task: TaskItem, title: String, description: String, type: TaskType, taskTypeIdRaw: String? = nil, steps: [TaskStep], attachments: [TaskAttachment]) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        task.title = title
-        task.taskDescription = description
-        task.taskType = type
-        replaceSteps(for: task, with: steps)
-        task.attachments = attachments
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
+            steps: steps,
+            attachments: attachments
+        )
+        try taskMutationService.updateTask(task, payload: payload)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -113,20 +191,7 @@ final class TodayViewModel {
     func deleteTasks(at offsets: IndexSet) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        let tasks = day.sortedDraftTasks
-        let tasksToDelete = offsets.compactMap { index in
-            tasks.indices.contains(index) ? tasks[index] : nil
-        }
-        day.tasks.removeAll { task in
-            tasksToDelete.contains { $0.id == task.id }
-        }
-        for task in tasksToDelete {
-            modelContext.delete(task)
-        }
-        renumberDraftTasks(for: day)
-        if day.sortedDraftTasks.isEmpty {
-            day.status = .empty
-        }
+        _ = try taskMutationService.deleteDraftTasks(in: day, at: offsets)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
@@ -135,19 +200,13 @@ final class TodayViewModel {
     func moveDraftTasks(from source: IndexSet, to destination: Int) throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
-        let count = day.sortedDraftTasks.count
-        guard source.isEmpty == false, destination >= 0, destination <= count else { return }
-        var tasks = day.sortedDraftTasks
-        tasks.move(fromOffsets: source, toOffset: destination)
-        for (index, task) in tasks.enumerated() {
-            task.order = index + 1
-        }
+        try taskMutationService.moveDraftTasks(in: day, from: source, to: destination)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
 
-    func startDay() throws -> MindStampItem? {
+    func startDay() throws {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         let sortedTasks = day.sortedDraftTasks
@@ -159,6 +218,8 @@ final class TodayViewModel {
         }
         day.status = .execute
         day.initiatedAt = now
+        day.executionMode = userSettings.defaultExecutionMode
+        day.isDraftZoneUnlocked = false
 
         if let first = sortedTasks.first {
             first.zone = .focus
@@ -172,7 +233,6 @@ final class TodayViewModel {
 
         try modelContext.save()
         syncToday()
-        return randomMindStampProvider()
     }
 
     func doneFocus() throws {
@@ -192,6 +252,7 @@ final class TodayViewModel {
         } else {
             day.status = .completed
             day.closedAt = now
+            day.isDraftZoneUnlocked = false
             notificationService.cancelKillTimeNotification(for: day)
         }
 
@@ -199,17 +260,181 @@ final class TodayViewModel {
         syncToday()
     }
 
-    func changeKillTime(hour: Int, minute: Int) throws {
-        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
-        guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
-        if let killDate = killDate(for: day), timeProvider.now >= killDate {
-            throw WeekyiiError.killTimePassed
-        }
-        day.killTimeHour = hour
-        day.killTimeMinute = minute
+    func setDraftZoneUnlocked(_ isUnlocked: Bool) throws {
+        let day = try resolveFlexibleExecutionDay()
+        day.isDraftZoneUnlocked = isUnlocked
+        try modelContext.save()
+        syncToday()
+    }
+
+    func addExecutionTask(
+        title: String,
+        description: String = "",
+        type: TaskType,
+        taskTypeIdRaw: String? = nil,
+        steps: [TaskStep] = [],
+        attachments: [TaskAttachment] = []
+    ) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
+            steps: steps,
+            attachments: attachments
+        )
+        _ = try taskMutationService.createTask(in: day, payload: payload, zone: .frozen)
+        taskMutationService.normalizeOrder(in: day, zone: .frozen)
         updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
+    }
+
+    func updateExecutionTask(
+        _ task: TaskItem,
+        title: String,
+        description: String,
+        type: TaskType,
+        taskTypeIdRaw: String? = nil,
+        steps: [TaskStep],
+        attachments: [TaskAttachment]
+    ) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        guard task.zone == .frozen,
+              day.tasks.contains(where: { $0.id == task.id }) else {
+            throw WeekyiiError.cannotEditStartedDay
+        }
+        let payload = TaskDraftPayload(
+            title: title,
+            description: description,
+            type: type,
+            taskTypeIdRaw: taskTypeIdRaw,
+            steps: steps,
+            attachments: attachments
+        )
+        try taskMutationService.updateTask(task, payload: payload)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func deleteExecutionTasks(at offsets: IndexSet) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        _ = try taskMutationService.deleteTasks(in: day, zone: .frozen, at: offsets)
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func moveExecutionTasks(from source: IndexSet, to destination: Int) throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        try taskMutationService.moveTasks(in: day, zone: .frozen, from: source, to: destination)
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func exchangeFocusWithFirstDraft() throws {
+        let day = try resolveUnlockedFlexibleExecutionDay()
+        guard let currentFocus = day.focusTask else { throw WeekyiiError.taskNotFound(UUID()) }
+        guard let nextFocus = day.frozenTasks.first else { throw WeekyiiError.executionQueueEmpty }
+
+        let remainingFrozen = day.frozenTasks.dropFirst()
+        currentFocus.zone = .frozen
+        currentFocus.startedAt = nil
+        currentFocus.endedAt = nil
+        currentFocus.completedOrder = 0
+
+        nextFocus.zone = .focus
+        nextFocus.startedAt = timeProvider.now
+        nextFocus.endedAt = nil
+        nextFocus.completedOrder = 0
+        nextFocus.order = 1
+
+        currentFocus.order = 2
+        for (index, task) in remainingFrozen.enumerated() {
+            task.order = index + 3
+        }
+
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func evaluateKillTimeChangeImpact(hour: Int, minute: Int) throws -> KillTimeChangeImpact {
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
+        guard isValidKillTime(hour: hour, minute: minute) else { throw WeekyiiError.dateFormatInvalid }
+
+        if willExpireImmediately(day: day, hour: hour, minute: minute) {
+            return .immediateExpire(expiredCount: expiredCountForImmediateExpire(day: day))
+        }
+        return .normal
+    }
+
+    func changeKillTime(hour: Int, minute: Int, allowImmediateExpire: Bool = false) throws {
+        guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
+        guard day.status == .draft || day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
+        guard isValidKillTime(hour: hour, minute: minute) else { throw WeekyiiError.dateFormatInvalid }
+
+        if willExpireImmediately(day: day, hour: hour, minute: minute) {
+            guard allowImmediateExpire else {
+                throw WeekyiiError.killTimePassed
+            }
+            day.killTimeHour = hour
+            day.killTimeMinute = minute
+            day.followsDefaultKillTime = false
+            expire(day: day, expiredCount: expiredCountForImmediateExpire(day: day))
+            try modelContext.save()
+            syncToday()
+            return
+        }
+
+        day.killTimeHour = hour
+        day.killTimeMinute = minute
+        day.followsDefaultKillTime = false
+        updateNotificationSchedule(for: day)
+        try modelContext.save()
+        syncToday()
+    }
+
+    func previewPostpone(taskID: UUID, taskTitle: String, targetDate: Date) throws -> PostponePreview {
+        let preview = try taskPostponeService.preview(taskID: taskID, targetDate: targetDate, today: timeProvider.today)
+        return PostponePreview(
+            taskID: preview.taskID,
+            taskTitle: taskTitle,
+            targetDate: preview.targetDate,
+            targetDayId: preview.targetDayId,
+            targetWeekId: preview.targetWeekId,
+            requiresWeekCreation: preview.requiresWeekCreation
+        )
+    }
+
+    func commitPostpone(_ preview: PostponePreview, allowWeekCreation: Bool) throws -> PostponeResult {
+        let internalPreview = TaskPostponeService.Preview(
+            taskID: preview.taskID,
+            targetDate: preview.targetDate,
+            targetDayId: preview.targetDayId,
+            targetWeekId: preview.targetWeekId,
+            requiresWeekCreation: preview.requiresWeekCreation
+        )
+        let execution = try taskPostponeService.execute(
+            preview: internalPreview,
+            allowCreateWeek: allowWeekCreation,
+            today: timeProvider.today,
+            now: timeProvider.now
+        )
+
+        if let sourceDay = fetchDay(by: execution.sourceDayId) {
+            updateNotificationSchedule(for: sourceDay)
+        }
+        if let targetDay = fetchDay(by: execution.targetDayId) {
+            updateNotificationSchedule(for: targetDay)
+        }
+
+        try modelContext.save()
+        syncToday()
+        return PostponeResult(targetDate: execution.targetDate, createdWeek: execution.createdWeek)
     }
 
     private func killDate(for day: DayModel) -> Date? {
@@ -220,9 +445,28 @@ final class TodayViewModel {
         return calendar.date(from: components)
     }
 
+    private func isValidKillTime(hour: Int, minute: Int) -> Bool {
+        (0...23).contains(hour) && (0...59).contains(minute)
+    }
+
+    private func willExpireImmediately(day: DayModel, hour: Int, minute: Int) -> Bool {
+        guard day.status == .draft || day.status == .execute else { return false }
+        var components = calendar.dateComponents([.year, .month, .day], from: day.date)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        guard let newKillDate = calendar.date(from: components) else { return false }
+        return timeProvider.now >= newKillDate
+    }
+
+    private func expiredCountForImmediateExpire(day: DayModel) -> Int {
+        day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
+    }
+
     private func expire(day: DayModel, expiredCount: Int) {
         day.status = .expired
         day.expiredCount = expiredCount
+        day.isDraftZoneUnlocked = false
         removeTasks(in: [.draft, .focus, .frozen], from: day)
         notificationService.cancelKillTimeNotification(for: day)
     }
@@ -282,10 +526,51 @@ final class TodayViewModel {
         return resolved
     }
 
+    private func resolveFlexibleExecutionDay() throws -> DayModel {
+        guard let day = resolveToday() else {
+            throw WeekyiiError.dayNotFound(timeProvider.today.dayId)
+        }
+        guard day.status == .execute else { throw WeekyiiError.cannotEditStartedDay }
+        guard day.executionMode == .flexible else { throw WeekyiiError.flexibleModeRequired }
+        return day
+    }
+
+    private func resolveUnlockedFlexibleExecutionDay() throws -> DayModel {
+        let day = try resolveFlexibleExecutionDay()
+        guard day.isDraftZoneUnlocked else { throw WeekyiiError.draftZoneLocked }
+        return day
+    }
+
     private func ensurePresentWeek() {
+        let currentWeekId = timeProvider.currentWeekId
         let descriptor = FetchDescriptor<WeekModel>()
-        let presentWeeks = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .present }
-        if presentWeeks.isEmpty == false { return }
+        let allWeeks = (try? modelContext.fetch(descriptor)) ?? []
+        let presentWeeks = allWeeks.filter { $0.status == .present }
+
+        if let currentPresent = presentWeeks.first(where: { $0.weekId == currentWeekId }) {
+            var changed = false
+            for extra in presentWeeks where extra.id != currentPresent.id {
+                extra.status = .past
+                changed = true
+            }
+            if changed {
+                persistOrRecordError()
+            }
+            return
+        }
+
+        if let existingCurrent = allWeeks.first(where: { $0.weekId == currentWeekId }) {
+            existingCurrent.status = .present
+            for week in presentWeeks where week.id != existingCurrent.id {
+                week.status = .past
+            }
+            persistOrRecordError()
+            return
+        }
+
+        for week in presentWeeks {
+            week.status = .past
+        }
         let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
         modelContext.insert(week)
         persistOrRecordError()
@@ -294,7 +579,10 @@ final class TodayViewModel {
     private func createMissingDay(for date: Date) -> DayModel? {
         // Locate present week; if absent, bail (caller already called ensurePresentWeek)
         let descriptor = FetchDescriptor<WeekModel>()
-        guard let week = try? modelContext.fetch(descriptor).first(where: { $0.status == .present }) else { return nil }
+        let weeks = (try? modelContext.fetch(descriptor)) ?? []
+        let targetWeek = weeks.first(where: { $0.status == .present && $0.weekId == date.weekId })
+            ?? weeks.first(where: { $0.status == .present })
+        guard let week = targetWeek else { return nil }
         let day = DayModel(dayId: date.dayId, date: date, status: .empty)
         week.days.append(day)
         persistOrRecordError()
@@ -324,12 +612,34 @@ final class TodayViewModel {
 
         notificationService.scheduleKillTimeNotification(
             for: day,
-            reminderMinutes: userSettings.killTimeReminderMinutes
+            reminderMinutes: userSettings.killTimeReminderMinutes,
+            fixedReminder: userSettings.fixedReminderEnabled
+                ? DateComponents(hour: userSettings.fixedReminderHour, minute: userSettings.fixedReminderMinute)
+                : nil
         )
     }
 
     private func syncToday() {
         today = fetchDay(by: timeProvider.today.dayId)
+        refreshWidgetSnapshot()
+        liveActivityService?.reconcile(
+            modelContext: modelContext,
+            now: timeProvider.now,
+            selectedThemeRaw: userSettings.selectedThemeRaw,
+            appearanceModeRaw: userSettings.appearanceModeRaw,
+            premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+        )
+    }
+
+    private func refreshWidgetSnapshot() {
+        WidgetSnapshotComposer.syncFromModelContext(
+            modelContext: modelContext,
+            now: timeProvider.now,
+            todayDate: timeProvider.today,
+            selectedThemeRaw: userSettings.selectedThemeRaw,
+            appearanceModeRaw: userSettings.appearanceModeRaw,
+            premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+        )
     }
 }
 

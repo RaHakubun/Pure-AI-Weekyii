@@ -7,6 +7,7 @@ final class TaskItem {
 
     var title: String
     var taskType: TaskType
+    var taskTypeIdRaw: String = TaskType.regular.rawValue
     var order: Int
     var zone: TaskZone
 
@@ -26,6 +27,7 @@ final class TaskItem {
         self.title = title
         self.taskDescription = taskDescription
         self.taskType = taskType
+        self.taskTypeIdRaw = taskType.rawValue
         self.order = order
         self.zone = zone
     }

@@ -5,11 +5,18 @@ import SwiftUI
 struct TaskCard: View {
     let task: TaskItem
     let showStatus: Bool
+    let showsProjectOrigin: Bool
     let onTap: (() -> Void)?
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+
+    private var taskType: TaskTypePresentation {
+        taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+    }
     
-    init(task: TaskItem, showStatus: Bool = true, onTap: (() -> Void)? = nil) {
+    init(task: TaskItem, showStatus: Bool = true, showsProjectOrigin: Bool = false, onTap: (() -> Void)? = nil) {
         self.task = task
         self.showStatus = showStatus
+        self.showsProjectOrigin = showsProjectOrigin
         self.onTap = onTap
     }
     
@@ -30,14 +37,14 @@ struct TaskCard: View {
         HStack(spacing: WeekSpacing.md) {
             // 左侧彩色边条
             RoundedRectangle(cornerRadius: WeekRadius.full)
-                .fill(task.taskType.color)
+                .fill(taskType.color)
                 .frame(width: 4)
 
             VStack(alignment: .leading, spacing: WeekSpacing.xs) {
                 HStack(spacing: WeekSpacing.sm) {
                     // 任务类型图标
-                    Image(systemName: task.taskType.iconName)
-                        .foregroundColor(task.taskType.color)
+                    Image(systemName: taskType.iconName)
+                        .foregroundColor(taskType.color)
                         .font(.caption)
 
                     Text(task.title)
@@ -50,6 +57,10 @@ struct TaskCard: View {
                     if showStatus {
                         TaskZoneBadge(zone: task.zone)
                     }
+                }
+
+                if showsProjectOrigin {
+                    TaskProjectOriginBadge(project: task.project)
                 }
 
                 // 时间信息

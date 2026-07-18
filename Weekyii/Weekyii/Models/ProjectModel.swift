@@ -13,6 +13,8 @@ final class ProjectModel {
     var startDate: Date
     var endDate: Date
     var createdAt: Date
+    var tileSizeRaw: String = ProjectTileSize.medium.rawValue
+    var tileOrder: Int = 0
 
     @Relationship(deleteRule: .nullify, inverse: \TaskItem.project)
     var tasks: [TaskItem] = []
@@ -47,7 +49,8 @@ final class ProjectModel {
     }
 
     var expiredTaskCount: Int {
-        let today = Calendar.current.startOfDay(for: Date())
+        let isoCalendar = Calendar(identifier: .iso8601)
+        let today = isoCalendar.startOfDay(for: Date())
         return tasks.filter { task in
             guard let taskDate = task.day?.date else { return false }
             return taskDate < today && task.zone != .complete
@@ -61,5 +64,10 @@ final class ProjectModel {
 
     var isAllCompleted: Bool {
         totalTaskCount > 0 && completedTaskCount == totalTaskCount
+    }
+
+    var tileSize: ProjectTileSize {
+        get { ProjectTileSize(storedValue: tileSizeRaw) ?? .medium }
+        set { tileSizeRaw = newValue.rawValue }
     }
 }

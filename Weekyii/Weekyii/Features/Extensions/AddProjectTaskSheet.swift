@@ -1,15 +1,23 @@
 import SwiftUI
+import SwiftData
 
 struct AddProjectTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: UserSettings
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     let project: ProjectModel
     let viewModel: ExtensionsViewModel
 
     @State private var title = ""
+    @State private var description = ""
     @State private var taskType: TaskType = .regular
+    @State private var taskTypeIdRaw: String = TaskType.regular.rawValue
+    @State private var steps: [TaskStep] = []
+    @State private var attachments: [TaskAttachment] = []
     @State private var selectedDates: Set<DateComponents> = []
     @State private var currentMonth = Date()
     @State private var errorMessage: String?
+    @State private var showingTaskDetailEditor = false
 
     private let calendar = Calendar(identifier: .iso8601)
 
@@ -28,6 +36,13 @@ struct AddProjectTaskSheet: View {
                                 .padding(WeekSpacing.md)
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.small)
+
+                            TextField(String(localized: "task.description.placeholder"), text: $description, axis: .vertical)
+                                .font(.bodyMedium)
+                                .lineLimit(2...5)
+                                .padding(WeekSpacing.md)
+                                .background(Color.backgroundTertiary)
+                                .cornerRadius(WeekRadius.small)
                         }
                     }
 
@@ -38,25 +53,59 @@ struct AddProjectTaskSheet: View {
                                 .font(.bodyMedium)
                                 .foregroundColor(.textSecondary)
 
-                            HStack(spacing: WeekSpacing.sm) {
-                                ForEach(TaskType.allCases, id: \.self) { type in
-                                    Button {
-                                        taskType = type
-                                    } label: {
-                                        HStack(spacing: WeekSpacing.xs) {
-                                            Image(systemName: type.iconName)
-                                                .font(.caption)
-                                            Text(type.displayName)
-                                                .font(.bodyMedium)
+                            ScrollView(.horizontal) {
+                                HStack(spacing: WeekSpacing.xs) {
+                                    ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
+                                        Button {
+                                            taskType = definition.baseKind
+                                            taskTypeIdRaw = definition.idRaw
+                                        } label: {
+                                            HStack(spacing: WeekSpacing.xs) {
+                                                Image(systemName: definition.iconName)
+                                                    .font(.caption)
+                                                Text(definition.name)
+                                                    .font(.captionBold)
+                                                    .lineLimit(1)
+                                                    .minimumScaleFactor(0.78)
+                                            }
+                                            .foregroundColor(taskTypeIdRaw == definition.idRaw ? definition.color : .textSecondary)
+                                            .frame(minWidth: 78, minHeight: 36)
+                                            .padding(.horizontal, 8)
+                                            .background(taskTypeIdRaw == definition.idRaw ? definition.color.opacity(0.15) : Color.backgroundTertiary)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(taskTypeIdRaw == definition.idRaw ? definition.color : Color.clear, lineWidth: 1)
+                                            )
                                         }
-                                        .foregroundColor(taskType == type ? .white : type.color)
-                                        .padding(.horizontal, WeekSpacing.md)
-                                        .padding(.vertical, WeekSpacing.sm)
-                                        .background(taskType == type ? type.color : type.color.opacity(0.1))
-                                        .cornerRadius(WeekRadius.small)
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                            }
+                            .scrollIndicators(.hidden)
+                        }
+                    }
+
+                    WeekCard {
+                        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                            HStack {
+                                Text(String(localized: "task.basic_info"))
+                                    .font(.bodyMedium)
+                                    .foregroundColor(.textSecondary)
+                                Spacer()
+                                Button(String(localized: "action.edit")) {
+                                    showingTaskDetailEditor = true
+                                }
+                                .font(.captionBold)
+                            }
+
+                            HStack(spacing: WeekSpacing.md) {
+                                Label("\(steps.count)", systemImage: "list.bullet")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                Label("\(attachments.count)", systemImage: "paperclip")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
                             }
                         }
                     }
@@ -134,6 +183,30 @@ struct AddProjectTaskSheet: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .sheet(isPresented: $showingTaskDetailEditor) {
+                TaskEditorSheet(
+                    title: String(localized: "task.basic_info"),
+                    initialTitle: title,
+                    initialDescription: description,
+                    initialType: taskType,
+                    initialTypeIdRaw: taskTypeIdRaw,
+                    initialSteps: steps,
+                    initialAttachments: attachments
+                ) { _, _, _, _, _ in
+                } onSaveWithTypeId: { newTitle, newDescription, newType, newTypeIdRaw, newSteps, newAttachments in
+                    title = newTitle
+                    description = newDescription
+                    taskType = newType
+                    taskTypeIdRaw = newTypeIdRaw
+                    steps = newSteps
+                    attachments = newAttachments
+                    showingTaskDetailEditor = false
+                }
+            }
+        }
+        .onAppear {
+            taskType = settings.defaultTaskType
+            taskTypeIdRaw = settings.defaultTaskTypeIdRaw
         }
     }
 
@@ -145,14 +218,33 @@ struct AddProjectTaskSheet: View {
         }
     }
 
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        if active.isEmpty { return TaskTypeDefinition.builtInDefinitions() }
+        if active.contains(where: { $0.idRaw == taskTypeIdRaw }) { return active }
+        if let selected = taskTypeDefinitions.first(where: { $0.idRaw == taskTypeIdRaw }) {
+            return active + [selected]
+        }
+        return active
+    }
+
     private func createTasks() {
+        let dates = sortedSelectedDates.compactMap { calendar.date(from: $0) }
+        if let placementError = dates.compactMap({ viewModel.projectTaskPlacementError(for: project, on: $0) }).first {
+            errorMessage = placementError
+            return
+        }
+
         var firstFailureMessage: String?
-        for dc in sortedSelectedDates {
-            guard let date = calendar.date(from: dc) else { continue }
+        for date in dates {
             let result = viewModel.addTask(
                 to: project,
                 title: title.trimmingCharacters(in: .whitespaces),
+                description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 taskType: taskType,
+                taskTypeIdRaw: taskTypeIdRaw,
+                steps: steps,
+                attachments: attachments,
                 on: date
             )
             if result == nil, firstFailureMessage == nil {
@@ -192,7 +284,7 @@ struct AddProjectTaskSheet: View {
         var days: [CalDay] = []
         if leadingOffset > 0 {
             for i in (1...leadingOffset).reversed() {
-                let d = calendar.date(byAdding: .day, value: -i, to: monthStart)!
+                guard let d = calendar.date(byAdding: .day, value: -i, to: monthStart) else { continue }
                 days.append(CalDay(date: d, isCurrent: false))
             }
         }
@@ -204,7 +296,7 @@ struct AddProjectTaskSheet: View {
         let remainder = days.count % 7
         if remainder > 0 {
             for i in 0..<(7 - remainder) {
-                let d = calendar.date(byAdding: .day, value: i, to: monthEnd)!
+                guard let d = calendar.date(byAdding: .day, value: i, to: monthEnd) else { continue }
                 days.append(CalDay(date: d, isCurrent: false))
             }
         }
@@ -230,7 +322,7 @@ struct AddProjectTaskSheet: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .disabled(monthStart <= calendar.date(from: calendar.dateComponents([.year, .month], from: project.startDate))!)
+                    .disabled(monthStart <= (calendar.date(from: calendar.dateComponents([.year, .month], from: project.startDate)) ?? project.startDate))
 
                     Button {
                         withAnimation { currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth }
@@ -240,7 +332,7 @@ struct AddProjectTaskSheet: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .disabled(monthStart >= calendar.date(from: calendar.dateComponents([.year, .month], from: project.endDate))!)
+                    .disabled(monthStart >= (calendar.date(from: calendar.dateComponents([.year, .month], from: project.endDate)) ?? project.endDate))
                 }
             }
 

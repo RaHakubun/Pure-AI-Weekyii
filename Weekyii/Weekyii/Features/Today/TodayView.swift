@@ -6,19 +6,118 @@ private enum TodaySection: Int {
     case week
 }
 
+private enum TaskEditorContext: String {
+    case draft
+    case flexibleExecution
+}
+
+private enum DraftTaskEditorMode: Identifiable {
+    case create(TaskEditorContext)
+    case edit(TaskItem, TaskEditorContext)
+
+    var id: String {
+        switch self {
+        case .create(let context):
+            return "create-\(context.rawValue)"
+        case .edit(let task, let context):
+            return "edit-\(context.rawValue)-\(task.id.uuidString)"
+        }
+    }
+}
+
+enum TodayStartFlowStep: Equatable {
+    case warning
+    case ritual
+}
+
+struct TodayStartFlowCoordinator {
+    var isPresented = false
+    var step: TodayStartFlowStep = .warning
+
+    mutating func present() {
+        isPresented = true
+        step = .warning
+    }
+
+    mutating func chooseDirectEnter() {
+        step = .ritual
+    }
+
+    mutating func cancel() {
+        isPresented = false
+        step = .warning
+    }
+}
+
+private struct PendingPostponeRequest {
+    let taskID: UUID
+    let taskTitle: String
+    let targetDate: Date
+}
+
 struct TodayView: View {
+    private enum TodayKillTimeConfirmMode {
+        case normal
+        case immediateExpire(expiredCount: Int)
+    }
+    private let floatingStartOverlayReserveHeight: CGFloat = 120
+    let animationsActive: Bool
+
+    init(animationsActive: Bool = true) {
+        self.animationsActive = animationsActive
+    }
+
+    private static let dayIDFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let longDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    private static let postponeDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
 
     @State private var viewModel: TodayViewModel?
-    @State private var showingTaskCreator = false
     @State private var selectedTaskForDetail: TaskItem?
+    @State private var draftTaskEditorMode: DraftTaskEditorMode?
     @State private var errorMessage: String?
-    @State private var ritualStamp: MindStampItem?
-    @GestureState private var isInteractingWithKillTime = false
+    @State private var startFlowCoordinator = TodayStartFlowCoordinator()
+    @State private var startFlowStamp: MindStampItem?
+    @State private var startFlowDetent: PresentationDetent = .fraction(0.5)
+    @State private var pendingTodayKillTimeHour: Int?
+    @State private var pendingTodayKillTimeMinute: Int?
+    @State private var showingTodayKillTimeConfirm = false
+    @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
     @State private var selectedSection: TodaySection = .today
+    @State private var taskForPostpone: TaskItem?
+    @State private var pendingPostponeRequest: PendingPostponeRequest?
+    @State private var pendingPostponePreview: TodayViewModel.PostponePreview?
+    @State private var showingPostponeConfirm = false
+    @State private var showingPostponeWeekCreationConfirm = false
     
 
     var body: some View {
@@ -54,6 +153,7 @@ struct TodayView: View {
                 Text(errorMessage ?? "")
             }
         }
+        .background(todaySceneBackground)
         .onAppear {
             if viewModel == nil {
                 let model = TodayViewModel(
@@ -61,12 +161,23 @@ struct TodayView: View {
                     timeProvider: TimeProvider(),
                     notificationService: NotificationService.shared,
                     appState: appState,
-                    userSettings: userSettings
+                    userSettings: userSettings,
+                    liveActivityService: TodayLiveActivityService.shared
                 )
                 viewModel = model
             }
             viewModel?.refresh()
             viewModel?.seedDraftTasksForUITestsIfNeeded()
+            viewModel?.seedFlexibleExecutionForUITestsIfNeeded()
+        }
+        .onChange(of: userSettings.defaultKillTimeHour) { _, _ in
+            viewModel?.refresh()
+        }
+        .onChange(of: userSettings.defaultKillTimeMinute) { _, _ in
+            viewModel?.refresh()
+        }
+        .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh()
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue {
@@ -80,34 +191,78 @@ struct TodayView: View {
                 initialTitle: task.title,
                 initialDescription: task.taskDescription,
                 initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
                 onSave: { _, _, _, _, _ in }
             )
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { ritualStamp != nil },
-                set: { if !$0 { ritualStamp = nil } }
-            )
-        ) {
-            if let stamp = ritualStamp {
-                MindStampRitualView(stamp: stamp) {
-                    ritualStamp = nil
-                }
+        .sheet(item: $draftTaskEditorMode) { mode in
+            draftTaskEditorSheet(mode: mode)
+        }
+        .sheet(isPresented: $startFlowCoordinator.isPresented, onDismiss: {
+            startFlowStamp = nil
+            startFlowCoordinator.cancel()
+            startFlowDetent = .fraction(0.5)
+        }) {
+            if let viewModel {
+                startFlowSheet(viewModel: viewModel)
+                    .presentationDetents(
+                        [.fraction(0.5), .fraction(0.62), .large],
+                        selection: $startFlowDetent
+                    )
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Color.backgroundPrimary)
             }
+        }
+        .sheet(item: $taskForPostpone) { task in
+            PostponeTaskSheet(
+                taskTitle: task.title,
+                onSubmit: { targetDate in
+                    stagePostponeRequest(for: task, targetDate: targetDate)
+                },
+                presentationStyle: .sheet,
+                onCancel: {
+                    taskForPostpone = nil
+                }
+            )
+            .presentationDetents([.fraction(0.58), .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.backgroundPrimary)
+            .presentationCornerRadius(26)
+        }
+        .alert("确认后移任务", isPresented: $showingPostponeConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                clearPendingPostponeContext()
+            }
+            Button("确认后移") {
+                guard let viewModel else { return }
+                confirmPostponeRequest(viewModel: viewModel)
+            }
+        } message: {
+            Text(postponeConfirmMessage)
+        }
+        .alert("目标周尚未创建", isPresented: $showingPostponeWeekCreationConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                clearPendingPostponeContext()
+            }
+            Button("创建并移动", role: .destructive) {
+                guard let viewModel else { return }
+                confirmPostponeWithWeekCreation(viewModel: viewModel)
+            }
+        } message: {
+            Text(postponeCreateWeekConfirmMessage)
         }
     }
 
     @ViewBuilder
     private func content(for day: DayModel, viewModel: TodayViewModel) -> some View {
-        TodayWeekSwitcher(
-            selectedSection: $selectedSection,
-            isPagingEnabled: !isInteractingWithKillTime,
-            todayContent: { todayContent(day: day, viewModel: viewModel) },
-            weekContent: { WeekOverviewContentView() }
-        )
-        .background(Color.backgroundPrimary)
+        TodayWeekSwitcher(selectedSection: $selectedSection, isPagingEnabled: false) {
+            todayContent(day: day, viewModel: viewModel)
+        } weekContent: {
+            WeekOverviewContentView()
+        }
+            .background(Color.clear)
     }
 
     private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
@@ -123,6 +278,12 @@ struct TodayView: View {
                 killTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
+            .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
+        }
+        .overlay(alignment: .bottom) {
+            if shouldShowFloatingStartButton(for: day) {
+                floatingStartButtonOverlay
+            }
         }
     }
 
@@ -174,7 +335,16 @@ struct TodayView: View {
                             .foregroundColor(.weekyiiPrimary)
                     }
                 }
-                
+
+                ThemeStatusArtwork(theme: userSettings.selectedTheme)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 88)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+                    )
+
                 // 日期显示
                 Text(formatDate(day.dayId))
                     .font(.bodyMedium)
@@ -185,6 +355,10 @@ struct TodayView: View {
 
     @ViewBuilder
     private func killTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
+        let displayedHour = pendingTodayKillTimeHour ?? day.killTimeHour
+        let displayedMinute = pendingTodayKillTimeMinute ?? day.killTimeMinute
+        let hasPendingChange = displayedHour != day.killTimeHour || displayedMinute != day.killTimeMinute
+
         WeekCard(accentColor: .accentOrange) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
@@ -196,25 +370,53 @@ struct TodayView: View {
                 }
                 
                 KillTimeEditor(
-                    hour: day.killTimeHour,
-                    minute: day.killTimeMinute,
+                    hour: displayedHour,
+                    minute: displayedMinute,
                     isEditable: day.status == .draft || day.status == .execute,
                     onChange: { hour, minute in
-                        do {
-                            try viewModel.changeKillTime(hour: hour, minute: minute)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
+                        pendingTodayKillTimeHour = hour
+                        pendingTodayKillTimeMinute = minute
                     }
                 )
+
+                if day.status == .draft || day.status == .execute, hasPendingChange {
+                    HStack(spacing: WeekSpacing.sm) {
+                        WeekButton("取消", style: .outline) {
+                            pendingTodayKillTimeHour = nil
+                            pendingTodayKillTimeMinute = nil
+                        }
+                        Spacer(minLength: 0)
+                        WeekButton("确认修改", style: .primary) {
+                            guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+                            do {
+                                let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
+                                switch impact {
+                                case .normal:
+                                    todayKillTimeConfirmMode = .normal
+                                case .immediateExpire(let expiredCount):
+                                    todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
+                                }
+                                showingTodayKillTimeConfirm = true
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isInteractingWithKillTime) { _, state, _ in
-                    state = true
-                }
-        )
+        .alert(
+            todayKillTimeConfirmTitle,
+            isPresented: $showingTodayKillTimeConfirm
+        ) {
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+            Button("确认") {
+                applyPendingTodayKillTime(viewModel: viewModel)
+            }
+        } message: {
+            Text(todayKillTimeConfirmMessage)
+        }
     }
     
     // MARK: - Empty State
@@ -243,22 +445,7 @@ struct TodayView: View {
         }
         
         WeekButton(String(localized: "action.create"), icon: "plus.circle.fill", style: .primary) {
-            showingTaskCreator = true
-        }
-        .sheet(isPresented: $showingTaskCreator, onDismiss: {
-            viewModel.refresh()
-        }) {
-            TaskEditorSheet(
-                title: String(localized: "draft.add_title"),
-                onSave: { title, description, type, steps, attachments in
-                    do {
-                        try viewModel.addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
-                        showingTaskCreator = false
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
+            draftTaskEditorMode = .create(.draft)
         }
     }
     
@@ -268,20 +455,19 @@ struct TodayView: View {
     private func draftStateContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                DraftEditorView(day: day, viewModel: viewModel)
-            }
-        }
-        
-        WeekButton(
-            String(localized: "action.start"),
-            icon: "play.circle.fill",
-            style: .primary,
-            isEnabled: !day.sortedDraftTasks.isEmpty
-        ) {
-            do {
-                ritualStamp = try viewModel.startDay()
-            } catch {
-                errorMessage = error.localizedDescription
+                DraftEditorView(
+                    day: day,
+                    viewModel: viewModel,
+                    onAddTask: {
+                        draftTaskEditorMode = .create(.draft)
+                    },
+                    onEditTask: { task in
+                        draftTaskEditorMode = .edit(task, .draft)
+                    },
+                    onPostponeTask: { task in
+                        taskForPostpone = task
+                    }
+                )
             }
         }
     }
@@ -308,6 +494,11 @@ struct TodayView: View {
                         .onTapGesture {
                             selectedTaskForDetail = focusTask
                         }
+
+                    TaskProjectOriginBadge(
+                        project: focusTask.project,
+                        isOnDarkBackground: true
+                    )
                     
                     HStack {
                         if let startedAt = focusTask.startedAt {
@@ -322,6 +513,45 @@ struct TodayView: View {
                         
                         Spacer()
                         
+                        Button {
+                            taskForPostpone = focusTask
+                        } label: {
+                            HStack(spacing: WeekSpacing.xs) {
+                                Image(systemName: "calendar.badge.clock")
+                                Text("后移")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .padding(.vertical, WeekSpacing.xs)
+                            .padding(.horizontal, WeekSpacing.sm)
+                        }
+                        .foregroundColor(.white)
+                        .background(.white.opacity(0.2), in: Capsule())
+                        .buttonStyle(.plain)
+
+                        if day.executionMode == .flexible {
+                            Button {
+                                do {
+                                    try viewModel.exchangeFocusWithFirstDraft()
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            } label: {
+                                HStack(spacing: WeekSpacing.xs) {
+                                    Image(systemName: "arrow.triangle.swap")
+                                    Text("交换")
+                                }
+                                .font(.caption.weight(.semibold))
+                                .padding(.vertical, WeekSpacing.xs)
+                                .padding(.horizontal, WeekSpacing.sm)
+                            }
+                            .foregroundColor(.white)
+                            .background(.white.opacity(0.2), in: Capsule())
+                            .buttonStyle(.plain)
+                            .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
+                            .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
+                            .accessibilityIdentifier("focusExchangeButton")
+                        }
+
                         Button {
                             do {
                                 try viewModel.doneFocus()
@@ -346,8 +576,31 @@ struct TodayView: View {
             }
         }
         
-        // 冻结任务
-        if !day.frozenTasks.isEmpty {
+        if day.executionMode == .flexible {
+            WeekCard {
+                DraftEditorView(
+                    day: day,
+                    viewModel: viewModel,
+                    presentationMode: .flexibleExecution,
+                    onAddTask: {
+                        draftTaskEditorMode = .create(.flexibleExecution)
+                    },
+                    onEditTask: { task in
+                        draftTaskEditorMode = .edit(task, .flexibleExecution)
+                    },
+                    onPostponeTask: { task in
+                        taskForPostpone = task
+                    },
+                    onToggleLock: {
+                        do {
+                            try viewModel.setDraftZoneUnlocked(!day.isDraftZoneUnlocked)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+        } else if !day.frozenTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
@@ -364,9 +617,16 @@ struct TodayView: View {
                             .foregroundColor(.weekyiiPrimary)
                     }
                     
-                    FrozenZoneView(tasks: day.frozenTasks, onTapTask: { task in
-                        selectedTaskForDetail = task
-                    })
+                    FrozenZoneView(
+                        tasks: day.frozenTasks,
+                        showsProjectOrigin: true,
+                        onTapTask: { task in
+                            selectedTaskForDetail = task
+                        },
+                        onPostponeTask: { task in
+                            taskForPostpone = task
+                        }
+                    )
                 }
             }
         }
@@ -516,21 +776,298 @@ struct TodayView: View {
         }
         .padding(WeekSpacing.base)
     }
+
+    private func shouldShowFloatingStartButton(for day: DayModel) -> Bool {
+        day.status == .draft && !day.sortedDraftTasks.isEmpty
+    }
+
+    @ViewBuilder
+    private var floatingStartButtonOverlay: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [
+                    Color.backgroundPrimary.opacity(0),
+                    Color.backgroundPrimary
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 32)
+            .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                WeekButton(
+                    "准备开始",
+                    icon: "play.circle.fill",
+                    style: .primary
+                ) {
+                    startFlowDetent = .fraction(0.5)
+                    startFlowCoordinator.present()
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("todayFloatingStartButton")
+            }
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.top, WeekSpacing.sm)
+            .padding(.bottom, WeekSpacing.sm)
+            .background(Color.backgroundPrimary)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    @ViewBuilder
+    private func draftTaskEditorSheet(mode: DraftTaskEditorMode) -> some View {
+        switch mode {
+        case .create(let context):
+            TaskEditorSheet(
+                title: String(localized: "draft.add_title"),
+                initialType: userSettings.defaultTaskType,
+                initialTypeIdRaw: userSettings.defaultTaskTypeIdRaw,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
+                    guard let viewModel else { return }
+                    do {
+                        switch context {
+                        case .draft:
+                            try viewModel.addTask(
+                                title: title,
+                                description: description,
+                                type: type,
+                                taskTypeIdRaw: typeIdRaw,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        case .flexibleExecution:
+                            try viewModel.addExecutionTask(
+                                title: title,
+                                description: description,
+                                type: type,
+                                taskTypeIdRaw: typeIdRaw,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        }
+                        draftTaskEditorMode = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            )
+        case .edit(let task, let context):
+            TaskEditorSheet(
+                title: String(localized: "draft.edit_title"),
+                initialTitle: task.title,
+                initialDescription: task.taskDescription,
+                initialType: task.taskType,
+                initialTypeIdRaw: task.taskTypeIdRaw,
+                initialSteps: task.steps,
+                initialAttachments: task.attachments,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeIdRaw, steps, attachments in
+                    guard let viewModel else { return }
+                    do {
+                        switch context {
+                        case .draft:
+                            try viewModel.updateTask(
+                                task,
+                                title: title,
+                                description: description,
+                                type: type,
+                                taskTypeIdRaw: typeIdRaw,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        case .flexibleExecution:
+                            try viewModel.updateExecutionTask(
+                                task,
+                                title: title,
+                                description: description,
+                                type: type,
+                                taskTypeIdRaw: typeIdRaw,
+                                steps: steps,
+                                attachments: attachments
+                            )
+                        }
+                        draftTaskEditorMode = nil
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            )
+        }
+    }
     
     private func formatDate(_ dayId: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: dayId) else { return dayId }
-        
-        formatter.dateStyle = .long
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        guard let date = Self.dayIDFormatter.date(from: dayId) else { return dayId }
+        return Self.longDateFormatter.string(from: date)
     }
     
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        Self.timeFormatter.string(from: date)
+    }
+
+    private var postponeConfirmMessage: String {
+        guard let request = pendingPostponeRequest else { return "确认后移该任务？" }
+        return "确认将「\(request.taskTitle)」后移到 \(formatPostponeDate(request.targetDate)) 吗？"
+    }
+
+    private var postponeCreateWeekConfirmMessage: String {
+        guard let preview = pendingPostponePreview else {
+            return "目标周尚未创建，确认后会自动创建并完成任务后移。"
+        }
+        return "将创建 \(preview.targetWeekId) 后把任务移动到 \(formatPostponeDate(preview.targetDate))。是否继续？"
+    }
+
+    private func stagePostponeRequest(for task: TaskItem, targetDate: Date) {
+        taskForPostpone = nil
+        pendingPostponeRequest = PendingPostponeRequest(
+            taskID: task.id,
+            taskTitle: task.title,
+            targetDate: targetDate.startOfDay
+        )
+        showingPostponeConfirm = true
+    }
+
+    private func confirmPostponeRequest(viewModel: TodayViewModel) {
+        guard let request = pendingPostponeRequest else { return }
+        do {
+            let preview = try viewModel.previewPostpone(
+                taskID: request.taskID,
+                taskTitle: request.taskTitle,
+                targetDate: request.targetDate
+            )
+            pendingPostponePreview = preview
+            if preview.requiresWeekCreation {
+                showingPostponeWeekCreationConfirm = true
+            } else {
+                _ = try viewModel.commitPostpone(preview, allowWeekCreation: false)
+                clearPendingPostponeContext()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            clearPendingPostponeContext()
+        }
+    }
+
+    private func confirmPostponeWithWeekCreation(viewModel: TodayViewModel) {
+        guard let preview = pendingPostponePreview else { return }
+        do {
+            _ = try viewModel.commitPostpone(preview, allowWeekCreation: true)
+            clearPendingPostponeContext()
+        } catch {
+            errorMessage = error.localizedDescription
+            clearPendingPostponeContext()
+        }
+    }
+
+    private func clearPendingPostponeContext() {
+        showingPostponeConfirm = false
+        showingPostponeWeekCreationConfirm = false
+        taskForPostpone = nil
+        pendingPostponeRequest = nil
+        pendingPostponePreview = nil
+    }
+
+    private func formatPostponeDate(_ date: Date) -> String {
+        Self.postponeDateFormatter.string(from: date)
+    }
+
+    private var todayKillTimeConfirmTitle: String {
+        switch todayKillTimeConfirmMode {
+        case .normal:
+            return "确认修改截止时间"
+        case .immediateExpire:
+            return "新时间会导致今日任务立即过期"
+        }
+    }
+
+    private var todayKillTimeConfirmMessage: String {
+        switch todayKillTimeConfirmMode {
+        case .normal:
+            return "确认后将更新今日截止时间。"
+        case .immediateExpire(let expiredCount):
+            return "确认后今日未完成内容将立即过期（\(expiredCount) 项）。"
+        }
+    }
+
+    private func applyPendingTodayKillTime(viewModel: TodayViewModel) {
+        guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+        do {
+            switch todayKillTimeConfirmMode {
+            case .normal:
+                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: false)
+            case .immediateExpire:
+                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: true)
+            }
+            pendingTodayKillTimeHour = nil
+            pendingTodayKillTimeMinute = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func startFlowSheet(viewModel: TodayViewModel) -> some View {
+        let day = viewModel.today
+        let draftCount = day?.sortedDraftTasks.count ?? 0
+        let killTimeHour = day?.killTimeHour ?? 20
+        let killTimeMinute = day?.killTimeMinute ?? 0
+        let killTimeText = String(format: "%02d:%02d", killTimeHour, killTimeMinute)
+
+        VStack(alignment: .leading, spacing: WeekSpacing.base) {
+            if startFlowCoordinator.step == .warning {
+                StartFlowWarningStepView(
+                    draftCount: draftCount,
+                    killTimeText: killTimeText,
+                    onCancel: {
+                        startFlowStamp = nil
+                        startFlowDetent = .fraction(0.5)
+                        startFlowCoordinator.cancel()
+                    },
+                    onContinue: {
+                        startFlowStamp = viewModel.pickStartRitualStamp()
+                        startFlowCoordinator.chooseDirectEnter()
+                        withAnimation(.easeInOut(duration: 0.24)) {
+                            startFlowDetent = .fraction(0.62)
+                        }
+                    }
+                )
+            } else {
+                StartFlowRitualStepView(
+                    stamp: startFlowStamp,
+                    onConfirm: {
+                        do {
+                            try viewModel.startDay()
+                            startFlowStamp = nil
+                            startFlowDetent = .fraction(0.5)
+                            startFlowCoordinator.cancel()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, WeekSpacing.base)
+        .padding(.top, WeekSpacing.lg)
+        .padding(.bottom, WeekSpacing.base)
+        .background(Color.backgroundPrimary)
+    }
+
+    @ViewBuilder
+    private var todaySceneBackground: some View {
+        ZStack {
+            Color.backgroundPrimary
+            if userSettings.selectedTheme == .sunset {
+                SunsetWaterReflectionBackground(animationsActive: animationsActive)
+                    .transition(.opacity)
+            } else if userSettings.selectedTheme == .lotr {
+                LotrRainNightBackground(animationsActive: animationsActive)
+                    .transition(.opacity)
+            }
+        }
+        .ignoresSafeArea()
     }
     
 }
@@ -628,6 +1165,205 @@ private struct TodayWeekSwitcher<TodayContent: View, WeekContent: View>: View {
             }
     }
 }
+
+private struct StartFlowWarningStepView: View {
+    let draftCount: Int
+    let killTimeText: String
+    let onCancel: () -> Void
+    let onContinue: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.base) {
+            HStack(alignment: .top, spacing: WeekSpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.weekyiiPrimary.opacity(0.12))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "play.circle.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color.weekyiiGradient)
+                }
+
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    Text("是否开始今日任务流？")
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(.textPrimary)
+
+                    Text("进入后将按任务顺序推进，直到完成或截止。")
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("开始任务流头部信息")
+            .accessibilityIdentifier("startFlowSheetHeader")
+
+            HStack(spacing: WeekSpacing.sm) {
+                summaryItem(icon: "checklist", title: "草稿任务", value: "\(draftCount) 项")
+                summaryItem(icon: "clock.fill", title: "截止时间", value: killTimeText)
+            }
+
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.bodyLarge)
+                    .foregroundColor(.accentOrange)
+
+                Text("同意后无法撤回，需要在截止时间前完成，未完成项将被过期遗忘。")
+                    .font(.bodyMedium)
+                    .foregroundColor(.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(WeekSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .fill(Color.accentOrangeLight.opacity(0.14))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .stroke(Color.accentOrange.opacity(0.25), lineWidth: 1)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("开始任务流风险提示")
+            .accessibilityIdentifier("startFlowWarningCard")
+
+            HStack(spacing: WeekSpacing.sm) {
+                WeekButton("我再想想", style: .outline, action: onCancel)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowSecondaryButton")
+
+                WeekButton("直接进入", style: .primary, action: onContinue)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("startFlowPrimaryButton")
+            }
+        }
+    }
+
+    private func summaryItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Image(systemName: icon)
+                .font(.bodyMedium.weight(.semibold))
+                .foregroundStyle(Color.weekyiiGradient)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                Text(value)
+                    .font(.bodyLarge.weight(.semibold))
+                    .foregroundColor(.textPrimary)
+            }
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium))
+    }
+}
+
+private struct StartFlowRitualStepView: View {
+    let stamp: MindStampItem?
+    let onConfirm: () -> Void
+
+    private var quoteText: String? {
+        guard let stamp else { return nil }
+        let trimmed = stamp.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: WeekSpacing.base) {
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text("阶段 2/2 · 呆胶布")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.textSecondary)
+                        Text("把注意力收束到唯一入口，然后开始今天。")
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                        Label("今日呆胶布", systemImage: "bandage.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.weekyiiPrimary)
+
+                        if let blob = stamp?.imageBlob, let uiImage = UIImage(data: blob) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 112)
+                                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                        .stroke(Color.backgroundTertiary, lineWidth: 1)
+                                )
+                        }
+
+                        ZStack(alignment: .topLeading) {
+                            Text("“")
+                                .font(.system(size: 38, weight: .bold, design: .serif))
+                                .foregroundStyle(Color.weekyiiPrimary.opacity(0.20))
+                                .offset(x: -2, y: -8)
+
+                            Text(contentText)
+                                .font(.bodyLarge.weight(.medium))
+                                .foregroundColor(quoteText == nil ? .textSecondary : .textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .lineSpacing(4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, WeekSpacing.lg)
+                        }
+                        .padding(WeekSpacing.md)
+                        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+                        .background(
+                            Color.weekyiiPrimary.opacity(0.07),
+                            in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .stroke(Color.weekyiiPrimary.opacity(0.18), lineWidth: 1)
+                        )
+                        .accessibilityIdentifier("startFlowRitualText")
+                    }
+                    .padding(WeekSpacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.backgroundSecondary,
+                        in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(Color.weekyiiPrimary.opacity(0.12), lineWidth: 1)
+                    )
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("呆胶布内容：\(contentText)")
+                    .accessibilityIdentifier("startFlowRitualCard")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, WeekSpacing.base)
+            }
+            .scrollIndicators(.hidden)
+
+            WeekButton("确认开始", style: .primary, action: onConfirm)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("startFlowPrimaryButton")
+                .padding(.top, WeekSpacing.xs)
+                .padding(.bottom, WeekSpacing.sm)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var contentText: String {
+        if let quoteText {
+            return quoteText
+        }
+        return "给自己一个清晰而坚定的开始。"
+    }
+}
 /// 高级 Segmented Control 样式的切换器
 /// 两个标签始终可见，高亮胶囊在背后滑动，带渐变和玻璃质感
 private struct SectionToggleView: View {
@@ -655,6 +1391,7 @@ private struct SectionToggleView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("todaySectionTodayButton")
             
             // 本周 按钮
             Button {
@@ -672,6 +1409,7 @@ private struct SectionToggleView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("todaySectionWeekButton")
         }
         .background(
             GeometryReader { geo in
@@ -755,4 +1493,289 @@ private struct SectionToggleView: View {
     }
 }
 
-// MARK: - Task Creator Sheet
+/// Lightweight animated scene used only by the Sunset theme on Today page.
+private struct SunsetWaterReflectionBackground: View {
+    let animationsActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var sunDrift = false
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let sunY = sunCenterY(for: size)
+            let waterlineY = waterline(for: size)
+
+            ZStack {
+                LinearGradient(
+                    colors: skyGradientColors,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                horizonGlow(y: waterlineY, size: size)
+                sunDisk(y: sunY, size: size)
+                reflectedSun(y: sunY, waterlineY: waterlineY, size: size)
+                reflectionRipples(size: size, waterlineY: waterlineY)
+            }
+            .drawingGroup(opaque: false, colorMode: .linear)
+            .onAppear {
+                updateSunAnimation()
+            }
+            .onChange(of: shouldAnimate) { _, _ in
+                updateSunAnimation()
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var skyGradientColors: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color(hex: "#251414"),
+                Color(hex: "#3A1D1A"),
+                Color(hex: "#221917"),
+                Color(hex: "#141317")
+            ]
+        }
+        return [
+            Color(hex: "#FFE5D1"),
+            Color(hex: "#F9C39E"),
+            Color(hex: "#DF896B"),
+            Color(hex: "#B86A5C")
+        ]
+    }
+
+    private func waterline(for size: CGSize) -> CGFloat {
+        size.height * (colorScheme == .dark ? 0.52 : 0.56)
+    }
+
+    private func sunCenterY(for size: CGSize) -> CGFloat {
+        let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
+        guard shouldAnimate else { return base }
+        return base + (sunDrift ? 5 : -5)
+    }
+
+    private func updateSunAnimation() {
+        if shouldAnimate {
+            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
+                sunDrift = true
+            }
+        } else {
+            withAnimation(nil) {
+                sunDrift = false
+            }
+        }
+    }
+
+    private func sunCenterX(for size: CGSize) -> CGFloat {
+        size.width * 0.382
+    }
+
+    private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: colorScheme == .dark ? "#E5B099" : "#F2B28F")
+                            .opacity(colorScheme == .dark ? 0.08 : 0.13),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(height: 86)
+            .position(x: size.width / 2, y: y)
+    }
+
+    private func sunDisk(y: CGFloat, size: CGSize) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: colorScheme == .dark ? "#FA6D5B" : "#F16250"),
+                            Color(hex: colorScheme == .dark ? "#D84A3E" : "#C83D36")
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 74, height: 74)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.2 : 0.24),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                )
+                .frame(width: 40, height: 40)
+                .offset(y: -9)
+        }
+        .overlay(
+            Circle()
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                .frame(width: 74, height: 74)
+        )
+        .position(x: sunCenterX(for: size), y: y)
+    }
+
+    private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
+        let height: CGFloat = colorScheme == .dark ? 212 : 230
+        let reflectionTop = max(y + 24, waterlineY - 10)
+        return RoundedRectangle(cornerRadius: 70, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#F06B58").opacity(colorScheme == .dark ? 0.2 : 0.3),
+                        Color(hex: "#D34A3F").opacity(colorScheme == .dark ? 0.14 : 0.24),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 84, height: height)
+            .blur(radius: 4)
+            .scaleEffect(x: 1.04, y: 1.0, anchor: .top)
+            .position(x: sunCenterX(for: size) + 10, y: reflectionTop + height / 2)
+    }
+
+    private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
+            Canvas { context, canvasSize in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let lineCount = 13
+                let leftX = canvasSize.width * 0.06
+                let rightX = canvasSize.width * 0.94
+                let laneHeight = max((canvasSize.height - waterlineY) / CGFloat(lineCount + 2), 8)
+                let waveAmplitude: CGFloat = reduceMotion ? 0.8 : 3.8
+
+                for idx in 0..<lineCount {
+                    let progress = CGFloat(idx) / CGFloat(lineCount)
+                    let baseY = waterlineY + CGFloat(idx + 1) * laneHeight
+                    let phase = Double(idx) * 0.76
+                    let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
+                    let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
+                    let lineWidth = max(0.7, 2.1 - progress * 1.2)
+                    let alpha = max(0.02, 0.11 - Double(progress) * 0.08)
+
+                    var path = Path()
+                    path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
+                    path.addQuadCurve(
+                        to: CGPoint(x: rightX - xWave, y: baseY - yWave * 0.35),
+                        control: CGPoint(
+                            x: canvasSize.width * 0.5 + CGFloat(sin(t * 0.4 + phase * 1.4)) * 26,
+                            y: baseY + CGFloat(cos(t * 0.3 + phase)) * (waveAmplitude * 0.9)
+                        )
+                    )
+
+                    context.stroke(
+                        path,
+                        with: .color(Color(hex: "#FFD6B9").opacity(alpha)),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .blendMode(.plusLighter)
+        }
+    }
+}
+
+private struct LotrRainNightBackground: View {
+    let animationsActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let horizonY = size.height * 0.6
+
+            ZStack {
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color(hex: "#070808"), Color(hex: "#0D0F12"), Color(hex: "#13161A"), Color(hex: "#1A1D22")]
+                        : [Color(hex: "#E6E7EA"), Color(hex: "#D6D8DD"), Color(hex: "#C1C4CB"), Color(hex: "#ADB1BA")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // starless night: no stars, only layered mountain silhouettes
+                mountainLayer(size: size, y: horizonY - 34, opacity: colorScheme == .dark ? 0.7 : 0.34, offset: 0)
+                mountainLayer(size: size, y: horizonY - 12, opacity: colorScheme == .dark ? 0.86 : 0.46, offset: 24)
+
+                // distant call: a tiny warm beacon near golden-left valley
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color(hex: colorScheme == .dark ? "#D1A261" : "#AF7D47"))
+                    .frame(width: 3, height: 12)
+                    .blur(radius: 0.4)
+                    .position(x: size.width * 0.362, y: horizonY - 8)
+
+                coldRain(size: size, fromY: horizonY - 120)
+            }
+            .drawingGroup(opaque: false, colorMode: .linear)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: -20, y: size.height))
+            path.addLine(to: CGPoint(x: -20, y: y + 40))
+            path.addCurve(
+                to: CGPoint(x: size.width * 0.28, y: y - 22),
+                control1: CGPoint(x: size.width * 0.05, y: y + 10),
+                control2: CGPoint(x: size.width * 0.18, y: y - 26)
+            )
+            path.addCurve(
+                to: CGPoint(x: size.width * 0.58, y: y + 6),
+                control1: CGPoint(x: size.width * 0.36, y: y - 16),
+                control2: CGPoint(x: size.width * 0.46, y: y + 14)
+            )
+            path.addCurve(
+                to: CGPoint(x: size.width + 20, y: y - 12),
+                control1: CGPoint(x: size.width * 0.71, y: y - 14),
+                control2: CGPoint(x: size.width * 0.89, y: y - 20)
+            )
+            path.addLine(to: CGPoint(x: size.width + 20, y: size.height))
+            path.closeSubpath()
+        }
+        .fill(Color.black.opacity(opacity))
+        .offset(x: offset)
+    }
+
+    private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimate)) { timeline in
+            Canvas { context, canvas in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let columns = 24
+                for idx in 0..<columns {
+                    let x = (CGFloat(idx) + 0.5) / CGFloat(columns) * canvas.width
+                    let phase = Double(idx) * 0.37
+                    let drift = CGFloat(sin(t * 0.65 + phase)) * (reduceMotion ? 0.5 : 2.3)
+                    let dropTop = fromY + CGFloat((idx % 4) * 6) + CGFloat((t * 38 + phase * 30).truncatingRemainder(dividingBy: 16))
+                    let dropHeight: CGFloat = 14 + CGFloat(idx % 3) * 2
+                    let rect = CGRect(x: x + drift, y: dropTop, width: 1.0, height: dropHeight)
+                    let path = Path(roundedRect: rect, cornerRadius: 1)
+                    context.fill(path, with: .color(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.1)))
+                }
+            }
+        }
+    }
+}

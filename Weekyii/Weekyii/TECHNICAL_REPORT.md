@@ -17,7 +17,9 @@ Application startup is in `/Users/luobowen/handwrittenfnn/weekyii/Weekyii/Weekyi
 Key points:
 - SwiftData schema registration (`WeekModel`, `DayModel`, `TaskItem`, `TaskStep`, `TaskAttachment`, `ProjectModel`, `MindStampItem`)
 - Persistent store located at `Application Support/Weekyii/Weekyii.store`
-- In-memory fallback if persistent store initialization fails
+- Persistent store located at `Application Support/Weekyii/Weekyii.store`
+- Store initialization previously fell back to an in-memory container if persistent initialization failed. This path was triggered after `ProjectModel` added persisted tile fields without a formal migration path, causing an existing on-device store to be treated as unavailable.
+- Runtime fallback is not considered a safe steady-state because it hides migration defects and risks user confusion about whether data is still durable.
 - Global services: `AppState`, `UserSettings`, `StateMachine`, minute-level timer
 
 ```swift
@@ -32,8 +34,15 @@ let schema = Schema([
 ])
 
 let config = ModelConfiguration("Weekyii", schema: schema, url: storeURL, allowsSave: true, cloudKitDatabase: .none)
-modelContainer = try ModelContainer(for: schema, configurations: config)
+modelContainer = try ModelContainer(for: schema, migrationPlan: WeekyiiMigrationPlan.self, configurations: config)
 ```
+
+### 2.1.1 Persistence incident note
+- Date: March 6, 2026
+- Trigger: `ProjectModel` gained persisted board fields (`tileSizeRaw`, `tileOrder`) for the Windows Phone project board redesign.
+- Observed behavior: existing installs could fail persistent `ModelContainer` initialization and show the alert `本地数据暂时不可用，已进入只保启动模式。请尽快备份并重启。`
+- Root cause: schema evolution relied on ad-hoc lightweight migration assumptions instead of a declared SwiftData versioned schema and migration plan.
+- Required correction: formalize schema versioning, add an explicit migration path for the previous `ProjectModel`, and remove the user-facing in-memory runtime mode as the normal recovery path.
 
 ### 2.2 Top-level navigation
 `/Users/luobowen/handwrittenfnn/weekyii/Weekyii/Weekyii/App/ContentView.swift` defines a 5-tab architecture:

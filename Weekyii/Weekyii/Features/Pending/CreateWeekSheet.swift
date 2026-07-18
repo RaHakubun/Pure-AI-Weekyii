@@ -2,10 +2,10 @@ import SwiftUI
 
 struct CreateWeekSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDate = Date()
-    @State private var selectedMonth = Date()
+    @State private var selectedDate: Date
+    @State private var selectedMonth: Date
     @State private var selectedWeekId: String?
-    @State private var selectedMode: Mode = .date
+    @State private var selectedMode: Mode
     @State private var createdDay: DayModel?
     @State private var createdWeek: WeekModel?
     @State private var errorMessage: String?
@@ -16,6 +16,24 @@ struct CreateWeekSheet: View {
     enum Mode: String, CaseIterable {
         case date
         case weekId
+    }
+
+    init(
+        viewModel: PendingViewModel,
+        initialDate: Date? = nil,
+        initialMonth: Date? = nil,
+        initialMode: Mode? = nil
+    ) {
+        self.viewModel = viewModel
+
+        let fallbackDate = Date()
+        let resolvedDate = initialDate ?? fallbackDate
+        let resolvedMonth = initialMonth ?? resolvedDate
+
+        _selectedDate = State(initialValue: resolvedDate)
+        _selectedMonth = State(initialValue: resolvedMonth)
+        _selectedMode = State(initialValue: initialMode ?? .date)
+        _selectedWeekId = State(initialValue: nil)
     }
 
     var body: some View {
@@ -198,6 +216,7 @@ private struct CustomCalendarView: View {
     @Binding var selectedMonth: Date
     let viewModel: PendingViewModel
 
+    @EnvironmentObject private var settings: UserSettings
     @State private var cachedTaskDates: Set<String> = []
     @State private var cachedDDLDates: Set<String> = []
 
@@ -239,7 +258,7 @@ private struct CustomCalendarView: View {
         // 前置填充（上个月的尾数日期）
         if leadingOffset > 0 {
             for i in (1...leadingOffset).reversed() {
-                let date = calendar.date(byAdding: .day, value: -i, to: monthStart)!
+                guard let date = calendar.date(byAdding: .day, value: -i, to: monthStart) else { continue }
                 days.append(CalendarDay(date: date, isCurrentMonth: false))
             }
         }
@@ -256,7 +275,7 @@ private struct CustomCalendarView: View {
         if remainder > 0 {
             let trailingCount = 7 - remainder
             for i in 0..<trailingCount {
-                let date = calendar.date(byAdding: .day, value: i, to: monthEnd)!
+                guard let date = calendar.date(byAdding: .day, value: i, to: monthEnd) else { continue }
                 days.append(CalendarDay(date: date, isCurrentMonth: false))
             }
         }
@@ -391,16 +410,14 @@ private struct CustomCalendarView: View {
                 }
                 .frame(width: 36, height: 36)
 
-                // 指示器区域（固定高度，保持布局稳定）
+                // 指示器区域（遵循「我的 > 未来月视图」设置项）
                 HStack(spacing: 3) {
-                    if day.isCurrentMonth && hasTasks {
-                        // 有任务/草稿 → 小绿点
+                    if day.isCurrentMonth && settings.pendingMonthShowRegular && hasTasks {
                         Circle()
                             .fill(Color.accentGreen)
                             .frame(width: 6, height: 6)
                     }
-                    if day.isCurrentMonth && hasDDL {
-                        // 有 DDL 任务 → 火焰图标
+                    if day.isCurrentMonth && settings.pendingMonthShowDDL && hasDDL {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 8))
                             .foregroundColor(.taskDDL)

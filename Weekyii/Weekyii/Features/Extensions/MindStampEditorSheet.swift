@@ -10,6 +10,7 @@ struct MindStampEditorSheet: View {
     @State private var imageData: Data?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var errorMessage: String?
+    @State private var imagePreviewItem: ImagePreviewItem?
 
     init(viewModel: MindStampViewModel, editingItem: MindStampItem? = nil) {
         self.viewModel = viewModel
@@ -39,6 +40,7 @@ struct MindStampEditorSheet: View {
                             .padding(WeekSpacing.md)
                             .background(Color.backgroundTertiary)
                             .cornerRadius(WeekRadius.small)
+                            .accessibilityIdentifier("mindstampEditorTextField")
                         }
                     }
 
@@ -76,6 +78,10 @@ struct MindStampEditorSheet: View {
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 180)
                                         .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+                                        .contentShape(RoundedRectangle(cornerRadius: WeekRadius.small))
+                                        .onTapGesture {
+                                            imagePreviewItem = ImagePreviewItem(image: uiImage)
+                                        }
 
                                     Button {
                                         self.imageData = nil
@@ -101,6 +107,7 @@ struct MindStampEditorSheet: View {
                         save()
                     }
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageData == nil)
+                    .accessibilityIdentifier("mindstampEditorSaveButton")
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "action.cancel")) {
@@ -125,6 +132,9 @@ struct MindStampEditorSheet: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+        }
+        .fullScreenCover(item: $imagePreviewItem) { item in
+            ImageViewerScreen(image: item.image)
         }
     }
 

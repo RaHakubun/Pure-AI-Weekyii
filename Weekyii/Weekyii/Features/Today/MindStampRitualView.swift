@@ -17,7 +17,7 @@ struct MindStampRitualView: View {
             // Card
             VStack(spacing: WeekSpacing.xl) {
                 // Seal icon
-                Image(systemName: "seal.fill")
+                Image(systemName: "bandage.fill")
                     .font(.system(size: 44))
                     .foregroundStyle(Color.orangeGradient)
                     .scaleEffect(showContent ? 1 : 0.5)

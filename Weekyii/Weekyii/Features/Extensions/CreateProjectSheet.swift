@@ -2,7 +2,9 @@ import SwiftUI
 
 struct CreateProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: UserSettings
     let viewModel: ExtensionsViewModel
+    let projectToEdit: ProjectModel?
 
     @State private var name = ""
     @State private var description = ""
@@ -11,6 +13,7 @@ struct CreateProjectSheet: View {
     @State private var startDate = Date()
     @State private var endDate = Date().addingDays(7)
     @State private var errorMessage: String?
+    @State private var hasAppliedProjectDefaults = false
 
     private let colorOptions = [
         "#C46A1A", "#3FA67A", "#D05C3E", "#8C6AD9",
@@ -22,6 +25,17 @@ struct CreateProjectSheet: View {
         "flag.fill", "book.fill", "hammer.fill", "puzzlepiece.fill",
         "lightbulb.fill", "chart.bar.fill", "graduationcap.fill", "airplane"
     ]
+
+    init(viewModel: ExtensionsViewModel, projectToEdit: ProjectModel? = nil) {
+        self.viewModel = viewModel
+        self.projectToEdit = projectToEdit
+        _name = State(initialValue: projectToEdit?.name ?? "")
+        _description = State(initialValue: projectToEdit?.projectDescription ?? "")
+        _selectedColor = State(initialValue: projectToEdit?.color ?? "#C46A1A")
+        _selectedIcon = State(initialValue: projectToEdit?.icon ?? "folder.fill")
+        _startDate = State(initialValue: projectToEdit?.startDate ?? Date())
+        _endDate = State(initialValue: projectToEdit?.endDate ?? Date().addingDays(7))
+    }
 
     var body: some View {
         NavigationStack {
@@ -142,22 +156,45 @@ struct CreateProjectSheet: View {
                 .weekPadding(WeekSpacing.base)
             }
             .background(Color.backgroundPrimary)
-            .navigationTitle(String(localized: "project.create.title"))
+            .navigationTitle(projectToEdit == nil ? String(localized: "project.create.title") : "编辑项目")
+            .onAppear {
+                guard projectToEdit == nil, !hasAppliedProjectDefaults else { return }
+                startDate = Date()
+                endDate = Date().addingDays(max(settings.defaultProjectDurationDays, 1))
+                hasAppliedProjectDefaults = true
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "action.create")) {
-                        let project = viewModel.createProject(
-                            name: name,
-                            description: description,
-                            color: selectedColor,
-                            icon: selectedIcon,
-                            startDate: startDate,
-                            endDate: endDate
-                        )
-                        if project != nil {
-                            dismiss()
+                    Button(projectToEdit == nil ? String(localized: "action.create") : "保存") {
+                        if let projectToEdit {
+                            if viewModel.updateProject(
+                                projectToEdit,
+                                name: name,
+                                description: description,
+                                color: selectedColor,
+                                icon: selectedIcon,
+                                startDate: startDate,
+                                endDate: endDate
+                            ) {
+                                dismiss()
+                            } else {
+                                errorMessage = viewModel.errorMessage
+                            }
                         } else {
-                            errorMessage = viewModel.errorMessage
+                            let project = viewModel.createProject(
+                                name: name,
+                                description: description,
+                                color: selectedColor,
+                                icon: selectedIcon,
+                                startDate: startDate,
+                                endDate: endDate,
+                                tileSize: settings.defaultProjectTileSize
+                            )
+                            if project != nil {
+                                dismiss()
+                            } else {
+                                errorMessage = viewModel.errorMessage
+                            }
                         }
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)

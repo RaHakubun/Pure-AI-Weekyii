@@ -1,6 +1,9 @@
 import SwiftUI
 import PhotosUI
+import Photos
 import SwiftData
+import ImageIO
+@preconcurrency import UIKit
 
 struct TaskEditorSheet: View {
     let title: String
@@ -8,13 +11,17 @@ struct TaskEditorSheet: View {
     @State var taskTitle: String
     @State var taskDescription: String
     @State var taskType: TaskType
+    @State private var taskTypeIdRaw: String
+    @State private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var stepDrafts: [TaskStepDraft]
     @State var attachments: [TaskAttachment]
     
     // Config for save callback: returns necessary data
     var onSave: (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
+    var onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)?
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     // Step editing state
     @State private var newStepTitle: String = ""
@@ -22,6 +29,9 @@ struct TaskEditorSheet: View {
     
     // Photo picker state
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var showingStepFullText = false
+    @State private var selectedStepFullText = ""
+    @State private var imagePreviewItem: ImagePreviewItem?
     
     init(
         title: String,
@@ -29,15 +39,19 @@ struct TaskEditorSheet: View {
         initialTitle: String = "",
         initialDescription: String = "",
         initialType: TaskType = .regular,
+        initialTypeIdRaw: String? = nil,
         initialSteps: [TaskStep] = [],
         initialAttachments: [TaskAttachment] = [],
-        onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void
+        onSave: @escaping (String, String, TaskType, [TaskStep], [TaskAttachment]) -> Void,
+        onSaveWithTypeId: ((String, String, TaskType, String, [TaskStep], [TaskAttachment]) -> Void)? = nil
     ) {
         self.title = title
         self.isReadOnly = isReadOnly
         _taskTitle = State(initialValue: initialTitle)
         _taskDescription = State(initialValue: initialDescription)
         _taskType = State(initialValue: initialType)
+        _taskTypeIdRaw = State(initialValue: initialTypeIdRaw ?? initialType.rawValue)
+        _taskTypeDefinitions = State(initialValue: TaskTypeDefinition.builtInDefinitions())
         _stepDrafts = State(initialValue: initialSteps
             .sorted {
                 if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
@@ -55,17 +69,18 @@ struct TaskEditorSheet: View {
         )
         _attachments = State(initialValue: initialAttachments)
         self.onSave = onSave
+        self.onSaveWithTypeId = onSaveWithTypeId
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    WeekCard(accentColor: taskType.color) {
+                    WeekCard(accentColor: selectedTaskTypeDefinition.color) {
                         sectionHeader(
                             titleKey: "task.basic_info",
                             icon: "text.badge.plus",
-                            accent: taskType.color
+                            accent: selectedTaskTypeDefinition.color
                         )
                         
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
@@ -75,6 +90,7 @@ struct TaskEditorSheet: View {
                                 .background(Color.backgroundTertiary)
                                 .cornerRadius(WeekRadius.medium)
                                 .disabled(isReadOnly)
+                                .accessibilityIdentifier("taskEditorTitleField")
                             
                             TextField(String(localized: "task.description.placeholder"), text: $taskDescription, axis: .vertical)
                                 .font(.bodyMedium)
@@ -89,15 +105,18 @@ struct TaskEditorSheet: View {
                                     .font(.captionBold)
                                     .foregroundColor(.textSecondary)
                                 
-                                HStack(spacing: WeekSpacing.sm) {
-                                    ForEach(TaskType.allCases, id: \.self) { type in
-                                        taskTypeChip(for: type)
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: WeekSpacing.xs) {
+                                        ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
+                                            taskTypeChip(for: definition)
+                                        }
                                     }
                                 }
+                                .scrollIndicators(.hidden)
                             }
                         }
                     }
-                    
+
                     WeekCard {
                         sectionHeader(
                             titleKey: "task.steps",
@@ -106,12 +125,7 @@ struct TaskEditorSheet: View {
                         )
                         
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                            if stepDrafts.isEmpty {
-                                Text(String(localized: "task.steps.empty"))
-                                    .font(.bodyMedium)
-                                    .foregroundColor(.textSecondary)
-                                    .padding(.vertical, WeekSpacing.sm)
-                            } else {
+                            if !stepDrafts.isEmpty {
                                 VStack(spacing: WeekSpacing.sm) {
                                     ForEach(stepDrafts) { draft in
                                         stepRow(for: draft.id)
@@ -148,51 +162,34 @@ struct TaskEditorSheet: View {
                             accent: .accentOrange
                         )
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: WeekSpacing.sm) {
-                                ForEach(attachments, id: \.id) { (attachment: TaskAttachment) in
-                                    if let data = attachment.data, let uiImage = UIImage(data: data) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 84, height: 84)
-                                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-                                            .overlay(alignment: .topTrailing) {
-                                                if !isReadOnly {
-                                                    Button(action: {
-                                                        deleteAttachment(attachment)
-                                                    }) {
-                                                        Image(systemName: "xmark.circle.fill")
-                                                            .foregroundColor(.red)
-                                                            .background(Circle().fill(.white))
-                                                    }
-                                                    .offset(x: 8, y: -8)
-                                                }
+                        let columns = [
+                            GridItem(.adaptive(minimum: 92), spacing: WeekSpacing.sm)
+                        ]
+
+                        LazyVGrid(columns: columns, spacing: WeekSpacing.sm) {
+                            ForEach(attachments, id: \.id) { (attachment: TaskAttachment) in
+                                attachmentTile(attachment)
+                            }
+                            if !isReadOnly {
+                                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                                        .fill(Color.accentOrangeLight.opacity(0.22))
+                                        .frame(height: 96)
+                                        .overlay(
+                                            VStack(spacing: 6) {
+                                                Image(systemName: "plus.square.fill")
+                                                    .font(.title2)
+                                                    .foregroundColor(.accentOrange)
+                                                Text(String(localized: "action.add"))
+                                                    .font(.captionBold)
+                                                    .foregroundColor(.accentOrange)
                                             }
-                                    }
+                                        )
                                 }
-                                if !isReadOnly {
-                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                        RoundedRectangle(cornerRadius: WeekRadius.medium)
-                                            .fill(Color.accentOrangeLight.opacity(0.2))
-                                            .frame(width: 84, height: 84)
-                                            .overlay(
-                                                VStack(spacing: 6) {
-                                                    Image(systemName: "photo.badge.plus")
-                                                        .font(.title2)
-                                                        .foregroundColor(.accentOrange)
-                                                    Text(String(localized: "action.add"))
-                                                        .font(.caption)
-                                                        .foregroundColor(.accentOrange)
-                                                }
-                                            )
-                                    }
-                                    .onChange(of: selectedPhoto) { _, newItem in
-                                        loadPhoto(newItem)
-                                    }
+                                .onChange(of: selectedPhoto) { _, newItem in
+                                    loadPhoto(newItem)
                                 }
                             }
-                            .padding(.vertical, WeekSpacing.xs)
                         }
                     }
                 }
@@ -219,17 +216,35 @@ struct TaskEditorSheet: View {
                                         sortOrder: draft.sortOrder
                                     )
                                 }
-                            onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
+                            if let onSaveWithTypeId {
+                                onSaveWithTypeId(taskTitle, taskDescription, taskType, taskTypeIdRaw, normalizedSteps, attachments)
+                            } else {
+                                onSave(taskTitle, taskDescription, taskType, normalizedSteps, attachments)
+                            }
                         }
                         .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("taskEditorSaveButton")
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "action.cancel")) {
                         dismiss()
                     }
+                    .accessibilityIdentifier("taskEditorCancelButton")
                 }
             }
+    }
+
+        .alert("步骤全文", isPresented: $showingStepFullText) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(selectedStepFullText)
+        }
+        .fullScreenCover(item: $imagePreviewItem) { item in
+            ImageViewerScreen(image: item.image)
+        }
+        .task {
+            loadTaskTypeDefinitions()
         }
     }
 
@@ -244,23 +259,58 @@ struct TaskEditorSheet: View {
         }
     }
     
-    private func taskTypeChip(for type: TaskType) -> some View {
-        let isSelected = taskType == type
-        
-        return Button(action: { taskType = type }) {
+    private var selectedTaskTypeDefinition: TaskTypeDefinition {
+        taskTypeDefinitions.first { $0.idRaw == taskTypeIdRaw }
+            ?? taskTypeDefinitions.first { $0.idRaw == taskType.rawValue }
+            ?? TaskTypeCatalog.builtInFallback
+    }
+
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        let merged = active.contains(where: { $0.idRaw == taskTypeIdRaw })
+            ? active
+            : active + [selectedTaskTypeDefinition]
+        return merged.sorted { lhs, rhs in
+            if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func loadTaskTypeDefinitions() {
+        do {
+            taskTypeDefinitions = try TaskTypeCatalog.load(in: modelContext).definitions
+            let selected = selectedTaskTypeDefinition
+            taskType = selected.baseKind
+            taskTypeIdRaw = selected.idRaw
+        } catch {
+            taskTypeDefinitions = TaskTypeDefinition.builtInDefinitions()
+        }
+    }
+
+    private func taskTypeChip(for definition: TaskTypeDefinition) -> some View {
+        let isSelected = taskTypeIdRaw == definition.idRaw
+        let color = definition.color
+
+        return Button(action: {
+            taskTypeIdRaw = definition.idRaw
+            taskType = definition.baseKind
+        }) {
             HStack(spacing: WeekSpacing.xs) {
-                Image(systemName: type.iconName)
-                Text(type.displayName)
+                Image(systemName: definition.iconName)
+                    .font(.caption)
+                Text(definition.name)
                     .font(.captionBold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
-            .foregroundColor(isSelected ? type.color : .textSecondary)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(isSelected ? type.color.opacity(0.15) : Color.backgroundTertiary)
+            .foregroundColor(isSelected ? color : .textSecondary)
+            .frame(minWidth: 78, minHeight: 36)
+            .padding(.horizontal, 8)
+            .background(isSelected ? color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(isSelected ? type.color : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? color : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -284,9 +334,24 @@ struct TaskEditorSheet: View {
                     .buttonStyle(.plain)
                 }
 
-                TextField(String(localized: "Step"), text: binding.title)
-                    .font(.bodyMedium)
-                    .disabled(isReadOnly)
+                if isReadOnly {
+                    Text(binding.title.wrappedValue)
+                        .font(.bodyMedium)
+                        .foregroundColor(.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedStepFullText = binding.title.wrappedValue
+                            showingStepFullText = true
+                        }
+                } else {
+                    TextField(String(localized: "Step"), text: binding.title, axis: .vertical)
+                        .font(.bodyMedium)
+                        .lineLimit(1...8)
+                        .disabled(isReadOnly)
+                }
 
                 Spacer()
 
@@ -369,6 +434,103 @@ struct TaskEditorSheet: View {
             attachments.remove(at: index)
         }
     }
+
+    @ViewBuilder
+    private func attachmentTile(_ attachment: TaskAttachment) -> some View {
+        let fileLabel = attachment.fileName.isEmpty ? "Attachment" : attachment.fileName
+
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .fill(Color.accentOrangeLight.opacity(0.16))
+                .frame(height: 96)
+                .overlay(alignment: .bottomLeading) {
+                    Text(fileLabel)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(2)
+                        .foregroundColor(.textPrimary)
+                        .padding(8)
+                }
+
+            if let data = attachment.data {
+                AttachmentThumbnail(data: data)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                    .overlay(alignment: .bottomLeading) {
+                        Rectangle()
+                            .fill(.black.opacity(0.32))
+                            .frame(height: 26)
+                            .overlay(alignment: .leading) {
+                                Text(fileLabel)
+                                    .font(.caption2.weight(.semibold))
+                                    .lineLimit(1)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                            }
+                    }
+            }
+
+            if !isReadOnly {
+                Button(action: {
+                    deleteAttachment(attachment)
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.white)
+                        .background(Circle().fill(.black.opacity(0.45)))
+                }
+                .offset(x: 6, y: -6)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let data = attachment.data else { return }
+            Task {
+                let image = await Task.detached(priority: .userInitiated) {
+                    UIImage(data: data)?.preparingForDisplay()
+                }.value
+                if let image { imagePreviewItem = ImagePreviewItem(image: image) }
+            }
+        }
+    }
+}
+
+struct AttachmentThumbnail: View {
+    let data: Data
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+            } else {
+                ZStack {
+                    Color.accentOrangeLight.opacity(0.12)
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+        .task(id: data.count) {
+            image = await Task.detached(priority: .utility) {
+                downsampledImage(from: data, maxPixelSize: 320)
+            }.value
+        }
+    }
+
+    private nonisolated func downsampledImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
 }
 
 private struct TaskStepDraft: Identifiable {
@@ -376,4 +538,140 @@ private struct TaskStepDraft: Identifiable {
     var title: String
     var isCompleted: Bool
     var sortOrder: Int
+}
+
+struct ImagePreviewItem: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+struct ImageViewerScreen: View {
+    let image: UIImage
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var showingSaveAction = false
+    @State private var saveAlert: PhotoSaveAlert?
+    @State private var imageSaver: ImageSaver?
+
+    private let minScale: CGFloat = 1
+    private let maxScale: CGFloat = 4
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let updated = lastScale * value
+                            scale = min(max(updated, minScale), maxScale)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.white)
+                    .background(Circle().fill(.black.opacity(0.5)))
+            }
+            .padding(WeekSpacing.base)
+        }
+        .onLongPressGesture(minimumDuration: 0.4) {
+            showingSaveAction = true
+        }
+        .confirmationDialog("保存图片", isPresented: $showingSaveAction) {
+            Button("保存到相册") {
+                saveToPhotos()
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+        }
+        .alert(item: $saveAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text(String(localized: "action.ok")))
+            )
+        }
+    }
+
+    private func saveToPhotos() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if PhotoLibraryAccess.canSave(status: status) {
+            performSave()
+            return
+        }
+
+        if status == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                DispatchQueue.main.async {
+                    if PhotoLibraryAccess.canSave(status: newStatus) {
+                        performSave()
+                    } else {
+                        presentDeniedAlert()
+                    }
+                }
+            }
+            return
+        }
+
+        presentDeniedAlert()
+    }
+
+    private func performSave() {
+        let saver = ImageSaver { error in
+            if let error {
+                saveAlert = PhotoSaveAlert(title: "保存失败", message: error.localizedDescription)
+            } else {
+                saveAlert = PhotoSaveAlert(title: "已保存", message: "图片已保存到相册")
+            }
+        }
+        imageSaver = saver
+        saver.save(image)
+    }
+
+    private func presentDeniedAlert() {
+        saveAlert = PhotoSaveAlert(title: "无法保存", message: "请在系统设置中允许添加照片。")
+    }
+}
+
+struct PhotoSaveAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+enum PhotoLibraryAccess {
+    static func canSave(status: PHAuthorizationStatus) -> Bool {
+        status == .authorized || status == .limited
+    }
+}
+
+final class ImageSaver: NSObject {
+    private let onComplete: (Error?) -> Void
+
+    init(onComplete: @escaping (Error?) -> Void) {
+        self.onComplete = onComplete
+    }
+
+    func save(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        DispatchQueue.main.async {
+            self.onComplete(error)
+        }
+    }
 }
