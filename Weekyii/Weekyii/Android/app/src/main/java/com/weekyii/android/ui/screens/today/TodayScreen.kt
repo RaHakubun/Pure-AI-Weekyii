@@ -23,13 +23,19 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Celebration
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -52,7 +58,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import android.graphics.BitmapFactory
 import androidx.compose.ui.Alignment
@@ -69,13 +74,24 @@ import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.TodayViewModel
 import com.weekyii.android.ui.viewmodel.WeekViewModel
 import com.weekyii.android.ui.screens.week.WeekScreen
+import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiButton
+import com.weekyii.android.ui.components.WeekyiiButtonStyle
+import com.weekyii.android.ui.components.WeekyiiEmptyState
+import com.weekyii.android.ui.components.WeekyiiHeader
+import com.weekyii.android.ui.components.WeekyiiSegmentedControl
+import com.weekyii.android.ui.components.WeekyiiStatusArtwork
+import com.weekyii.android.ui.components.WeekyiiTaskRow
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
 
 @Composable
 fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel: WeekViewModel? = null) {
     val state by viewModel.state.collectAsState()
+    val daysStartedCount by viewModel.daysStartedCount.collectAsState()
     var showWeek by remember { mutableStateOf(false) }
+    var showEmptyComposer by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
     var executionTaskTitle by remember { mutableStateOf("") }
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
@@ -101,7 +117,14 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     val day = state.day
 
     if (showWeek && weekViewModel != null) {
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(padding)
+                .padding(horizontal = WeekyiiDimensions.contentHorizontalPadding)
+        ) {
+            WeekyiiHeader()
             TodayWeekSwitcher(showWeek = true, onChange = { showWeek = it })
             WeekScreen(weekViewModel, modifier = Modifier.weight(1f))
         }
@@ -111,10 +134,17 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(padding),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(
+            horizontal = WeekyiiDimensions.contentHorizontalPadding,
+            vertical = WeekyiiDimensions.spacingBase
+        ),
+        verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingLarge)
     ) {
+        item {
+            WeekyiiHeader()
+        }
         item {
             TodayWeekSwitcher(showWeek = false, onChange = { showWeek = it })
         }
@@ -122,41 +152,83 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
             item { RitualStampCard(stamp.text, stamp.imageBlob, viewModel::dismissRitual) }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Weekyii", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    state.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE")),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                StatusArtwork(day?.status ?: DayStatus.EMPTY)
+            val status = day?.status ?: DayStatus.EMPTY
+            WeekyiiCard(accentColor = statusAccentColor(status)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
-                    StatusPill(day?.status ?: DayStatus.EMPTY)
-                    KillTimeButton(
-                        hour = day?.killHour ?: 20,
-                        minute = day?.killMinute ?: 0,
-                        enabled = day?.status !in listOf(DayStatus.COMPLETED, DayStatus.EXPIRED),
-                        onChange = viewModel::changeKillTime
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+                        Text("状态", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        StatusPill(status)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("已启动天数", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            daysStartedCount.toString(),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
+                Spacer(Modifier.height(WeekyiiDimensions.spacingBase))
+                WeekyiiStatusArtwork(status)
+                Spacer(Modifier.height(WeekyiiDimensions.spacingBase))
+                Text(
+                    state.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日")),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
         when (day?.status ?: DayStatus.EMPTY) {
-            DayStatus.EMPTY, DayStatus.DRAFT -> {
+            DayStatus.EMPTY -> {
+                item {
+                    WeekyiiEmptyState(
+                        title = "今日无任务",
+                        subtitle = "创建今日任务流以开始。",
+                        icon = Icons.Filled.Edit
+                    )
+                }
+                item {
+                    WeekyiiButton(
+                        text = "创建",
+                        icon = Icons.Filled.Add,
+                        onClick = { showEmptyComposer = true },
+                    )
+                }
+                if (showEmptyComposer) {
+                    item {
+                        AddTaskCard(
+                            title = newTaskTitle,
+                            onTitleChange = { newTaskTitle = it },
+                            onAdd = {
+                                val title = newTaskTitle.trim()
+                                if (title.isNotEmpty()) {
+                                    viewModel.createDraft(listOf(title))
+                                    newTaskTitle = ""
+                                    showEmptyComposer = false
+                                }
+                            },
+                            onStart = viewModel::startDay,
+                            canStart = false
+                        )
+                    }
+                }
+            }
+
+            DayStatus.DRAFT -> {
                 item {
                     SectionHeader("今日草稿", "启动前可以自由调整顺序；启动后任务流即成为承诺。")
                 }
-                if (day?.status == DayStatus.DRAFT) {
-                    item {
-                        ExecutionModePicker(
-                            selected = state.startExecutionMode,
-                            onSelect = viewModel::selectExecutionMode
-                        )
-                    }
+                item {
+                    ExecutionModePicker(
+                        selected = state.startExecutionMode,
+                        onSelect = viewModel::selectExecutionMode
+                    )
                 }
                 item {
                     TaskTypePicker(
@@ -187,45 +259,19 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                     )
                 }
                 item {
-                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = newTaskTitle,
-                                onValueChange = { newTaskTitle = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text("添加任务") },
-                                supportingText = { Text("任务将按照当前顺序进入专注区") },
-                                singleLine = true
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                FilledTonalButton(
-                                    onClick = {
-                                        val title = newTaskTitle.trim()
-                                        if (title.isNotEmpty()) {
-                                            viewModel.createDraft(listOf(title))
-                                            newTaskTitle = ""
-                                        }
-                                    },
-                                    enabled = newTaskTitle.isNotBlank(),
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("加入草稿") }
-                                Button(
-                                    onClick = viewModel::startDay,
-                                    enabled = state.draft.isNotEmpty(),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                                    Text("开始今天")
-                                }
+                    AddTaskCard(
+                        title = newTaskTitle,
+                        onTitleChange = { newTaskTitle = it },
+                        onAdd = {
+                            val title = newTaskTitle.trim()
+                            if (title.isNotEmpty()) {
+                                viewModel.createDraft(listOf(title))
+                                newTaskTitle = ""
                             }
-                        }
-                    }
+                        },
+                        onStart = viewModel::startDay,
+                        canStart = state.draft.isNotEmpty()
+                    )
                 }
             }
 
@@ -292,9 +338,8 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                     }
                 }
                 if (state.complete.isNotEmpty()) {
-                    item { SectionHeader("已完成", "今天已经推进 ${state.complete.size} 项") }
-                    itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                        CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
+                    item {
+                        CompletedTasksCard(state.complete, state.taskTypeDefinitions)
                     }
                 }
             }
@@ -306,20 +351,43 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         body = "${state.complete.size} 项任务全部进入完成区。"
                     )
                 }
-                itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                    CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
+                if (state.complete.isNotEmpty()) {
+                    item { CompletedTasksCard(state.complete, state.taskTypeDefinitions) }
                 }
             }
 
             DayStatus.EXPIRED -> {
                 item {
-                    CompletionCard(
-                        title = "今天已经收口",
-                        body = "完成 ${state.complete.size} 项，过期 ${day?.expiredCount ?: 0} 项。过期详情已被遗忘。"
-                    )
+                    ExpiredCard(day?.expiredCount ?: 0)
                 }
-                itemsIndexed(state.complete, key = { _, task -> task.id }) { index, task ->
-                    CompletedTaskRow(index + 1, task, taskTypeLabel(task, state.taskTypeDefinitions))
+                if (state.complete.isNotEmpty()) {
+                    item { CompletedTasksCard(state.complete, state.taskTypeDefinitions) }
+                }
+            }
+        }
+
+        item {
+            WeekyiiCard(accentColor = MaterialTheme.colorScheme.tertiary) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                        Text(
+                            "截止时间",
+                            modifier = Modifier.padding(start = WeekyiiDimensions.spacingSmall),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    KillTimeButton(
+                        hour = day?.killHour ?: 20,
+                        minute = day?.killMinute ?: 0,
+                        enabled = day?.status !in listOf(DayStatus.COMPLETED, DayStatus.EXPIRED),
+                        onChange = viewModel::changeKillTime
+                    )
                 }
             }
         }
@@ -416,30 +484,9 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
 }
 
 @Composable
-private fun StatusArtwork(status: DayStatus) {
-    val colors = when (status) {
-        DayStatus.EMPTY -> listOf(Color(0xFFFFD49A), Color(0xFFC46A1A))
-        DayStatus.DRAFT -> listOf(Color(0xFFC8E6E0), Color(0xFF2F7E79))
-        DayStatus.EXECUTE -> listOf(Color(0xFFFFC1A8), Color(0xFFD05C3E))
-        DayStatus.COMPLETED -> listOf(Color(0xFFA7DFC6), Color(0xFF208B4B))
-        DayStatus.EXPIRED -> listOf(Color(0xFFD8D1CC), Color(0xFF76645A))
-    }
-    val message = when (status) {
-        DayStatus.EMPTY -> "一张空白桌面，等待今天的第一笔"
-        DayStatus.DRAFT -> "先排好路线，再出发"
-        DayStatus.EXECUTE -> "专注当前一步，下一步自然解冻"
-        DayStatus.COMPLETED -> "今日承诺已经收口"
-        DayStatus.EXPIRED -> "遗忘未完成，保留继续前行的空间"
-    }
-    Box(modifier = Modifier.fillMaxWidth().height(104.dp).background(Brush.horizontalGradient(colors)).padding(16.dp), contentAlignment = Alignment.BottomStart) {
-        Text(message, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
 private fun RitualStampCard(text: String, imageBlob: ByteArray?, onDismiss: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("今日 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("把这一刻带进今天。", color = MaterialTheme.colorScheme.onTertiaryContainer)
             if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge)
@@ -454,24 +501,43 @@ private fun RitualStampCard(text: String, imageBlob: ByteArray?, onDismiss: () -
 
 @Composable
 private fun TodayWeekSwitcher(showWeek: Boolean, onChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected = !showWeek, onClick = { onChange(false) }, label = { Text("今天") })
-        FilterChip(selected = showWeek, onClick = { onChange(true) }, label = { Text("本周") })
-    }
+    WeekyiiSegmentedControl(
+        items = listOf("当下", "本周"),
+        selectedIndex = if (showWeek) 1 else 0,
+        onSelectedIndexChange = { onChange(it == 1) },
+        icons = listOf(Icons.Filled.WbSunny, Icons.Filled.CalendarMonth)
+    )
 }
 
 @Composable
 private fun StatusPill(status: DayStatus) {
     val label = when (status) {
-        DayStatus.EMPTY -> "尚未规划"
+        DayStatus.EMPTY -> "空"
         DayStatus.DRAFT -> "草稿"
         DayStatus.EXECUTE -> "执行中"
         DayStatus.COMPLETED -> "已完成"
         DayStatus.EXPIRED -> "已过期"
     }
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.extraLarge) {
-        Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), fontWeight = FontWeight.SemiBold)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        shape = MaterialTheme.shapes.extraLarge
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
     }
+}
+
+@Composable
+private fun statusAccentColor(status: DayStatus): Color = when (status) {
+    DayStatus.EMPTY -> MaterialTheme.colorScheme.outline
+    DayStatus.DRAFT -> MaterialTheme.colorScheme.primary
+    DayStatus.EXECUTE -> MaterialTheme.colorScheme.tertiary
+    DayStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
+    DayStatus.EXPIRED -> MaterialTheme.colorScheme.error
 }
 
 @Composable
@@ -500,7 +566,7 @@ private fun SectionHeader(title: String, subtitle: String) {
 
 @Composable
 private fun ExecutionModePicker(selected: ExecutionMode, onSelect: (ExecutionMode) -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("执行模式", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -534,7 +600,7 @@ private fun FlexibleExecutionControls(
     selectedTaskTypeId: String,
     onTaskTypeSelect: (String) -> Unit
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -605,22 +671,53 @@ private fun DraftTaskCard(
     onEdit: () -> Unit,
     onPostpone: (LocalDate) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("T${task.order.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(task.title)
-                Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        WeekyiiTaskRow(
+            title = task.title,
+            subtitle = "T${task.order.toString().padStart(2, '0')} · $typeLabel",
+            trailing = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                            onClick = { menuExpanded = false; onEdit() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("上移") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowUpward, contentDescription = null) },
+                            enabled = canMoveUp,
+                            onClick = { menuExpanded = false; onMoveUp() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("下移") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
+                            enabled = canMoveDown,
+                            onClick = { menuExpanded = false; onMoveDown() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("后移到其他日期") },
+                            leadingIcon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                TimePickerDateDialog(context, LocalDate.now().plusDays(1), onPostpone)
+                            }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = { menuExpanded = false; onDelete() }
+                        )
+                    }
+                }
             }
-            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "编辑") }
-            IconButton(onClick = onMoveUp, enabled = canMoveUp) { Icon(Icons.Filled.ArrowUpward, "上移") }
-            IconButton(onClick = onMoveDown, enabled = canMoveDown) { Icon(Icons.Filled.ArrowDownward, "下移") }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "删除") }
-            PostponeButton(onPostpone)
-        }
+        )
     }
 }
 
@@ -631,21 +728,32 @@ private fun FocusTaskCard(
     onComplete: () -> Unit,
     onPostpone: (TaskUi, LocalDate) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("FOCUS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            typeLabel?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
-            if (!task?.description.isNullOrBlank()) Text(task!!.description)
+    val context = LocalContext.current
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), gradient = true) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
+                Text("专注区", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+            Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            typeLabel?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f)) }
+            if (!task?.description.isNullOrBlank()) Text(task!!.description, color = Color.White.copy(alpha = 0.9f))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onComplete, enabled = task != null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Check, contentDescription = null)
-                    Text("完成")
+                WeekyiiButton(
+                    text = "完成当前任务",
+                    icon = Icons.Filled.Check,
+                    style = WeekyiiButtonStyle.OnGradient,
+                    enabled = task != null,
+                    onClick = onComplete,
+                    modifier = Modifier.weight(1f)
+                )
+                if (task != null) {
+                    WeekyiiButton(
+                        text = "后移",
+                        style = WeekyiiButtonStyle.OnGradient,
+                        onClick = { val tomorrow = LocalDate.now().plusDays(1); TimePickerDateDialog(context, tomorrow) { onPostpone(task, it) } }
+                    )
                 }
-                if (task != null) PostponeButton { date -> onPostpone(task, date) }
             }
         }
     }
@@ -665,25 +773,58 @@ private fun CompactTaskRow(
     onEdit: () -> Unit,
     onPostpone: (LocalDate) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("T${number.toString().padStart(2, '0')}", fontWeight = FontWeight.Bold)
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text(task.title, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(typeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        WeekyiiTaskRow(
+            title = task.title,
+            subtitle = "T${number.toString().padStart(2, '0')} · $typeLabel",
+            leading = { Icon(Icons.Filled.AcUnit, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            trailing = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        if (editable) {
+                            DropdownMenuItem(
+                                text = { Text("编辑") },
+                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                onClick = { menuExpanded = false; onEdit() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("上移") },
+                                leadingIcon = { Icon(Icons.Filled.ArrowUpward, contentDescription = null) },
+                                enabled = canMoveUp,
+                                onClick = { menuExpanded = false; onMoveUp() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("下移") },
+                                leadingIcon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
+                                enabled = canMoveDown,
+                                onClick = { menuExpanded = false; onMoveDown() }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("后移到其他日期") },
+                            leadingIcon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                TimePickerDateDialog(context, LocalDate.now().plusDays(1), onPostpone)
+                            }
+                        )
+                        if (editable) {
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = { menuExpanded = false; onDelete() }
+                            )
+                        }
+                    }
                 }
-                PostponeButton(onPostpone)
             }
-            if (editable) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "编辑") }
-                    IconButton(onClick = onMoveUp, enabled = canMoveUp) { Icon(Icons.Filled.ArrowUpward, "上移") }
-                    IconButton(onClick = onMoveDown, enabled = canMoveDown) { Icon(Icons.Filled.ArrowDownward, "下移") }
-                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "删除") }
-                }
-            }
-        }
+        )
     }
 }
 
@@ -724,6 +865,27 @@ private fun CompletedTaskRow(number: Int, task: TaskUi, typeLabel: String) {
     }
 }
 
+@Composable
+private fun CompletedTasksCard(tasks: List<TaskUi>, definitions: List<TaskTypeDefinitionEntity>) {
+    WeekyiiCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Text("已完成", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Text(tasks.size.toString(), color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        tasks.forEachIndexed { index, task ->
+            CompletedTaskRow(index + 1, task, taskTypeLabel(task, definitions))
+        }
+    }
+}
+
 private fun taskTypeLabel(task: TaskUi, definitions: List<TaskTypeDefinitionEntity>): String =
     definitions.firstOrNull { it.idRaw == task.taskTypeIdRaw }?.name
         ?: when (task.taskType) {
@@ -734,10 +896,68 @@ private fun taskTypeLabel(task: TaskUi, definitions: List<TaskTypeDefinitionEnti
 
 @Composable
 private fun CompletionCard(title: String, body: String) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), gradient = true) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(Icons.Filled.Celebration, contentDescription = null, tint = Color.White, modifier = Modifier.height(44.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(body, color = Color.White.copy(alpha = 0.9f))
+        }
+    }
+}
+
+@Composable
+private fun ExpiredCard(expiredCount: Int) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.error) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            Text("今天已经收口", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("未完成任务已被遗忘", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(expiredCount.toString(), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AddTaskCard(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onStart: () -> Unit,
+    canStart: Boolean
+) {
+    WeekyiiCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = onTitleChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("添加任务") },
+                supportingText = { Text("任务会按当前顺序进入专注区") },
+                singleLine = true
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                WeekyiiButton(
+                    text = "加入草稿",
+                    onClick = onAdd,
+                    enabled = title.isNotBlank(),
+                    style = WeekyiiButtonStyle.Secondary,
+                    modifier = Modifier.weight(1f)
+                )
+                WeekyiiButton(
+                    text = "开始今天",
+                    icon = Icons.Filled.PlayArrow,
+                    onClick = onStart,
+                    enabled = canStart,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }

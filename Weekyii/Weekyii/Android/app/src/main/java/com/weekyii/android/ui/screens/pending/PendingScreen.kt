@@ -25,9 +25,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +52,7 @@ import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.model.WeekUi
 import com.weekyii.android.ui.viewmodel.PendingViewModel
+import com.weekyii.android.ui.components.WeekyiiCard
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -139,8 +137,8 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
             item { Text("点击月历中的未来日期，打开或创建对应周。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("创建未来周", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
@@ -195,8 +193,8 @@ private fun MonthCalendar(
     onNext: () -> Unit,
     onDateClick: (LocalDate) -> Unit
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPrevious) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "上个月") }
                 Text(month.format(DateTimeFormatter.ofPattern("yyyy年M月")), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -234,8 +232,8 @@ private fun MonthDayCell(cell: PendingViewModel.MonthCell, modifier: Modifier, o
 
 @Composable
 private fun WeekOutlookCard(week: WeekUi, snapshot: PendingViewModel.WeekOutlookSnapshot, onClose: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("${week.weekId} 预报", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -253,8 +251,8 @@ private fun WeekOutlookCard(week: WeekUi, snapshot: PendingViewModel.WeekOutlook
 
 @Composable
 private fun FutureWeekRow(week: WeekUi, selected: Boolean, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), accentColor = if (selected) MaterialTheme.colorScheme.secondary else null) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(week.weekId, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text("${week.startDate} ~ ${week.endDate}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("${week.days.count { it.tasks.isNotEmpty() }} 天有任务 · ${week.days.sumOf { it.tasks.size }} 项")
@@ -282,8 +280,8 @@ private fun FutureDayEditor(
 ) {
     if (day == null) return
     val editable = day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("${day.date} ${day.dayOfWeek}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

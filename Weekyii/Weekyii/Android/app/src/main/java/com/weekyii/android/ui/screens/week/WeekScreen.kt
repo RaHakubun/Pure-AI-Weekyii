@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,9 +23,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +44,7 @@ import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.viewmodel.WeekViewModel
+import com.weekyii.android.ui.components.WeekyiiCard
 import java.time.LocalDate
 
 @Composable
@@ -148,8 +147,8 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier, onBackTo
 
 @Composable
 private fun WeekStatsCard(week: com.weekyii.android.ui.model.WeekUi, completed: Int, remaining: Int, forgotten: Int) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${week.startDate} ~ ${week.endDate}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 WeekMetric("完成", completed)
@@ -171,7 +170,7 @@ private fun WeekMetric(label: String, value: Int) {
 
 @Composable
 private fun WeekDayCard(day: DayUi, summary: WeekViewModel.DaySummary, selected: Boolean, onClick: () -> Unit) {
-    Card(modifier = Modifier.clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+    WeekyiiCard(modifier = Modifier.width(184.dp).clickable(onClick = onClick), accentColor = if (selected) MaterialTheme.colorScheme.primary else null, fillWidth = false) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(day.dayOfWeek, style = MaterialTheme.typography.labelMedium)
             Text(day.date.dayOfMonth.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -184,7 +183,7 @@ private fun WeekDayCard(day: DayUi, summary: WeekViewModel.DaySummary, selected:
 
 @Composable
 private fun WeekDayStrip(day: DayUi, summary: WeekViewModel.DaySummary, selected: Boolean, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), accentColor = if (selected) MaterialTheme.colorScheme.primary else null) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("${day.dayOfWeek} ${day.date}", fontWeight = FontWeight.SemiBold)
@@ -212,8 +211,8 @@ private fun WeekDayDetail(
     onMove: (Int, Int) -> Unit
 ) {
     val editable = day.date >= currentDate && (day.status == DayStatus.EMPTY || day.status == DayStatus.DRAFT)
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("日程详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

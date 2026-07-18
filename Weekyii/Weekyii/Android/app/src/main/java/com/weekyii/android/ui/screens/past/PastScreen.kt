@@ -20,8 +20,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material3.Card
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +37,7 @@ import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.WeekUi
 import com.weekyii.android.ui.viewmodel.PastViewModel
+import com.weekyii.android.ui.components.WeekyiiCard
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -80,8 +79,8 @@ fun PastScreen(viewModel: PastViewModel, padding: PaddingValues) {
 
 @Composable
 private fun MonthToolbar(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevious) { Icon(Icons.Filled.ArrowBack, "上个月") }
             Text(month.format(DateTimeFormatter.ofPattern("yyyy年M月")), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             IconButton(onClick = onNext) { Icon(Icons.Filled.ArrowForward, "下个月") }
@@ -91,8 +90,8 @@ private fun MonthToolbar(month: YearMonth, onPrevious: () -> Unit, onNext: () ->
 
 @Composable
 private fun PastStatsCard(stats: PastViewModel.Stats) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("本月概览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Stat("完成", stats.totalCompletedTasks); Stat("过期", stats.totalExpiredTasks); Stat("完成率", "${(stats.completionRate * 100).toInt()}%"); Stat("启动", stats.totalStartedDays)
@@ -111,8 +110,8 @@ private fun formatMinutes(minutes: Long): String = if (minutes < 60) "${minutes}
 
 @Composable
 private fun PastWeekCard(week: WeekUi) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(week.weekId, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text("${week.completedTasksCount} 完成 / ${week.expiredTasksCount} 过期") }
             Text("${week.startDate} ~ ${week.endDate} · 启动 ${week.totalStartedDays} 天", color = MaterialTheme.colorScheme.onSurfaceVariant)
             week.days.sortedBy { it.date }.forEach { day -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${day.dayOfWeek} ${day.date}"); Text(if (day.status == DayStatus.EXPIRED) "过期 ${day.expiredCount} 项" else "完成 ${day.tasks.count { it.zone == TaskZone.COMPLETE }}") } }
@@ -125,8 +124,8 @@ private fun PastMonthCalendar(month: YearMonth, summaries: Map<LocalDate, PastVi
     val first = month.atDay(1).minusDays((month.atDay(1).dayOfWeek.value - 1).toLong())
     val last = month.atEndOfMonth().plusDays((7 - month.atEndOfMonth().dayOfWeek.value).toLong())
     val dates = generateSequence(first) { it.plusDays(1) }.takeWhile { !it.isAfter(last) }.toList()
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth()) { listOf("一", "二", "三", "四", "五", "六", "日").forEach { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium) } }
             dates.chunked(7).forEach { week -> Row(modifier = Modifier.fillMaxWidth()) { week.forEach { date ->
                 val summary = summaries[date]; val selected = date == selectedDate
@@ -141,8 +140,8 @@ private fun PastMonthCalendar(month: YearMonth, summaries: Map<LocalDate, PastVi
 
 @Composable
 private fun PastSelectedDayCard(day: DayUi?, date: LocalDate) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${date.format(DateTimeFormatter.ofPattern("M月d日"))} 回顾", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             if (day == null || (day.tasks.isEmpty() && day.expiredCount == 0)) Text("当天没有历史记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             else { Text("完成 ${day.tasks.count { it.zone == TaskZone.COMPLETE }} · 过期 ${day.expiredCount}"); day.tasks.filter { it.zone == TaskZone.COMPLETE }.forEach { task -> Text("✓ ${task.title}") } }
@@ -152,8 +151,8 @@ private fun PastSelectedDayCard(day: DayUi?, date: LocalDate) {
 
 @Composable
 private fun TrendCard(points: List<PastViewModel.DayTaskPoint>) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("月趋势", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             if (points.all { it.completedCount == 0 && it.expiredCount == 0 }) Text("暂无可绘制的任务数据。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             else {
@@ -172,8 +171,8 @@ private fun TrendCard(points: List<PastViewModel.DayTaskPoint>) {
 
 @Composable
 private fun HeatmapCard(points: List<PastViewModel.HeatmapPoint>) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("完成热力图", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             points.chunked(7).forEach { week -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { week.forEach { point -> androidx.compose.foundation.layout.Box(modifier = Modifier.size(16.dp).background(heatmapColor(point.status))) } } }
             Text("浅色=低完成 · 深色=高完成 · 红色=过期", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

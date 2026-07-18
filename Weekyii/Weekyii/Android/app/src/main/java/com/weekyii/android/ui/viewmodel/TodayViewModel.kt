@@ -50,6 +50,7 @@ class TodayViewModel(
         UiState(startExecutionMode = settings?.defaultExecutionMode?.value ?: ExecutionMode.STRICT)
     )
     val state: StateFlow<UiState> = _state
+    val daysStartedCount: StateFlow<Int> = appState.daysStartedCount
 
     init {
         refresh()

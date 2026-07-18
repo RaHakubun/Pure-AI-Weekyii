@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +34,7 @@ import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.model.ProjectDetailUi
 import com.weekyii.android.ui.model.TaskUi
 import java.time.LocalDate
+import com.weekyii.android.ui.components.WeekyiiCard
 
 @Composable
 fun ProjectDetailScreen(
@@ -73,8 +73,8 @@ fun ProjectDetailScreen(
             item { Text(message, color = MaterialTheme.colorScheme.error) }
         }
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(project.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(project.description.ifBlank { "无项目说明" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("${project.startDate} ~ ${project.endDate}")
@@ -109,8 +109,8 @@ fun ProjectDetailScreen(
             item { Text("项目暂无任务", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             items(detail.sections, key = { it.date.toString() }) { section ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("${section.date} · ${section.tasks.size} 项", style = MaterialTheme.typography.titleMedium)
                         section.tasks.forEach { task ->
                             ProjectTaskRow(

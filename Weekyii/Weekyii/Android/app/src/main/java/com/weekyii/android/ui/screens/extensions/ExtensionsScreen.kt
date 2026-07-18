@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,8 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,6 +51,7 @@ import com.weekyii.android.ui.model.SuspendedTaskUi
 import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import java.time.LocalDate
+import com.weekyii.android.ui.components.WeekyiiCard
 
 @Composable
 fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
@@ -123,8 +123,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             }
         }
         item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("新建项目", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(projectName, { projectName = it }, label = { Text("项目名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(projectDescription, { projectDescription = it }, label = { Text("项目说明") }, modifier = Modifier.fillMaxWidth())
@@ -140,8 +140,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             }
         }
         item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("MindStamp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(stampText, { stampText = it }, label = { Text("启动仪式内容") }, modifier = Modifier.fillMaxWidth())
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,8 +152,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             }
         }
         item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("悬置任务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("暂时不安排到某一天，到期前再决定去向。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
@@ -202,8 +202,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
         state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         item { Text("悬置箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.suspendedTasks, key = { it.id }) { task ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
                         state.taskTypeDefinitions.firstOrNull { it.idRaw == task.taskTypeIdRaw }?.name ?: task.taskType.name,
@@ -230,8 +230,8 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
         }
         item { Text("已保存的 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.mindStamps, key = { it.id }) { stamp ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     stamp.imageBlob?.let { bytes ->
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmap -> Image(bitmap.asImageBitmap(), "MindStamp 图片", modifier = Modifier.size(56.dp), contentScale = ContentScale.Crop) }
                     }
@@ -349,8 +349,8 @@ private fun AssignSuspendedButton(onAssign: (LocalDate) -> Unit) {
 
 @Composable
 private fun ProjectCard(project: ProjectUi, viewModel: ExtensionsViewModel, canMoveUp: Boolean, canMoveDown: Boolean, onOpen: () -> Unit) {
-    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(project.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(project.description.ifBlank { "无项目说明" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("${project.startDate} ~ ${project.endDate}")

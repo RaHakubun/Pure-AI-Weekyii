@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +47,7 @@ import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.viewmodel.SettingsViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import com.weekyii.android.ui.components.WeekyiiCard
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
@@ -91,12 +91,19 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("主题", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("主题只改变 Android 外观，不改变任务逻辑。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(listOf("amber" to "琥珀", "ocean" to "海洋", "forest" to "森林", "rose" to "玫瑰", "lavender" to "薰衣草", "graphite" to "石墨", "mint" to "薄荷", "midnight" to "午夜")) { (id, label) ->
+                        items(
+                            listOf(
+                                "amber" to "琥珀", "ocean" to "海蓝", "forest" to "森绿",
+                                "rose" to "玫瑰", "lavender" to "薰紫", "graphite" to "石墨",
+                                "sunset" to "落日", "mint" to "薄荷", "midnight" to "极夜",
+                                "lotr" to "魔戒"
+                            )
+                        ) { (id, label) ->
                             FilterChip(selected = state.themeId == id, onClick = { viewModel.setTheme(id) }, label = { Text(label) })
                         }
                     }
@@ -111,8 +118,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("项目默认值", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("只影响之后新建的项目。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("默认周期", style = MaterialTheme.typography.labelLarge)
@@ -140,8 +147,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("通知提醒", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("设置 Kill Time 前的提前提醒；系统仍会在截止时提醒。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -189,8 +196,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("默认 Kill Time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     OutlinedButton(onClick = {
                         TimePickerDialog(
@@ -206,8 +213,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("数据归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("导出包含任务、周、项目、MindStamp、悬置箱、任务类型和核心设置。导入会先创建本地恢复点，再替换当前数据。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -228,8 +235,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("默认执行模式", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (state.defaultExecutionMode == ExecutionMode.STRICT) FilledTonalButton(onClick = {}) { Text("严格") }
@@ -242,8 +249,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("任务类型", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("自定义名称、颜色与图标；基础行为决定提醒和统计归类。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     activeTypes.forEachIndexed { index, definition ->
@@ -265,8 +272,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
 
         if (archivedTypes.isNotEmpty()) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("已归档类型", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         archivedTypes.forEach { definition ->
                             Row(
