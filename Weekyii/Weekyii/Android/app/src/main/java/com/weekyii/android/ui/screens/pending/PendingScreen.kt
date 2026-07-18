@@ -2,6 +2,7 @@ package com.weekyii.android.ui.screens.pending
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,8 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -20,6 +24,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -34,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,16 +51,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.DayStatus
+import com.weekyii.android.data.db.entities.WeekStatus
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.model.WeekUi
 import com.weekyii.android.ui.viewmodel.PendingViewModel
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiBottomSheet
+import com.weekyii.android.ui.components.WeekyiiButton
+import com.weekyii.android.ui.components.WeekyiiButtonStyle
+import com.weekyii.android.ui.components.WeekyiiEmptyState
+import com.weekyii.android.ui.components.WeekyiiHeader
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -63,6 +79,8 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
     val context = LocalContext.current
     val summaries = viewModel.monthDaySummaries()
     val cells = PendingViewModel.buildMonthCells(state.selectedMonth, summaries)
+    val weeksInMonth = viewModel.weeksInSelectedMonth()
+    val futureWeeksInMonth = weeksInMonth.filter { it.status == WeekStatus.PENDING && it.startDate.isAfter(state.currentDate) }
     val selectedWeek = state.pendingWeeks.firstOrNull { it.weekId == state.selectedWeekId }
     val selectedDay = selectedWeek?.days?.firstOrNull { it.dayId == state.selectedDayId }
     var selectedDate by remember { mutableStateOf(LocalDate.now().plusWeeks(1)) }
@@ -71,6 +89,8 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
     var newTaskDescription by remember { mutableStateOf("") }
     var newTaskType by remember { mutableStateOf("regular") }
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
+    var monthMode by remember { mutableStateOf(false) }
+    var showCreateSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.nextWeekId) { if (weekId.isBlank()) weekId = state.nextWeekId }
     LaunchedEffect(selectedDay?.dayId) {
@@ -81,35 +101,71 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("未来计划", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("先看整月节奏，再打开某一周编辑未来日。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                PendingToolbarButton(
+                    icon = if (monthMode) Icons.Filled.ViewAgenda else Icons.Filled.CalendarMonth,
+                    contentDescription = if (monthMode) "切换到周列表" else "切换到月视图",
+                    onClick = { monthMode = !monthMode }
+                )
+                WeekyiiHeader(modifier = Modifier.weight(1f))
+                PendingToolbarButton(Icons.Filled.Add, "新建未来周", onClick = { showCreateSheet = true })
             }
         }
         item {
-            MonthCalendar(
+            PendingMonthPicker(
                 month = state.selectedMonth,
-                cells = cells,
+                canGoPrevious = state.selectedMonth > YearMonth.from(state.currentDate),
                 onPrevious = viewModel::selectPreviousMonth,
-                onNext = viewModel::selectNextMonth,
-                onDateClick = { date ->
-                    if (!date.isBefore(state.currentDate)) viewModel.openOrCreateDate(date)
-                }
+                onNext = viewModel::selectNextMonth
             )
         }
         state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
-        if (selectedWeek != null) {
+        if (monthMode) {
             item {
-                WeekOutlookCard(
-                    week = selectedWeek,
-                    snapshot = PendingViewModel.buildWeekOutlook(selectedWeek),
-                    onClose = viewModel::closeWeek
+                MonthCalendar(
+                    month = state.selectedMonth,
+                    cells = cells,
+                    onPrevious = viewModel::selectPreviousMonth,
+                    onNext = viewModel::selectNextMonth,
+                    onDateClick = { date ->
+                        if (!date.isBefore(state.currentDate)) viewModel.openOrCreateDate(date)
+                    }
                 )
             }
+            if (selectedWeek != null) {
+                item {
+                    WeekOutlookCard(selectedWeek, PendingViewModel.buildWeekOutlook(selectedWeek), viewModel::closeWeek)
+                }
+                item {
+                    FutureDayEditor(
+                        days = selectedWeek.days,
+                        day = selectedDay,
+                        definitions = state.taskTypeDefinitions,
+                        newTitle = newTaskTitle,
+                        onNewTitle = { newTaskTitle = it },
+                        newDescription = newTaskDescription,
+                        onNewDescription = { newTaskDescription = it },
+                        newTypeId = newTaskType,
+                        onNewTypeId = { newTaskType = it },
+                        onSelectDay = viewModel::selectDay,
+                        onAdd = {
+                            selectedDay?.let { viewModel.addDraftTask(it.dayId, newTaskTitle, newTaskDescription, newTaskType) }
+                            newTaskTitle = ""
+                            newTaskDescription = ""
+                        },
+                        onEdit = { editingTask = it },
+                        onDelete = { selectedDay?.let { day -> viewModel.deleteDraftTask(day.dayId, it.id) } },
+                        onMoveUp = { index -> selectedDay?.let { day -> viewModel.moveDraftTask(day.dayId, index, index - 1) } },
+                        onMoveDown = { index -> selectedDay?.let { day -> viewModel.moveDraftTask(day.dayId, index, index + 1) } }
+                    )
+                }
+            }
+        } else if (selectedWeek != null) {
+            item { WeekOutlookCard(selectedWeek, PendingViewModel.buildWeekOutlook(selectedWeek), viewModel::closeWeek) }
             item {
                 FutureDayEditor(
                     days = selectedWeek.days,
@@ -123,52 +179,50 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
                     onNewTypeId = { newTaskType = it },
                     onSelectDay = viewModel::selectDay,
                     onAdd = {
-                        viewModel.addDraftTask(selectedDay!!.dayId, newTaskTitle, newTaskDescription, newTaskType)
+                        selectedDay?.let { viewModel.addDraftTask(it.dayId, newTaskTitle, newTaskDescription, newTaskType) }
                         newTaskTitle = ""
                         newTaskDescription = ""
                     },
                     onEdit = { editingTask = it },
-                    onDelete = { viewModel.deleteDraftTask(selectedDay!!.dayId, it.id) },
-                    onMoveUp = { index -> viewModel.moveDraftTask(selectedDay!!.dayId, index, index - 1) },
-                    onMoveDown = { index -> viewModel.moveDraftTask(selectedDay!!.dayId, index, index + 1) }
+                    onDelete = { selectedDay?.let { day -> viewModel.deleteDraftTask(day.dayId, it.id) } },
+                    onMoveUp = { index -> selectedDay?.let { day -> viewModel.moveDraftTask(day.dayId, index, index - 1) } },
+                    onMoveDown = { index -> selectedDay?.let { day -> viewModel.moveDraftTask(day.dayId, index, index + 1) } }
+                )
+            }
+        } else if (futureWeeksInMonth.isEmpty()) {
+            item {
+                WeekyiiEmptyState(
+                    title = "暂无未来周",
+                    subtitle = "创建未来周以提前规划。",
+                    icon = Icons.Filled.CalendarMonth,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         } else {
-            item { Text("点击月历中的未来日期，打开或创建对应周。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        item {
-            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("创建未来周", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            DatePickerDialog(context, { _, year, month, day ->
-                                selectedDate = LocalDate.of(year, month + 1, day)
-                                viewModel.createWeekForDate(selectedDate)
-                            }, selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth).show()
-                        }) { Text("按日期创建") }
-                        OutlinedButton(onClick = viewModel::createNextWeek) { Text("创建下周") }
-                    }
-                    OutlinedTextField(
-                        value = weekId,
-                        onValueChange = { weekId = it },
-                        label = { Text("周编号，例如 2026-W31") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Button(onClick = { viewModel.createWeekById(weekId.trim()) }, enabled = weekId.isNotBlank()) {
-                        Text("按周编号创建")
-                    }
-                }
+            item { PendingWeeksSummary(futureWeeksInMonth.size) }
+            items(futureWeeksInMonth, key = { it.weekId }) { week ->
+                FutureWeekRow(week, selected = false) { viewModel.openWeek(week.weekId) }
             }
         }
-        item { Text("未来周", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (state.pendingWeeks.isEmpty()) {
-            item { Text("还没有预先规划的未来周。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        } else {
-            items(state.pendingWeeks, key = { it.weekId }) { week ->
-                FutureWeekRow(week, selected = week.weekId == state.selectedWeekId) { viewModel.openWeek(week.weekId) }
-            }
+    }
+
+    WeekyiiBottomSheet(visible = showCreateSheet, onDismiss = { showCreateSheet = false }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("新建未来周", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("提前为接下来的一周留出计划空间。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            WeekyiiButton(text = "按日期创建", style = WeekyiiButtonStyle.Primary, modifier = Modifier.fillMaxWidth(), onClick = {
+                DatePickerDialog(context, { _, year, month, day ->
+                    selectedDate = LocalDate.of(year, month + 1, day)
+                    viewModel.createWeekForDate(selectedDate)
+                    showCreateSheet = false
+                }, selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth).show()
+            })
+            OutlinedTextField(weekId, { weekId = it }, label = { Text("周编号，例如 2026-W31") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            WeekyiiButton(text = "按周编号创建", style = WeekyiiButtonStyle.Secondary, enabled = weekId.isNotBlank(), modifier = Modifier.fillMaxWidth(), onClick = {
+                viewModel.createWeekById(weekId.trim())
+                showCreateSheet = false
+            })
+            TextButton(onClick = { viewModel.createNextWeek(); showCreateSheet = false }) { Text("直接创建下周") }
         }
     }
 
@@ -182,6 +236,73 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
                 editingTask = null
             }
         )
+    }
+}
+
+@Composable
+private fun PendingMonthPicker(
+    month: YearMonth,
+    canGoPrevious: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, shape),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrevious, enabled = canGoPrevious) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上个月")
+            }
+            Text(
+                month.format(DateTimeFormatter.ofPattern("yyyy年M月")),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            IconButton(onClick = onNext) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "下个月")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingToolbarButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    val shape = CircleShape
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(48.dp)
+            .shadow(2.dp, shape)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun PendingWeeksSummary(count: Int) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("未来周", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(count.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+            }
+            Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f))
+        }
     }
 }
 

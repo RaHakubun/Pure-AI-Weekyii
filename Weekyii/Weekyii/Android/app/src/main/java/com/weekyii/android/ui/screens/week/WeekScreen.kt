@@ -2,12 +2,15 @@ package com.weekyii.android.ui.screens.week
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +23,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,44 +51,39 @@ import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.viewmodel.WeekViewModel
 import com.weekyii.android.ui.components.WeekyiiCard
 import java.time.LocalDate
+import java.time.DayOfWeek
 
 @Composable
-fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier, onBackToToday: (() -> Unit)? = null) {
+fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsState()
     val week = state.presentWeek
     var newTitle by remember { mutableStateOf("") }
     var newDescription by remember { mutableStateOf("") }
     var newType by remember { mutableStateOf("regular") }
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
+    var showDayDetail by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("本周", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(week?.weekId ?: "正在准备当前周", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (onBackToToday != null) AssistChip(onClick = onBackToToday, label = { Text("回到今天") })
-                IconButton(onClick = {}) { Icon(Icons.Filled.Refresh, "刷新") }
-            }
-        }
         if (week == null) {
             item { Text("当前周尚未准备好，请稍后重试。", color = MaterialTheme.colorScheme.error) }
         } else {
             val summaries = week.days.associate { it.dayId to WeekViewModel.buildDaySummary(it) }
-            val completed = week.days.sumOf { summaries[it.dayId]?.completedCount ?: 0 }
-            val remaining = week.days.sumOf { summaries[it.dayId]?.remainingCount ?: 0 }
-            val forgotten = week.days.sumOf { summaries[it.dayId]?.forgottenCount ?: 0 }
             item {
-                WeekStatsCard(week, completed, remaining, forgotten)
+                WeekStatsCard(week)
             }
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("周视图", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                WeekTopologyCard(week, summaries, state.selectedDayId, onSelect = { dayId ->
+                    viewModel.selectDay(dayId)
+                    showDayDetail = true
+                })
+            }
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("本周详情", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.CARDS, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.CARDS) }, label = { Text("卡片") })
                     FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.STRIPS, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.STRIPS) }, label = { Text("横条") })
                     FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.COLLAPSED, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.COLLAPSED) }, label = { Text("折叠") })
@@ -93,19 +93,19 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier, onBackTo
                 WeekViewModel.DisplayMode.CARDS -> item {
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         week.days.sortedBy { it.date }.forEach { day ->
-                            WeekDayCard(day, summaries.getValue(day.dayId), day.dayId == state.selectedDayId) { viewModel.selectDay(day.dayId) }
+                            WeekDayCard(day, summaries.getValue(day.dayId), day.dayId == state.selectedDayId) { viewModel.selectDay(day.dayId); showDayDetail = true }
                         }
                     }
                 }
                 WeekViewModel.DisplayMode.STRIPS -> items(week.days.sortedBy { it.date }, key = { it.dayId }) { day ->
-                    WeekDayStrip(day, summaries.getValue(day.dayId), day.dayId == state.selectedDayId) { viewModel.selectDay(day.dayId) }
+                    WeekDayStrip(day, summaries.getValue(day.dayId), day.dayId == state.selectedDayId) { viewModel.selectDay(day.dayId); showDayDetail = true }
                 }
                 WeekViewModel.DisplayMode.COLLAPSED -> item {
                     Text("已折叠七日详情，点击上方“卡片”或“横条”展开。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             val selectedDay = week.days.firstOrNull { it.dayId == state.selectedDayId }
-            if (selectedDay != null) {
+            if (selectedDay != null && showDayDetail) {
                 item {
                     WeekDayDetail(
                         day = selectedDay,
@@ -146,18 +146,90 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier, onBackTo
 }
 
 @Composable
-private fun WeekStatsCard(week: com.weekyii.android.ui.model.WeekUi, completed: Int, remaining: Int, forgotten: Int) {
+private fun WeekStatsCard(week: com.weekyii.android.ui.model.WeekUi) {
     WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("${week.startDate} ~ ${week.endDate}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                WeekMetric("完成", completed)
-                WeekMetric("剩余", remaining)
-                WeekMetric("遗忘", forgotten)
-                WeekMetric("启动", week.totalStartedDays)
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("${week.startDate.monthValue}/${week.startDate.dayOfMonth} - ${week.endDate.monthValue}/${week.endDate.dayOfMonth}", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+            val completedDays = week.days.count { it.status == DayStatus.COMPLETED }
+            val completion = completedDays / week.days.size.coerceAtLeast(1).toFloat()
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("完成天数", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$completedDays/${week.days.size}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${(completion * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.width(180.dp).height(12.dp).background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.fillMaxWidth(completion).height(12.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun WeekTopologyCard(
+    week: com.weekyii.android.ui.model.WeekUi,
+    summaries: Map<String, WeekViewModel.DaySummary>,
+    selectedDayId: String?,
+    onSelect: (String) -> Unit
+) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("本周拓扑", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                IconButton(onClick = {}) { Icon(Icons.Filled.Refresh, contentDescription = "刷新") }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                week.days.sortedBy { it.date }.forEach { day ->
+                    val selected = day.dayId == selectedDayId
+                    val summary = summaries[day.dayId]
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.weight(1f).clickable { onSelect(day.dayId) }
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .width(42.dp)
+                                .height(42.dp)
+                                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
+                                .then(if (selected) Modifier else Modifier.padding(1.dp))
+                                .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), androidx.compose.foundation.shape.CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(day.date.dayOfMonth.toString(), fontWeight = FontWeight.Bold)
+                        }
+                        Text(day.date.dayOfWeek.shortChineseName(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (summary?.highlightKind == WeekViewModel.DayHighlightKind.EMPTY) "·" else "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun DayOfWeek.shortChineseName(): String = when (this) {
+    DayOfWeek.MONDAY -> "周一"
+    DayOfWeek.TUESDAY -> "周二"
+    DayOfWeek.WEDNESDAY -> "周三"
+    DayOfWeek.THURSDAY -> "周四"
+    DayOfWeek.FRIDAY -> "周五"
+    DayOfWeek.SATURDAY -> "周六"
+    DayOfWeek.SUNDAY -> "周日"
 }
 
 @Composable

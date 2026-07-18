@@ -1,6 +1,7 @@
 package com.weekyii.android.ui.screens.past
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -20,15 +23,20 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +46,8 @@ import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.WeekUi
 import com.weekyii.android.ui.viewmodel.PastViewModel
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiEmptyState
+import com.weekyii.android.ui.components.WeekyiiHeader
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -47,6 +57,7 @@ fun PastScreen(viewModel: PastViewModel, padding: PaddingValues) {
     val state by viewModel.state.collectAsState()
     val summaries = state.monthSummaries.associateBy { it.date }
     val selectedDay = state.monthDays.firstOrNull { it.date == state.selectedDate }
+    var showAnalytics by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
@@ -54,49 +65,120 @@ fun PastScreen(viewModel: PastViewModel, padding: PaddingValues) {
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("过去记录", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text("过期任务只保留数量，不回放已遗忘详情。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { viewModel.setDisplayMode(if (state.displayMode == PastViewModel.DisplayMode.WEEK_LIST) PastViewModel.DisplayMode.MONTH else PastViewModel.DisplayMode.WEEK_LIST) }) {
-                    Icon(if (state.displayMode == PastViewModel.DisplayMode.WEEK_LIST) Icons.Filled.CalendarMonth else Icons.Filled.ViewList, "切换视图")
-                }
+                PastToolbarButton(
+                    icon = if (state.displayMode == PastViewModel.DisplayMode.WEEK_LIST) Icons.Filled.CalendarMonth else Icons.Filled.ViewList,
+                    contentDescription = "切换视图",
+                    onClick = { viewModel.setDisplayMode(if (state.displayMode == PastViewModel.DisplayMode.WEEK_LIST) PastViewModel.DisplayMode.MONTH else PastViewModel.DisplayMode.WEEK_LIST) }
+                )
+                WeekyiiHeader(modifier = Modifier.weight(1f))
+                androidx.compose.foundation.layout.Spacer(Modifier.size(48.dp))
             }
         }
         item { MonthToolbar(state.selectedMonth, viewModel::previousMonth, viewModel::nextMonth) }
-        item { PastStatsCard(state.stats) }
+        item { PastStatsCard(state.selectedMonth, state.stats) }
         if (state.displayMode == PastViewModel.DisplayMode.WEEK_LIST) {
-            if (state.monthWeeks.isEmpty()) item { EmptyPastMessage() }
+            if (state.monthWeeks.isEmpty()) item {
+                WeekyiiEmptyState(
+                    title = "暂无历史",
+                    subtitle = "完成的周将显示在这里。",
+                    icon = Icons.Outlined.History
+                )
+            }
             else items(state.monthWeeks, key = { it.weekId }) { week -> PastWeekCard(week) }
         } else {
             item { PastMonthCalendar(state.selectedMonth, summaries, state.selectedDate, viewModel::selectDate) }
             item { PastSelectedDayCard(selectedDay, state.selectedDate) }
         }
-        item { TrendCard(state.trend) }
-        item { HeatmapCard(state.heatmap) }
+        item { AnalyticsDisclosureCard(showAnalytics, onToggle = { showAnalytics = !showAnalytics }) }
+        if (showAnalytics) {
+            item { TrendCard(state.trend) }
+            item { HeatmapCard(state.heatmap) }
+        }
+    }
+}
+
+@Composable
+private fun PastToolbarButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val shape = CircleShape
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(48.dp)
+            .shadow(2.dp, shape)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+    ) {
+        Icon(icon, contentDescription, tint = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
 private fun MonthToolbar(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
-    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, shape),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevious) { Icon(Icons.Filled.ArrowBack, "上个月") }
-            Text(month.format(DateTimeFormatter.ofPattern("yyyy年M月")), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                month.format(DateTimeFormatter.ofPattern("yyyy年M月")),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
             IconButton(onClick = onNext) { Icon(Icons.Filled.ArrowForward, "下个月") }
         }
     }
 }
 
 @Composable
-private fun PastStatsCard(stats: PastViewModel.Stats) {
+private fun PastStatsCard(month: YearMonth, stats: PastViewModel.Stats) {
     WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("本月概览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Stat("完成", stats.totalCompletedTasks); Stat("过期", stats.totalExpiredTasks); Stat("完成率", "${(stats.completionRate * 100).toInt()}%"); Stat("启动", stats.totalStartedDays)
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("本月回顾", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(month.format(DateTimeFormatter.ofPattern("yyyy年M月")), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("↗", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
             }
-            Text("专注 ${formatMinutes(stats.totalFocusMinutes)} · 平均每项 ${stats.averageTaskMinutes} 分钟", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val hasHistory = stats.totalCompletedTasks > 0 || stats.totalExpiredTasks > 0 || stats.totalStartedDays > 0
+            if (hasHistory) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Stat("完成", stats.totalCompletedTasks)
+                    Stat("过期", stats.totalExpiredTasks)
+                    Stat("完成率", "${(stats.completionRate * 100).toInt()}%")
+                    Stat("启动", stats.totalStartedDays)
+                }
+                Text("专注 ${formatMinutes(stats.totalFocusMinutes)} · 平均每项 ${stats.averageTaskMinutes} 分钟", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("这个月还没有可以回顾的记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalyticsDisclosureCard(expanded: Boolean, onToggle: () -> Unit) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("趋势与洞察", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("趋势、热力与效率统计", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(if (expanded) "⌃" else "⌄", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.headlineSmall)
+            }
+            Text("完成任务保留详情；过期任务仅保留数量。", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

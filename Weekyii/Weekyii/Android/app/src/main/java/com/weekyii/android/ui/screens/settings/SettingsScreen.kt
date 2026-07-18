@@ -3,9 +3,12 @@ package com.weekyii.android.ui.screens.settings
 import android.Manifest
 import android.os.Build
 import android.app.TimePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +21,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,10 +42,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Label
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Build
 import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
@@ -48,6 +64,25 @@ import com.weekyii.android.ui.viewmodel.SettingsViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import com.weekyii.android.ui.components.WeekyiiCard
+
+private enum class SettingsSection(val title: String) {
+    APPEARANCE("外观与主题"),
+    TODAY("今日节奏"),
+    TASK_TYPES("任务管理"),
+    FUTURE("未来"),
+    PROJECTS("项目"),
+    DATA("数据与安全"),
+    ABOUT("关于 Weekyii"),
+    DEVELOPER("开发者与诊断")
+}
+
+private data class SettingsRowSpec(
+    val section: SettingsSection,
+    val title: String,
+    val value: String? = null,
+    val icon: ImageVector,
+    val tint: Color
+)
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
@@ -57,6 +92,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
     var creatingType by remember { mutableStateOf(false) }
     var pendingExportData by remember { mutableStateOf<ByteArray?>(null) }
     var localArchiveMessage by remember { mutableStateOf<String?>(null) }
+    var selectedSection by remember { mutableStateOf<SettingsSection?>(null) }
+    BackHandler(enabled = selectedSection != null) { selectedSection = null }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         val data = pendingExportData
         if (uri != null && data != null) {
@@ -78,15 +115,27 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
     val archivedTypes = state.taskTypeDefinitions.filter { it.isArchived && !it.isBuiltIn }.sortedBy { it.name }
     val resolvedDefaultId = state.defaultTaskTypeId.takeIf { id -> activeTypes.any { it.idRaw == id } } ?: "regular"
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    if (selectedSection == null) {
+        SettingsHomeScreen(
+            state = state,
+            padding = padding,
+            onSelect = { selectedSection = it }
+        )
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("默认设置只影响新任务和新的一天。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { selectedSection = null }) { Text("‹ 返回") }
+                Text(
+                    selectedSection?.title ?: "设置",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
@@ -293,6 +342,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         state.error?.let { message ->
             item { Text(message, color = MaterialTheme.colorScheme.error) }
         }
+        }
     }
 
     if (creatingType) {
@@ -334,6 +384,94 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             dismissButton = { TextButton(onClick = viewModel::cancelImport) { Text("取消") } }
         )
     }
+}
+
+@Composable
+private fun SettingsHomeScreen(
+    state: SettingsViewModel.UiState,
+    padding: PaddingValues,
+    onSelect: (SettingsSection) -> Unit
+) {
+    val rows = listOf(
+        "个性化" to listOf(
+            SettingsRowSpec(SettingsSection.APPEARANCE, "外观与主题", "${themeLabel(state.themeId)} · ${appearanceLabel(state.appearanceMode)}", Icons.Outlined.Palette, Color(0xFFBF32D3))
+        ),
+        "使用方式" to listOf(
+            SettingsRowSpec(SettingsSection.TODAY, "今日节奏", "%02d:%02d".format(state.defaultKillTime.hour, state.defaultKillTime.minute), Icons.Outlined.Timer, Color(0xFFFF8A2A)),
+            SettingsRowSpec(SettingsSection.TASK_TYPES, "任务管理", "${state.taskTypeDefinitions.count { !it.isArchived }} 个类型", Icons.Outlined.Label, Color(0xFF13B5C8)),
+            SettingsRowSpec(SettingsSection.FUTURE, "未来", "周一开始", Icons.Outlined.CalendarMonth, Color(0xFF237CF2)),
+            SettingsRowSpec(SettingsSection.PROJECTS, "项目", "默认 ${state.defaultProjectDurationDays} 天", Icons.Outlined.Folder, Color(0xFFAF8A6C))
+        ),
+        "数据" to listOf(
+            SettingsRowSpec(SettingsSection.DATA, "数据与安全", icon = Icons.Outlined.Lock, tint = Color(0xFF6257E8))
+        ),
+        "应用" to listOf(
+            SettingsRowSpec(SettingsSection.ABOUT, "关于 Weekyii", icon = Icons.Outlined.Info, tint = Color(0xFF11BFAE)),
+            SettingsRowSpec(SettingsSection.DEVELOPER, "开发者与诊断", icon = Icons.Outlined.Build, tint = Color(0xFF7B7B82))
+        )
+    )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(Color(0xFFF2F2F7)).padding(padding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        item {
+            Text("设置", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        }
+        rows.forEach { (sectionTitle, sectionRows) ->
+            item(key = sectionTitle) {
+                SettingsGroup(sectionTitle, sectionRows, onSelect)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroup(
+    title: String,
+    rows: List<SettingsRowSpec>,
+    onSelect: (SettingsSection) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = Color(0xFF77777F), modifier = Modifier.padding(start = 12.dp))
+        val shape = RoundedCornerShape(24.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+        ) {
+            rows.forEachIndexed { index, row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(row.section) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(row.tint)) {
+                        Icon(row.icon, contentDescription = null, tint = Color.White, modifier = Modifier.padding(9.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(row.title, style = MaterialTheme.typography.titleMedium)
+                        row.value?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.outline)
+                }
+                if (index < rows.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 72.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+            }
+        }
+    }
+}
+
+private fun themeLabel(id: String): String = mapOf(
+    "amber" to "琥珀", "ocean" to "海蓝", "forest" to "森绿", "rose" to "玫瑰", "lavender" to "薰紫",
+    "graphite" to "石墨", "sunset" to "落日", "mint" to "薄荷", "midnight" to "极夜", "lotr" to "魔戒"
+)[id] ?: "琥珀"
+
+private fun appearanceLabel(id: String): String = when (id) {
+    "light" -> "浅色"
+    "dark" -> "深色"
+    else -> "自动"
 }
 
 @Composable
