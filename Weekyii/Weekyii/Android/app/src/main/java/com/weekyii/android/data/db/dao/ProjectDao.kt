@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Delete
 import com.weekyii.android.data.db.entities.ProjectEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -16,6 +17,12 @@ interface ProjectDao {
     @Query("SELECT * FROM projects WHERE project_id = :id LIMIT 1")
     suspend fun findById(id: UUID): ProjectEntity?
 
+    @Delete
+    suspend fun delete(project: ProjectEntity)
+
     @Query("SELECT * FROM projects")
     fun observeAll(): Flow<List<ProjectEntity>>
+
+    @Query("SELECT MAX(tile_order) FROM projects")
+    suspend fun maxTileOrder(): Int?
 }

@@ -33,6 +33,7 @@ data class TaskEntity(
     @ColumnInfo(name = "title") val title: String,
     @ColumnInfo(name = "description") val description: String = "",
     @ColumnInfo(name = "task_type") val taskType: TaskType = TaskType.REGULAR,
+    @ColumnInfo(name = "task_type_id_raw") val taskTypeIdRaw: String = "regular",
     @ColumnInfo(name = "order") val order: Int,
     @ColumnInfo(name = "zone") val zone: TaskZone = TaskZone.DRAFT,
     @ColumnInfo(name = "started_at") val startedAt: Date? = null,

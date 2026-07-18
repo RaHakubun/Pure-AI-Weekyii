@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Delete
 import com.weekyii.android.data.db.entities.MindStampEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -18,4 +19,7 @@ interface MindStampDao {
 
     @Query("SELECT * FROM mindstamps WHERE id = :id LIMIT 1")
     suspend fun findById(id: UUID): MindStampEntity?
+
+    @Delete
+    suspend fun delete(mindStamp: MindStampEntity)
 }

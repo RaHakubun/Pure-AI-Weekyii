@@ -30,6 +30,12 @@ interface DayDao {
     @Query("SELECT * FROM days WHERE status = :status")
     fun observeByStatus(status: DayStatus): Flow<List<DayEntity>>
 
+    @Query("SELECT * FROM days ORDER BY date")
+    fun observeAll(): Flow<List<DayEntity>>
+
     @Query("SELECT * FROM days WHERE week_owner_id = :weekId")
     suspend fun listByWeek(weekId: String): List<DayEntity>
+
+    @Query("SELECT * FROM days")
+    suspend fun allDays(): List<DayEntity>
 }

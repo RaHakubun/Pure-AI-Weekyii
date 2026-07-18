@@ -5,3 +5,6 @@ enum class DayStatus { EMPTY, DRAFT, EXECUTE, COMPLETED, EXPIRED }
 enum class TaskZone { DRAFT, FOCUS, FROZEN, COMPLETE }
 enum class TaskType { REGULAR, DDL, LEISURE }
 enum class ProjectStatus { PLANNING, ACTIVE, COMPLETED, ARCHIVED }
+enum class ExecutionMode { STRICT, FLEXIBLE }
+enum class ProjectTileSize { MINI, SMALL, MEDIUM, WIDE }
+enum class SuspendedTaskStatus { ACTIVE, ASSIGNED }

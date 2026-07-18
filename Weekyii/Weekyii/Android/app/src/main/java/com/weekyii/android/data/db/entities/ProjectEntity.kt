@@ -16,5 +16,7 @@ data class ProjectEntity(
     @ColumnInfo(name = "status") val status: ProjectStatus = ProjectStatus.PLANNING,
     @ColumnInfo(name = "start_date") val startDate: Date,
     @ColumnInfo(name = "end_date") val endDate: Date,
-    @ColumnInfo(name = "created_at") val createdAt: Date = Date()
+    @ColumnInfo(name = "created_at") val createdAt: Date = Date(),
+    @ColumnInfo(name = "tile_size_raw") val tileSizeRaw: String = "medium",
+    @ColumnInfo(name = "tile_order") val tileOrder: Int = 0
 )

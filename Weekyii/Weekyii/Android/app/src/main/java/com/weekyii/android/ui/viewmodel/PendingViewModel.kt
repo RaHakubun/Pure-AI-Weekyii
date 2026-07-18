@@ -21,6 +21,7 @@ class PendingViewModel(
 
     data class UiState(
         val pendingWeeks: List<WeekUi> = emptyList(),
+        val nextWeekId: String = "",
         val error: String? = null
     )
 
@@ -32,17 +33,27 @@ class PendingViewModel(
     private fun observePending() {
         viewModelScope.launch {
             repo.observePendingWeeks().collectLatest { weeks ->
-                _state.value = UiState(pendingWeeks = weeks)
+                _state.value = _state.value.copy(
+                    pendingWeeks = weeks.sortedBy { it.startDate },
+                    nextWeekId = calculator.weekId(timeProvider.today.plusWeeks(1)),
+                    error = null
+                )
             }
         }
     }
 
     fun createWeekForDate(date: LocalDate) {
         viewModelScope.launch {
-            val week = repo.ensureWeek(date, WeekStatus.PENDING)
-            // week already created will be returned, no-op
+            if (!date.isAfter(timeProvider.today)) {
+                _state.value = _state.value.copy(error = "只能创建未来日期所属的周")
+                return@launch
+            }
+            repo.ensureWeek(date, WeekStatus.PENDING)
+            _state.value = _state.value.copy(error = null)
         }
     }
+
+    fun createNextWeek() = createWeekForDate(timeProvider.today.plusWeeks(1))
 
     fun createWeekById(weekId: String) {
         viewModelScope.launch {
@@ -51,7 +62,12 @@ class PendingViewModel(
                 _state.value = _state.value.copy(error = "周格式无效")
                 return@launch
             }
+            if (!startDate.isAfter(timeProvider.today)) {
+                _state.value = _state.value.copy(error = "只能创建未来周")
+                return@launch
+            }
             repo.ensureWeek(startDate, WeekStatus.PENDING)
+            _state.value = _state.value.copy(error = null)
         }
     }
 }

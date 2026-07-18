@@ -28,8 +28,11 @@ data class DayEntity(
     @ColumnInfo(name = "status") val status: DayStatus,
     @ColumnInfo(name = "kill_hour") val killHour: Int = 20,
     @ColumnInfo(name = "kill_minute") val killMinute: Int = 0,
+    @ColumnInfo(name = "follows_default_kill_time") val followsDefaultKillTime: Boolean = true,
     @ColumnInfo(name = "initiated_at") val initiatedAt: Date? = null,
     @ColumnInfo(name = "closed_at") val closedAt: Date? = null,
+    @ColumnInfo(name = "execution_mode_raw") val executionModeRaw: String = "strict",
+    @ColumnInfo(name = "is_draft_zone_unlocked") val isDraftZoneUnlocked: Boolean = false,
     @ColumnInfo(name = "week_owner_id") val weekOwnerId: String,
     @ColumnInfo(name = "expired_count") val expiredCount: Int = 0
 )

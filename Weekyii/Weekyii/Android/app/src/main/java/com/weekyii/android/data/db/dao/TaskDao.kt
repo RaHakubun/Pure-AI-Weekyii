@@ -23,6 +23,9 @@ interface TaskDao {
     @Delete
     suspend fun delete(task: TaskEntity)
 
+    @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
+    suspend fun findById(id: UUID): TaskEntity?
+
     @Transaction
     @Query("SELECT * FROM tasks WHERE day_owner_id = :dayId ORDER BY `order`")
     fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>>

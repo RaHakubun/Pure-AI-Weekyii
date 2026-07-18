@@ -21,17 +21,14 @@ import com.weekyii.android.ui.screens.pending.PendingScreen
 import com.weekyii.android.ui.screens.past.PastScreen
 import com.weekyii.android.ui.screens.extensions.ExtensionsScreen
 import com.weekyii.android.ui.screens.settings.SettingsScreen
-import com.weekyii.android.data.repository.WeekCalculator
-import com.weekyii.android.data.repository.WeekyiiRepository
-import com.weekyii.android.domain.DefaultTimeProvider
-import com.weekyii.android.domain.StateMachine
-import com.weekyii.android.domain.InMemoryAppStateStore
-import com.weekyii.android.domain.TimeProvider
 import com.weekyii.android.ui.viewmodel.TodayViewModel
 import com.weekyii.android.ui.viewmodel.PendingViewModel
 import com.weekyii.android.ui.viewmodel.PastViewModel
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import com.weekyii.android.ui.viewmodel.SettingsViewModel
+import com.weekyii.android.data.repository.WeekCalculator
+import com.weekyii.android.data.repository.ProjectRepository
+import com.weekyii.android.data.repository.MindStampRepository
 
 /**
  * 临时手动装配（未接入 Hilt），仅为界面跑通。依赖 Room/DB 初始化后应替换为 Application 级单例。
@@ -39,22 +36,29 @@ import com.weekyii.android.ui.viewmodel.SettingsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val app = application as WeekyiiApplication
         setContent {
             WeekyiiTheme {
+                if (app.startupError != null) {
+                    Text(text = app.startupError!!, modifier = Modifier.fillMaxSize())
+                    return@WeekyiiTheme
+                }
                 val navController = rememberNavController()
                 val navItems = NavItem.items
 
-                // TODO: 替换为真正的 Room 实例
-                val dummyRepo = remember { StubRepoFactory.makeRepository(applicationContext) }
-                val timeProvider: TimeProvider = remember { DefaultTimeProvider() }
-                val appState = remember { InMemoryAppStateStore() }
-                remember { StateMachine(dummyRepo, timeProvider, appState) }.processStateTransitions()
+                val repo = app.repository
+                val timeProvider = app.timeProvider
 
-                val todayVm = remember { TodayViewModel(dummyRepo, timeProvider) }
-                val pendingVm = remember { PendingViewModel(dummyRepo, WeekCalculator(), timeProvider) }
-                val pastVm = remember { PastViewModel(dummyRepo) }
-                val extVm = remember { ExtensionsViewModel() }
-                val settingsVm = remember { SettingsViewModel() }
+                val todayVm = remember { TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore) }
+                val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider) }
+                val pastVm = remember { PastViewModel(repo) }
+                val extVm = remember {
+                    ExtensionsViewModel(
+                        ProjectRepository(app.database.projectDao(), timeProvider),
+                        MindStampRepository(app.database.mindStampDao())
+                    )
+                }
+                val settingsVm = remember { SettingsViewModel(app.settingsStore) }
 
                 Scaffold(
                     bottomBar = {
@@ -79,12 +83,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-// --- 临时仓库工厂：无 Room 环境下占位，方便界面代码编译 ---
-object StubRepoFactory {
-    fun makeRepository(context: android.content.Context): WeekyiiRepository {
-        throw IllegalStateException("Room 数据库尚未初始化，请接入实际 DB")
     }
 }

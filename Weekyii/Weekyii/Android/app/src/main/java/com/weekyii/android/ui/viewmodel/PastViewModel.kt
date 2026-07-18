@@ -14,7 +14,11 @@ class PastViewModel(
 ) : ViewModel() {
 
     data class UiState(
-        val pastWeeks: List<WeekUi> = emptyList()
+        val pastWeeks: List<WeekUi> = emptyList(),
+        val completedTasks: Int = 0,
+        val expiredTasks: Int = 0,
+        val startedDays: Int = 0,
+        val completionRate: Int = 0
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -23,7 +27,16 @@ class PastViewModel(
     init {
         viewModelScope.launch {
             repo.observePastWeeks().collectLatest { weeks ->
-                _state.value = UiState(pastWeeks = weeks)
+                val completed = weeks.sumOf { it.completedTasksCount }
+                val expired = weeks.sumOf { it.expiredTasksCount }
+                val total = completed + expired
+                _state.value = UiState(
+                    pastWeeks = weeks.sortedByDescending { it.startDate },
+                    completedTasks = completed,
+                    expiredTasks = expired,
+                    startedDays = weeks.sumOf { it.totalStartedDays },
+                    completionRate = if (total == 0) 0 else completed * 100 / total
+                )
             }
         }
     }

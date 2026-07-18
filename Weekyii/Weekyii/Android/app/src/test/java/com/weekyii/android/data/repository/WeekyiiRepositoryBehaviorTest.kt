@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Date
 import java.util.UUID
@@ -66,6 +67,24 @@ class WeekyiiRepositoryBehaviorTest {
         repository.updateWeekSummary(weekId)
 
         assertEquals(1, weekDao.findById(weekId)?.totalStartedDays)
+    }
+
+    @Test
+    fun killTimeAtOrBeforeNowIsRejectedButFutureTimeCanBeSaved() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val date = LocalDate.of(2026, 7, 20)
+        val day = day(date.toString(), DayStatus.DRAFT).copy(
+            date = Date.from(date.atStartOfDay(zone).toInstant())
+        )
+        val days = FakeDayDao(mutableMapOf(day.dayId to day))
+        val repository = repository(dayDao = days)
+        val now = Date.from(LocalDateTime.of(2026, 7, 20, 20, 1).atZone(zone).toInstant())
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repository.changeKillTime(day.dayId, 20, 0, now) }
+        }
+        repository.changeKillTime(day.dayId, 21, 0, now)
+        assertEquals(21, days.findById(day.dayId)?.killHour)
     }
 
     private fun repository(
@@ -124,13 +143,16 @@ private class FakeDayDao(
     override suspend fun findWithTasks(dayId: String): DayWithTasks? = values[dayId]?.let { DayWithTasks(it, emptyList()) }
     override fun observeByStatus(status: DayStatus): Flow<List<DayEntity>> =
         MutableStateFlow(values.values.filter { it.status == status })
+    override fun observeAll(): Flow<List<DayEntity>> = MutableStateFlow(values.values.toList())
     override suspend fun listByWeek(weekId: String): List<DayEntity> = values.values.filter { it.weekOwnerId == weekId }
+    override suspend fun allDays(): List<DayEntity> = values.values.toList()
 }
 
 private class FakeTaskDao : TaskDao {
     override suspend fun upsert(task: TaskEntity) = Unit
     override suspend fun update(task: TaskEntity) = Unit
     override suspend fun delete(task: TaskEntity) = Unit
+    override suspend fun findById(id: UUID): TaskEntity? = null
     override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> = MutableStateFlow(emptyList())
     override suspend fun findWithSteps(id: UUID): TaskWithSteps? = null
     override suspend fun deleteByZones(dayId: String, zones: List<String>) = Unit
@@ -140,10 +162,13 @@ private class FakeProjectDao : ProjectDao {
     override suspend fun upsert(project: ProjectEntity) = Unit
     override suspend fun findById(id: UUID): ProjectEntity? = null
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())
+    override suspend fun delete(project: ProjectEntity) = Unit
+    override suspend fun maxTileOrder(): Int? = null
 }
 
 private class FakeMindStampDao : MindStampDao {
     override suspend fun upsert(mindStamp: MindStampEntity) = Unit
     override fun observeAll(): Flow<List<MindStampEntity>> = MutableStateFlow(emptyList())
     override suspend fun findById(id: UUID): MindStampEntity? = null
+    override suspend fun delete(mindStamp: MindStampEntity) = Unit
 }

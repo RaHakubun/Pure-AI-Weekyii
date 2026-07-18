@@ -1,0 +1,374 @@
+package com.weekyii.android.domain
+
+import com.weekyii.android.data.db.dao.DayDao
+import com.weekyii.android.data.db.dao.ProjectDao
+import com.weekyii.android.data.db.dao.TaskDao
+import com.weekyii.android.data.db.dao.WeekDao
+import com.weekyii.android.data.db.entities.DayEntity
+import com.weekyii.android.data.db.entities.DayStatus
+import com.weekyii.android.data.db.entities.DayWithTasks
+import com.weekyii.android.data.db.entities.ExecutionMode
+import com.weekyii.android.data.db.entities.ProjectEntity
+import com.weekyii.android.data.db.entities.TaskEntity
+import com.weekyii.android.data.db.entities.TaskWithSteps
+import com.weekyii.android.data.db.entities.TaskZone
+import com.weekyii.android.data.db.entities.WeekEntity
+import com.weekyii.android.data.db.entities.WeekStatus
+import com.weekyii.android.data.db.entities.WeekWithDays
+import com.weekyii.android.data.repository.WeekCalculator
+import com.weekyii.android.data.repository.WeekyiiRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
+import org.junit.Test
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.Date
+import java.util.UUID
+
+class StateMachineTest {
+    private val zone = ZoneId.of("Asia/Shanghai")
+
+    @Test
+    fun reconcileExpiresEveryStaleOpenDayAndKeepsOnlyCompletedTaskDetails() = runBlocking {
+        val now = Instant.parse("2026-07-20T02:00:00Z")
+        val staleDate = LocalDate.of(2026, 7, 6)
+        val oldWeek = week(staleDate, WeekStatus.PAST)
+        val staleDay = day(staleDate, oldWeek.weekId, DayStatus.EXECUTE)
+        val tasks = mutableMapOf(
+            staleDay.dayId to mutableListOf(
+                task(staleDay.dayId, 1, TaskZone.FOCUS),
+                task(staleDay.dayId, 2, TaskZone.FROZEN),
+                task(staleDay.dayId, 3, TaskZone.COMPLETE)
+            )
+        )
+        val days = RecordingDayDao(mutableMapOf(staleDay.dayId to staleDay), tasks)
+        val weeks = RecordingWeekDao(mutableMapOf(oldWeek.weekId to oldWeek)) { days.values() }
+        val repository = repository(weeks, days, RecordingTaskDao(tasks))
+        val state = InMemoryAppStateStore().apply {
+            setLastProcessedDate(LocalDate.of(2026, 7, 19))
+        }
+
+        StateMachine(repository, FixedTimeProvider(now, zone), state).reconcile(force = true)
+
+        assertEquals(DayStatus.EXPIRED, days.findById(staleDay.dayId)?.status)
+        assertEquals(2, days.findById(staleDay.dayId)?.expiredCount)
+        assertEquals(listOf(TaskZone.COMPLETE), tasks.getValue(staleDay.dayId).map { it.zone })
+    }
+
+    @Test
+    fun reconcilePromotesCurrentPendingWeekAndArchivesOldPresentAndStalePendingWeeks() = runBlocking {
+        val now = Instant.parse("2026-07-20T02:00:00Z")
+        val current = week(LocalDate.of(2026, 7, 20), WeekStatus.PENDING)
+        val oldPresent = week(LocalDate.of(2026, 7, 13), WeekStatus.PRESENT)
+        val stalePending = week(LocalDate.of(2026, 7, 6), WeekStatus.PENDING)
+        val futurePending = week(LocalDate.of(2026, 7, 27), WeekStatus.PENDING)
+        val weeks = RecordingWeekDao(
+            mutableMapOf(
+                current.weekId to current,
+                oldPresent.weekId to oldPresent,
+                stalePending.weekId to stalePending,
+                futurePending.weekId to futurePending
+            )
+        )
+        val repository = repository(weeks, RecordingDayDao(), RecordingTaskDao())
+
+        StateMachine(repository, FixedTimeProvider(now, zone), InMemoryAppStateStore())
+            .reconcile(force = true)
+
+        assertEquals(WeekStatus.PRESENT, weeks.findById(current.weekId)?.status)
+        assertEquals(WeekStatus.PAST, weeks.findById(oldPresent.weekId)?.status)
+        assertEquals(WeekStatus.PAST, weeks.findById(stalePending.weekId)?.status)
+        assertEquals(WeekStatus.PENDING, weeks.findById(futurePending.weekId)?.status)
+        assertEquals(1, weeks.allWeeks().count { it.status == WeekStatus.PRESENT })
+    }
+
+    @Test
+    fun reconcileExpiresTodayAtTheExactKillTimeBoundary() = runBlocking {
+        val now = Instant.parse("2026-07-20T12:00:00Z") // 20:00 Asia/Shanghai
+        val today = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(today, WeekStatus.PRESENT)
+        val todayDay = day(today, currentWeek.weekId, DayStatus.EXECUTE).copy(killHour = 20, killMinute = 0)
+        val tasks = mutableMapOf(todayDay.dayId to mutableListOf(task(todayDay.dayId, 1, TaskZone.FOCUS)))
+        val days = RecordingDayDao(mutableMapOf(todayDay.dayId to todayDay), tasks)
+        val weeks = RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() }
+        val repository = repository(weeks, days, RecordingTaskDao(tasks))
+
+        StateMachine(repository, FixedTimeProvider(now, zone), InMemoryAppStateStore())
+            .reconcile(force = true)
+
+        assertEquals(DayStatus.EXPIRED, days.findById(todayDay.dayId)?.status)
+        assertEquals(1, days.findById(todayDay.dayId)?.expiredCount)
+        assertTrue(tasks.getValue(todayDay.dayId).isEmpty())
+    }
+
+    @Test
+    fun reconcileSkipsASecondRunWithinTheSameMinute() = runBlocking {
+        val now = Instant.parse("2026-07-20T02:00:00Z")
+        val state = InMemoryAppStateStore()
+        val repository = repository(RecordingWeekDao(), RecordingDayDao(), RecordingTaskDao())
+        val machine = StateMachine(repository, FixedTimeProvider(now, zone), state)
+
+        val first = machine.reconcile(force = false)
+        val second = machine.reconcile(force = false)
+
+        assertFalse(first.skipped)
+        assertTrue(second.skipped)
+        assertEquals(1, state.stateTransitionRevision.value)
+    }
+
+    @Test
+    fun addingBlankDraftTaskIsRejectedWithoutWritingAnEmptyTask() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EMPTY)
+        val tasks = mutableMapOf<String, MutableList<TaskEntity>>()
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.addDraftTasks(today.dayId, listOf("  ")) }
+        }
+        assertTrue(days.findWithTasks(today.dayId)?.tasks.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun flexibleExecutionCanUnlockAndAppendANewFrozenTask() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.DRAFT)
+        val tasks = mutableMapOf(
+            today.dayId to mutableListOf(
+                task(today.dayId, 1, TaskZone.DRAFT),
+                task(today.dayId, 2, TaskZone.DRAFT)
+            )
+        )
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+
+        repository.startDay(today.dayId, Date(1_000), ExecutionMode.FLEXIBLE)
+        repository.setDraftZoneUnlocked(today.dayId, true)
+        repository.addExecutionTask(today.dayId, "Late task")
+
+        val updatedDay = days.findById(today.dayId)!!
+        assertEquals(ExecutionMode.FLEXIBLE.name.lowercase(), updatedDay.executionModeRaw)
+        assertTrue(updatedDay.isDraftZoneUnlocked)
+        assertEquals(
+            listOf(TaskZone.FOCUS, TaskZone.FROZEN, TaskZone.FROZEN),
+            tasks.getValue(today.dayId).sortedBy { it.order }.map { it.zone }
+        )
+    }
+
+    @Test
+    fun strictExecutionCannotUnlockTheExecutionQueue() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.DRAFT)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(task(today.dayId, 1, TaskZone.DRAFT)))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+        repository.startDay(today.dayId, Date(1_000), ExecutionMode.STRICT)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.setDraftZoneUnlocked(today.dayId, true) }
+        }
+        Unit
+    }
+
+    @Test
+    fun flexibleExecutionCanExchangeFocusWithTheFirstFrozenTask() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.DRAFT)
+        val first = task(today.dayId, 1, TaskZone.DRAFT)
+        val second = task(today.dayId, 2, TaskZone.DRAFT)
+        val tasks = mutableMapOf(today.dayId to mutableListOf(first, second))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            RecordingTaskDao(tasks)
+        )
+        repository.startDay(today.dayId, Date(1_000), ExecutionMode.FLEXIBLE)
+        repository.setDraftZoneUnlocked(today.dayId, true)
+
+        repository.exchangeFocusWithFirstFrozen(today.dayId, Date(2_000))
+
+        val byId = tasks.getValue(today.dayId).associateBy { it.id }
+        assertEquals(TaskZone.FROZEN, byId.getValue(first.id).zone)
+        assertEquals(2, byId.getValue(first.id).order)
+        assertEquals(TaskZone.FOCUS, byId.getValue(second.id).zone)
+        assertEquals(1, byId.getValue(second.id).order)
+        assertEquals(Date(2_000), byId.getValue(second.id).startedAt)
+    }
+
+    @Test
+    fun reconcileSyncsDefaultKillTimeOnlyWhenTheDayRollsOver() = runBlocking {
+        val now = Instant.parse("2026-07-20T02:00:00Z")
+        val today = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(today, WeekStatus.PRESENT)
+        val todayDay = day(today, currentWeek.weekId, DayStatus.EMPTY).copy(
+            killHour = 20,
+            killMinute = 0,
+            followsDefaultKillTime = false
+        )
+        val days = RecordingDayDao(mutableMapOf(todayDay.dayId to todayDay))
+        val weeks = RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() }
+        val settings = InMemorySettingsStore(killTime = LocalTime.of(23, 59))
+        val state = InMemoryAppStateStore().apply {
+            setLastProcessedDate(today.minusDays(1))
+        }
+        val repository = repository(weeks, days, RecordingTaskDao())
+
+        StateMachine(repository, FixedTimeProvider(now, zone), state, settings).reconcile(force = true)
+
+        assertEquals(23, days.findById(todayDay.dayId)?.killHour)
+        assertEquals(59, days.findById(todayDay.dayId)?.killMinute)
+        assertTrue(days.findById(todayDay.dayId)?.followsDefaultKillTime == true)
+
+        days.upsert(days.findById(todayDay.dayId)!!.copy(killHour = 22, killMinute = 0, followsDefaultKillTime = false))
+        state.setLastProcessedDate(today)
+        StateMachine(repository, FixedTimeProvider(now, zone), state, settings).reconcile(force = true)
+
+        assertEquals(22, days.findById(todayDay.dayId)?.killHour)
+        assertFalse(days.findById(todayDay.dayId)?.followsDefaultKillTime == true)
+    }
+
+    private fun repository(
+        weekDao: RecordingWeekDao,
+        dayDao: RecordingDayDao,
+        taskDao: RecordingTaskDao
+    ) = WeekyiiRepository(
+        weekDao = weekDao,
+        dayDao = dayDao,
+        taskDao = taskDao,
+        projectDao = RecordingProjectDao(),
+        weekCalculator = WeekCalculator(),
+        zoneId = zone
+    )
+
+    private fun week(date: LocalDate, status: WeekStatus): WeekEntity {
+        val calculator = WeekCalculator()
+        val (start, end) = calculator.weekRange(date)
+        return WeekEntity(
+            weekId = calculator.weekId(date),
+            startDate = start.asDate(zone),
+            endDate = end.asDate(zone),
+            status = status
+        )
+    }
+
+    private fun day(date: LocalDate, weekId: String, status: DayStatus) = DayEntity(
+        dayId = date.toString(),
+        date = date.asDate(zone),
+        dayOfWeek = date.dayOfWeek.name.take(3),
+        status = status,
+        weekOwnerId = weekId
+    )
+
+    private fun task(dayId: String, order: Int, zone: TaskZone) = TaskEntity(
+        title = "Task $order",
+        order = order,
+        zone = zone,
+        dayOwnerId = dayId
+    )
+}
+
+private class FixedTimeProvider(
+    override val nowInstant: Instant,
+    override val zoneId: ZoneId
+) : TimeProvider {
+    override val currentWeekId: String
+        get() = WeekCalculator().weekId(today)
+}
+
+private class InMemorySettingsStore(
+    killTime: LocalTime = LocalTime.of(20, 0),
+    executionMode: ExecutionMode = ExecutionMode.STRICT
+) : UserSettingsStore {
+    override val defaultKillTime = MutableStateFlow(killTime)
+    override val defaultExecutionMode = MutableStateFlow(executionMode)
+    override suspend fun setDefaultKillTime(time: LocalTime) { defaultKillTime.value = time }
+    override suspend fun setDefaultExecutionMode(mode: ExecutionMode) { defaultExecutionMode.value = mode }
+}
+
+private class RecordingWeekDao(
+    private val values: MutableMap<String, WeekEntity> = mutableMapOf(),
+    private val days: () -> Collection<DayEntity> = { emptyList() }
+) : WeekDao {
+    override suspend fun upsert(week: WeekEntity) { values[week.weekId] = week }
+    override suspend fun update(week: WeekEntity) { values[week.weekId] = week }
+    override suspend fun findById(weekId: String): WeekEntity? = values[weekId]
+    override suspend fun findWithDays(weekId: String): WeekWithDays? =
+        values[weekId]?.let { WeekWithDays(it, days().filter { day -> day.weekOwnerId == weekId }) }
+    override fun observeWeeksByStatus(status: WeekStatus): Flow<List<WeekEntity>> =
+        MutableStateFlow(values.values.filter { it.status == status })
+    override suspend fun allWeeks(): List<WeekEntity> = values.values.toList()
+}
+
+private class RecordingDayDao(
+    private val values: MutableMap<String, DayEntity> = mutableMapOf(),
+    private val tasks: MutableMap<String, MutableList<TaskEntity>> = mutableMapOf()
+) : DayDao {
+    fun values(): Collection<DayEntity> = values.values
+    override suspend fun upsert(day: DayEntity) { values[day.dayId] = day }
+    override suspend fun update(day: DayEntity) { values[day.dayId] = day }
+    override suspend fun findById(dayId: String): DayEntity? = values[dayId]
+    override suspend fun findWithTasks(dayId: String): DayWithTasks? =
+        values[dayId]?.let { DayWithTasks(it, tasks[dayId].orEmpty().toList()) }
+    override fun observeByStatus(status: DayStatus): Flow<List<DayEntity>> =
+        MutableStateFlow(values.values.filter { it.status == status })
+    override fun observeAll(): Flow<List<DayEntity>> = MutableStateFlow(values.values.toList())
+    override suspend fun listByWeek(weekId: String): List<DayEntity> =
+        values.values.filter { it.weekOwnerId == weekId }
+    override suspend fun allDays(): List<DayEntity> = values.values.toList()
+}
+
+private class RecordingTaskDao(
+    private val tasks: MutableMap<String, MutableList<TaskEntity>> = mutableMapOf()
+) : TaskDao {
+    override suspend fun upsert(task: TaskEntity) {
+        val dayTasks = tasks.getOrPut(task.dayOwnerId) { mutableListOf() }
+        dayTasks.removeAll { it.id == task.id }
+        dayTasks += task
+    }
+    override suspend fun update(task: TaskEntity) = upsert(task)
+    override suspend fun delete(task: TaskEntity) {
+        tasks[task.dayOwnerId]?.removeAll { it.id == task.id }
+    }
+    override suspend fun findById(id: UUID): TaskEntity? = tasks.values.flatten().firstOrNull { it.id == id }
+    override fun observeTasksForDay(dayId: String): Flow<List<TaskEntity>> =
+        MutableStateFlow(tasks[dayId].orEmpty())
+    override suspend fun findWithSteps(id: UUID): TaskWithSteps? = null
+    override suspend fun deleteByZones(dayId: String, zones: List<String>) {
+        tasks[dayId]?.removeAll { it.zone.name in zones }
+    }
+}
+
+private class RecordingProjectDao : ProjectDao {
+    override suspend fun upsert(project: ProjectEntity) = Unit
+    override suspend fun findById(id: UUID): ProjectEntity? = null
+    override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())
+    override suspend fun delete(project: ProjectEntity) = Unit
+    override suspend fun maxTileOrder(): Int? = null
+}
+
+private fun LocalDate.asDate(zoneId: ZoneId): Date = Date.from(atStartOfDay(zoneId).toInstant())

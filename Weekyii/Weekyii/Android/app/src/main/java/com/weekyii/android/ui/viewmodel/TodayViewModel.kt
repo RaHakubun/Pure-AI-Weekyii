@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.weekyii.android.data.repository.WeekyiiRepository
 import com.weekyii.android.data.repository.toUi
+import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.domain.TimeProvider
+import com.weekyii.android.domain.AppStateStore
+import com.weekyii.android.domain.UserSettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -15,19 +18,25 @@ import java.time.LocalDate
 
 class TodayViewModel(
     private val repo: WeekyiiRepository,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val appState: AppStateStore,
+    private val settings: UserSettingsStore? = null
 ) : ViewModel() {
 
     data class UiState(
         val date: LocalDate = LocalDate.now(),
         val day: DayUi? = null,
+        val draft: List<TaskUi> = emptyList(),
         val focus: TaskUi? = null,
         val frozen: List<TaskUi> = emptyList(),
         val complete: List<TaskUi> = emptyList(),
+        val startExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val error: String? = null
     )
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(
+        UiState(startExecutionMode = settings?.defaultExecutionMode?.value ?: ExecutionMode.STRICT)
+    )
     val state: StateFlow<UiState> = _state
 
     init {
@@ -43,12 +52,15 @@ class TodayViewModel(
             val focus = tasks.firstOrNull { it.zone.name == "FOCUS" }?.toUi()
             val frozen = tasks.filter { it.zone.name == "FROZEN" }.sortedBy { it.order }.map { it.toUi() }
             val complete = tasks.filter { it.zone.name == "COMPLETE" }.sortedBy { it.completedOrder }.map { it.toUi() }
+            val selectedMode = _state.value.startExecutionMode
             _state.value = UiState(
                 date = today,
                 day = day?.day?.toUi(tasks = tasks.map { it.toUi() }),
+                draft = tasks.filter { it.zone.name == "DRAFT" }.sortedBy { it.order }.map { it.toUi() },
                 focus = focus,
                 frozen = frozen,
                 complete = complete,
+                startExecutionMode = selectedMode,
                 error = null
             )
         }
@@ -65,30 +77,104 @@ class TodayViewModel(
     fun startDay() {
         viewModelScope.launch {
             try {
-                repo.startDay(timeProvider.today.toString(), timeProvider.now)
+                repo.startDay(timeProvider.today.toString(), timeProvider.now, _state.value.startExecutionMode)
                 refresh()
-                appIncrementDayStarted()
+                appState.incrementDaysStarted()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }
         }
     }
 
-    private suspend fun appIncrementDayStarted() {
-        // placeholder, real increment由StateMachine的AppStateStore处理
+    fun selectExecutionMode(mode: ExecutionMode) {
+        _state.update { it.copy(startExecutionMode = mode) }
+    }
+
+    fun setDraftZoneUnlocked(isUnlocked: Boolean) {
+        viewModelScope.launch {
+            try {
+                repo.setDraftZoneUnlocked(timeProvider.today.toString(), isUnlocked)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun addExecutionTask(title: String) {
+        viewModelScope.launch {
+            try {
+                repo.addExecutionTask(timeProvider.today.toString(), title)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun exchangeFocusWithFirstFrozen() {
+        viewModelScope.launch {
+            try {
+                repo.exchangeFocusWithFirstFrozen(timeProvider.today.toString(), timeProvider.now)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
     }
 
     fun doneFocus() {
         viewModelScope.launch {
-            repo.doneFocus(timeProvider.today.toString(), timeProvider.now)
-            refresh()
+            try {
+                repo.doneFocus(timeProvider.today.toString(), timeProvider.now)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
         }
     }
 
     fun changeKillTime(hour: Int, minute: Int) {
         viewModelScope.launch {
-            repo.changeKillTime(timeProvider.today.toString(), hour, minute)
-            refresh()
+            try {
+                repo.changeKillTime(timeProvider.today.toString(), hour, minute, timeProvider.now)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun updateDraftTask(task: TaskUi, title: String, description: String = "") {
+        viewModelScope.launch {
+            try {
+                repo.updateDraftTask(timeProvider.today.toString(), task.id, title, description, task.taskType, task.taskTypeIdRaw)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteDraftTask(task: TaskUi) {
+        viewModelScope.launch {
+            try {
+                repo.deleteDraftTasks(timeProvider.today.toString(), listOf(task.id))
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun moveDraftTask(fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            try {
+                repo.moveDraftTask(timeProvider.today.toString(), fromIndex, toIndex)
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
         }
     }
 }
