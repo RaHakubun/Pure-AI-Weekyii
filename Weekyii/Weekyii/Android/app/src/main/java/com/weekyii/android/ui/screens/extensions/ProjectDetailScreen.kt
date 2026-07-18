@@ -12,12 +12,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +43,12 @@ import com.weekyii.android.ui.model.ProjectDetailUi
 import com.weekyii.android.ui.model.TaskUi
 import java.time.LocalDate
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiButton
+import com.weekyii.android.ui.components.WeekyiiButtonStyle
+import com.weekyii.android.ui.components.WeekyiiEmptyState
+import com.weekyii.android.ui.components.WeekyiiErrorState
+import com.weekyii.android.ui.components.StatusBadge
+import com.weekyii.android.ui.components.WeekyiiTaskRow
 
 @Composable
 fun ProjectDetailScreen(
@@ -57,6 +71,19 @@ fun ProjectDetailScreen(
     var deletingTask by remember { mutableStateOf<TaskUi?>(null) }
     var deletingProject by remember { mutableStateOf(false) }
     var editingProject by remember { mutableStateOf(false) }
+    var projectMenuExpanded by remember { mutableStateOf(false) }
+    val statusLabel = when (project.status) {
+        ProjectStatus.PLANNING -> "规划中"
+        ProjectStatus.ACTIVE -> "进行中"
+        ProjectStatus.COMPLETED -> "已完成"
+        ProjectStatus.ARCHIVED -> "已归档"
+    }
+    val primaryActionLabel = when (project.status) {
+        ProjectStatus.PLANNING -> "激活项目"
+        ProjectStatus.ACTIVE -> if (detail.totalCount > 0 && detail.remainingCount == 0) "确认结项" else null
+        ProjectStatus.COMPLETED -> "重新打开"
+        ProjectStatus.ARCHIVED -> "恢复项目"
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -64,13 +91,26 @@ fun ProjectDetailScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = onBack) { Text("返回项目列表") }
-                Text(project.status.name.lowercase(), color = MaterialTheme.colorScheme.primary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回项目列表")
+                    }
+                    Text("项目详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+                StatusBadge(
+                    text = statusLabel,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
         error?.let { message ->
-            item { Text(message, color = MaterialTheme.colorScheme.error) }
+            item { WeekyiiErrorState(message) }
         }
         item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
@@ -81,32 +121,80 @@ fun ProjectDetailScreen(
                     Text("进度 ${(detail.progress * 100).toInt()}% · 已完成 ${detail.completedCount} / ${detail.totalCount}")
                     Text("剩余 ${detail.remainingCount} · 过期 ${detail.expiredCount}")
                     detail.nextTaskTitle?.let { Text("下一步：$it", color = MaterialTheme.colorScheme.primary) }
-                    if (writable) OutlinedButton(onClick = { editingProject = true }) { Text("编辑项目资料") }
                 }
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (project.status) {
-                    ProjectStatus.PLANNING -> Button(onClick = { onStatusChange(ProjectStatus.ACTIVE) }) { Text("激活") }
-                    ProjectStatus.ACTIVE -> if (detail.totalCount > 0 && detail.remainingCount == 0) {
-                        Button(onClick = { onStatusChange(ProjectStatus.COMPLETED) }) { Text("确认结项") }
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("项目操作", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        primaryActionLabel?.let { label ->
+                            WeekyiiButton(
+                                text = label,
+                                style = WeekyiiButtonStyle.Primary,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    when (project.status) {
+                                        ProjectStatus.PLANNING -> onStatusChange(ProjectStatus.ACTIVE)
+                                        ProjectStatus.ACTIVE -> onStatusChange(ProjectStatus.COMPLETED)
+                                        ProjectStatus.COMPLETED -> onStatusChange(ProjectStatus.ACTIVE)
+                                        ProjectStatus.ARCHIVED -> onStatusChange(ProjectStatus.COMPLETED)
+                                    }
+                                }
+                            )
+                        }
+                        if (writable) {
+                            WeekyiiButton(
+                                text = "添加任务",
+                                style = WeekyiiButtonStyle.Secondary,
+                                modifier = Modifier.weight(1f),
+                                onClick = { addDialog = true }
+                            )
+                        }
+                        androidx.compose.foundation.layout.Box {
+                            IconButton(onClick = { projectMenuExpanded = true }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "更多项目操作")
+                            }
+                            DropdownMenu(
+                                expanded = projectMenuExpanded,
+                                onDismissRequest = { projectMenuExpanded = false }
+                            ) {
+                                if (writable) {
+                                    DropdownMenuItem(
+                                        text = { Text("编辑项目资料") },
+                                        onClick = { projectMenuExpanded = false; editingProject = true }
+                                    )
+                                }
+                                if (project.status == ProjectStatus.COMPLETED) {
+                                    DropdownMenuItem(
+                                        text = { Text("归档项目") },
+                                        onClick = { projectMenuExpanded = false; onStatusChange(ProjectStatus.ARCHIVED) }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("删除项目") },
+                                    onClick = { projectMenuExpanded = false; deletingProject = true }
+                                )
+                            }
+                        }
                     }
-                    ProjectStatus.COMPLETED -> {
-                        OutlinedButton(onClick = { onStatusChange(ProjectStatus.ACTIVE) }) { Text("重新打开") }
-                        Button(onClick = { onStatusChange(ProjectStatus.ARCHIVED) }) { Text("归档") }
-                    }
-                    ProjectStatus.ARCHIVED -> OutlinedButton(onClick = { onStatusChange(ProjectStatus.COMPLETED) }) { Text("恢复") }
                 }
-                if (writable) {
-                    OutlinedButton(onClick = { addDialog = true }) { Text("添加项目任务") }
-                }
-                OutlinedButton(onClick = { deletingProject = true }) { Text("删除项目") }
             }
         }
         item { Text("按日期排列的任务", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         if (detail.sections.isEmpty()) {
-            item { Text("项目暂无任务", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item {
+                WeekyiiEmptyState(
+                    title = "项目暂无任务",
+                    subtitle = if (writable) "添加项目任务，让工作台开始积累进度。" else "当前项目没有可展示的任务。",
+                    icon = Icons.Outlined.TaskAlt
+                )
+            }
         } else {
             items(detail.sections, key = { it.date.toString() }) { section ->
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
@@ -185,16 +273,35 @@ fun ProjectDetailScreen(
 
 @Composable
 private fun ProjectTaskRow(task: TaskUi, editable: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(task.title, fontWeight = FontWeight.SemiBold)
-            Text(task.zone.name.lowercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var menuExpanded by remember(task.id) { mutableStateOf(false) }
+    WeekyiiTaskRow(
+        title = task.title,
+        subtitle = task.zone.name.lowercase(),
+        trailing = {
+            if (editable) {
+                androidx.compose.foundation.layout.Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "任务操作")
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(text = { Text("编辑") }, onClick = { menuExpanded = false; onEdit() })
+                        DropdownMenuItem(text = { Text("删除") }, onClick = { menuExpanded = false; onDelete() })
+                    }
+                }
+            } else {
+                StatusBadge(
+                    text = when (task.zone) {
+                        TaskZone.DRAFT -> "草稿"
+                        TaskZone.COMPLETE -> "完成"
+                        TaskZone.FOCUS -> "专注"
+                        TaskZone.FROZEN -> "冻结"
+                    },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        if (editable) {
-            TextButton(onClick = onEdit) { Text("编辑") }
-            TextButton(onClick = onDelete) { Text("删除") }
-        }
-    }
+    )
 }
 
 @Composable
