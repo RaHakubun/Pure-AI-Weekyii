@@ -9,6 +9,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -31,16 +33,13 @@ class DataStoreAppStateStore(
         val stateTransitionRevision = intPreferencesKey("state_transition_revision")
     }
 
-    private val snapshot = context.weekyiiDataStore.data.map { preferences ->
-        Snapshot(
-            systemStartDate = preferences[Keys.systemStartDate]?.let(LocalDate::parse),
-            lastProcessedDate = preferences[Keys.lastProcessedDate]?.let(LocalDate::parse),
-            lastRolloverAt = preferences[Keys.lastRolloverAt]?.let(LocalDateTime::parse),
-            runtimeErrorMessage = preferences[Keys.runtimeErrorMessage],
-            daysStartedCount = preferences[Keys.daysStartedCount] ?: 0,
-            stateTransitionRevision = preferences[Keys.stateTransitionRevision] ?: 0
-        )
-    }.stateIn(scope, SharingStarted.Eagerly, Snapshot())
+    private val initialSnapshot = runBlocking(Dispatchers.IO) {
+        context.weekyiiDataStore.data.first().toSnapshot()
+    }
+
+    private val snapshot = context.weekyiiDataStore.data
+        .map { it.toSnapshot() }
+        .stateIn(scope, SharingStarted.Eagerly, initialSnapshot)
 
     override val systemStartDate: StateFlow<LocalDate?> = snapshot.mapState(scope) { it.systemStartDate }
     override val lastProcessedDate: StateFlow<LocalDate?> = snapshot.mapState(scope) { it.lastProcessedDate }
@@ -100,6 +99,15 @@ class DataStoreAppStateStore(
         val runtimeErrorMessage: String? = null,
         val daysStartedCount: Int = 0,
         val stateTransitionRevision: Int = 0
+    )
+
+    private fun androidx.datastore.preferences.core.Preferences.toSnapshot() = Snapshot(
+        systemStartDate = this[Keys.systemStartDate]?.let(LocalDate::parse),
+        lastProcessedDate = this[Keys.lastProcessedDate]?.let(LocalDate::parse),
+        lastRolloverAt = this[Keys.lastRolloverAt]?.let(LocalDateTime::parse),
+        runtimeErrorMessage = this[Keys.runtimeErrorMessage],
+        daysStartedCount = this[Keys.daysStartedCount] ?: 0,
+        stateTransitionRevision = this[Keys.stateTransitionRevision] ?: 0
     )
 }
 
