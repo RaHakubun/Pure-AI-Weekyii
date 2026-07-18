@@ -5,6 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Intent
+import java.time.LocalDateTime
+import java.time.ZoneId
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.weekyii.android.R
@@ -36,5 +41,24 @@ class WeekyiiNotificationService(private val context: Context) {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(dayId.hashCode(), notification)
+    }
+
+    fun scheduleKillTime(dayId: String, at: LocalDateTime, unfinishedCount: Int) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val intent = Intent(context, WeekyiiAlarmReceiver::class.java).apply {
+            action = WeekyiiAlarmReceiver.ACTION_KILL_TIME
+            putExtra(WeekyiiAlarmReceiver.EXTRA_DAY_ID, dayId)
+            putExtra(WeekyiiAlarmReceiver.EXTRA_KILL_TIME, "%02d:%02d".format(at.hour, at.minute))
+            putExtra(WeekyiiAlarmReceiver.EXTRA_UNFINISHED_COUNT, unfinishedCount)
+        }
+        val pending = PendingIntent.getBroadcast(context, dayId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val trigger = at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
+    }
+
+    fun cancelKillTime(dayId: String) {
+        val intent = Intent(context, WeekyiiAlarmReceiver::class.java).apply { action = WeekyiiAlarmReceiver.ACTION_KILL_TIME }
+        val pending = PendingIntent.getBroadcast(context, dayId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        context.getSystemService(AlarmManager::class.java).cancel(pending)
     }
 }

@@ -44,6 +44,7 @@ fun ProjectDetailScreen(
     taskTypeDefinitions: List<TaskTypeDefinitionEntity>,
     onBack: () -> Unit,
     onStatusChange: (ProjectStatus) -> Unit,
+    onUpdateProject: (String, String, LocalDate, LocalDate, String, String, String) -> Unit,
     onAddTasks: (title: String, description: String, taskType: TaskType, taskTypeIdRaw: String, dates: List<LocalDate>) -> Unit,
     onUpdateTask: (task: TaskUi, title: String, description: String) -> Unit,
     onDeleteTask: (TaskUi) -> Unit,
@@ -55,6 +56,7 @@ fun ProjectDetailScreen(
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
     var deletingTask by remember { mutableStateOf<TaskUi?>(null) }
     var deletingProject by remember { mutableStateOf(false) }
+    var editingProject by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -79,6 +81,7 @@ fun ProjectDetailScreen(
                     Text("进度 ${(detail.progress * 100).toInt()}% · 已完成 ${detail.completedCount} / ${detail.totalCount}")
                     Text("剩余 ${detail.remainingCount} · 过期 ${detail.expiredCount}")
                     detail.nextTaskTitle?.let { Text("下一步：$it", color = MaterialTheme.colorScheme.primary) }
+                    if (writable) OutlinedButton(onClick = { editingProject = true }) { Text("编辑项目资料") }
                 }
             }
         }
@@ -132,6 +135,16 @@ fun ProjectDetailScreen(
             onCreate = { title, description, taskType, taskTypeIdRaw, dates ->
                 onAddTasks(title, description, taskType, taskTypeIdRaw, dates)
                 addDialog = false
+            }
+        )
+    }
+    if (editingProject) {
+        EditProjectMetadataDialog(
+            project = project,
+            onDismiss = { editingProject = false },
+            onSave = { name, description, startDate, endDate, color, icon, tileSize ->
+                onUpdateProject(name, description, startDate, endDate, color, icon, tileSize)
+                editingProject = false
             }
         )
     }
@@ -259,6 +272,42 @@ private fun EditProjectTaskDialog(task: TaskUi, onDismiss: () -> Unit, onSave: (
             }
         },
         confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title, description) }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+@Composable
+private fun EditProjectMetadataDialog(
+    project: com.weekyii.android.ui.model.ProjectUi,
+    onDismiss: () -> Unit,
+    onSave: (String, String, LocalDate, LocalDate, String, String, String) -> Unit
+) {
+    val context = LocalContext.current
+    var name by remember(project.id) { mutableStateOf(project.name) }
+    var description by remember(project.id) { mutableStateOf(project.description) }
+    var startDate by remember(project.id) { mutableStateOf(project.startDate) }
+    var endDate by remember(project.id) { mutableStateOf(project.endDate) }
+    var color by remember(project.id) { mutableStateOf(project.color) }
+    var icon by remember(project.id) { mutableStateOf(project.icon) }
+    var tileSize by remember(project.id) { mutableStateOf(project.tileSizeRaw) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑项目资料") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("名称") }, singleLine = true)
+                OutlinedTextField(description, { description = it }, label = { Text("说明") })
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { DatePickerDialog(context, { _, y, m, d -> startDate = LocalDate.of(y, m + 1, d) }, startDate.year, startDate.monthValue - 1, startDate.dayOfMonth).show() }) { Text("开始 ${startDate}") }
+                    OutlinedButton(onClick = { DatePickerDialog(context, { _, y, m, d -> endDate = LocalDate.of(y, m + 1, d) }, endDate.year, endDate.monthValue - 1, endDate.dayOfMonth).show() }) { Text("结束 ${endDate}") }
+                }
+                OutlinedTextField(color, { color = it }, label = { Text("颜色 #RRGGBB") }, singleLine = true)
+                OutlinedTextField(icon, { icon = it }, label = { Text("图标名称") }, singleLine = true)
+                Text("磁贴大小", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("mini", "small", "medium", "wide").forEach { value -> FilterChip(selected = tileSize == value, onClick = { tileSize = value }, label = { Text(value) }) } }
+            }
+        },
+        confirmButton = { TextButton(enabled = name.isNotBlank() && !endDate.isBefore(startDate), onClick = { onSave(name, description, startDate, endDate, color, icon, tileSize) }) { Text("保存") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
 }

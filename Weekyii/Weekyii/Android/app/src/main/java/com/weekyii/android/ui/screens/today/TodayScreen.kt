@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +48,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import android.graphics.BitmapFactory
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -110,6 +118,9 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         item {
             TodayWeekSwitcher(showWeek = false, onChange = { showWeek = it })
         }
+        state.ritualStamp?.let { stamp ->
+            item { RitualStampCard(stamp.text, stamp.imageBlob, viewModel::dismissRitual) }
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Weekyii", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -117,6 +128,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                     state.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE")),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                StatusArtwork(day?.status ?: DayStatus.EMPTY)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -400,6 +412,43 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
             },
             dismissButton = { TextButton(onClick = { editingTask = null }) { Text("取消") } }
         )
+    }
+}
+
+@Composable
+private fun StatusArtwork(status: DayStatus) {
+    val colors = when (status) {
+        DayStatus.EMPTY -> listOf(Color(0xFFFFD49A), Color(0xFFC46A1A))
+        DayStatus.DRAFT -> listOf(Color(0xFFC8E6E0), Color(0xFF2F7E79))
+        DayStatus.EXECUTE -> listOf(Color(0xFFFFC1A8), Color(0xFFD05C3E))
+        DayStatus.COMPLETED -> listOf(Color(0xFFA7DFC6), Color(0xFF208B4B))
+        DayStatus.EXPIRED -> listOf(Color(0xFFD8D1CC), Color(0xFF76645A))
+    }
+    val message = when (status) {
+        DayStatus.EMPTY -> "一张空白桌面，等待今天的第一笔"
+        DayStatus.DRAFT -> "先排好路线，再出发"
+        DayStatus.EXECUTE -> "专注当前一步，下一步自然解冻"
+        DayStatus.COMPLETED -> "今日承诺已经收口"
+        DayStatus.EXPIRED -> "遗忘未完成，保留继续前行的空间"
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(104.dp).background(Brush.horizontalGradient(colors)).padding(16.dp), contentAlignment = Alignment.BottomStart) {
+        Text(message, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun RitualStampCard(text: String, imageBlob: ByteArray?, onDismiss: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("今日 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("把这一刻带进今天。", color = MaterialTheme.colorScheme.onTertiaryContainer)
+            if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge)
+            imageBlob?.let { bytes ->
+                val bitmap = remember(bytes.contentHashCode()) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                bitmap?.let { Image(it.asImageBitmap(), contentDescription = "MindStamp 图片", modifier = Modifier.height(140.dp), contentScale = ContentScale.Fit) }
+            }
+            TextButton(onClick = onDismiss) { Text("收下并开始") }
+        }
     }
 }
 

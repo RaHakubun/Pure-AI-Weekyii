@@ -8,6 +8,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,7 +41,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val app = application as WeekyiiApplication
         setContent {
-            WeekyiiTheme {
+            val themeId by app.settingsStore.themeId.collectAsState()
+            WeekyiiTheme(themeId = themeId) {
                 if (app.startupError != null) {
                     Text(text = app.startupError!!, modifier = Modifier.fillMaxSize())
                     return@WeekyiiTheme
@@ -49,9 +52,10 @@ class MainActivity : ComponentActivity() {
 
                 val repo = app.repository
                 val timeProvider = app.timeProvider
+                val mindStampRepo = remember { MindStampRepository(app.database.mindStampDao()) }
 
                 val todayVm = remember {
-                    TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore, app.taskTypeDefinitionRepository)
+                    TodayViewModel(repo, timeProvider, app.appStateStore, app.settingsStore, app.taskTypeDefinitionRepository, mindStampRepo, app.notificationService)
                 }
                 val pendingVm = remember { PendingViewModel(repo, WeekCalculator(), timeProvider, app.taskTypeDefinitionRepository) }
                 val weekVm = remember { WeekViewModel(repo, timeProvider, app.taskTypeDefinitionRepository) }
@@ -67,7 +71,7 @@ class MainActivity : ComponentActivity() {
                             weekCalculator = WeekCalculator(),
                             database = app.database
                         ),
-                        MindStampRepository(app.database.mindStampDao()),
+                        mindStampRepo,
                         app.suspendedTaskRepository,
                         app.taskTypeDefinitionRepository
                     )

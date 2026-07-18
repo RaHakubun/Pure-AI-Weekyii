@@ -18,9 +18,11 @@ interface UserSettingsStore {
     val defaultKillTime: StateFlow<LocalTime>
     val defaultExecutionMode: StateFlow<ExecutionMode>
     val defaultTaskTypeId: StateFlow<String>
+    val themeId: StateFlow<String>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
     suspend fun setDefaultTaskTypeId(idRaw: String)
+    suspend fun setThemeId(idRaw: String)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -33,6 +35,7 @@ class DataStoreUserSettingsStore(
         val defaultKillTime = stringPreferencesKey("default_kill_time")
         val defaultExecutionMode = stringPreferencesKey("default_execution_mode")
         val defaultTaskTypeId = stringPreferencesKey("default_task_type_id")
+        val themeId = stringPreferencesKey("theme_id")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -51,6 +54,10 @@ class DataStoreUserSettingsStore(
         .map { preferences -> preferences[Keys.defaultTaskTypeId] ?: "regular" }
         .stateIn(scope, SharingStarted.Eagerly, "regular")
 
+    override val themeId: StateFlow<String> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.themeId] ?: "amber" }
+        .stateIn(scope, SharingStarted.Eagerly, "amber")
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
@@ -62,5 +69,10 @@ class DataStoreUserSettingsStore(
     override suspend fun setDefaultTaskTypeId(idRaw: String) {
         require(idRaw.isNotBlank()) { "Default task type cannot be empty" }
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultTaskTypeId] = idRaw }
+    }
+
+    override suspend fun setThemeId(idRaw: String) {
+        require(idRaw.isNotBlank()) { "Theme cannot be empty" }
+        context.weekyiiSettingsDataStore.edit { it[Keys.themeId] = idRaw }
     }
 }

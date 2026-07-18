@@ -80,6 +80,27 @@ class ExtensionsViewModel(
         }
     }
 
+    fun updateProjectMetadata(
+        id: UUID,
+        name: String,
+        description: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        color: String,
+        icon: String,
+        tileSizeRaw: String
+    ) {
+        viewModelScope.launch {
+            runCatching { projects.updateProjectMetadata(id, name, description, startDate, endDate, color, icon, tileSizeRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess { refreshProjectDetail(id) }
+        }
+    }
+
+    fun moveProject(id: UUID, direction: Int) {
+        viewModelScope.launch { runCatching { projects.moveProject(id, direction) }.onFailure { _state.value = _state.value.copy(error = it.message) } }
+    }
+
     fun deleteProject(id: UUID, includeTasks: Boolean = false) {
         viewModelScope.launch {
             runCatching { projects.deleteProject(id, includeTasks) }
@@ -152,9 +173,9 @@ class ExtensionsViewModel(
         }
     }
 
-    fun createMindStamp(text: String) {
+    fun createMindStamp(text: String, imageBlob: ByteArray? = null) {
         viewModelScope.launch {
-            runCatching { mindStamps.create(text, null) }
+            runCatching { mindStamps.create(text, imageBlob) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }
@@ -186,6 +207,23 @@ class ExtensionsViewModel(
 
     fun extendSuspendedTask(id: UUID, days: Int) {
         viewModelScope.launch { suspendedTasks.extend(id, days, java.util.Date()) }
+    }
+
+    fun updateSuspendedTask(id: UUID, title: String, description: String, typeIdRaw: String, countdownDays: Int) {
+        viewModelScope.launch {
+            val definition = taskTypes?.resolve(typeIdRaw)
+            runCatching {
+                suspendedTasks.update(
+                    id = id,
+                    title = title,
+                    description = description,
+                    taskType = definition?.baseKind ?: TaskType.REGULAR,
+                    countdownDays = countdownDays,
+                    now = java.util.Date(),
+                    taskTypeIdRaw = definition?.idRaw ?: typeIdRaw
+                )
+            }.onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
     }
 
     fun deleteSuspendedTask(id: UUID) {

@@ -5,6 +5,9 @@ import com.weekyii.android.data.db.dao.ProjectDao
 import com.weekyii.android.data.db.entities.MindStampEntity
 import com.weekyii.android.data.db.entities.ProjectEntity
 import com.weekyii.android.data.db.entities.ProjectStatus
+import com.weekyii.android.data.db.entities.SuspendedTaskEntity
+import com.weekyii.android.data.db.entities.SuspendedTaskStatus
+import com.weekyii.android.data.db.dao.SuspendedTaskDao
 import com.weekyii.android.domain.TimeProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,6 +113,29 @@ class ExtensionsRepositoryTest {
         assertEquals(1, dao.values.size)
         assertTrue(dao.values.values.single().hasContent)
     }
+
+    @Test
+    fun mindStampRitualProviderReturnsPersistedContent() = runBlocking {
+        val dao = RecordingMindStampDao()
+        dao.upsert(MindStampEntity(text = "Begin gently"))
+
+        val result = MindStampRepository(dao).random()
+
+        assertEquals("Begin gently", result?.text)
+    }
+
+    @Test
+    fun suspendedTaskCanBeEditedAndDeadlineRecomputed() = runBlocking {
+        val dao = EditingSuspendedTaskDao()
+        val repository = SuspendedTaskRepository(dao, zone)
+        val id = repository.create("Old", "", com.weekyii.android.data.db.entities.TaskType.REGULAR, 5, java.util.Date.from(time.nowInstant))
+
+        repository.update(id, "New", "Details", com.weekyii.android.data.db.entities.TaskType.DDL, 3, java.util.Date.from(time.nowInstant), "ddl")
+
+        assertEquals("New", dao.values[id]?.title)
+        assertEquals("ddl", dao.values[id]?.taskTypeIdRaw)
+        assertEquals(3, dao.values[id]?.preferredCountdownDays)
+    }
 }
 
 private class RecordingProjectDao : ProjectDao {
@@ -133,4 +159,20 @@ private class RecordingMindStampDao : MindStampDao {
     override suspend fun delete(mindStamp: MindStampEntity) { values.remove(mindStamp.id) }
     override suspend fun allMindStamps(): List<MindStampEntity> = values.values.toList()
     override suspend fun deleteAll() { values.clear() }
+}
+
+private class EditingSuspendedTaskDao : SuspendedTaskDao {
+    val values = linkedMapOf<UUID, SuspendedTaskEntity>()
+    override suspend fun insert(task: SuspendedTaskEntity): Long { if (values.containsKey(task.id)) return -1; values[task.id] = task; return 1 }
+    override suspend fun update(task: SuspendedTaskEntity) { values[task.id] = task }
+    override suspend fun upsert(task: SuspendedTaskEntity) { values[task.id] = task }
+    override suspend fun delete(task: SuspendedTaskEntity) { values.remove(task.id) }
+    override suspend fun findWithDetails(id: UUID): com.weekyii.android.data.db.entities.SuspendedTaskWithDetails? = values[id]?.let { com.weekyii.android.data.db.entities.SuspendedTaskWithDetails(it, emptyList(), emptyList()) }
+    override fun observeByStatus(status: SuspendedTaskStatus): Flow<List<com.weekyii.android.data.db.entities.SuspendedTaskWithDetails>> = MutableStateFlow(values.values.filter { it.status == status }.map { com.weekyii.android.data.db.entities.SuspendedTaskWithDetails(it, emptyList(), emptyList()) })
+    override suspend fun listDue(status: SuspendedTaskStatus, deadline: java.util.Date): List<SuspendedTaskEntity> = values.values.filter { it.status == status && !it.decisionDeadline.after(deadline) }
+    override suspend fun updateTaskTypeBaseKind(typeIdRaw: String, baseKind: com.weekyii.android.data.db.entities.TaskType) = Unit
+    override suspend fun allTasks(): List<SuspendedTaskEntity> = values.values.toList()
+    override suspend fun deleteAll() { values.clear() }
+    override suspend fun upsertSteps(steps: List<com.weekyii.android.data.db.entities.SuspendedTaskStepEntity>) = Unit
+    override suspend fun upsertAttachments(attachments: List<com.weekyii.android.data.db.entities.SuspendedTaskAttachmentEntity>) = Unit
 }

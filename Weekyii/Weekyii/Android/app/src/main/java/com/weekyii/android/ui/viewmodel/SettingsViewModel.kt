@@ -24,6 +24,7 @@ class SettingsViewModel(
         val defaultKillTime: LocalTime = LocalTime.of(20, 0),
         val defaultExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val defaultTaskTypeId: String = "regular",
+        val themeId: String = "amber",
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val importInspection: WeekyiiArchiveService.Inspection? = null,
         val isImporting: Boolean = false,
@@ -41,9 +42,10 @@ class SettingsViewModel(
                 settings.defaultKillTime,
                 settings.defaultExecutionMode,
                 settings.defaultTaskTypeId,
+                settings.themeId,
                 taskTypes.observeAll()
-            ) { time, mode, defaultTypeId, definitions ->
-                UiState(time, mode, defaultTypeId, definitions)
+            ) { time, mode, defaultTypeId, themeId, definitions ->
+                UiState(time, mode, defaultTypeId, themeId, definitions)
             }.collect { next -> _state.value = next }
         }
     }
@@ -69,6 +71,13 @@ class SettingsViewModel(
                 require(!definition.isArchived) { "Archived task type cannot be the default" }
                 settings.setDefaultTaskTypeId(definition.idRaw)
             }.onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setTheme(idRaw: String) {
+        viewModelScope.launch {
+            runCatching { settings.setThemeId(idRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }
 

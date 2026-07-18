@@ -73,7 +73,9 @@ data class ProjectUi(
     val status: ProjectStatus,
     val startDate: LocalDate,
     val endDate: LocalDate,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val tileSizeRaw: String = "medium",
+    val tileOrder: Int = 0
 )
 
 data class ProjectDetailSectionUi(

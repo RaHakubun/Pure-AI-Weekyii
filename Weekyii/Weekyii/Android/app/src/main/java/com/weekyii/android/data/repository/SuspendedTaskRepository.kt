@@ -68,6 +68,29 @@ class SuspendedTaskRepository(
         )
     }
 
+    suspend fun update(
+        id: UUID,
+        title: String,
+        description: String,
+        taskType: TaskType,
+        countdownDays: Int,
+        now: Date,
+        taskTypeIdRaw: String = taskType.name.lowercase()
+    ) {
+        require(title.isNotBlank()) { "Task title cannot be empty" }
+        require(countdownDays > 0) { "Countdown must be positive" }
+        val task = dao.findWithDetails(id)?.task ?: return
+        require(task.status == SuspendedTaskStatus.ACTIVE) { "Suspended task is no longer active" }
+        dao.upsert(task.copy(
+            title = title.trim(),
+            description = description.trim(),
+            taskType = taskType,
+            taskTypeIdRaw = taskTypeIdRaw,
+            decisionDeadline = deadlineFrom(now, countdownDays),
+            preferredCountdownDays = countdownDays
+        ))
+    }
+
     suspend fun delete(id: UUID) {
         val task = dao.findWithDetails(id)?.task ?: return
         dao.delete(task)

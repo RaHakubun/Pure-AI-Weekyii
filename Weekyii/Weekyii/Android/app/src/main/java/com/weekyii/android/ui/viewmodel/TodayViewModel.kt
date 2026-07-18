@@ -9,6 +9,8 @@ import com.weekyii.android.data.db.entities.ExecutionMode
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
+import com.weekyii.android.data.repository.MindStampRepository
+import com.weekyii.android.platform.WeekyiiNotificationService
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.domain.TimeProvider
@@ -25,7 +27,9 @@ class TodayViewModel(
     private val timeProvider: TimeProvider,
     private val appState: AppStateStore,
     private val settings: UserSettingsStore? = null,
-    private val taskTypeRepository: TaskTypeDefinitionRepository? = null
+    private val taskTypeRepository: TaskTypeDefinitionRepository? = null,
+    private val mindStampRepository: MindStampRepository? = null,
+    private val notificationService: WeekyiiNotificationService? = null
 ) : ViewModel() {
 
     data class UiState(
@@ -38,6 +42,7 @@ class TodayViewModel(
         val startExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val selectedTaskTypeId: String = "regular",
+        val ritualStamp: com.weekyii.android.ui.model.MindStampUi? = null,
         val error: String? = null
     )
 
@@ -78,8 +83,20 @@ class TodayViewModel(
                 startExecutionMode = selectedMode,
                 taskTypeDefinitions = definitions,
                 selectedTaskTypeId = preferredTypeId,
+                ritualStamp = _state.value.ritualStamp,
                 error = null
             )
+            val currentDay = _state.value.day
+            if (currentDay != null && currentDay.status in setOf(com.weekyii.android.data.db.entities.DayStatus.DRAFT, com.weekyii.android.data.db.entities.DayStatus.EXECUTE)) {
+                val unfinished = _state.value.draft.size + (if (_state.value.focus != null) 1 else 0) + _state.value.frozen.size
+                notificationService?.scheduleKillTime(
+                    dayId = currentDay.dayId,
+                    at = today.atTime(currentDay.killHour, currentDay.killMinute),
+                    unfinishedCount = unfinished
+                )
+            } else {
+                notificationService?.cancelKillTime(today.toString())
+            }
         }
     }
 
@@ -105,13 +122,17 @@ class TodayViewModel(
         viewModelScope.launch {
             try {
                 repo.startDay(timeProvider.today.toString(), timeProvider.now, _state.value.startExecutionMode)
+                val ritualStamp = mindStampRepository?.random()
                 refresh()
+                _state.update { it.copy(ritualStamp = ritualStamp) }
                 appState.incrementDaysStarted()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }
         }
     }
+
+    fun dismissRitual() { _state.update { it.copy(ritualStamp = null) } }
 
     fun selectExecutionMode(mode: ExecutionMode) {
         _state.update { it.copy(startExecutionMode = mode) }

@@ -45,8 +45,18 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun WeekyiiTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = if (darkTheme) DarkColors else LightColors
+fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val base = if (darkTheme) DarkColors else LightColors
+    val colors = base.copy(primary = when (themeId) {
+        "ocean" -> androidx.compose.ui.graphics.Color(0xFF267A9A)
+        "forest" -> androidx.compose.ui.graphics.Color(0xFF3F8054)
+        "rose" -> androidx.compose.ui.graphics.Color(0xFFB65368)
+        "lavender" -> androidx.compose.ui.graphics.Color(0xFF765BB2)
+        "graphite" -> androidx.compose.ui.graphics.Color(0xFF59636B)
+        "mint" -> androidx.compose.ui.graphics.Color(0xFF2D8A78)
+        "midnight" -> androidx.compose.ui.graphics.Color(0xFF526EA8)
+        else -> WeekyiiPrimary
+    })
 
     MaterialTheme(
         colorScheme = colors,

@@ -112,6 +112,26 @@ class ProjectRepositoryTaskTest {
     }
 
     @Test
+    fun projectMetadataCanUpdateDateRangeWithoutInvalidatingExistingTasks() = runBlocking {
+        val fixture = projectFixture()
+        val taskId = fixture.repository.addTask(fixture.projectId, "Existing", targetDate = LocalDate.of(2026, 7, 22))
+
+        fixture.repository.updateProjectMetadata(
+            fixture.projectId,
+            name = "Renamed",
+            description = "New scope",
+            startDate = LocalDate.of(2026, 7, 21),
+            endDate = LocalDate.of(2026, 8, 5),
+            color = "#336699",
+            icon = "flag",
+            tileSizeRaw = "wide"
+        )
+
+        assertEquals("Renamed", fixture.repository.projectDetail(fixture.projectId)?.project?.name)
+        assertEquals("Existing", fixture.tasks.findById(taskId)?.title)
+    }
+
+    @Test
     fun deletingLastDraftProjectTaskReturnsDayToEmpty() = runBlocking {
         val fixture = projectFixture()
         val taskId = fixture.repository.addTask(

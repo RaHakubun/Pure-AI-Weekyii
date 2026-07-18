@@ -96,6 +96,50 @@ class ProjectRepository(
         projectDao.upsert(project.copy(name = name.trim(), description = description.trim()))
     }
 
+    suspend fun updateProjectMetadata(
+        id: UUID,
+        name: String,
+        description: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        color: String,
+        icon: String,
+        tileSizeRaw: String
+    ) = inTransaction {
+        require(name.isNotBlank()) { "Project name cannot be empty" }
+        require(!startDate.isBefore(timeProvider.today)) { "Project cannot start in the past" }
+        require(!endDate.isBefore(startDate)) { "Project end date must not precede start date" }
+        require(tileSizeRaw in setOf("mini", "small", "medium", "wide")) { "Unknown project tile size" }
+        val project = projectDao.findById(id) ?: return@inTransaction
+        require(project.status == ProjectStatus.PLANNING || project.status == ProjectStatus.ACTIVE) { "项目已完成或归档，无法编辑。" }
+        val days = dayDao?.allDays()?.associateBy { it.dayId }.orEmpty()
+        val projectTasks = taskDao?.allTasks()?.filter { it.projectOwnerId == id }.orEmpty()
+        require(projectTasks.all { task ->
+            val date = days[task.dayOwnerId]?.date?.toInstant()?.atZone(zoneId)?.toLocalDate()
+            date != null && !date.isBefore(startDate) && !date.isAfter(endDate)
+        }) { "新的日期范围不能排除已有项目任务。" }
+        projectDao.upsert(project.copy(
+            name = name.trim(),
+            description = description.trim(),
+            startDate = startDate.asDate(zoneId),
+            endDate = endDate.asDate(zoneId),
+            color = color,
+            icon = icon,
+            tileSizeRaw = tileSizeRaw
+        ))
+    }
+
+    suspend fun moveProject(id: UUID, direction: Int) = inTransaction {
+        val ordered = projectDao.allProjects().sortedBy { it.tileOrder }.toMutableList()
+        val index = ordered.indexOfFirst { it.projectId == id }
+        if (index < 0) return@inTransaction
+        val target = (index + direction).coerceIn(0, ordered.lastIndex)
+        if (target == index) return@inTransaction
+        val item = ordered.removeAt(index)
+        ordered.add(target, item)
+        ordered.forEachIndexed { order, project -> projectDao.upsert(project.copy(tileOrder = order)) }
+    }
+
     suspend fun addTask(
         projectId: UUID,
         title: String,
@@ -392,7 +436,9 @@ private fun ProjectEntity.toUi(zoneId: ZoneId) = ProjectUi(
     status = status,
     startDate = startDate.toInstant().atZone(zoneId).toLocalDate(),
     endDate = endDate.toInstant().atZone(zoneId).toLocalDate(),
-    createdAt = createdAt.toInstant().atZone(zoneId).toLocalDateTime()
+    createdAt = createdAt.toInstant().atZone(zoneId).toLocalDateTime(),
+    tileSizeRaw = tileSizeRaw,
+    tileOrder = tileOrder
 )
 
 private fun LocalDate.asDate(zoneId: ZoneId): Date = Date.from(atStartOfDay(zoneId).toInstant())
