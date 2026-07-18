@@ -55,7 +55,8 @@ class MainActivity : ComponentActivity() {
                 val extVm = remember {
                     ExtensionsViewModel(
                         ProjectRepository(app.database.projectDao(), timeProvider),
-                        MindStampRepository(app.database.mindStampDao())
+                        MindStampRepository(app.database.mindStampDao()),
+                        app.suspendedTaskRepository
                     )
                 }
                 val settingsVm = remember { SettingsViewModel(app.settingsStore) }

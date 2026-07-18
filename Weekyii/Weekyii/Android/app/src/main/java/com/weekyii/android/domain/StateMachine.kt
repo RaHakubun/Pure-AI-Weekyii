@@ -4,6 +4,7 @@ import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.data.db.entities.WeekStatus
 import com.weekyii.android.data.repository.WeekyiiRepository
+import com.weekyii.android.data.repository.SuspendedTaskSweeper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,7 +21,8 @@ data class StateReconcileReport(
     val staleDaysExpiredCount: Int = 0,
     val crossDayExpiredCount: Int = 0,
     val crossWeekAdjustedCount: Int = 0,
-    val killTimeExpiredCount: Int = 0
+    val killTimeExpiredCount: Int = 0,
+    val suspendedAutoDeletedCount: Int = 0
 )
 
 class StateMachine(
@@ -28,6 +30,7 @@ class StateMachine(
     private val timeProvider: TimeProvider,
     private val appState: AppStateStore,
     private val settings: UserSettingsStore? = null,
+    private val suspendedTaskSweeper: SuspendedTaskSweeper? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) {
     private val reconcileMutex = Mutex()
@@ -49,6 +52,7 @@ class StateMachine(
         val crossWeek = processCrossWeek()
         syncTodayDefaultKillTime(lastProcessedBeforeRun)
         val killTime = processKillTime()
+        val suspendedDeleted = suspendedTaskSweeper?.sweep(timeProvider.now) ?: 0
         refreshWeekSummaryMetrics()
         appState.setLastProcessedDate(timeProvider.today)
         appState.setLastRollover(now)
@@ -58,7 +62,8 @@ class StateMachine(
             staleDaysExpiredCount = staleDays,
             crossDayExpiredCount = crossDay,
             crossWeekAdjustedCount = crossWeek,
-            killTimeExpiredCount = killTime
+            killTimeExpiredCount = killTime,
+            suspendedAutoDeletedCount = suspendedDeleted
         )
     }
 

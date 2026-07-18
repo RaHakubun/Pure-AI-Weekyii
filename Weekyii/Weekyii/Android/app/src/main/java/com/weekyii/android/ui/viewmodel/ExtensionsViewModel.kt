@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.weekyii.android.data.db.entities.ProjectStatus
 import com.weekyii.android.data.repository.MindStampRepository
 import com.weekyii.android.data.repository.ProjectRepository
+import com.weekyii.android.data.repository.SuspendedTaskRepository
 import com.weekyii.android.ui.model.MindStampUi
 import com.weekyii.android.ui.model.ProjectUi
+import com.weekyii.android.ui.model.SuspendedTaskUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -16,11 +18,13 @@ import java.util.UUID
 
 class ExtensionsViewModel(
     private val projects: ProjectRepository,
-    private val mindStamps: MindStampRepository
+    private val mindStamps: MindStampRepository,
+    private val suspendedTasks: SuspendedTaskRepository
 ) : ViewModel() {
     data class UiState(
         val projects: List<ProjectUi> = emptyList(),
         val mindStamps: List<MindStampUi> = emptyList(),
+        val suspendedTasks: List<SuspendedTaskUi> = emptyList(),
         val error: String? = null
     )
 
@@ -29,8 +33,9 @@ class ExtensionsViewModel(
 
     init {
         viewModelScope.launch {
-            combine(projects.observeProjects(), mindStamps.observeAll()) { projectList, stamps -> projectList to stamps }
-                .collect { (projectList, stamps) -> _state.value = UiState(projectList, stamps) }
+            combine(projects.observeProjects(), mindStamps.observeAll(), suspendedTasks.observeActive()) { projectList, stamps, suspended ->
+                Triple(projectList, stamps, suspended)
+            }.collect { (projectList, stamps, suspended) -> _state.value = UiState(projectList, stamps, suspended) }
         }
     }
 
@@ -58,5 +63,20 @@ class ExtensionsViewModel(
 
     fun deleteMindStamp(id: UUID) {
         viewModelScope.launch { mindStamps.delete(id) }
+    }
+
+    fun createSuspendedTask(title: String, countdownDays: Int) {
+        viewModelScope.launch {
+            runCatching { suspendedTasks.create(title, "", com.weekyii.android.data.db.entities.TaskType.REGULAR, countdownDays, java.util.Date()) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun extendSuspendedTask(id: UUID, days: Int) {
+        viewModelScope.launch { suspendedTasks.extend(id, days, java.util.Date()) }
+    }
+
+    fun deleteSuspendedTask(id: UUID) {
+        viewModelScope.launch { suspendedTasks.delete(id) }
     }
 }

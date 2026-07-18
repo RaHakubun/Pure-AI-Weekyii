@@ -36,6 +36,7 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     var projectName by remember { mutableStateOf("") }
     var projectDescription by remember { mutableStateOf("") }
     var stampText by remember { mutableStateOf("") }
+    var suspendedTitle by remember { mutableStateOf("") }
     val today = LocalDate.now()
 
     LazyColumn(
@@ -75,7 +76,33 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                 }
             }
         }
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("悬置任务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("暂时不安排到某一天，到期前再决定去向。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
+                    Button(
+                        onClick = { viewModel.createSuspendedTask(suspendedTitle, 10); suspendedTitle = "" },
+                        enabled = suspendedTitle.isNotBlank()
+                    ) { Text("悬置 10 天") }
+                }
+            }
+        }
         state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+        item { Text("悬置箱", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        items(state.suspendedTasks, key = { it.id }) { task ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(task.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${task.decisionDeadline.toLocalDate()} 到期 · 已延期 ${task.snoozeCount} 次")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { viewModel.extendSuspendedTask(task.id, 10) }) { Text("延长 10 天") }
+                        OutlinedButton(onClick = { viewModel.deleteSuspendedTask(task.id) }) { Text("删除") }
+                    }
+                }
+            }
+        }
         item { Text("项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.projects, key = { it.id }) { project -> ProjectCard(project, viewModel) }
         item { Text("已保存的 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }

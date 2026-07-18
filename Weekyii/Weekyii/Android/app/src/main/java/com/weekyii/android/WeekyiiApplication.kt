@@ -6,6 +6,7 @@ import com.weekyii.android.data.db.AppDatabase
 import com.weekyii.android.data.db.MIGRATION_1_2
 import com.weekyii.android.data.repository.WeekCalculator
 import com.weekyii.android.data.repository.WeekyiiRepository
+import com.weekyii.android.data.repository.SuspendedTaskRepository
 import com.weekyii.android.domain.DataStoreAppStateStore
 import com.weekyii.android.domain.DefaultTimeProvider
 import com.weekyii.android.domain.StateMachine
@@ -25,6 +26,8 @@ class WeekyiiApplication : Application() {
     lateinit var appStateStore: DataStoreAppStateStore
         private set
     lateinit var settingsStore: DataStoreUserSettingsStore
+        private set
+    lateinit var suspendedTaskRepository: SuspendedTaskRepository
         private set
     var startupError: String? = null
         private set
@@ -47,11 +50,13 @@ class WeekyiiApplication : Application() {
             )
             appStateStore = DataStoreAppStateStore(this)
             settingsStore = DataStoreUserSettingsStore(this)
+            suspendedTaskRepository = SuspendedTaskRepository(database.suspendedTaskDao(), zone)
             stateMachine = StateMachine(
                 repo = repository,
                 timeProvider = timeProvider,
                 appState = appStateStore,
-                settings = settingsStore
+                settings = settingsStore,
+                suspendedTaskSweeper = suspendedTaskRepository
             )
             stateMachine.processStateTransitions()
         } catch (error: Exception) {

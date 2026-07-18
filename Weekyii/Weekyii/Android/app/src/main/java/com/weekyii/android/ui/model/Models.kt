@@ -84,3 +84,13 @@ data class MindStampUi(
 ) {
     val hasContent: Boolean get() = text.isNotBlank() || imageBlob != null
 }
+
+data class SuspendedTaskUi(
+    val id: UUID,
+    val title: String,
+    val description: String,
+    val taskType: TaskType,
+    val decisionDeadline: LocalDateTime,
+    val preferredCountdownDays: Int,
+    val snoozeCount: Int
+)
