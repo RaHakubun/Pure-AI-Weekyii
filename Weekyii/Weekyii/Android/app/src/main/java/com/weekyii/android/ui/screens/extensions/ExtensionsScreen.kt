@@ -52,6 +52,9 @@ import com.weekyii.android.ui.model.TaskAttachmentUi
 import com.weekyii.android.ui.viewmodel.ExtensionsViewModel
 import java.time.LocalDate
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiBottomSheet
+import com.weekyii.android.ui.components.WeekyiiButton
+import com.weekyii.android.ui.components.WeekyiiButtonStyle
 
 @Composable
 fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
@@ -103,6 +106,9 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     val suspendedAttachments = remember { mutableStateListOf<TaskAttachmentUi>() }
     var stampImage by remember { mutableStateOf<ByteArray?>(null) }
     var editingSuspended by remember { mutableStateOf<SuspendedTaskUi?>(null) }
+    var showProjectComposer by remember { mutableStateOf(false) }
+    var showStampComposer by remember { mutableStateOf(false) }
+    var showSuspendedComposer by remember { mutableStateOf(false) }
     val today = LocalDate.now()
     val stampImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) stampImage = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -124,79 +130,35 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
         }
         item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("新建项目", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(projectName, { projectName = it }, label = { Text("项目名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(projectDescription, { projectDescription = it }, label = { Text("项目说明") }, modifier = Modifier.fillMaxWidth())
-                    Button(
-                        onClick = {
-                            viewModel.createProject(projectName, projectDescription, today)
-                            projectName = ""
-                            projectDescription = ""
-                        },
-                        enabled = projectName.isNotBlank()
-                    ) { Text("创建项目") }
-                }
+                ModulePreview(
+                    title = "项目",
+                    body = "把跨天目标放进独立工作台，保留自己的进度和任务上下文。",
+                    detail = if (state.projects.isEmpty()) "还没有项目" else "${state.projects.size} 个项目",
+                    actionLabel = "新建项目",
+                    onAction = { showProjectComposer = true }
+                )
             }
         }
         item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("MindStamp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(stampText, { stampText = it }, label = { Text("启动仪式内容") }, modifier = Modifier.fillMaxWidth())
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { stampImagePicker.launch(arrayOf("image/*")) }) { Text(if (stampImage == null) "添加图片" else "更换图片") }
-                        Button(onClick = { viewModel.createMindStamp(stampText, stampImage); stampText = ""; stampImage = null }, enabled = stampText.isNotBlank() || stampImage != null) { Text("保存 MindStamp") }
-                    }
-                }
+                ModulePreview(
+                    title = "MindStamp",
+                    body = "为开始今天留下一个简短的启动仪式，文字和图片都可以保存。",
+                    detail = if (state.mindStamps.isEmpty()) "还没有保存的仪式" else "已保存 ${state.mindStamps.size} 条",
+                    actionLabel = "添加 MindStamp",
+                    onAction = { showStampComposer = true }
+                )
             }
         }
         item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("悬置任务", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("暂时不安排到某一天，到期前再决定去向。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(suspendedDescription, { suspendedDescription = it }, label = { Text("备注") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(
-                        suspendedStepsText,
-                        { suspendedStepsText = it },
-                        label = { Text("步骤（每行一个）") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    ExtensionTaskTypePicker(
-                        definitions = state.taskTypeDefinitions,
-                        selectedId = state.selectedTaskTypeId,
-                        onSelect = viewModel::selectTaskType
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(onClick = { suspendedAttachmentPicker.launch(arrayOf("*/*")) }) {
-                            Text("附件 ${suspendedAttachments.size}")
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.createSuspendedTask(
-                                    title = suspendedTitle,
-                                    countdownDays = 10,
-                                    description = suspendedDescription,
-                                    stepTitles = suspendedStepsText.lines(),
-                                    attachments = suspendedAttachments.map { TaskAttachmentDraft(it.fileName, it.fileType, it.data) }
-                                )
-                                suspendedTitle = ""
-                                suspendedDescription = ""
-                                suspendedStepsText = ""
-                                suspendedAttachments.clear()
-                            },
-                            enabled = suspendedTitle.isNotBlank()
-                        ) { Text("悬置 10 天") }
-                    }
-                    suspendedAttachments.forEachIndexed { index, attachment ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(attachment.fileName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            TextButton(onClick = { suspendedAttachments.removeAt(index) }) { Text("移除") }
-                        }
-                    }
-                }
+                ModulePreview(
+                    title = "悬置任务",
+                    body = "暂时不安排到某一天，到期前再决定去向。",
+                    detail = if (state.suspendedTasks.isEmpty()) "悬置箱为空" else "${state.suspendedTasks.size} 项等待决定",
+                    actionLabel = "悬置新任务",
+                    onAction = { showSuspendedComposer = true }
+                )
             }
         }
         state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
@@ -252,6 +214,102 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
                 editingSuspended = null
             }
         )
+    }
+
+    WeekyiiBottomSheet(visible = showProjectComposer, onDismiss = { showProjectComposer = false }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("新建项目", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("项目独立于每日任务流，适合持续推进的目标。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(projectName, { projectName = it }, label = { Text("项目名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(projectDescription, { projectDescription = it }, label = { Text("项目说明") }, modifier = Modifier.fillMaxWidth())
+            WeekyiiButton(
+                text = "创建项目",
+                style = WeekyiiButtonStyle.Primary,
+                enabled = projectName.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    viewModel.createProject(projectName, projectDescription, today)
+                    projectName = ""
+                    projectDescription = ""
+                    showProjectComposer = false
+                }
+            )
+        }
+    }
+
+    WeekyiiBottomSheet(visible = showStampComposer, onDismiss = { showStampComposer = false }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("添加 MindStamp", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("给开始今天留下一个可以回看的锚点。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(stampText, { stampText = it }, label = { Text("启动仪式内容") }, modifier = Modifier.fillMaxWidth())
+            OutlinedButton(onClick = { stampImagePicker.launch(arrayOf("image/*")) }) {
+                Text(if (stampImage == null) "添加图片" else "更换图片")
+            }
+            WeekyiiButton(
+                text = "保存 MindStamp",
+                style = WeekyiiButtonStyle.Primary,
+                enabled = stampText.isNotBlank() || stampImage != null,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    viewModel.createMindStamp(stampText, stampImage)
+                    stampText = ""
+                    stampImage = null
+                    showStampComposer = false
+                }
+            )
+        }
+    }
+
+    WeekyiiBottomSheet(visible = showSuspendedComposer, onDismiss = { showSuspendedComposer = false }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("悬置新任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("先把任务放进悬置箱，到期前再决定安排到哪一天。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(suspendedTitle, { suspendedTitle = it }, label = { Text("任务名称") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(suspendedDescription, { suspendedDescription = it }, label = { Text("备注") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(suspendedStepsText, { suspendedStepsText = it }, label = { Text("步骤（每行一个）") }, modifier = Modifier.fillMaxWidth())
+            ExtensionTaskTypePicker(definitions = state.taskTypeDefinitions, selectedId = state.selectedTaskTypeId, onSelect = viewModel::selectTaskType)
+            OutlinedButton(onClick = { suspendedAttachmentPicker.launch(arrayOf("*/*")) }) {
+                Text("附件 ${suspendedAttachments.size}")
+            }
+            WeekyiiButton(
+                text = "悬置 10 天",
+                style = WeekyiiButtonStyle.Primary,
+                enabled = suspendedTitle.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    viewModel.createSuspendedTask(
+                        title = suspendedTitle,
+                        countdownDays = 10,
+                        description = suspendedDescription,
+                        stepTitles = suspendedStepsText.lines(),
+                        attachments = suspendedAttachments.map { TaskAttachmentDraft(it.fileName, it.fileType, it.data) }
+                    )
+                    suspendedTitle = ""
+                    suspendedDescription = ""
+                    suspendedStepsText = ""
+                    suspendedAttachments.clear()
+                    showSuspendedComposer = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModulePreview(
+    title: String,
+    body: String,
+    detail: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(detail, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            WeekyiiButton(text = actionLabel, style = WeekyiiButtonStyle.Secondary, onClick = onAction)
+        }
     }
 }
 
