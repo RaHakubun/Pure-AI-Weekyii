@@ -144,6 +144,7 @@ private class FakeWeekDao(
 ) : WeekDao {
     var withDays: WeekWithDays? = null
 
+    override suspend fun insert(week: WeekEntity): Long { values[week.weekId] = week; return 1L }
     override suspend fun upsert(week: WeekEntity) { values[week.weekId] = week }
     override suspend fun update(week: WeekEntity) { values[week.weekId] = week }
     override suspend fun findById(weekId: String): WeekEntity? = values[weekId]
@@ -157,6 +158,7 @@ private class FakeWeekDao(
 private class FakeDayDao(
     private val values: MutableMap<String, DayEntity> = mutableMapOf()
 ) : DayDao {
+    override suspend fun insert(day: DayEntity): Long { values[day.dayId] = day; return 1L }
     override suspend fun upsert(day: DayEntity) { values[day.dayId] = day }
     override suspend fun update(day: DayEntity) { values[day.dayId] = day }
     override suspend fun findById(dayId: String): DayEntity? = values[dayId]
@@ -170,6 +172,7 @@ private class FakeDayDao(
 }
 
 private class FakeTaskDao : TaskDao {
+    override suspend fun insert(task: TaskEntity): Long = 1L
     override suspend fun upsert(task: TaskEntity) = Unit
     override suspend fun update(task: TaskEntity) = Unit
     override suspend fun delete(task: TaskEntity) = Unit
@@ -187,6 +190,8 @@ private class FakeTaskDao : TaskDao {
 }
 
 private class FakeProjectDao : ProjectDao {
+    override suspend fun insert(project: ProjectEntity): Long = 1L
+    override suspend fun update(project: ProjectEntity) = Unit
     override suspend fun upsert(project: ProjectEntity) = Unit
     override suspend fun findById(id: UUID): ProjectEntity? = null
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())

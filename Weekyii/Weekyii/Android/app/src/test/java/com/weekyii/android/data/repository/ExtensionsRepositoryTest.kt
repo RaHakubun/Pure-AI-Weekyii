@@ -61,6 +61,43 @@ class ExtensionsRepositoryTest {
     }
 
     @Test
+    fun projectRejectsLifecycleTransitionsThatSkipStates() = runBlocking {
+        val dao = RecordingProjectDao()
+        val repository = ProjectRepository(dao, time, zone)
+        val id = repository.createProject(
+            name = "Android parity",
+            description = "Finish the port",
+            startDate = LocalDate.of(2026, 7, 20),
+            endDate = LocalDate.of(2026, 8, 20)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.updateStatus(id, ProjectStatus.COMPLETED) }
+        }
+        assertEquals(ProjectStatus.PLANNING, dao.findById(id)?.status)
+        Unit
+    }
+
+    @Test
+    fun completedProjectMetadataIsReadOnly() = runBlocking {
+        val dao = RecordingProjectDao()
+        val project = ProjectEntity(
+            name = "Released",
+            status = ProjectStatus.COMPLETED,
+            startDate = java.util.Date.from(LocalDate.of(2026, 7, 20).atStartOfDay(zone).toInstant()),
+            endDate = java.util.Date.from(LocalDate.of(2026, 8, 20).atStartOfDay(zone).toInstant())
+        )
+        dao.upsert(project)
+        val repository = ProjectRepository(dao, time, zone)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.updateProject(project.projectId, "Changed", "Changed") }
+        }
+        assertEquals("Released", dao.findById(project.projectId)?.name)
+        Unit
+    }
+
+    @Test
     fun mindStampRejectsEmptyContentAndPersistsText() = runBlocking {
         val dao = RecordingMindStampDao()
         val repository = MindStampRepository(dao)
@@ -77,6 +114,8 @@ class ExtensionsRepositoryTest {
 
 private class RecordingProjectDao : ProjectDao {
     val values = linkedMapOf<UUID, ProjectEntity>()
+    override suspend fun insert(project: ProjectEntity): Long { values[project.projectId] = project; return 1L }
+    override suspend fun update(project: ProjectEntity) { values[project.projectId] = project }
     override suspend fun upsert(project: ProjectEntity) { values[project.projectId] = project }
     override suspend fun findById(id: UUID): ProjectEntity? = values[id]
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(values.values.toList())

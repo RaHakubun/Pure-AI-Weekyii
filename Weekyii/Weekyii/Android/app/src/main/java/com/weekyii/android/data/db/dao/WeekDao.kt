@@ -13,11 +13,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WeekDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(week: WeekEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(week: WeekEntity): Long
 
     @Update
     suspend fun update(week: WeekEntity)
+
+    @Transaction
+    suspend fun upsert(week: WeekEntity) {
+        if (insert(week) == -1L) update(week)
+    }
 
     @Query("SELECT * FROM weeks WHERE week_id = :weekId LIMIT 1")
     suspend fun findById(weekId: String): WeekEntity?

@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,40 @@ import java.time.LocalDate
 @Composable
 fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
     val state by viewModel.state.collectAsState()
+    state.projectDetail?.let { detail ->
+        LaunchedEffect(state.selectedProjectId) { viewModel.refreshSelectedProject() }
+        ProjectDetailScreen(
+            detail = detail,
+            padding = padding,
+            error = state.error,
+            taskTypeDefinitions = state.taskTypeDefinitions,
+            onBack = viewModel::closeProject,
+            onStatusChange = { status -> viewModel.updateProjectStatus(detail.project.id, status) },
+            onAddTasks = { title, description, taskType, taskTypeIdRaw, dates ->
+                viewModel.addProjectTask(
+                    projectId = detail.project.id,
+                    title = title,
+                    description = description,
+                    taskType = taskType,
+                    taskTypeIdRaw = taskTypeIdRaw,
+                    dates = dates
+                )
+            },
+            onUpdateTask = { task, title, description ->
+                viewModel.updateProjectTask(
+                    projectId = detail.project.id,
+                    taskId = task.id,
+                    title = title,
+                    description = description,
+                    taskType = task.taskType,
+                    taskTypeIdRaw = task.taskTypeIdRaw
+                )
+            },
+            onDeleteTask = { task -> viewModel.deleteProjectTask(detail.project.id, task.id) },
+            onDeleteProject = { includeTasks -> viewModel.deleteProject(detail.project.id, includeTasks) }
+        )
+        return
+    }
     var projectName by remember { mutableStateOf("") }
     var projectDescription by remember { mutableStateOf("") }
     var stampText by remember { mutableStateOf("") }
@@ -119,7 +154,7 @@ fun ExtensionsScreen(viewModel: ExtensionsViewModel, padding: PaddingValues) {
             }
         }
         item { Text("项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        items(state.projects, key = { it.id }) { project -> ProjectCard(project, viewModel) }
+        items(state.projects, key = { it.id }) { project -> ProjectCard(project, viewModel, onOpen = { viewModel.openProject(project.id) }) }
         item { Text("已保存的 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(state.mindStamps, key = { it.id }) { stamp ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -166,8 +201,8 @@ private fun AssignSuspendedButton(onAssign: (LocalDate) -> Unit) {
 }
 
 @Composable
-private fun ProjectCard(project: ProjectUi, viewModel: ExtensionsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun ProjectCard(project: ProjectUi, viewModel: ExtensionsViewModel, onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(project.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(project.description.ifBlank { "无项目说明" }, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -89,6 +89,7 @@ private class RecordingTaskTypeDefinitionDao : TaskTypeDefinitionDao {
 
 private class TaskTypeRecordingTaskDao : TaskDao {
     var lastTypeUpdate: Pair<String, TaskType>? = null
+    override suspend fun insert(task: TaskEntity): Long = 1L
     override suspend fun upsert(task: TaskEntity) = Unit
     override suspend fun update(task: TaskEntity) = Unit
     override suspend fun delete(task: TaskEntity) = Unit
@@ -109,6 +110,8 @@ private class TaskTypeRecordingTaskDao : TaskDao {
 
 private class TaskTypeRecordingSuspendedDao : SuspendedTaskDao {
     var lastTypeUpdate: Pair<String, TaskType>? = null
+    override suspend fun insert(task: SuspendedTaskEntity): Long = 1L
+    override suspend fun update(task: SuspendedTaskEntity) = Unit
     override suspend fun upsert(task: SuspendedTaskEntity) = Unit
     override suspend fun upsertSteps(steps: List<SuspendedTaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<SuspendedTaskAttachmentEntity>) = Unit

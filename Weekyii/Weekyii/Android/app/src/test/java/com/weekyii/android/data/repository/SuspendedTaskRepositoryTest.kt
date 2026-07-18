@@ -67,6 +67,8 @@ class SuspendedTaskRepositoryTest {
 
 private class RecordingSuspendedTaskDao : SuspendedTaskDao {
     val values = linkedMapOf<UUID, SuspendedTaskEntity>()
+    override suspend fun insert(task: SuspendedTaskEntity): Long { values[task.id] = task; return 1L }
+    override suspend fun update(task: SuspendedTaskEntity) { values[task.id] = task }
     override suspend fun upsert(task: SuspendedTaskEntity) { values[task.id] = task }
     override suspend fun upsertSteps(steps: List<SuspendedTaskStepEntity>) = Unit
     override suspend fun upsertAttachments(attachments: List<SuspendedTaskAttachmentEntity>) = Unit

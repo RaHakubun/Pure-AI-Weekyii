@@ -76,6 +76,24 @@ data class ProjectUi(
     val createdAt: LocalDateTime
 )
 
+data class ProjectDetailSectionUi(
+    val date: LocalDate,
+    val tasks: List<TaskUi>,
+    val isExpandedByDefault: Boolean
+)
+
+data class ProjectDetailUi(
+    val project: ProjectUi,
+    val progress: Double,
+    val totalCount: Int,
+    val completedCount: Int,
+    val remainingCount: Int,
+    val expiredCount: Int,
+    val nextTaskTitle: String?,
+    val nextTaskDate: LocalDate?,
+    val sections: List<ProjectDetailSectionUi>
+)
+
 data class MindStampUi(
     val id: UUID,
     val text: String,

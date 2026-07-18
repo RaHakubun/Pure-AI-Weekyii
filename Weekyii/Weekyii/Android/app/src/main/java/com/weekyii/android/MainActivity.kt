@@ -56,7 +56,15 @@ class MainActivity : ComponentActivity() {
                 val pastVm = remember { PastViewModel(repo) }
                 val extVm = remember {
                     ExtensionsViewModel(
-                        ProjectRepository(app.database.projectDao(), timeProvider),
+                        ProjectRepository(
+                            projectDao = app.database.projectDao(),
+                            timeProvider = timeProvider,
+                            weekDao = app.database.weekDao(),
+                            dayDao = app.database.dayDao(),
+                            taskDao = app.database.taskDao(),
+                            weekCalculator = WeekCalculator(),
+                            database = app.database
+                        ),
                         MindStampRepository(app.database.mindStampDao()),
                         app.suspendedTaskRepository,
                         app.taskTypeDefinitionRepository

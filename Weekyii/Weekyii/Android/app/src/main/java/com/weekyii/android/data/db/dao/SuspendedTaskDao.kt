@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import com.weekyii.android.data.db.entities.SuspendedTaskAttachmentEntity
 import com.weekyii.android.data.db.entities.SuspendedTaskEntity
 import com.weekyii.android.data.db.entities.SuspendedTaskStatus
@@ -18,8 +19,16 @@ import java.util.UUID
 
 @Dao
 interface SuspendedTaskDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(task: SuspendedTaskEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(task: SuspendedTaskEntity): Long
+
+    @Update
+    suspend fun update(task: SuspendedTaskEntity)
+
+    @Transaction
+    suspend fun upsert(task: SuspendedTaskEntity) {
+        if (insert(task) == -1L) update(task)
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSteps(steps: List<SuspendedTaskStepEntity>)

@@ -11,6 +11,7 @@ import com.weekyii.android.data.db.entities.TaskTypeDefinitionEntity
 import com.weekyii.android.data.db.entities.TaskType
 import com.weekyii.android.ui.model.MindStampUi
 import com.weekyii.android.ui.model.ProjectUi
+import com.weekyii.android.ui.model.ProjectDetailUi
 import com.weekyii.android.ui.model.SuspendedTaskUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,8 @@ class ExtensionsViewModel(
         val suspendedTasks: List<SuspendedTaskUi> = emptyList(),
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val selectedTaskTypeId: String = "regular",
+        val selectedProjectId: UUID? = null,
+        val projectDetail: ProjectDetailUi? = null,
         val error: String? = null
     )
 
@@ -47,7 +50,17 @@ class ExtensionsViewModel(
             combine(base, taskTypes?.observeActive() ?: flowOf(emptyList())) { (projectList, stamps, suspended), definitions ->
                 val selected = _state.value.selectedTaskTypeId.takeIf { id -> definitions.any { it.idRaw == id } }
                     ?: definitions.firstOrNull()?.idRaw ?: "regular"
-                UiState(projectList, stamps, suspended, definitions, selected)
+                val current = _state.value
+                UiState(
+                    projects = projectList,
+                    mindStamps = stamps,
+                    suspendedTasks = suspended,
+                    taskTypeDefinitions = definitions,
+                    selectedTaskTypeId = selected,
+                    selectedProjectId = current.selectedProjectId,
+                    projectDetail = current.projectDetail,
+                    error = current.error
+                )
             }.collect { next -> _state.value = next }
         }
     }
@@ -60,11 +73,83 @@ class ExtensionsViewModel(
     }
 
     fun updateProjectStatus(id: UUID, status: ProjectStatus) {
-        viewModelScope.launch { projects.updateStatus(id, status) }
+        viewModelScope.launch {
+            runCatching { projects.updateStatus(id, status) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess { refreshProjectDetail(id) }
+        }
     }
 
-    fun deleteProject(id: UUID) {
-        viewModelScope.launch { projects.deleteProject(id) }
+    fun deleteProject(id: UUID, includeTasks: Boolean = false) {
+        viewModelScope.launch {
+            runCatching { projects.deleteProject(id, includeTasks) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess {
+                    if (_state.value.selectedProjectId == id) closeProject()
+                }
+        }
+    }
+
+    fun openProject(id: UUID) {
+        _state.value = _state.value.copy(selectedProjectId = id, projectDetail = null, error = null)
+        viewModelScope.launch { refreshProjectDetail(id) }
+    }
+
+    fun closeProject() {
+        _state.value = _state.value.copy(selectedProjectId = null, projectDetail = null)
+    }
+
+    fun refreshSelectedProject() {
+        _state.value.selectedProjectId?.let { id ->
+            viewModelScope.launch { refreshProjectDetail(id) }
+        }
+    }
+
+    fun addProjectTask(
+        projectId: UUID,
+        title: String,
+        description: String,
+        taskType: TaskType,
+        taskTypeIdRaw: String,
+        dates: List<LocalDate>
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                projects.addTasks(projectId, title, description, taskType, taskTypeIdRaw, dates)
+            }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess { refreshProjectDetail(projectId) }
+        }
+    }
+
+    fun updateProjectTask(
+        projectId: UUID,
+        taskId: UUID,
+        title: String,
+        description: String,
+        taskType: TaskType,
+        taskTypeIdRaw: String
+    ) {
+        viewModelScope.launch {
+            runCatching { projects.updateTask(projectId, taskId, title, description, taskType, taskTypeIdRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess { refreshProjectDetail(projectId) }
+        }
+    }
+
+    fun deleteProjectTask(projectId: UUID, taskId: UUID) {
+        viewModelScope.launch {
+            runCatching { projects.deleteTask(projectId, taskId) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+                .onSuccess { refreshProjectDetail(projectId) }
+        }
+    }
+
+    private suspend fun refreshProjectDetail(projectId: UUID) {
+        val detail = projects.projectDetail(projectId)
+        if (_state.value.selectedProjectId == projectId) {
+            _state.value = _state.value.copy(projectDetail = detail, error = null)
+        }
     }
 
     fun createMindStamp(text: String) {

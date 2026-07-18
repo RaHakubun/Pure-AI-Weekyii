@@ -13,11 +13,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DayDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(day: DayEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(day: DayEntity): Long
 
     @Update
     suspend fun update(day: DayEntity)
+
+    @Transaction
+    suspend fun upsert(day: DayEntity) {
+        if (insert(day) == -1L) update(day)
+    }
 
     @Transaction
     @Query("SELECT * FROM days WHERE day_id = :dayId LIMIT 1")

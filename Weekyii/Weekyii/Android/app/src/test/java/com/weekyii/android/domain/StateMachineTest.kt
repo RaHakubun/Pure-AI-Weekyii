@@ -547,6 +547,7 @@ private class RecordingWeekDao(
     private val values: MutableMap<String, WeekEntity> = mutableMapOf(),
     private val days: () -> Collection<DayEntity> = { emptyList() }
 ) : WeekDao {
+    override suspend fun insert(week: WeekEntity): Long { values[week.weekId] = week; return 1L }
     override suspend fun upsert(week: WeekEntity) { values[week.weekId] = week }
     override suspend fun update(week: WeekEntity) { values[week.weekId] = week }
     override suspend fun findById(weekId: String): WeekEntity? = values[weekId]
@@ -563,6 +564,7 @@ private class RecordingDayDao(
     private val tasks: MutableMap<String, MutableList<TaskEntity>> = mutableMapOf()
 ) : DayDao {
     fun values(): Collection<DayEntity> = values.values
+    override suspend fun insert(day: DayEntity): Long { values[day.dayId] = day; return 1L }
     override suspend fun upsert(day: DayEntity) { values[day.dayId] = day }
     override suspend fun update(day: DayEntity) { values[day.dayId] = day }
     override suspend fun findById(dayId: String): DayEntity? = values[dayId]
@@ -582,6 +584,7 @@ private class RecordingTaskDao(
 ) : TaskDao {
     private val steps = mutableMapOf<UUID, MutableList<TaskStepEntity>>()
     private val attachments = mutableMapOf<UUID, MutableList<TaskAttachmentEntity>>()
+    override suspend fun insert(task: TaskEntity): Long { upsert(task); return 1L }
     override suspend fun upsert(task: TaskEntity) {
         tasks.values.forEach { dayTasks -> dayTasks.removeAll { it.id == task.id } }
         val dayTasks = tasks.getOrPut(task.dayOwnerId) { mutableListOf() }
@@ -620,6 +623,8 @@ private class RecordingTaskDao(
 }
 
 private class RecordingProjectDao : ProjectDao {
+    override suspend fun insert(project: ProjectEntity): Long = 1L
+    override suspend fun update(project: ProjectEntity) = Unit
     override suspend fun upsert(project: ProjectEntity) = Unit
     override suspend fun findById(id: UUID): ProjectEntity? = null
     override fun observeAll(): Flow<List<ProjectEntity>> = MutableStateFlow(emptyList())

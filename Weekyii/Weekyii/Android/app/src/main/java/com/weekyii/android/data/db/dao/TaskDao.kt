@@ -17,11 +17,16 @@ import java.util.UUID
 
 @Dao
 interface TaskDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(task: TaskEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(task: TaskEntity): Long
 
     @Update
     suspend fun update(task: TaskEntity)
+
+    @Transaction
+    suspend fun upsert(task: TaskEntity) {
+        if (insert(task) == -1L) update(task)
+    }
 
     @Delete
     suspend fun delete(task: TaskEntity)
