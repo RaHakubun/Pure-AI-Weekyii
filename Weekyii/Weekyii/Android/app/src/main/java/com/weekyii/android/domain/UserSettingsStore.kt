@@ -26,6 +26,10 @@ interface UserSettingsStore {
     val fixedReminderMinute: StateFlow<Int>
     val defaultProjectDurationDays: StateFlow<Int>
     val defaultProjectTileSizeRaw: StateFlow<String>
+    val weekStartsOnMonday: StateFlow<Boolean>
+    val pendingMonthShowRegular: StateFlow<Boolean>
+    val pendingMonthShowDDL: StateFlow<Boolean>
+    val pendingMonthShowLeisure: StateFlow<Boolean>
     suspend fun setDefaultKillTime(time: LocalTime)
     suspend fun setDefaultExecutionMode(mode: ExecutionMode)
     suspend fun setDefaultTaskTypeId(idRaw: String)
@@ -36,6 +40,8 @@ interface UserSettingsStore {
     suspend fun setFixedReminderTime(hour: Int, minute: Int)
     suspend fun setDefaultProjectDurationDays(days: Int)
     suspend fun setDefaultProjectTileSizeRaw(idRaw: String)
+    suspend fun setWeekStartsOnMonday(enabled: Boolean)
+    suspend fun setPendingMonthMarkers(regular: Boolean, ddl: Boolean, leisure: Boolean)
 }
 
 private val Context.weekyiiSettingsDataStore by preferencesDataStore(name = "weekyii_settings")
@@ -56,6 +62,10 @@ class DataStoreUserSettingsStore(
         val fixedReminderMinute = stringPreferencesKey("fixed_reminder_minute")
         val defaultProjectDurationDays = stringPreferencesKey("default_project_duration_days")
         val defaultProjectTileSizeRaw = stringPreferencesKey("default_project_tile_size")
+        val weekStartsOnMonday = stringPreferencesKey("week_starts_on_monday")
+        val pendingMonthShowRegular = stringPreferencesKey("pending_month_show_regular")
+        val pendingMonthShowDDL = stringPreferencesKey("pending_month_show_ddl")
+        val pendingMonthShowLeisure = stringPreferencesKey("pending_month_show_leisure")
     }
 
     override val defaultKillTime: StateFlow<LocalTime> = context.weekyiiSettingsDataStore.data
@@ -106,6 +116,22 @@ class DataStoreUserSettingsStore(
         .map { preferences -> preferences[Keys.defaultProjectTileSizeRaw] ?: "medium" }
         .stateIn(scope, SharingStarted.Eagerly, "medium")
 
+    override val weekStartsOnMonday: StateFlow<Boolean> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.weekStartsOnMonday]?.toBoolean() ?: true }
+        .stateIn(scope, SharingStarted.Eagerly, true)
+
+    override val pendingMonthShowRegular: StateFlow<Boolean> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.pendingMonthShowRegular]?.toBoolean() ?: false }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
+    override val pendingMonthShowDDL: StateFlow<Boolean> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.pendingMonthShowDDL]?.toBoolean() ?: true }
+        .stateIn(scope, SharingStarted.Eagerly, true)
+
+    override val pendingMonthShowLeisure: StateFlow<Boolean> = context.weekyiiSettingsDataStore.data
+        .map { preferences -> preferences[Keys.pendingMonthShowLeisure]?.toBoolean() ?: false }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
     override suspend fun setDefaultKillTime(time: LocalTime) {
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultKillTime] = time.toString() }
     }
@@ -154,5 +180,17 @@ class DataStoreUserSettingsStore(
     override suspend fun setDefaultProjectTileSizeRaw(idRaw: String) {
         require(idRaw in setOf("mini", "small", "medium", "wide")) { "Unknown project tile size" }
         context.weekyiiSettingsDataStore.edit { it[Keys.defaultProjectTileSizeRaw] = idRaw }
+    }
+
+    override suspend fun setWeekStartsOnMonday(enabled: Boolean) {
+        context.weekyiiSettingsDataStore.edit { it[Keys.weekStartsOnMonday] = enabled.toString() }
+    }
+
+    override suspend fun setPendingMonthMarkers(regular: Boolean, ddl: Boolean, leisure: Boolean) {
+        context.weekyiiSettingsDataStore.edit {
+            it[Keys.pendingMonthShowRegular] = regular.toString()
+            it[Keys.pendingMonthShowDDL] = ddl.toString()
+            it[Keys.pendingMonthShowLeisure] = leisure.toString()
+        }
     }
 }

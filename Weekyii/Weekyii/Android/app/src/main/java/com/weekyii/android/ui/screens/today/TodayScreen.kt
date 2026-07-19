@@ -53,9 +53,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
@@ -89,13 +92,17 @@ import com.weekyii.android.ui.components.StatusBadge
 import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 @Composable
 fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel: WeekViewModel? = null) {
     val state by viewModel.state.collectAsState()
     val daysStartedCount by viewModel.daysStartedCount.collectAsState()
     var showWeek by remember { mutableStateOf(false) }
-    var showEmptyComposer by remember { mutableStateOf(false) }
+    var showCreateEditor by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
     var executionTaskTitle by remember { mutableStateOf("") }
     var editingTask by remember { mutableStateOf<TaskUi?>(null) }
@@ -110,18 +117,71 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     var pendingKillTimeImpact by remember { mutableStateOf<TodayViewModel.KillTimeChangeImpact?>(null) }
     var killTimeError by remember { mutableStateOf<String?>(null) }
     var pendingPostpone by remember { mutableStateOf<Pair<TaskUi, LocalDate>?>(null) }
+    var pendingPostponeCreate by remember { mutableStateOf<Pair<TaskUi, LocalDate>?>(null) }
+    var attachmentError by remember { mutableStateOf<String?>(null) }
+    var pendingAttachmentReads by remember { mutableStateOf(0) }
+    val editorSession = remember { mutableStateOf(0) }
+    val screenScope = rememberCoroutineScope()
+    val maxAttachmentBytes = 5 * 1024 * 1024
+    val maxAttachmentCount = 8
+    val maxAttachmentTotalBytes = 20 * 1024 * 1024
     val context = LocalContext.current
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
-            editingAttachments.add(
-                TaskAttachmentUi(
-                    fileName = name,
-                    fileType = context.contentResolver.getType(uri) ?: "application/octet-stream",
-                    data = bytes
-                )
-            )
+            val sessionAtLaunch = editorSession.value
+            attachmentError = null
+            pendingAttachmentReads += 1
+            screenScope.launch {
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                val output = ByteArrayOutputStream()
+                                val buffer = ByteArray(8 * 1024)
+                                var total = 0
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read < 0) break
+                                    total += read
+                                    if (total > maxAttachmentBytes) return@runCatching null
+                                    output.write(buffer, 0, read)
+                                }
+                                output.toByteArray()
+                            } ?: error("无法读取附件")
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (sessionAtLaunch != editorSession.value) return@withContext
+                        result.onSuccess { bytes ->
+                            if (bytes == null) {
+                                attachmentError = "附件不能超过 5 MB"
+                            } else if (editingAttachments.size >= maxAttachmentCount) {
+                                attachmentError = "任务附件最多 $maxAttachmentCount 个"
+                            } else if (editingAttachments.sumOf { it.data?.size ?: 0 } + bytes.size > maxAttachmentTotalBytes) {
+                                attachmentError = "任务附件总大小不能超过 20 MB"
+                            } else {
+                                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
+                                editingAttachments.add(
+                                    TaskAttachmentUi(
+                                        fileName = name,
+                                        fileType = context.contentResolver.getType(uri) ?: "application/octet-stream",
+                                        data = bytes
+                                    )
+                                )
+                            }
+                        }.onFailure { attachmentError = "读取附件失败：${it.message ?: "未知错误"}" }
+                    }
+                } finally {
+                    withContext(Dispatchers.Main) { pendingAttachmentReads = (pendingAttachmentReads - 1).coerceAtLeast(0) }
+                }
+            }
+        }
+    }
+    fun pickAttachment() {
+        if (editingAttachments.size >= maxAttachmentCount) {
+            attachmentError = "任务附件最多 $maxAttachmentCount 个"
+        } else {
+            attachmentPicker.launch(arrayOf("*/*"))
         }
     }
     val day = state.day
@@ -204,29 +264,16 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                     WeekyiiButton(
                         text = "创建",
                         icon = Icons.Filled.Add,
-                        onClick = { showEmptyComposer = true },
+                        onClick = {
+                            editorSession.value += 1
+                            editingTitle = ""
+                            editingDescription = ""
+                            editingStepsText = ""
+                            editingTaskTypeId = state.selectedTaskTypeId
+                            editingAttachments.clear()
+                            showCreateEditor = true
+                        },
                     )
-                }
-                if (showEmptyComposer) {
-                    item {
-                        AddTaskCard(
-                            title = newTaskTitle,
-                            onTitleChange = { newTaskTitle = it },
-                            onAdd = {
-                                val title = newTaskTitle.trim()
-                                if (title.isNotEmpty()) {
-                                    viewModel.createDraft(listOf(title))
-                                    newTaskTitle = ""
-                                    showEmptyComposer = false
-                                }
-                            },
-                            onStart = {
-                                viewModel.prepareStartRitual()
-                                startFlow.present()
-                            },
-                            canStart = false
-                        )
-                    }
                 }
             }
 
@@ -257,6 +304,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         onMoveDown = { viewModel.moveDraftTask(index, index + 1) },
                         onDelete = { viewModel.deleteDraftTask(task) },
                         onEdit = {
+                            editorSession.value += 1
                             editingTask = task
                             editingTitle = task.title
                             editingDescription = task.description
@@ -283,7 +331,16 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             viewModel.prepareStartRitual()
                             startFlow.present()
                         },
-                        canStart = state.draft.isNotEmpty()
+                        canStart = state.draft.isNotEmpty(),
+                        onAdvancedCreate = {
+                            editorSession.value += 1
+                            editingTitle = ""
+                            editingDescription = ""
+                            editingStepsText = ""
+                            editingTaskTypeId = state.selectedTaskTypeId
+                            editingAttachments.clear()
+                            showCreateEditor = true
+                        }
                     )
                 }
             }
@@ -338,6 +395,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             onMoveDown = { viewModel.moveFrozenTask(index, index + 1) },
                             onDelete = { viewModel.deleteFrozenTask(task) },
                             onEdit = {
+                                editorSession.value += 1
                                 editingTask = task
                                 editingTitle = task.title
                                 editingDescription = task.description
@@ -473,22 +531,104 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     pendingPostpone?.let { (task, targetDate) ->
         WeekyiiConfirmDialog(
             title = "确认后移任务",
-            message = "确认将「${task.title}」后移到 $targetDate 吗？目标周不存在时会自动创建。",
+            message = "确认将「${task.title}」后移到 $targetDate 吗？",
             confirmLabel = "确认后移",
             onConfirm = {
-                viewModel.postponeTask(task, targetDate)
                 pendingPostpone = null
+                viewModel.targetWeekExists(targetDate) { exists ->
+                    if (exists) viewModel.postponeTask(task, targetDate)
+                    else pendingPostponeCreate = task to targetDate
+                }
             },
             onDismiss = { pendingPostpone = null }
         )
     }
 
+    pendingPostponeCreate?.let { (task, targetDate) ->
+        WeekyiiConfirmDialog(
+            title = "创建目标周并后移？",
+            message = "日期 $targetDate 所属周尚未创建。确认创建该周，并将「${task.title}」移动过去吗？",
+            confirmLabel = "创建并后移",
+            onConfirm = {
+                viewModel.postponeTask(task, targetDate)
+                pendingPostponeCreate = null
+            },
+            onDismiss = { pendingPostponeCreate = null }
+        )
+    }
+
+    if (showCreateEditor) {
+        AlertDialog(
+            onDismissRequest = { editorSession.value += 1; showCreateEditor = false },
+            title = { Text("新增任务") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editingTitle,
+                        onValueChange = { editingTitle = it },
+                        label = { Text("任务名称") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editingDescription,
+                        onValueChange = { editingDescription = it },
+                        label = { Text("任务说明") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TaskTypePicker(
+                        definitions = state.taskTypeDefinitions,
+                        selectedId = editingTaskTypeId,
+                        onSelect = { editingTaskTypeId = it }
+                    )
+                    OutlinedTextField(
+                        value = editingStepsText,
+                        onValueChange = { editingStepsText = it },
+                        label = { Text("子任务（每行一项）") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedButton(onClick = ::pickAttachment) {
+                        Text("添加附件 (${editingAttachments.size})")
+                    }
+                    attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = editingTitle.isNotBlank() && pendingAttachmentReads == 0,
+                    onClick = {
+                        val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
+                        viewModel.createDetailedDraft(
+                            editingTitle,
+                            editingDescription,
+                            editingStepsText.lines(),
+                            editingAttachments.toList(),
+                            taskType = definition?.baseKind ?: TaskType.REGULAR,
+                            taskTypeIdRaw = definition?.idRaw ?: "regular"
+                        )
+                        editorSession.value += 1
+                        showCreateEditor = false
+                    }
+                ) { Text(if (pendingAttachmentReads > 0) "正在读取…" else "保存") }
+            },
+            dismissButton = { TextButton(onClick = { editorSession.value += 1; showCreateEditor = false }) { Text("取消") } }
+        )
+    }
+
     editingTask?.let { task ->
         AlertDialog(
-            onDismissRequest = { editingTask = null },
+            onDismissRequest = { editorSession.value += 1; editingTask = null },
             title = { Text("编辑任务") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     OutlinedTextField(
                         value = editingTitle,
                         onValueChange = { editingTitle = it },
@@ -515,14 +655,15 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         selectedId = editingTaskTypeId,
                         onSelect = { editingTaskTypeId = it }
                     )
-                    OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) {
+                    OutlinedButton(onClick = ::pickAttachment) {
                         Text("添加附件 (${editingAttachments.size})")
                     }
+                    attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = editingTitle.isNotBlank(),
+                    enabled = editingTitle.isNotBlank() && pendingAttachmentReads == 0,
                     onClick = {
                         if (task.zone.name == "FROZEN") {
                             val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
@@ -547,11 +688,12 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                                 taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
                             )
                         }
+                        editorSession.value += 1
                         editingTask = null
                     }
-                ) { Text("保存") }
+                ) { Text(if (pendingAttachmentReads > 0) "正在读取…" else "保存") }
             },
-            dismissButton = { TextButton(onClick = { editingTask = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { editorSession.value += 1; editingTask = null }) { Text("取消") } }
         )
     }
 }
@@ -1046,7 +1188,8 @@ private fun AddTaskCard(
     onTitleChange: (String) -> Unit,
     onAdd: () -> Unit,
     onStart: () -> Unit,
-    canStart: Boolean
+    canStart: Boolean,
+    onAdvancedCreate: () -> Unit = {}
 ) {
     WeekyiiCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1058,6 +1201,7 @@ private fun AddTaskCard(
                 supportingText = { Text("任务会按当前顺序进入专注区") },
                 singleLine = true
             )
+            TextButton(onClick = onAdvancedCreate) { Text("使用完整编辑器（描述、子任务、附件）") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 WeekyiiButton(
                     text = "加入草稿",

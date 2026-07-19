@@ -27,6 +27,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -51,6 +54,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
@@ -78,7 +82,7 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val summaries = viewModel.monthDaySummaries()
-    val cells = PendingViewModel.buildMonthCells(state.selectedMonth, summaries)
+    val cells = PendingViewModel.buildMonthCells(state.selectedMonth, summaries, state.weekStartsOnMonday)
     val weeksInMonth = viewModel.weeksInSelectedMonth()
     val futureWeeksInMonth = weeksInMonth.filter { it.status == WeekStatus.PENDING && it.startDate.isAfter(state.currentDate) }
     val selectedWeek = state.pendingWeeks.firstOrNull { it.weekId == state.selectedWeekId }
@@ -129,6 +133,11 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
                 MonthCalendar(
                     month = state.selectedMonth,
                     cells = cells,
+                    startsOnMonday = state.weekStartsOnMonday,
+                    showRegular = state.pendingMonthShowRegular,
+                    showDDL = state.pendingMonthShowDDL,
+                    showLeisure = state.pendingMonthShowLeisure,
+                    currentDate = state.currentDate,
                     onPrevious = viewModel::selectPreviousMonth,
                     onNext = viewModel::selectNextMonth,
                     onDateClick = { date ->
@@ -310,6 +319,11 @@ private fun PendingWeeksSummary(count: Int) {
 private fun MonthCalendar(
     month: YearMonth,
     cells: List<PendingViewModel.MonthCell>,
+    startsOnMonday: Boolean,
+    showRegular: Boolean,
+    showDDL: Boolean,
+    showLeisure: Boolean,
+    currentDate: LocalDate,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onDateClick: (LocalDate) -> Unit
@@ -322,12 +336,13 @@ private fun MonthCalendar(
                 IconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "下个月") }
             }
             Row(modifier = Modifier.fillMaxWidth()) {
-                listOf("一", "二", "三", "四", "五", "六", "日").forEach { Text(it, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium) }
+                (if (startsOnMonday) listOf("一", "二", "三", "四", "五", "六", "日") else listOf("日", "一", "二", "三", "四", "五", "六"))
+                    .forEach { Text(it, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium) }
             }
             cells.chunked(7).forEach { row ->
                 Row(modifier = Modifier.fillMaxWidth()) {
                     row.forEach { cell ->
-                        MonthDayCell(cell, Modifier.weight(1f), onDateClick)
+                        MonthDayCell(cell, Modifier.weight(1f), showRegular, showDDL, showLeisure, currentDate, onDateClick)
                     }
                 }
             }
@@ -336,17 +351,34 @@ private fun MonthCalendar(
 }
 
 @Composable
-private fun MonthDayCell(cell: PendingViewModel.MonthCell, modifier: Modifier, onClick: (LocalDate) -> Unit) {
+private fun MonthDayCell(
+    cell: PendingViewModel.MonthCell,
+    modifier: Modifier,
+    showRegular: Boolean,
+    showDDL: Boolean,
+    showLeisure: Boolean,
+    currentDate: LocalDate,
+    onClick: (LocalDate) -> Unit
+) {
     val summary = cell.summary
+    val enabled = cell.isInSelectedMonth && !cell.date.isBefore(currentDate)
     val tint = if (cell.isInSelectedMonth) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .35f)
     Column(
-        modifier = modifier.padding(2.dp).height(58.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (summary?.hasAnyRecord == true) .55f else .18f)).clickable { onClick(cell.date) }.padding(4.dp),
+        modifier = modifier
+            .padding(2.dp)
+            .height(58.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (summary?.hasAnyRecord == true) .55f else .18f))
+            .clickable(enabled = enabled) { onClick(cell.date) }
+            .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(cell.date.dayOfMonth.toString(), color = tint, style = MaterialTheme.typography.labelLarge)
         if (summary != null && summary.taskCount > 0) {
-            Text("${summary.regularCount}/${summary.ddlCount}/${summary.leisureCount}", color = tint, style = MaterialTheme.typography.labelSmall)
-            if (summary.ddlCount > 0) Text("🔥", style = MaterialTheme.typography.labelSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (showRegular && summary.regularCount > 0) Icon(Icons.Filled.Circle, contentDescription = "常规任务", tint = Color(0xFF4CAF50), modifier = Modifier.size(8.dp))
+                if (showDDL && summary.ddlCount > 0) Icon(Icons.Filled.Whatshot, contentDescription = "截止任务", tint = Color(0xFFE57373), modifier = Modifier.size(11.dp))
+                if (showLeisure && summary.leisureCount > 0) Icon(Icons.Filled.AutoAwesome, contentDescription = "休闲任务", tint = Color(0xFF64B5F6), modifier = Modifier.size(11.dp))
+            }
         }
     }
 }

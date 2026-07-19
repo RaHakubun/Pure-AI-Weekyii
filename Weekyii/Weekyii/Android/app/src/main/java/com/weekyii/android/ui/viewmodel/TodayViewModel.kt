@@ -125,8 +125,43 @@ class TodayViewModel(
         }
     }
 
+    fun createDetailedDraft(
+        title: String,
+        description: String,
+        stepTitles: List<String>,
+        attachments: List<com.weekyii.android.ui.model.TaskAttachmentUi>,
+        taskType: TaskType,
+        taskTypeIdRaw: String
+    ) {
+        viewModelScope.launch {
+            try {
+                repo.createDraftDayIfNeeded(timeProvider.today)
+                repo.addDraftTask(
+                    timeProvider.today.toString(),
+                    title,
+                    description,
+                    taskType,
+                    taskTypeIdRaw,
+                    stepTitles,
+                    attachments.map { attachment -> TaskAttachmentDraft(attachment.fileName, attachment.fileType, attachment.data) }
+                )
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun selectTaskType(idRaw: String) {
         _state.update { it.copy(selectedTaskTypeId = idRaw) }
+    }
+
+    fun targetWeekExists(date: LocalDate, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            runCatching { repo.weekExistsForDate(date) }
+                .onSuccess(onResult)
+                .onFailure { _state.update { state -> state.copy(error = it.message) } }
+        }
     }
 
     fun prepareStartRitual() {
@@ -304,10 +339,13 @@ class TodayViewModel(
     ) {
         viewModelScope.launch {
             try {
-                repo.updateDraftTask(timeProvider.today.toString(), task.id, title, description, taskType, taskTypeIdRaw)
-                repo.replaceDraftTaskResources(
+                repo.updateDraftTaskWithResources(
                     timeProvider.today.toString(),
                     task.id,
+                    title,
+                    description,
+                    taskType,
+                    taskTypeIdRaw,
                     stepTitles,
                     attachments.map { attachment -> TaskAttachmentDraft(attachment.fileName, attachment.fileType, attachment.data) }
                 )

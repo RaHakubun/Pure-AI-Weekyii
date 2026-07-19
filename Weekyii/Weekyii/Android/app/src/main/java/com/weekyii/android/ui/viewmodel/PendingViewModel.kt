@@ -10,6 +10,7 @@ import com.weekyii.android.data.repository.WeekCalculator
 import com.weekyii.android.data.repository.WeekyiiRepository
 import com.weekyii.android.data.repository.TaskTypeDefinitionRepository
 import com.weekyii.android.domain.TimeProvider
+import com.weekyii.android.domain.UserSettingsStore
 import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.model.WeekUi
@@ -27,7 +28,8 @@ class PendingViewModel(
     private val repo: WeekyiiRepository,
     private val calculator: WeekCalculator,
     private val timeProvider: TimeProvider,
-    private val taskTypes: TaskTypeDefinitionRepository? = null
+    private val taskTypes: TaskTypeDefinitionRepository? = null,
+    private val settings: UserSettingsStore? = null
 ) : ViewModel() {
 
     enum class WeekOutlookTone {
@@ -69,6 +71,10 @@ class PendingViewModel(
         val selectedWeekId: String? = null,
         val selectedDayId: String? = null,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
+        val weekStartsOnMonday: Boolean = true,
+        val pendingMonthShowRegular: Boolean = false,
+        val pendingMonthShowDDL: Boolean = true,
+        val pendingMonthShowLeisure: Boolean = false,
         val error: String? = null
     )
 
@@ -78,10 +84,13 @@ class PendingViewModel(
     companion object {
         fun buildMonthCells(
             month: YearMonth,
-            summaries: Map<LocalDate, MonthDaySummary>
+            summaries: Map<LocalDate, MonthDaySummary>,
+            startsOnMonday: Boolean = true
         ): List<MonthCell> {
-            val first = month.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val last = month.atEndOfMonth().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+            val startDay = if (startsOnMonday) DayOfWeek.MONDAY else DayOfWeek.SUNDAY
+            val endDay = if (startsOnMonday) DayOfWeek.SUNDAY else DayOfWeek.SATURDAY
+            val first = month.atDay(1).with(TemporalAdjusters.previousOrSame(startDay))
+            val last = month.atEndOfMonth().with(TemporalAdjusters.nextOrSame(endDay))
             return generateSequence(first) { date -> date.plusDays(1) }
                 .takeWhile { date -> !date.isAfter(last) }
                 .map { date ->
@@ -161,6 +170,28 @@ class PendingViewModel(
         )
         observePending()
         observeTaskTypes()
+        observeSettings()
+    }
+
+    private fun observeSettings() {
+        val store = settings ?: return
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                store.weekStartsOnMonday,
+                store.pendingMonthShowRegular,
+                store.pendingMonthShowDDL,
+                store.pendingMonthShowLeisure
+            ) { startsOnMonday, showRegular, showDDL, showLeisure ->
+                listOf(startsOnMonday, showRegular, showDDL, showLeisure)
+            }.collectLatest { values ->
+                _state.value = _state.value.copy(
+                    weekStartsOnMonday = values[0],
+                    pendingMonthShowRegular = values[1],
+                    pendingMonthShowDDL = values[2],
+                    pendingMonthShowLeisure = values[3]
+                )
+            }
+        }
     }
 
     private fun observeTaskTypes() {

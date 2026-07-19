@@ -32,6 +32,10 @@ class SettingsViewModel(
         val fixedReminderMinute: Int = 0,
         val defaultProjectDurationDays: Int = 7,
         val defaultProjectTileSizeRaw: String = "medium",
+        val weekStartsOnMonday: Boolean = true,
+        val pendingMonthShowRegular: Boolean = false,
+        val pendingMonthShowDDL: Boolean = true,
+        val pendingMonthShowLeisure: Boolean = false,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val importInspection: WeekyiiArchiveService.Inspection? = null,
         val isImporting: Boolean = false,
@@ -69,19 +73,36 @@ class SettingsViewModel(
             val projectDefaults = combine(settings.defaultProjectDurationDays, settings.defaultProjectTileSizeRaw) { durationDays, tileSizeRaw ->
                 ProjectDefaultsSnapshot(durationDays, tileSizeRaw)
             }
-            combine(preferences, settings.killTimeReminderMinutes, fixedReminder, projectDefaults, taskTypes.observeAll()) { pref, reminderMinutes, fixed, project, definitions ->
+            data class FuturePreferencesSnapshot(val startsOnMonday: Boolean, val showRegular: Boolean, val showDDL: Boolean, val showLeisure: Boolean)
+            val futurePreferences = combine(
+                settings.weekStartsOnMonday,
+                settings.pendingMonthShowRegular,
+                settings.pendingMonthShowDDL,
+                settings.pendingMonthShowLeisure
+            ) { startsOnMonday, showRegular, showDDL, showLeisure ->
+                FuturePreferencesSnapshot(startsOnMonday, showRegular, showDDL, showLeisure)
+            }
+            data class CoreSnapshot(val pref: PreferenceSnapshot, val reminderMinutes: Int, val fixed: FixedReminderSnapshot, val project: ProjectDefaultsSnapshot)
+            val core = combine(preferences, settings.killTimeReminderMinutes, fixedReminder, projectDefaults) { pref, reminderMinutes, fixed, project ->
+                CoreSnapshot(pref, reminderMinutes, fixed, project)
+            }
+            combine(core, futurePreferences, taskTypes.observeAll()) { snapshot, future, definitions ->
                 UiState(
-                    defaultKillTime = pref.killTime,
-                    defaultExecutionMode = pref.executionMode,
-                    defaultTaskTypeId = pref.taskTypeId,
-                    themeId = pref.themeId,
-                    appearanceMode = pref.appearanceMode,
-                    killTimeReminderMinutes = reminderMinutes,
-                    fixedReminderEnabled = fixed.enabled,
-                    fixedReminderHour = fixed.hour,
-                    fixedReminderMinute = fixed.minute,
-                    defaultProjectDurationDays = project.durationDays,
-                    defaultProjectTileSizeRaw = project.tileSizeRaw,
+                    defaultKillTime = snapshot.pref.killTime,
+                    defaultExecutionMode = snapshot.pref.executionMode,
+                    defaultTaskTypeId = snapshot.pref.taskTypeId,
+                    themeId = snapshot.pref.themeId,
+                    appearanceMode = snapshot.pref.appearanceMode,
+                    killTimeReminderMinutes = snapshot.reminderMinutes,
+                    fixedReminderEnabled = snapshot.fixed.enabled,
+                    fixedReminderHour = snapshot.fixed.hour,
+                    fixedReminderMinute = snapshot.fixed.minute,
+                    defaultProjectDurationDays = snapshot.project.durationDays,
+                    defaultProjectTileSizeRaw = snapshot.project.tileSizeRaw,
+                    weekStartsOnMonday = future.startsOnMonday,
+                    pendingMonthShowRegular = future.showRegular,
+                    pendingMonthShowDDL = future.showDDL,
+                    pendingMonthShowLeisure = future.showLeisure,
                     taskTypeDefinitions = definitions
                 )
             }.collect { next -> _state.value = next }
@@ -157,6 +178,20 @@ class SettingsViewModel(
     fun setDefaultProjectTileSize(idRaw: String) {
         viewModelScope.launch {
             runCatching { settings.setDefaultProjectTileSizeRaw(idRaw) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setWeekStartsOnMonday(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { settings.setWeekStartsOnMonday(enabled) }
+                .onFailure { _state.value = _state.value.copy(error = it.message) }
+        }
+    }
+
+    fun setPendingMonthMarkers(regular: Boolean, ddl: Boolean, leisure: Boolean) {
+        viewModelScope.launch {
+            runCatching { settings.setPendingMonthMarkers(regular, ddl, leisure) }
                 .onFailure { _state.value = _state.value.copy(error = it.message) }
         }
     }

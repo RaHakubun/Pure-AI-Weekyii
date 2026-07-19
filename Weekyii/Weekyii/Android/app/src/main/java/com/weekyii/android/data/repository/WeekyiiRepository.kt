@@ -4,6 +4,7 @@ import com.weekyii.android.data.db.dao.DayDao
 import com.weekyii.android.data.db.dao.ProjectDao
 import com.weekyii.android.data.db.dao.TaskDao
 import com.weekyii.android.data.db.dao.WeekDao
+import com.weekyii.android.data.db.AppDatabase
 import com.weekyii.android.data.db.entities.DayEntity
 import com.weekyii.android.data.db.entities.DayStatus
 import com.weekyii.android.data.db.entities.ExecutionMode
@@ -20,11 +21,16 @@ import com.weekyii.android.ui.model.WeekUi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import androidx.room.withTransaction
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
 data class TaskAttachmentDraft(val fileName: String, val fileType: String, val data: ByteArray?)
+
+private const val MAX_TASK_ATTACHMENTS = 8
+private const val MAX_TASK_ATTACHMENT_BYTES = 5 * 1024 * 1024
+private const val MAX_TASK_ATTACHMENTS_TOTAL_BYTES = 20 * 1024 * 1024
 
 class WeekyiiRepository(
     val weekDao: WeekDao,
@@ -32,8 +38,11 @@ class WeekyiiRepository(
     val taskDao: TaskDao,
     val projectDao: ProjectDao,
     private val weekCalculator: WeekCalculator,
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val database: AppDatabase? = null
 ) {
+    private suspend fun <T> inTransaction(block: suspend () -> T): T =
+        database?.withTransaction { block() } ?: block()
     // region Queries
     fun observePresentWeek(): Flow<List<WeekUi>> {
         return weekDao.observeWeeksByStatus(WeekStatus.PRESENT).combineObserveDays()
@@ -165,6 +174,55 @@ class WeekyiiRepository(
         dayDao.upsert(day.copy(status = newStatus))
     }
 
+    suspend fun addDraftTask(
+        dayId: String,
+        title: String,
+        description: String = "",
+        taskType: TaskType = TaskType.REGULAR,
+        taskTypeIdRaw: String = taskType.name.lowercase(),
+        stepTitles: List<String> = emptyList(),
+        attachments: List<TaskAttachmentDraft> = emptyList()
+    ): UUID {
+        return inTransaction {
+            validateTaskResources(attachments)
+            val day = dayDao.findById(dayId) ?: error("Day not found")
+            require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
+            require(title.isNotBlank()) { "Task title cannot be empty" }
+            val currentMax = dayDao.findWithTasks(dayId)?.tasks?.maxOfOrNull { it.order } ?: 0
+            val task = TaskEntity(
+                title = title.trim(),
+                description = description.trim(),
+                taskType = taskType,
+                taskTypeIdRaw = taskTypeIdRaw,
+                order = currentMax + 1,
+                dayOwnerId = dayId,
+                zone = TaskZone.DRAFT
+            )
+            taskDao.upsert(task)
+            replaceTaskResources(task.id, stepTitles, attachments)
+            dayDao.upsert(day.copy(status = DayStatus.DRAFT))
+            task.id
+        }
+    }
+
+    suspend fun updateDraftTaskWithResources(
+        dayId: String,
+        taskId: UUID,
+        title: String,
+        description: String,
+        taskType: TaskType,
+        taskTypeIdRaw: String,
+        stepTitles: List<String>,
+        attachments: List<TaskAttachmentDraft>
+    ) = inTransaction {
+        validateTaskResources(attachments)
+        updateDraftTask(dayId, taskId, title, description, taskType, taskTypeIdRaw)
+        replaceDraftTaskResources(dayId, taskId, stepTitles, attachments)
+    }
+
+    suspend fun weekExistsForDate(date: LocalDate): Boolean =
+        weekDao.findById(weekCalculator.weekId(date)) != null
+
     suspend fun updateDraftTask(
         dayId: String,
         taskId: UUID,
@@ -186,10 +244,11 @@ class WeekyiiRepository(
         taskId: UUID,
         stepTitles: List<String>,
         attachments: List<TaskAttachmentDraft>
-    ) {
-        val day = dayDao.findById(dayId) ?: return
+    ) = inTransaction {
+        validateTaskResources(attachments)
+        val day = dayDao.findById(dayId) ?: return@inTransaction
         require(day.status == DayStatus.DRAFT || day.status == DayStatus.EMPTY)
-        val task = taskDao.findById(taskId) ?: return
+        val task = taskDao.findById(taskId) ?: return@inTransaction
         require(task.dayOwnerId == dayId && task.zone == TaskZone.DRAFT)
         replaceTaskResources(taskId, stepTitles, attachments)
     }
@@ -199,6 +258,7 @@ class WeekyiiRepository(
         stepTitles: List<String>,
         attachments: List<TaskAttachmentDraft>
     ) {
+        validateTaskResources(attachments)
         taskDao.deleteSteps(taskId)
         taskDao.deleteAttachments(taskId)
         taskDao.upsertSteps(
@@ -218,6 +278,17 @@ class WeekyiiRepository(
                 )
             }
         )
+    }
+
+    private fun validateTaskResources(attachments: List<TaskAttachmentDraft>) {
+        require(attachments.size <= MAX_TASK_ATTACHMENTS) { "任务附件最多 8 个" }
+        require(attachments.all { it.fileName.isNotBlank() }) { "附件名称不能为空" }
+        require(attachments.all { it.data == null || it.data.size <= MAX_TASK_ATTACHMENT_BYTES }) {
+            "单个任务附件不能超过 5 MB"
+        }
+        require(attachments.sumOf { it.data?.size ?: 0 } <= MAX_TASK_ATTACHMENTS_TOTAL_BYTES) {
+            "任务附件总大小不能超过 20 MB"
+        }
     }
 
     suspend fun getTaskUi(taskId: UUID): TaskUi? {
@@ -325,15 +396,16 @@ class WeekyiiRepository(
         taskTypeIdRaw: String = taskType.name.lowercase(),
         stepTitles: List<String> = emptyList(),
         attachments: List<TaskAttachmentDraft> = emptyList()
-    ) {
+    ) = inTransaction {
+        validateTaskResources(attachments)
         require(title.isNotBlank()) { "Task title cannot be empty" }
-        val day = dayDao.findWithTasks(dayId) ?: return
+        val day = dayDao.findWithTasks(dayId) ?: return@inTransaction
         require(day.day.status == DayStatus.EXECUTE) { "Day is not executing" }
         require(day.day.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
             "Strict execution cannot edit the task queue"
         }
         require(day.day.isDraftZoneUnlocked) { "Task queue is locked" }
-        val task = taskDao.findById(taskId) ?: return
+        val task = taskDao.findById(taskId) ?: return@inTransaction
         require(task.dayOwnerId == dayId && task.zone == TaskZone.FROZEN) {
             "Only Frozen tasks can be edited"
         }

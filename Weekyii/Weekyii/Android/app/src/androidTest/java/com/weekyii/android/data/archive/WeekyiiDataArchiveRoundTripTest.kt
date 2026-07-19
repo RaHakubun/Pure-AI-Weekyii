@@ -31,6 +31,20 @@ import java.util.Date
 
 @RunWith(AndroidJUnit4::class)
 class WeekyiiDataArchiveRoundTripTest {
+    private data class SettingsSnapshot(
+        val theme: String,
+        val appearance: String,
+        val reminderMinutes: Int,
+        val fixedEnabled: Boolean,
+        val fixedHour: Int,
+        val fixedMinute: Int,
+        val weekStartsMonday: Boolean,
+        val showRegular: Boolean,
+        val showDDL: Boolean,
+        val showLeisure: Boolean,
+        val projectDays: Int,
+        val tileSize: String
+    )
     private lateinit var database: AppDatabase
     private lateinit var repository: WeekyiiDataArchiveRepository
     private lateinit var settings: DataStoreUserSettingsStore
@@ -57,6 +71,21 @@ class WeekyiiDataArchiveRoundTripTest {
 
     @Test
     fun archiveRoundTripPreservesTaskResourcesSuspendedResourcesAndSettings() = runBlocking {
+        val original = SettingsSnapshot(
+            settings.themeId.value,
+            settings.appearanceMode.value,
+            settings.killTimeReminderMinutes.value,
+            settings.fixedReminderEnabled.value,
+            settings.fixedReminderHour.value,
+            settings.fixedReminderMinute.value,
+            settings.weekStartsOnMonday.value,
+            settings.pendingMonthShowRegular.value,
+            settings.pendingMonthShowDDL.value,
+            settings.pendingMonthShowLeisure.value,
+            settings.defaultProjectDurationDays.value,
+            settings.defaultProjectTileSizeRaw.value
+        )
+        try {
         val week = WeekEntity("2026-W30", Date(0), Date(86_400_000), WeekStatus.PRESENT)
         val day = DayEntity("2026-07-20", Date(0), "MON", DayStatus.DRAFT, weekOwnerId = week.weekId)
         val task = TaskEntity(title = "Task", order = 1, zone = TaskZone.DRAFT, dayOwnerId = day.dayId)
@@ -80,6 +109,8 @@ class WeekyiiDataArchiveRoundTripTest {
         settings.setKillTimeReminderMinutes(30)
         settings.setFixedReminderEnabled(true)
         settings.setFixedReminderTime(19, 45)
+        settings.setWeekStartsOnMonday(false)
+        settings.setPendingMonthMarkers(regular = true, ddl = false, leisure = true)
         settings.setDefaultProjectDurationDays(14)
         settings.setDefaultProjectTileSizeRaw("wide")
 
@@ -101,7 +132,22 @@ class WeekyiiDataArchiveRoundTripTest {
         assertEquals(true, settings.fixedReminderEnabled.value)
         assertEquals(19, settings.fixedReminderHour.value)
         assertEquals(45, settings.fixedReminderMinute.value)
+        assertEquals(false, settings.weekStartsOnMonday.value)
+        assertEquals(true, settings.pendingMonthShowRegular.value)
+        assertEquals(false, settings.pendingMonthShowDDL.value)
+        assertEquals(true, settings.pendingMonthShowLeisure.value)
         assertEquals(14, settings.defaultProjectDurationDays.value)
         assertEquals("wide", settings.defaultProjectTileSizeRaw.value)
+        } finally {
+            settings.setThemeId(original.theme)
+            settings.setAppearanceMode(original.appearance)
+            settings.setKillTimeReminderMinutes(original.reminderMinutes)
+            settings.setFixedReminderEnabled(original.fixedEnabled)
+            settings.setFixedReminderTime(original.fixedHour, original.fixedMinute)
+            settings.setWeekStartsOnMonday(original.weekStartsMonday)
+            settings.setPendingMonthMarkers(original.showRegular, original.showDDL, original.showLeisure)
+            settings.setDefaultProjectDurationDays(original.projectDays)
+            settings.setDefaultProjectTileSizeRaw(original.tileSize)
+        }
     }
 }

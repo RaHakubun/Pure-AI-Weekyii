@@ -343,8 +343,23 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("未来设置", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("未来周按周一开始，月视图会沿用任务类型的颜色标记。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("当前 Android 版本与 iOS 使用相同的周计算规则。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SettingsToggleRow(
+                        title = "周一开始",
+                        subtitle = "未来周与月视图从周一排列",
+                        checked = state.weekStartsOnMonday,
+                        onCheckedChange = viewModel::setWeekStartsOnMonday
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                    Text("在月视图上显示", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SettingsToggleRow("常规任务", "用绿色圆点标记", state.pendingMonthShowRegular) {
+                        viewModel.setPendingMonthMarkers(it, state.pendingMonthShowDDL, state.pendingMonthShowLeisure)
+                    }
+                    SettingsToggleRow("截止任务", "用截止图标标记", state.pendingMonthShowDDL) {
+                        viewModel.setPendingMonthMarkers(state.pendingMonthShowRegular, it, state.pendingMonthShowLeisure)
+                    }
+                    SettingsToggleRow("休闲任务", "用休闲图标标记", state.pendingMonthShowLeisure) {
+                        viewModel.setPendingMonthMarkers(state.pendingMonthShowRegular, state.pendingMonthShowDDL, it)
+                    }
                 }
             }
         }
@@ -428,7 +443,7 @@ private fun SettingsHomeScreen(
         "使用方式" to listOf(
             SettingsRowSpec(SettingsSection.TODAY, "今日节奏", "%02d:%02d".format(state.defaultKillTime.hour, state.defaultKillTime.minute), Icons.Outlined.Timer, Color(0xFFFF8A2A)),
             SettingsRowSpec(SettingsSection.TASK_TYPES, "任务管理", "${state.taskTypeDefinitions.count { !it.isArchived }} 个类型", Icons.Outlined.Label, Color(0xFF13B5C8)),
-            SettingsRowSpec(SettingsSection.FUTURE, "未来", "周一开始", Icons.Outlined.CalendarMonth, Color(0xFF237CF2)),
+            SettingsRowSpec(SettingsSection.FUTURE, "未来", if (state.weekStartsOnMonday) "周一开始" else "按系统周起始", Icons.Outlined.CalendarMonth, Color(0xFF237CF2)),
             SettingsRowSpec(SettingsSection.PROJECTS, "项目", "默认 ${state.defaultProjectDurationDays} 天", Icons.Outlined.Folder, Color(0xFFAF8A6C))
         ),
         "数据" to listOf(
@@ -501,6 +516,26 @@ private fun appearanceLabel(id: String): String = when (id) {
     "light" -> "浅色"
     "dark" -> "深色"
     else -> "自动"
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 @Composable

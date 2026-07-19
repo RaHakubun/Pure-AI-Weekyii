@@ -86,8 +86,12 @@ class WeekyiiDataArchiveRepository(
                 fixedReminderEnabled = settings.fixedReminderEnabled.value,
                 fixedReminderHour = settings.fixedReminderHour.value,
                 fixedReminderMinute = settings.fixedReminderMinute.value,
+                weekStartsOnMonday = settings.weekStartsOnMonday.value,
                 defaultProjectDurationDays = settings.defaultProjectDurationDays.value,
                 defaultProjectTileSizeRaw = settings.defaultProjectTileSizeRaw.value,
+                pendingMonthShowRegular = settings.pendingMonthShowRegular.value,
+                pendingMonthShowDDL = settings.pendingMonthShowDDL.value,
+                pendingMonthShowLeisure = settings.pendingMonthShowLeisure.value,
                 selectedThemeRaw = settings.themeId.value,
                 appearanceModeRaw = settings.appearanceMode.value
             ),
@@ -144,8 +148,10 @@ class WeekyiiDataArchiveRepository(
         settings.setKillTimeReminderMinutes(value.killTimeReminderMinutes)
         settings.setFixedReminderEnabled(value.fixedReminderEnabled)
         settings.setFixedReminderTime(value.fixedReminderHour, value.fixedReminderMinute)
+        settings.setWeekStartsOnMonday(value.weekStartsOnMonday)
         settings.setDefaultProjectDurationDays(value.defaultProjectDurationDays)
         settings.setDefaultProjectTileSizeRaw(value.defaultProjectTileSizeRaw)
+        settings.setPendingMonthMarkers(value.pendingMonthShowRegular, value.pendingMonthShowDDL, value.pendingMonthShowLeisure)
         settings.setThemeId(value.selectedThemeRaw)
         settings.setAppearanceMode(value.appearanceModeRaw)
     }

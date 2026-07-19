@@ -210,6 +210,37 @@ class StateMachineTest {
     }
 
     @Test
+    fun detailedDraftTaskPersistsDescriptionStepsAndAttachments() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.EMPTY)
+        val tasks = mutableMapOf<String, MutableList<TaskEntity>>()
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), tasks)
+        val taskDao = RecordingTaskDao(tasks)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            taskDao
+        )
+
+        repository.addDraftTask(
+            today.dayId,
+            "Plan launch",
+            "Keep the scope small",
+            TaskType.REGULAR,
+            "regular",
+            listOf("Write brief", "Review brief"),
+            listOf(TaskAttachmentDraft("brief.txt", "text/plain", "ok".toByteArray()))
+        )
+
+        val created = tasks.getValue(today.dayId).single()
+        val detail = taskDao.findWithSteps(created.id)!!
+        assertEquals("Keep the scope small", created.description)
+        assertEquals(listOf("Write brief", "Review brief"), detail.steps.map { it.title })
+        assertEquals("brief.txt", detail.attachments.single().fileName)
+    }
+
+    @Test
     fun flexibleExecutionCanUnlockAndAppendANewFrozenTask() = runBlocking {
         val date = LocalDate.of(2026, 7, 20)
         val currentWeek = week(date, WeekStatus.PRESENT)
@@ -316,6 +347,20 @@ class StateMachineTest {
         val updated = tasks.getValue(today.dayId).single { it.id == frozen.id }
         assertEquals("Updated frozen", updated.title)
         assertEquals("Details", updated.description)
+        assertEquals(listOf("Step one"), repository.getTaskUi(frozen.id)?.steps?.map { it.title })
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                repository.updateFrozenTask(
+                    today.dayId,
+                    frozen.id,
+                    "Should not persist",
+                    stepTitles = listOf("Should not replace"),
+                    attachments = listOf(TaskAttachmentDraft("huge.bin", "application/octet-stream", ByteArray(5 * 1024 * 1024 + 1)))
+                )
+            }
+        }
+        assertEquals("Updated frozen", tasks.getValue(today.dayId).single { it.id == frozen.id }.title)
         assertEquals(listOf("Step one"), repository.getTaskUi(frozen.id)?.steps?.map { it.title })
     }
 
@@ -483,6 +528,42 @@ class StateMachineTest {
         assertEquals("proof.txt", ui.attachments.single().fileName)
     }
 
+    @Test
+    fun oversizedDraftAttachmentIsRejectedBeforeExistingResourcesAreDeleted() = runBlocking {
+        val date = LocalDate.of(2026, 7, 20)
+        val currentWeek = week(date, WeekStatus.PRESENT)
+        val today = day(date, currentWeek.weekId, DayStatus.DRAFT)
+        val draft = task(today.dayId, 1, TaskZone.DRAFT)
+        val taskMap = mutableMapOf(today.dayId to mutableListOf(draft))
+        val days = RecordingDayDao(mutableMapOf(today.dayId to today), taskMap)
+        val taskDao = RecordingTaskDao(taskMap)
+        val repository = repository(
+            RecordingWeekDao(mutableMapOf(currentWeek.weekId to currentWeek)) { days.values() },
+            days,
+            taskDao
+        )
+        repository.replaceDraftTaskResources(
+            today.dayId,
+            draft.id,
+            listOf("Keep me"),
+            listOf(TaskAttachmentDraft("keep.txt", "text/plain", byteArrayOf(1)))
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                repository.replaceDraftTaskResources(
+                    today.dayId,
+                    draft.id,
+                    listOf("Should not replace"),
+                    listOf(TaskAttachmentDraft("huge.bin", "application/octet-stream", ByteArray(5 * 1024 * 1024 + 1)))
+                )
+            }
+        }
+        val ui = repository.getTaskUi(draft.id)!!
+        assertEquals(listOf("Keep me"), ui.steps.map { it.title })
+        assertEquals("keep.txt", ui.attachments.single().fileName)
+    }
+
     private fun repository(
         weekDao: RecordingWeekDao,
         dayDao: RecordingDayDao,
@@ -546,6 +627,10 @@ private class InMemorySettingsStore(
     override val fixedReminderMinute = MutableStateFlow(0)
     override val defaultProjectDurationDays = MutableStateFlow(7)
     override val defaultProjectTileSizeRaw = MutableStateFlow("medium")
+    override val weekStartsOnMonday = MutableStateFlow(true)
+    override val pendingMonthShowRegular = MutableStateFlow(false)
+    override val pendingMonthShowDDL = MutableStateFlow(true)
+    override val pendingMonthShowLeisure = MutableStateFlow(false)
     override suspend fun setDefaultKillTime(time: LocalTime) { defaultKillTime.value = time }
     override suspend fun setDefaultExecutionMode(mode: ExecutionMode) { defaultExecutionMode.value = mode }
     override suspend fun setDefaultTaskTypeId(idRaw: String) { defaultTaskTypeId.value = idRaw }
@@ -556,6 +641,12 @@ private class InMemorySettingsStore(
     override suspend fun setFixedReminderTime(hour: Int, minute: Int) { fixedReminderHour.value = hour; fixedReminderMinute.value = minute }
     override suspend fun setDefaultProjectDurationDays(days: Int) { defaultProjectDurationDays.value = days }
     override suspend fun setDefaultProjectTileSizeRaw(idRaw: String) { defaultProjectTileSizeRaw.value = idRaw }
+    override suspend fun setWeekStartsOnMonday(enabled: Boolean) { weekStartsOnMonday.value = enabled }
+    override suspend fun setPendingMonthMarkers(regular: Boolean, ddl: Boolean, leisure: Boolean) {
+        pendingMonthShowRegular.value = regular
+        pendingMonthShowDDL.value = ddl
+        pendingMonthShowLeisure.value = leisure
+    }
 }
 
 private class RecordingWeekDao(

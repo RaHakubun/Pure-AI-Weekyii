@@ -61,7 +61,8 @@ class WeekyiiApplication : Application() {
                 taskDao = database.taskDao(),
                 projectDao = database.projectDao(),
                 weekCalculator = WeekCalculator(),
-                zoneId = zone
+                zoneId = zone,
+                database = database
             )
             appStateStore = DataStoreAppStateStore(this)
             settingsStore = DataStoreUserSettingsStore(this)
