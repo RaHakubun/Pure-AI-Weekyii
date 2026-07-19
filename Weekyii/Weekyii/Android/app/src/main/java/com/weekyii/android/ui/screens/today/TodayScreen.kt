@@ -77,6 +77,8 @@ import com.weekyii.android.ui.screens.week.WeekScreen
 import com.weekyii.android.ui.components.WeekyiiCard
 import com.weekyii.android.ui.components.WeekyiiButton
 import com.weekyii.android.ui.components.WeekyiiButtonStyle
+import com.weekyii.android.ui.components.WeekyiiBottomSheet
+import com.weekyii.android.ui.components.WeekyiiConfirmDialog
 import com.weekyii.android.ui.components.WeekyiiEmptyState
 import com.weekyii.android.ui.components.WeekyiiHeader
 import com.weekyii.android.ui.components.WeekyiiSegmentedControl
@@ -102,6 +104,12 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     var editingStepsText by remember { mutableStateOf("") }
     var editingTaskTypeId by remember { mutableStateOf("regular") }
     val editingAttachments = remember { mutableStateListOf<TaskAttachmentUi>() }
+    val startFlow = remember { TodayStartFlowCoordinator() }
+    val startFlowState by startFlow.state.collectAsState()
+    var pendingKillTime by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var pendingKillTimeImpact by remember { mutableStateOf<TodayViewModel.KillTimeChangeImpact?>(null) }
+    var killTimeError by remember { mutableStateOf<String?>(null) }
+    var pendingPostpone by remember { mutableStateOf<Pair<TaskUi, LocalDate>?>(null) }
     val context = LocalContext.current
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -149,9 +157,6 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         }
         item {
             TodayWeekSwitcher(showWeek = false, onChange = { showWeek = it })
-        }
-        state.ritualStamp?.let { stamp ->
-            item { RitualStampCard(stamp.text, stamp.imageBlob, viewModel::dismissRitual) }
         }
         item {
             val status = day?.status ?: DayStatus.EMPTY
@@ -215,7 +220,10 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                                     showEmptyComposer = false
                                 }
                             },
-                            onStart = viewModel::startDay,
+                            onStart = {
+                                viewModel.prepareStartRitual()
+                                startFlow.present()
+                            },
                             canStart = false
                         )
                     }
@@ -257,7 +265,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             editingAttachments.clear()
                             editingAttachments.addAll(task.attachments)
                         },
-                        onPostpone = { date -> viewModel.postponeTask(task, date) }
+                        onPostpone = { date -> pendingPostpone = task to date }
                     )
                 }
                 item {
@@ -271,7 +279,10 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                                 newTaskTitle = ""
                             }
                         },
-                        onStart = viewModel::startDay,
+                        onStart = {
+                            viewModel.prepareStartRitual()
+                            startFlow.present()
+                        },
                         canStart = state.draft.isNotEmpty()
                     )
                 }
@@ -284,7 +295,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         task = state.focus,
                         typeLabel = state.focus?.let { taskTypeLabel(it, state.taskTypeDefinitions) },
                         onComplete = viewModel::doneFocus,
-                        onPostpone = { task, date -> viewModel.postponeTask(task, date) }
+                        onPostpone = { task, date -> pendingPostpone = task to date }
                     )
                 }
                 if (day?.executionModeRaw == ExecutionMode.FLEXIBLE.name.lowercase()) {
@@ -335,7 +346,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                                 editingAttachments.clear()
                                 editingAttachments.addAll(task.attachments)
                             },
-                            onPostpone = { date -> viewModel.postponeTask(task, date) }
+                            onPostpone = { date -> pendingPostpone = task to date }
                         )
                     }
                 }
@@ -384,11 +395,45 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                    KillTimeButton(
-                        hour = day?.killHour ?: 20,
-                        minute = day?.killMinute ?: 0,
-                        enabled = day?.status !in listOf(DayStatus.COMPLETED, DayStatus.EXPIRED),
-                        onChange = viewModel::changeKillTime
+                    KillTimeEditor(
+                        hour = pendingKillTime?.first ?: day?.killHour ?: 20,
+                        minute = pendingKillTime?.second ?: day?.killMinute ?: 0,
+                        enabled = day?.status in listOf(DayStatus.DRAFT, DayStatus.EXECUTE),
+                        hasPendingChange = pendingKillTime != null,
+                        onChange = { selectedHour, selectedMinute ->
+                            killTimeError = null
+                            pendingKillTime = selectedHour to selectedMinute
+                            pendingKillTimeImpact = runCatching {
+                                viewModel.evaluateKillTimeChangeImpact(selectedHour, selectedMinute)
+                            }.getOrElse {
+                                killTimeError = it.message
+                                null
+                            }
+                        },
+                        onCancel = {
+                            pendingKillTime = null
+                            pendingKillTimeImpact = null
+                            killTimeError = null
+                        },
+                        onConfirm = {
+                            pendingKillTime?.let { selected ->
+                                viewModel.changeKillTime(
+                                    selected.first,
+                                    selected.second,
+                                    allowImmediateExpire = pendingKillTimeImpact is TodayViewModel.KillTimeChangeImpact.ImmediateExpire
+                                )
+                                pendingKillTime = null
+                                pendingKillTimeImpact = null
+                            }
+                        }
+                    )
+                }
+                killTimeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (pendingKillTimeImpact is TodayViewModel.KillTimeChangeImpact.ImmediateExpire) {
+                    Text(
+                        "确认后将立即收口，未完成的 ${pendingKillTimeImpact?.let { (it as TodayViewModel.KillTimeChangeImpact.ImmediateExpire).expiredCount } ?: 0} 项只保留过期数量。",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -401,6 +446,41 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    WeekyiiBottomSheet(
+        visible = startFlowState.isVisible,
+        onDismiss = startFlow::dismiss
+    ) {
+        when (startFlowState.step) {
+            TodayStartFlowStep.WARNING -> StartWarningStep(
+                draftCount = state.draft.size,
+                killTime = String.format("%02d:%02d", day?.killHour ?: 20, day?.killMinute ?: 0),
+                onCancel = startFlow::dismiss,
+                onContinue = {
+                    viewModel.prepareStartRitual()
+                    startFlow.continueToRitual()
+                }
+            )
+            TodayStartFlowStep.RITUAL -> StartRitualStep(
+                stamp = state.startRitualStamp,
+                onBack = { startFlow.present() },
+                onConfirm = { viewModel.startDay { startFlow.finish() } }
+            )
+        }
+    }
+
+    pendingPostpone?.let { (task, targetDate) ->
+        WeekyiiConfirmDialog(
+            title = "确认后移任务",
+            message = "确认将「${task.title}」后移到 $targetDate 吗？目标周不存在时会自动创建。",
+            confirmLabel = "确认后移",
+            onConfirm = {
+                viewModel.postponeTask(task, targetDate)
+                pendingPostpone = null
+            },
+            onDismiss = { pendingPostpone = null }
+        )
     }
 
     editingTask?.let { task ->
@@ -477,17 +557,49 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
 }
 
 @Composable
-private fun RitualStampCard(text: String, imageBlob: ByteArray?, onDismiss: () -> Unit) {
-    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("今日 MindStamp", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("把这一刻带进今天。", color = MaterialTheme.colorScheme.onTertiaryContainer)
-            if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge)
-            imageBlob?.let { bytes ->
+private fun StartWarningStep(
+    draftCount: Int,
+    killTime: String,
+    onCancel: () -> Unit,
+    onContinue: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("准备开始", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("启动后任务顺序会成为今天的承诺，Focus 完成后才会解冻下一项。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("今日任务", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("$draftCount 项 · 截止 $killTime", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiButton(text = "取消", style = WeekyiiButtonStyle.Outline, onClick = onCancel, modifier = Modifier.weight(1f))
+            WeekyiiButton(text = "继续", icon = Icons.Filled.PlayArrow, onClick = onContinue, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun StartRitualStep(
+    stamp: com.weekyii.android.ui.model.MindStampUi?,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("启动仪式", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("把这一刻带进今天。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (stamp == null) {
+            Text("没有保存的 MindStamp，也可以直接开始。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            if (stamp.text.isNotBlank()) Text(stamp.text, style = MaterialTheme.typography.bodyLarge)
+            stamp.imageBlob?.let { bytes ->
                 val bitmap = remember(bytes.contentHashCode()) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
                 bitmap?.let { Image(it.asImageBitmap(), contentDescription = "MindStamp 图片", modifier = Modifier.height(140.dp), contentScale = ContentScale.Fit) }
             }
-            TextButton(onClick = onDismiss) { Text("收下并开始") }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            WeekyiiButton(text = "返回", style = WeekyiiButtonStyle.Outline, onClick = onBack, modifier = Modifier.weight(1f))
+            WeekyiiButton(text = "开始今天", icon = Icons.Filled.PlayArrow, onClick = onConfirm, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -529,18 +641,34 @@ private fun statusAccentColor(status: DayStatus): Color = when (status) {
 }
 
 @Composable
-private fun KillTimeButton(hour: Int, minute: Int, enabled: Boolean, onChange: (Int, Int) -> Unit) {
+private fun KillTimeEditor(
+    hour: Int,
+    minute: Int,
+    enabled: Boolean,
+    hasPendingChange: Boolean,
+    onChange: (Int, Int) -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit
+) {
     val context = LocalContext.current
-    OutlinedButton(
-        enabled = enabled,
-        onClick = {
-            TimePickerDialog(context, { _, selectedHour, selectedMinute ->
-                onChange(selectedHour, selectedMinute)
-            }, hour, minute, true).show()
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            enabled = enabled,
+            onClick = {
+                TimePickerDialog(context, { _, selectedHour, selectedMinute ->
+                    onChange(selectedHour, selectedMinute)
+                }, hour, minute, true).show()
+            }
+        ) {
+            Icon(Icons.Filled.Schedule, contentDescription = null)
+            Text(String.format("  %02d:%02d", hour, minute))
         }
-    ) {
-        Icon(Icons.Filled.Schedule, contentDescription = null)
-        Text(String.format("  %02d:%02d", hour, minute))
+        if (hasPendingChange) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel) { Text("取消") }
+                FilledTonalButton(onClick = onConfirm) { Text("确认修改") }
+            }
+        }
     }
 }
 

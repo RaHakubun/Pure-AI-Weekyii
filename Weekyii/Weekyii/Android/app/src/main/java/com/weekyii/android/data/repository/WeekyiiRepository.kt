@@ -574,16 +574,34 @@ class WeekyiiRepository(
         dayId: String,
         hour: Int,
         minute: Int,
-        now: java.util.Date = java.util.Date()
+        now: java.util.Date = java.util.Date(),
+        allowImmediateExpire: Boolean = false
     ) {
         require(hour in 0..23) { "Kill Time hour must be between 0 and 23" }
         require(minute in 0..59) { "Kill Time minute must be between 0 and 59" }
         val day = dayDao.findById(dayId) ?: return
-        if (day.status == DayStatus.EXPIRED || day.status == DayStatus.COMPLETED) return
+        if (day.status !in setOf(DayStatus.DRAFT, DayStatus.EXECUTE)) {
+            throw IllegalStateException("当前状态不可修改截止时间")
+        }
         val dayDate = day.date.toInstant().atZone(zoneId).toLocalDate()
         val proposedKillTime = java.util.Date.from(dayDate.atTime(hour, minute).atZone(zoneId).toInstant())
         if (!proposedKillTime.after(now)) {
-            throw IllegalStateException("Kill time has passed")
+            if (!allowImmediateExpire) throw IllegalStateException("Kill time has passed")
+            val unfinishedCount = dayDao.findWithTasks(dayId)?.tasks
+                ?.count { it.zone in listOf(TaskZone.DRAFT, TaskZone.FOCUS, TaskZone.FROZEN) }
+                ?: 0
+            dayDao.upsert(
+                day.copy(
+                    killHour = hour,
+                    killMinute = minute,
+                    followsDefaultKillTime = false,
+                    status = DayStatus.EXPIRED,
+                    expiredCount = unfinishedCount,
+                    isDraftZoneUnlocked = false
+                )
+            )
+            taskDao.deleteByZones(dayId, listOf(TaskZone.DRAFT.name, TaskZone.FOCUS.name, TaskZone.FROZEN.name))
+            return
         }
         dayDao.upsert(
             day.copy(

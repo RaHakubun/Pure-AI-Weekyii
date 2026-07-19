@@ -123,7 +123,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
         )
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -139,7 +139,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.APPEARANCE) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("主题", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -166,7 +166,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.PROJECTS) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("项目默认值", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -195,7 +195,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.TODAY) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.tertiary) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("通知提醒", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -244,7 +244,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.TODAY) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("默认 Kill Time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -261,7 +261,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.DATA) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("数据归档", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -283,7 +283,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.TODAY) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("默认执行模式", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -297,7 +297,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        item {
+        if (selectedSection == SettingsSection.TASK_TYPES) item {
             WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("任务类型", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -319,7 +319,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
             }
         }
 
-        if (archivedTypes.isNotEmpty()) {
+        if (selectedSection == SettingsSection.TASK_TYPES && archivedTypes.isNotEmpty()) {
             item {
                 WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -335,6 +335,35 @@ fun SettingsScreen(viewModel: SettingsViewModel, padding: PaddingValues) {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if (selectedSection == SettingsSection.FUTURE) item {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("未来设置", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("未来周按周一开始，月视图会沿用任务类型的颜色标记。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("当前 Android 版本与 iOS 使用相同的周计算规则。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        if (selectedSection == SettingsSection.ABOUT) item {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.secondary) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("关于 Weekyii", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("AI Native 的周粒度任务与 Todo 管理系统。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Android 原生版本 · 逻辑与 iOS 保持一致。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        if (selectedSection == SettingsSection.DEVELOPER) item {
+            WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("开发者与诊断", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("用于查看构建和数据归档状态。生产任务逻辑不会因诊断入口改变。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -412,7 +441,7 @@ private fun SettingsHomeScreen(
     )
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFF2F2F7)).padding(padding),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
@@ -434,7 +463,7 @@ private fun SettingsGroup(
     onSelect: (SettingsSection) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Color(0xFF77777F), modifier = Modifier.padding(start = 12.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
         val shape = RoundedCornerShape(24.dp)
         Column(
             modifier = Modifier

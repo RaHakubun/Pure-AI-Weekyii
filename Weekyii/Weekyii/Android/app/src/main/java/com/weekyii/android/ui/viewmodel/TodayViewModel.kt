@@ -32,6 +32,11 @@ class TodayViewModel(
     private val notificationService: WeekyiiNotificationService? = null
 ) : ViewModel() {
 
+    sealed interface KillTimeChangeImpact {
+        data object Normal : KillTimeChangeImpact
+        data class ImmediateExpire(val expiredCount: Int) : KillTimeChangeImpact
+    }
+
     data class UiState(
         val date: LocalDate = LocalDate.now(),
         val day: DayUi? = null,
@@ -42,7 +47,7 @@ class TodayViewModel(
         val startExecutionMode: ExecutionMode = ExecutionMode.STRICT,
         val taskTypeDefinitions: List<TaskTypeDefinitionEntity> = emptyList(),
         val selectedTaskTypeId: String = "regular",
-        val ritualStamp: com.weekyii.android.ui.model.MindStampUi? = null,
+        val startRitualStamp: com.weekyii.android.ui.model.MindStampUi? = null,
         val error: String? = null
     )
 
@@ -84,7 +89,7 @@ class TodayViewModel(
                 startExecutionMode = selectedMode,
                 taskTypeDefinitions = definitions,
                 selectedTaskTypeId = preferredTypeId,
-                ritualStamp = _state.value.ritualStamp,
+                startRitualStamp = _state.value.startRitualStamp,
                 error = null
             )
             val currentDay = _state.value.day
@@ -124,21 +129,25 @@ class TodayViewModel(
         _state.update { it.copy(selectedTaskTypeId = idRaw) }
     }
 
-    fun startDay() {
+    fun prepareStartRitual() {
+        viewModelScope.launch {
+            _state.update { it.copy(startRitualStamp = mindStampRepository?.random()) }
+        }
+    }
+
+    fun startDay(onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 repo.startDay(timeProvider.today.toString(), timeProvider.now, _state.value.startExecutionMode)
-                val ritualStamp = mindStampRepository?.random()
                 refresh()
-                _state.update { it.copy(ritualStamp = ritualStamp) }
+                _state.update { it.copy(startRitualStamp = null) }
                 appState.incrementDaysStarted()
+                onSuccess()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }
         }
     }
-
-    fun dismissRitual() { _state.update { it.copy(ritualStamp = null) } }
 
     fun selectExecutionMode(mode: ExecutionMode) {
         _state.update { it.copy(startExecutionMode = mode) }
@@ -257,10 +266,26 @@ class TodayViewModel(
         }
     }
 
-    fun changeKillTime(hour: Int, minute: Int) {
+    fun evaluateKillTimeChangeImpact(hour: Int, minute: Int): KillTimeChangeImpact {
+        require(hour in 0..23 && minute in 0..59) { "时间格式无效" }
+        val currentDay = _state.value.day ?: error("今天任务流不存在")
+        require(currentDay.status in setOf(com.weekyii.android.data.db.entities.DayStatus.DRAFT, com.weekyii.android.data.db.entities.DayStatus.EXECUTE)) {
+            "当前状态不可修改截止时间"
+        }
+        val proposed = currentDay.date.atTime(hour, minute).atZone(timeProvider.zoneId).toInstant()
+        return if (!proposed.isAfter(timeProvider.nowInstant)) {
+            KillTimeChangeImpact.ImmediateExpire(
+                _state.value.draft.size + (if (_state.value.focus != null) 1 else 0) + _state.value.frozen.size
+            )
+        } else {
+            KillTimeChangeImpact.Normal
+        }
+    }
+
+    fun changeKillTime(hour: Int, minute: Int, allowImmediateExpire: Boolean = false) {
         viewModelScope.launch {
             try {
-                repo.changeKillTime(timeProvider.today.toString(), hour, minute, timeProvider.now)
+                repo.changeKillTime(timeProvider.today.toString(), hour, minute, timeProvider.now, allowImmediateExpire)
                 refresh()
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }

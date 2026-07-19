@@ -11,6 +11,7 @@ import com.weekyii.android.data.db.entities.DayWithTasks
 import com.weekyii.android.data.db.entities.MindStampEntity
 import com.weekyii.android.data.db.entities.ProjectEntity
 import com.weekyii.android.data.db.entities.TaskEntity
+import com.weekyii.android.data.db.entities.TaskZone
 import com.weekyii.android.data.db.entities.TaskWithSteps
 import com.weekyii.android.data.db.entities.TaskStepEntity
 import com.weekyii.android.data.db.entities.TaskAttachmentEntity
@@ -120,6 +121,21 @@ class WeekyiiRepositoryBehaviorTest {
     }
 
     @Test
+    fun emptyDayCannotChangeKillTime(): Unit = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val date = LocalDate.of(2026, 7, 20)
+        val day = day(date.toString(), DayStatus.EMPTY).copy(
+            date = Date.from(date.atStartOfDay(zone).toInstant())
+        )
+        val repository = repository(dayDao = FakeDayDao(mutableMapOf(day.dayId to day)))
+        val now = Date.from(LocalDateTime.of(2026, 7, 20, 10, 0).atZone(zone).toInstant())
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repository.changeKillTime(day.dayId, 21, 0, now) }
+        }
+    }
+
+    @Test
     fun weekSummaryCountsOnlyDaysThatWereActuallyStarted() = runBlocking {
         val weekId = "2026-W30"
         val expiredDraft = day("2026-07-20", DayStatus.EXPIRED, weekId = weekId)
@@ -152,6 +168,29 @@ class WeekyiiRepositoryBehaviorTest {
         }
         repository.changeKillTime(day.dayId, 21, 0, now)
         assertEquals(21, days.findById(day.dayId)?.killHour)
+    }
+
+    @Test
+    fun pastKillTimeExpiresUnfinishedTasksOnlyAfterExplicitConfirmation() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val date = LocalDate.of(2026, 7, 20)
+        val day = day(date.toString(), DayStatus.EXECUTE).copy(
+            date = Date.from(date.atStartOfDay(zone).toInstant())
+        )
+        val tasks = listOf(
+            TaskEntity(title = "focus", order = 1, zone = TaskZone.FOCUS, dayOwnerId = day.dayId),
+            TaskEntity(title = "frozen", order = 2, zone = TaskZone.FROZEN, dayOwnerId = day.dayId),
+            TaskEntity(title = "done", order = 3, zone = TaskZone.COMPLETE, dayOwnerId = day.dayId)
+        )
+        val days = FakeDayDao(mutableMapOf(day.dayId to day), tasks)
+        val repository = repository(dayDao = days, taskDao = FakeTaskDao(tasks))
+        val now = Date.from(LocalDateTime.of(2026, 7, 20, 20, 1).atZone(zone).toInstant())
+
+        repository.changeKillTime(day.dayId, 20, 0, now, allowImmediateExpire = true)
+
+        assertEquals(DayStatus.EXPIRED, days.findById(day.dayId)?.status)
+        assertEquals(2, days.findById(day.dayId)?.expiredCount)
+        assertEquals(20, days.findById(day.dayId)?.killHour)
     }
 
     private fun repository(
@@ -204,13 +243,16 @@ private class FakeWeekDao(
 }
 
 private class FakeDayDao(
-    private val values: MutableMap<String, DayEntity> = mutableMapOf()
+    private val values: MutableMap<String, DayEntity> = mutableMapOf(),
+    private val tasks: List<TaskEntity> = emptyList()
 ) : DayDao {
     override suspend fun insert(day: DayEntity): Long { values[day.dayId] = day; return 1L }
     override suspend fun upsert(day: DayEntity) { values[day.dayId] = day }
     override suspend fun update(day: DayEntity) { values[day.dayId] = day }
     override suspend fun findById(dayId: String): DayEntity? = values[dayId]
-    override suspend fun findWithTasks(dayId: String): DayWithTasks? = values[dayId]?.let { DayWithTasks(it, emptyList()) }
+    override suspend fun findWithTasks(dayId: String): DayWithTasks? = values[dayId]?.let { day ->
+        DayWithTasks(day, tasks.filter { it.dayOwnerId == dayId })
+    }
     override fun observeByStatus(status: DayStatus): Flow<List<DayEntity>> =
         MutableStateFlow(values.values.filter { it.status == status })
     override fun observeAll(): Flow<List<DayEntity>> = MutableStateFlow(values.values.toList())
