@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.ui.theme.WeekyiiDimensions
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
 
 @Composable
 fun WeekyiiCard(
@@ -28,11 +29,12 @@ fun WeekyiiCard(
     fillWidth: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val palette = LocalWeekyiiPalette.current
     val shape = RoundedCornerShape(WeekyiiDimensions.radiusLarge)
     val borderColor = if (gradient) {
-        Color.White.copy(alpha = 0.22f)
+        palette.onGradient.copy(alpha = 0.22f)
     } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
     }
     val background = if (gradient) {
         Brush.linearGradient(
@@ -47,7 +49,12 @@ fun WeekyiiCard(
     Column(
         modifier = modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-            .shadow(WeekyiiDimensions.cardElevation, shape)
+            .shadow(
+                WeekyiiDimensions.cardElevation,
+                shape,
+                ambientColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+            )
             .clip(shape)
             .background(background)
             .border(1.dp, borderColor, shape)
@@ -56,8 +63,8 @@ fun WeekyiiCard(
         if (accentColor != null) {
             Spacer(
                 modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
+                    .width(WeekyiiDimensions.accentBarWidth)
+                    .height(WeekyiiDimensions.accentBarHeight)
                     .background(accentColor, RoundedCornerShape(WeekyiiDimensions.radiusFull))
                     .align(androidx.compose.ui.Alignment.CenterHorizontally)
             )

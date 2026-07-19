@@ -7,11 +7,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 
 @Composable
 fun WeekyiiTaskRow(
@@ -19,14 +24,16 @@ fun WeekyiiTaskRow(
     subtitle: String? = null,
     leading: (@Composable () -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
+    onMoreActions: (() -> Unit)? = null,
+    moreActionsContentDescription: String = "任务操作",
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
+            .padding(vertical = WeekyiiDimensions.taskRowVerticalPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)
     ) {
         leading?.invoke()
         Column(modifier = Modifier.weight(1f)) {
@@ -36,5 +43,10 @@ fun WeekyiiTaskRow(
             }
         }
         trailing()
+        onMoreActions?.let { onClick ->
+            IconButton(onClick = onClick) {
+                Icon(Icons.Filled.MoreVert, contentDescription = moreActionsContentDescription)
+            }
+        }
     }
 }

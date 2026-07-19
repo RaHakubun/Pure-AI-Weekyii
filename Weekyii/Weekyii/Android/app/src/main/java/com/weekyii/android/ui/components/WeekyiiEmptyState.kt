@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 
 @Composable
 fun WeekyiiEmptyState(
@@ -25,15 +26,15 @@ fun WeekyiiEmptyState(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 32.dp),
+                .padding(vertical = WeekyiiDimensions.spacingExtraExtraLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingMedium)
         ) {
             Icon(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(60.dp).padding(bottom = 8.dp)
+                modifier = Modifier.size(WeekyiiDimensions.emptyStateIconSize).padding(bottom = WeekyiiDimensions.spacingSmall)
             )
             Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)

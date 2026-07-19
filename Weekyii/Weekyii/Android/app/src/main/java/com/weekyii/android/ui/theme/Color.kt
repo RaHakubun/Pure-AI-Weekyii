@@ -24,9 +24,23 @@ data class WeekyiiPalette(
     val taskDDLBg: Color,
     val taskLeisure: Color,
     val taskLeisureBg: Color
-)
+) {
+    /** Foreground used on the amber/primary gradient surfaces. */
+    val onGradient: Color
+        get() = if (backgroundPrimary.red < 0.5f) backgroundPrimary else backgroundSecondary
+
+    /** Semantic status colors shared by cards, badges, and progress indicators. */
+    val success: Color get() = accentGreen
+    val warning: Color get() = taskDDL
+    val navigationIcon: Color get() = textPrimary
+}
 
 object WeekyiiPalettes {
+    val supportedThemeIds: Set<String> = setOf(
+        "amber", "ocean", "forest", "rose", "lavender",
+        "graphite", "sunset", "mint", "midnight", "lotr"
+    )
+
     private fun color(hex: String): Color = Color(hex.removePrefix("#").toLong(16) or 0xFF000000L)
 
     private fun palette(values: List<String>): WeekyiiPalette {

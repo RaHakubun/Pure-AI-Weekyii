@@ -52,6 +52,20 @@ class WeekyiiThemeTokensTest {
         val primaryColors = themeIds.map { WeekyiiPalettes.forTheme(it, darkTheme = false).primary }
 
         assertEquals(themeIds.size, primaryColors.distinct().size)
+        assertEquals(themeIds.toSet(), WeekyiiPalettes.supportedThemeIds)
+    }
+
+    @Test
+    fun semanticRolesStayInsideTheSelectedPalette() {
+        val light = WeekyiiPalettes.forTheme("amber", darkTheme = false)
+        val dark = WeekyiiPalettes.forTheme("amber", darkTheme = true)
+
+        assertEquals(light.backgroundSecondary, light.onGradient)
+        assertEquals(dark.backgroundPrimary, dark.onGradient)
+        assertEquals(light.accentGreen, light.success)
+        assertEquals(light.taskDDL, light.warning)
+        assertEquals(light.textPrimary, light.navigationIcon)
+        assertEquals(dark.textPrimary, dark.navigationIcon)
     }
 
     @Test
@@ -63,5 +77,22 @@ class WeekyiiThemeTokensTest {
         assertEquals(24f, WeekyiiDimensions.spacingExtraLarge.value)
         assertEquals(16f, WeekyiiDimensions.radiusLarge.value)
         assertEquals(24f, WeekyiiDimensions.radiusExtraLarge.value)
+        assertEquals(20f, WeekyiiDimensions.screenPadding.value)
+        assertEquals(14f, WeekyiiDimensions.listGap.value)
+        assertEquals(52f, WeekyiiDimensions.controlHeight.value)
+        assertEquals(48f, WeekyiiDimensions.minimumTouchTarget.value)
+        assertEquals(1f, WeekyiiDimensions.hairline.value)
+    }
+
+    @Test
+    fun typographyDefinesEveryIosHierarchyRole() {
+        assertEquals(46f, WeekyiiTypography.displayLarge.fontSize.value)
+        assertEquals(32f, WeekyiiTypography.titleLarge.fontSize.value)
+        assertEquals(22f, WeekyiiTypography.titleMedium.fontSize.value)
+        assertEquals(18f, WeekyiiTypography.titleSmall.fontSize.value)
+        assertEquals(17f, WeekyiiTypography.bodyLarge.fontSize.value)
+        assertEquals(15f, WeekyiiTypography.bodyMedium.fontSize.value)
+        assertEquals(13f, WeekyiiTypography.bodySmall.fontSize.value)
+        assertEquals(11f, WeekyiiTypography.labelSmall.fontSize.value)
     }
 }

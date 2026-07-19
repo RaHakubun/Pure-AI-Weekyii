@@ -10,20 +10,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 
 @Composable
 fun StatusBadge(
     text: String,
     color: Color,
-    contentColor: Color = Color.White,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+    contentColor: Color? = null,
+    contentPadding: PaddingValues = PaddingValues(horizontal = WeekyiiDimensions.badgeHorizontalPadding, vertical = WeekyiiDimensions.badgeVerticalPadding)
 ) {
+    val resolvedContentColor = contentColor ?: LocalWeekyiiPalette.current.onGradient
     Text(
         text = text,
-        color = contentColor,
+        color = resolvedContentColor,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
-            .background(color, RoundedCornerShape(12.dp))
+            .background(color, RoundedCornerShape(WeekyiiDimensions.badgeRadius))
             .padding(contentPadding)
     )
 }

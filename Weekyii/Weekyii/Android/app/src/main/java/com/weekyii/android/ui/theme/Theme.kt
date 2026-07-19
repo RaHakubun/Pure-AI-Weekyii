@@ -1,12 +1,15 @@
 package com.weekyii.android.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 
 val LocalWeekyiiThemeId = staticCompositionLocalOf { "amber" }
 val LocalWeekyiiPalette = staticCompositionLocalOf { WeekyiiPalettes.forTheme("amber", false) }
@@ -32,7 +35,15 @@ fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkT
             onSurface = palette.textPrimary,
             surfaceVariant = palette.backgroundTertiary,
             onSurfaceVariant = palette.textSecondary,
-            outline = palette.textTertiary
+            outline = palette.textTertiary,
+            error = palette.taskDDL,
+            onError = palette.backgroundSecondary,
+            errorContainer = palette.taskDDLBg,
+            onErrorContainer = palette.textPrimary,
+            inverseSurface = palette.textPrimary,
+            inverseOnSurface = palette.backgroundSecondary,
+            inversePrimary = palette.primaryLight,
+            scrim = Color.Black.copy(alpha = 0.32f)
         )
     } else {
         lightColorScheme(
@@ -52,9 +63,25 @@ fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkT
             onSurface = palette.textPrimary,
             surfaceVariant = palette.backgroundTertiary,
             onSurfaceVariant = palette.textSecondary,
-            outline = palette.textTertiary
+            outline = palette.textTertiary,
+            error = palette.taskDDL,
+            onError = palette.backgroundSecondary,
+            errorContainer = palette.taskDDLBg,
+            onErrorContainer = palette.textPrimary,
+            inverseSurface = palette.textPrimary,
+            inverseOnSurface = palette.backgroundSecondary,
+            inversePrimary = palette.primaryLight,
+            scrim = Color.Black.copy(alpha = 0.32f)
         )
     })
+
+    val shapes = Shapes(
+        extraSmall = RoundedCornerShape(WeekyiiDimensions.radiusSmall),
+        small = RoundedCornerShape(WeekyiiDimensions.radiusMedium),
+        medium = RoundedCornerShape(WeekyiiDimensions.radiusLarge),
+        large = RoundedCornerShape(WeekyiiDimensions.radiusExtraLarge),
+        extraLarge = RoundedCornerShape(WeekyiiDimensions.radiusExtraLarge)
+    )
 
     CompositionLocalProvider(
         LocalWeekyiiThemeId provides themeId,
@@ -63,6 +90,7 @@ fun WeekyiiTheme(themeId: String = "amber", darkTheme: Boolean = isSystemInDarkT
         MaterialTheme(
             colorScheme = colors,
             typography = WeekyiiTypography,
+            shapes = shapes,
             content = content
         )
     }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -23,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weekyii.android.ui.theme.WeekyiiDimensions
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
 
 enum class WeekyiiButtonStyle { Primary, Secondary, Outline, OnGradient }
 
@@ -35,6 +37,7 @@ fun WeekyiiButton(
     style: WeekyiiButtonStyle = WeekyiiButtonStyle.Primary,
     enabled: Boolean = true
 ) {
+    val palette = LocalWeekyiiPalette.current
     val shape = RoundedCornerShape(WeekyiiDimensions.radiusExtraLarge)
     val background = when (style) {
         WeekyiiButtonStyle.Primary -> Brush.horizontalGradient(
@@ -47,33 +50,34 @@ fun WeekyiiButton(
             listOf(Color.Transparent, Color.Transparent)
         )
         WeekyiiButtonStyle.OnGradient -> Brush.linearGradient(
-            listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0.20f))
+            listOf(palette.onGradient.copy(alpha = 0.20f), palette.onGradient.copy(alpha = 0.20f))
         )
     }
     val foreground = when (style) {
         WeekyiiButtonStyle.Primary -> MaterialTheme.colorScheme.onPrimary
         WeekyiiButtonStyle.Secondary, WeekyiiButtonStyle.Outline -> MaterialTheme.colorScheme.primary
-        WeekyiiButtonStyle.OnGradient -> Color.White
+        WeekyiiButtonStyle.OnGradient -> palette.onGradient
     }
     Row(
         modifier = modifier
-            .defaultMinSize(minHeight = 52.dp)
+            .defaultMinSize(minHeight = WeekyiiDimensions.controlHeight)
             .shadow(if (style == WeekyiiButtonStyle.Primary) WeekyiiDimensions.floatingElevation else 0.dp, shape)
             .clip(shape)
             .background(background)
             .then(
                 if (style == WeekyiiButtonStyle.Outline) {
-                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, shape)
+                    Modifier.border(WeekyiiDimensions.buttonOutlineWidth, MaterialTheme.colorScheme.primary, shape)
                 } else if (style == WeekyiiButtonStyle.OnGradient) {
-                    Modifier.border(1.dp, Color.White.copy(alpha = 0.28f), shape)
+                    Modifier.border(WeekyiiDimensions.hairline, palette.onGradient.copy(alpha = 0.28f), shape)
                 } else Modifier
             )
+            .alpha(if (enabled) 1f else 0.46f)
             .clickable(
                 enabled = enabled,
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(horizontal = WeekyiiDimensions.spacingExtraLarge, vertical = 14.dp),
+            .padding(horizontal = WeekyiiDimensions.spacingExtraLarge, vertical = WeekyiiDimensions.buttonVerticalPadding),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -85,7 +89,7 @@ fun WeekyiiButton(
             modifier = if (icon == null) Modifier else Modifier.padding(start = WeekyiiDimensions.spacingSmall),
             color = foreground.copy(alpha = if (enabled) 1f else 0.5f),
             style = MaterialTheme.typography.bodyLarge,
-            fontSize = 17.sp
+            fontSize = MaterialTheme.typography.bodyLarge.fontSize
         )
     }
 }

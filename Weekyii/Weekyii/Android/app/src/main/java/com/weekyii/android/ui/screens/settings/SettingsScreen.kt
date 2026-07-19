@@ -64,6 +64,8 @@ import com.weekyii.android.ui.viewmodel.SettingsViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 
 private enum class SettingsSection(val title: String) {
     APPEARANCE("外观与主题"),
@@ -436,29 +438,30 @@ private fun SettingsHomeScreen(
     padding: PaddingValues,
     onSelect: (SettingsSection) -> Unit
 ) {
+    val palette = LocalWeekyiiPalette.current
     val rows = listOf(
         "个性化" to listOf(
-            SettingsRowSpec(SettingsSection.APPEARANCE, "外观与主题", "${themeLabel(state.themeId)} · ${appearanceLabel(state.appearanceMode)}", Icons.Outlined.Palette, Color(0xFFBF32D3))
+            SettingsRowSpec(SettingsSection.APPEARANCE, "外观与主题", "${themeLabel(state.themeId)} · ${appearanceLabel(state.appearanceMode)}", Icons.Outlined.Palette, palette.primary)
         ),
         "使用方式" to listOf(
-            SettingsRowSpec(SettingsSection.TODAY, "今日节奏", "%02d:%02d".format(state.defaultKillTime.hour, state.defaultKillTime.minute), Icons.Outlined.Timer, Color(0xFFFF8A2A)),
-            SettingsRowSpec(SettingsSection.TASK_TYPES, "任务管理", "${state.taskTypeDefinitions.count { !it.isArchived }} 个类型", Icons.Outlined.Label, Color(0xFF13B5C8)),
-            SettingsRowSpec(SettingsSection.FUTURE, "未来", if (state.weekStartsOnMonday) "周一开始" else "按系统周起始", Icons.Outlined.CalendarMonth, Color(0xFF237CF2)),
-            SettingsRowSpec(SettingsSection.PROJECTS, "项目", "默认 ${state.defaultProjectDurationDays} 天", Icons.Outlined.Folder, Color(0xFFAF8A6C))
+            SettingsRowSpec(SettingsSection.TODAY, "今日节奏", "%02d:%02d".format(state.defaultKillTime.hour, state.defaultKillTime.minute), Icons.Outlined.Timer, palette.accentOrange),
+            SettingsRowSpec(SettingsSection.TASK_TYPES, "任务管理", "${state.taskTypeDefinitions.count { !it.isArchived }} 个类型", Icons.Outlined.Label, palette.taskRegular),
+            SettingsRowSpec(SettingsSection.FUTURE, "未来", if (state.weekStartsOnMonday) "周一开始" else "按系统周起始", Icons.Outlined.CalendarMonth, palette.primaryLight),
+            SettingsRowSpec(SettingsSection.PROJECTS, "项目", "默认 ${state.defaultProjectDurationDays} 天", Icons.Outlined.Folder, palette.textTertiary)
         ),
         "数据" to listOf(
-            SettingsRowSpec(SettingsSection.DATA, "数据与安全", icon = Icons.Outlined.Lock, tint = Color(0xFF6257E8))
+            SettingsRowSpec(SettingsSection.DATA, "数据与安全", icon = Icons.Outlined.Lock, tint = palette.taskLeisure)
         ),
         "应用" to listOf(
-            SettingsRowSpec(SettingsSection.ABOUT, "关于 Weekyii", icon = Icons.Outlined.Info, tint = Color(0xFF11BFAE)),
-            SettingsRowSpec(SettingsSection.DEVELOPER, "开发者与诊断", icon = Icons.Outlined.Build, tint = Color(0xFF7B7B82))
+            SettingsRowSpec(SettingsSection.ABOUT, "关于 Weekyii", icon = Icons.Outlined.Info, tint = palette.accentGreen),
+            SettingsRowSpec(SettingsSection.DEVELOPER, "开发者与诊断", icon = Icons.Outlined.Build, tint = palette.textSecondary)
         )
     )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        contentPadding = PaddingValues(horizontal = WeekyiiDimensions.screenPadding, vertical = WeekyiiDimensions.spacingLarge),
+        verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingLarge)
     ) {
         item {
             Text("设置", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
@@ -477,23 +480,24 @@ private fun SettingsGroup(
     rows: List<SettingsRowSpec>,
     onSelect: (SettingsSection) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
-        val shape = RoundedCornerShape(24.dp)
+    val palette = LocalWeekyiiPalette.current
+    Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = WeekyiiDimensions.spacingMedium))
+        val shape = RoundedCornerShape(WeekyiiDimensions.radiusExtraLarge)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shape)
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+                .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant, shape)
         ) {
             rows.forEachIndexed { index, row ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable { onSelect(row.section) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(row.section) }.padding(horizontal = WeekyiiDimensions.spacingBase, vertical = WeekyiiDimensions.spacingMedium),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(row.tint)) {
-                        Icon(row.icon, contentDescription = null, tint = Color.White, modifier = Modifier.padding(9.dp))
+                    Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(WeekyiiDimensions.radiusMedium)).background(row.tint)) {
+                        Icon(row.icon, contentDescription = null, tint = palette.onGradient, modifier = Modifier.padding(9.dp))
                     }
                     Column(modifier = Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(row.title, style = MaterialTheme.typography.titleMedium)
@@ -501,7 +505,7 @@ private fun SettingsGroup(
                     }
                     Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.outline)
                 }
-                if (index < rows.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 72.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                if (index < rows.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 72.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
     }

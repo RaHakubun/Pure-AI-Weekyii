@@ -73,6 +73,9 @@ import com.weekyii.android.ui.components.WeekyiiButton
 import com.weekyii.android.ui.components.WeekyiiButtonStyle
 import com.weekyii.android.ui.components.WeekyiiEmptyState
 import com.weekyii.android.ui.components.WeekyiiHeader
+import com.weekyii.android.ui.components.WeekyiiTextField
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -105,8 +108,8 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(horizontal = WeekyiiDimensions.screenPadding, vertical = WeekyiiDimensions.spacingBase),
+        verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.listGap)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -226,7 +229,7 @@ fun PendingScreen(viewModel: PendingViewModel, padding: PaddingValues) {
                     showCreateSheet = false
                 }, selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth).show()
             })
-            OutlinedTextField(weekId, { weekId = it }, label = { Text("周编号，例如 2026-W31") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            WeekyiiTextField(weekId, { weekId = it }, "周编号，例如 2026-W31", Modifier.fillMaxWidth(), singleLine = true)
             WeekyiiButton(text = "按周编号创建", style = WeekyiiButtonStyle.Secondary, enabled = weekId.isNotBlank(), modifier = Modifier.fillMaxWidth(), onClick = {
                 viewModel.createWeekById(weekId.trim())
                 showCreateSheet = false
@@ -255,12 +258,12 @@ private fun PendingMonthPicker(
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(WeekyiiDimensions.radiusLarge)
     Surface(
-        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, shape),
+        modifier = Modifier.fillMaxWidth().height(WeekyiiDimensions.toolbarHeight).shadow(WeekyiiDimensions.cardElevation, shape),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        border = androidx.compose.foundation.BorderStroke(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevious, enabled = canGoPrevious) {
@@ -292,11 +295,11 @@ private fun PendingToolbarButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(48.dp)
-            .shadow(2.dp, shape)
+            .size(WeekyiiDimensions.minimumTouchTarget)
+            .shadow(WeekyiiDimensions.cardElevation, shape)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+            .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant, shape)
     ) {
         Icon(icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.primary)
     }
@@ -360,6 +363,7 @@ private fun MonthDayCell(
     currentDate: LocalDate,
     onClick: (LocalDate) -> Unit
 ) {
+    val palette = LocalWeekyiiPalette.current
     val summary = cell.summary
     val enabled = cell.isInSelectedMonth && !cell.date.isBefore(currentDate)
     val tint = if (cell.isInSelectedMonth) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .35f)
@@ -375,9 +379,9 @@ private fun MonthDayCell(
         Text(cell.date.dayOfMonth.toString(), color = tint, style = MaterialTheme.typography.labelLarge)
         if (summary != null && summary.taskCount > 0) {
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (showRegular && summary.regularCount > 0) Icon(Icons.Filled.Circle, contentDescription = "常规任务", tint = Color(0xFF4CAF50), modifier = Modifier.size(8.dp))
-                if (showDDL && summary.ddlCount > 0) Icon(Icons.Filled.Whatshot, contentDescription = "截止任务", tint = Color(0xFFE57373), modifier = Modifier.size(11.dp))
-                if (showLeisure && summary.leisureCount > 0) Icon(Icons.Filled.AutoAwesome, contentDescription = "休闲任务", tint = Color(0xFF64B5F6), modifier = Modifier.size(11.dp))
+                if (showRegular && summary.regularCount > 0) Icon(Icons.Filled.Circle, contentDescription = "常规任务", tint = palette.taskRegular, modifier = Modifier.size(8.dp))
+                if (showDDL && summary.ddlCount > 0) Icon(Icons.Filled.Whatshot, contentDescription = "截止任务", tint = palette.taskDDL, modifier = Modifier.size(11.dp))
+                if (showLeisure && summary.leisureCount > 0) Icon(Icons.Filled.AutoAwesome, contentDescription = "休闲任务", tint = palette.taskLeisure, modifier = Modifier.size(11.dp))
             }
         }
     }

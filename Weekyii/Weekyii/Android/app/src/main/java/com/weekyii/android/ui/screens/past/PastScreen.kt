@@ -48,6 +48,8 @@ import com.weekyii.android.ui.viewmodel.PastViewModel
 import com.weekyii.android.ui.components.WeekyiiCard
 import com.weekyii.android.ui.components.WeekyiiEmptyState
 import com.weekyii.android.ui.components.WeekyiiHeader
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -60,8 +62,8 @@ fun PastScreen(viewModel: PastViewModel, padding: PaddingValues) {
     var showAnalytics by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(horizontal = WeekyiiDimensions.screenPadding, vertical = WeekyiiDimensions.spacingBase),
+        verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.listGap)
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -107,11 +109,11 @@ private fun PastToolbarButton(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(48.dp)
-            .shadow(2.dp, shape)
+            .size(WeekyiiDimensions.minimumTouchTarget)
+            .shadow(WeekyiiDimensions.cardElevation, shape)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), shape)
+            .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant, shape)
     ) {
         Icon(icon, contentDescription, tint = MaterialTheme.colorScheme.primary)
     }
@@ -119,12 +121,12 @@ private fun PastToolbarButton(
 
 @Composable
 private fun MonthToolbar(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(WeekyiiDimensions.radiusLarge)
     Surface(
-        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, shape),
+        modifier = Modifier.fillMaxWidth().height(WeekyiiDimensions.toolbarHeight).shadow(WeekyiiDimensions.cardElevation, shape),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+        border = androidx.compose.foundation.BorderStroke(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevious) { Icon(Icons.Filled.ArrowBack, "上个月") }
@@ -262,12 +264,16 @@ private fun HeatmapCard(points: List<PastViewModel.HeatmapPoint>) {
     }
 }
 
-private fun heatmapColor(status: PastViewModel.HeatmapStatus): Color = when (status) {
-    PastViewModel.HeatmapStatus.EMPTY -> Color.Gray.copy(alpha = .18f)
-    PastViewModel.HeatmapStatus.LOW -> Color(0xFFB7DFC3)
-    PastViewModel.HeatmapStatus.MID -> Color(0xFF62B57A)
-    PastViewModel.HeatmapStatus.HIGH -> Color(0xFF208B4B)
-    PastViewModel.HeatmapStatus.EXPIRED -> Color(0xFFD36B52)
+@Composable
+private fun heatmapColor(status: PastViewModel.HeatmapStatus): Color {
+    val palette = LocalWeekyiiPalette.current
+    return when (status) {
+        PastViewModel.HeatmapStatus.EMPTY -> MaterialTheme.colorScheme.surfaceVariant
+        PastViewModel.HeatmapStatus.LOW -> palette.taskRegularBg
+        PastViewModel.HeatmapStatus.MID -> palette.accentGreenLight
+        PastViewModel.HeatmapStatus.HIGH -> palette.taskRegular
+        PastViewModel.HeatmapStatus.EXPIRED -> palette.taskDDL
+    }
 }
 
 @Composable private fun EmptyPastMessage() { Text("这个月还没有过去周记录。", color = MaterialTheme.colorScheme.onSurfaceVariant) }

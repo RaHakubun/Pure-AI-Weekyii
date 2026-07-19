@@ -6,6 +6,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.Modifier
@@ -51,6 +53,37 @@ class WeekyiiComponentsTest {
         composeRule.onNodeWithText("创建").assertIsDisplayed()
         composeRule.onNodeWithTag("create-button").assert(hasClickAction())
         composeRule.onNodeWithText("创建").performClick()
+    }
+
+    @Test
+    fun disabledButtonExposesDisabledSemantics() {
+        composeRule.setContent {
+            WeekyiiTheme {
+                WeekyiiButton(
+                    text = "保存",
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.testTag("save-button")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("save-button").assertIsNotEnabled()
+    }
+
+    @Test
+    fun taskRowOffersOneAccessibleOverflowAction() {
+        composeRule.setContent {
+            WeekyiiTheme {
+                WeekyiiTaskRow(
+                    title = "整理需求",
+                    onMoreActions = {},
+                    moreActionsContentDescription = "任务操作"
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("任务操作").assert(hasClickAction())
     }
 
     @Test

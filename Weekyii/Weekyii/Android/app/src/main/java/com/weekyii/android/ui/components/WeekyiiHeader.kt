@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weekyii.android.ui.theme.WeekyiiDimensions
 
@@ -33,7 +32,7 @@ fun WeekyiiHeader(
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.Bold,
             fontSize = 42.sp,
-            letterSpacing = (-1.2).sp
+            letterSpacing = MaterialTheme.typography.displayLarge.letterSpacing
         )
         if (dateLabel != null) {
             Text(

@@ -87,9 +87,11 @@ import com.weekyii.android.ui.components.WeekyiiHeader
 import com.weekyii.android.ui.components.WeekyiiSegmentedControl
 import com.weekyii.android.ui.components.WeekyiiStatusArtwork
 import com.weekyii.android.ui.components.WeekyiiTaskRow
+import com.weekyii.android.ui.components.WeekyiiTextField
 import com.weekyii.android.ui.components.WeekyiiErrorState
 import com.weekyii.android.ui.components.StatusBadge
 import com.weekyii.android.ui.theme.WeekyiiDimensions
+import com.weekyii.android.ui.theme.LocalWeekyiiPalette
 import java.time.format.DateTimeFormatter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +123,12 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var pendingAttachmentReads by remember { mutableStateOf(0) }
     val editorSession = remember { mutableStateOf(0) }
+    var attachmentPickerSession by remember { mutableStateOf(0) }
+    fun advanceEditorSession() {
+        editorSession.value += 1
+        pendingAttachmentReads = 0
+        attachmentError = null
+    }
     val screenScope = rememberCoroutineScope()
     val maxAttachmentBytes = 5 * 1024 * 1024
     val maxAttachmentCount = 8
@@ -128,7 +136,8 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
     val context = LocalContext.current
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            val sessionAtLaunch = editorSession.value
+            val sessionAtLaunch = attachmentPickerSession
+            if (sessionAtLaunch != editorSession.value) return@rememberLauncherForActivityResult
             attachmentError = null
             pendingAttachmentReads += 1
             screenScope.launch {
@@ -172,7 +181,11 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         }.onFailure { attachmentError = "读取附件失败：${it.message ?: "未知错误"}" }
                     }
                 } finally {
-                    withContext(Dispatchers.Main) { pendingAttachmentReads = (pendingAttachmentReads - 1).coerceAtLeast(0) }
+                    withContext(Dispatchers.Main) {
+                        if (sessionAtLaunch == editorSession.value) {
+                            pendingAttachmentReads = (pendingAttachmentReads - 1).coerceAtLeast(0)
+                        }
+                    }
                 }
             }
         }
@@ -181,6 +194,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         if (editingAttachments.size >= maxAttachmentCount) {
             attachmentError = "任务附件最多 $maxAttachmentCount 个"
         } else {
+            attachmentPickerSession = editorSession.value
             attachmentPicker.launch(arrayOf("*/*"))
         }
     }
@@ -194,8 +208,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                 .padding(padding)
                 .padding(horizontal = WeekyiiDimensions.contentHorizontalPadding)
         ) {
-            WeekyiiHeader()
-            TodayWeekSwitcher(showWeek = true, onChange = { showWeek = it })
+            TodayHeader(showWeek = true, onShowWeekChange = { showWeek = it })
             WeekScreen(weekViewModel, modifier = Modifier.weight(1f))
         }
         return
@@ -213,42 +226,11 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingLarge)
     ) {
         item {
-            WeekyiiHeader()
-        }
-        item {
-            TodayWeekSwitcher(showWeek = false, onChange = { showWeek = it })
+            TodayHeader(showWeek = false, onShowWeekChange = { showWeek = it })
         }
         item {
             val status = day?.status ?: DayStatus.EMPTY
-            WeekyiiCard(accentColor = statusAccentColor(status)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
-                        Text("状态", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        StatusPill(status)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("已启动天数", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            daysStartedCount.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(Modifier.height(WeekyiiDimensions.spacingBase))
-                WeekyiiStatusArtwork(status)
-                Spacer(Modifier.height(WeekyiiDimensions.spacingBase))
-                Text(
-                    state.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日")),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            TodayStatusCard(status, daysStartedCount, state.date)
         }
 
         when (day?.status ?: DayStatus.EMPTY) {
@@ -265,7 +247,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         text = "创建",
                         icon = Icons.Filled.Add,
                         onClick = {
-                            editorSession.value += 1
+                            advanceEditorSession()
                             editingTitle = ""
                             editingDescription = ""
                             editingStepsText = ""
@@ -304,7 +286,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         onMoveDown = { viewModel.moveDraftTask(index, index + 1) },
                         onDelete = { viewModel.deleteDraftTask(task) },
                         onEdit = {
-                            editorSession.value += 1
+                            advanceEditorSession()
                             editingTask = task
                             editingTitle = task.title
                             editingDescription = task.description
@@ -333,7 +315,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                         },
                         canStart = state.draft.isNotEmpty(),
                         onAdvancedCreate = {
-                            editorSession.value += 1
+                            advanceEditorSession()
                             editingTitle = ""
                             editingDescription = ""
                             editingStepsText = ""
@@ -395,7 +377,7 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             onMoveDown = { viewModel.moveFrozenTask(index, index + 1) },
                             onDelete = { viewModel.deleteFrozenTask(task) },
                             onEdit = {
-                                editorSession.value += 1
+                                advanceEditorSession()
                                 editingTask = task
                                 editingTitle = task.title
                                 editingDescription = task.description
@@ -557,49 +539,35 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
         )
     }
 
-    if (showCreateEditor) {
-        AlertDialog(
-            onDismissRequest = { editorSession.value += 1; showCreateEditor = false },
-            title = { Text("新增任务") },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = editingTitle,
-                        onValueChange = { editingTitle = it },
-                        label = { Text("任务名称") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = editingDescription,
-                        onValueChange = { editingDescription = it },
-                        label = { Text("任务说明") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    TaskTypePicker(
-                        definitions = state.taskTypeDefinitions,
-                        selectedId = editingTaskTypeId,
-                        onSelect = { editingTaskTypeId = it }
-                    )
-                    OutlinedTextField(
-                        value = editingStepsText,
-                        onValueChange = { editingStepsText = it },
-                        label = { Text("子任务（每行一项）") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedButton(onClick = ::pickAttachment) {
-                        Text("添加附件 (${editingAttachments.size})")
-                    }
-                    attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(
+    WeekyiiBottomSheet(
+        visible = showCreateEditor,
+        onDismiss = { advanceEditorSession(); showCreateEditor = false }
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingMedium)
+        ) {
+            Text("新增任务", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            WeekyiiTextField(editingTitle, { editingTitle = it }, "任务名称", Modifier.fillMaxWidth(), singleLine = true)
+            WeekyiiTextField(editingDescription, { editingDescription = it }, "任务说明", Modifier.fillMaxWidth(), minLines = 3)
+            TaskTypePicker(state.taskTypeDefinitions, editingTaskTypeId) { editingTaskTypeId = it }
+            WeekyiiTextField(editingStepsText, { editingStepsText = it }, "子任务（每行一项）", Modifier.fillMaxWidth(), minLines = 3)
+            WeekyiiButton(
+                text = "添加附件 (${editingAttachments.size})",
+                style = WeekyiiButtonStyle.Outline,
+                onClick = ::pickAttachment,
+                modifier = Modifier.fillMaxWidth()
+            )
+            attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+                WeekyiiButton(
+                    text = "取消",
+                    style = WeekyiiButtonStyle.Outline,
+                    onClick = { advanceEditorSession(); showCreateEditor = false },
+                    modifier = Modifier.weight(1f)
+                )
+                WeekyiiButton(
+                    text = if (pendingAttachmentReads > 0) "正在读取…" else "保存",
                     enabled = editingTitle.isNotBlank() && pendingAttachmentReads == 0,
                     onClick = {
                         val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
@@ -611,90 +579,77 @@ fun TodayScreen(viewModel: TodayViewModel, padding: PaddingValues, weekViewModel
                             taskType = definition?.baseKind ?: TaskType.REGULAR,
                             taskTypeIdRaw = definition?.idRaw ?: "regular"
                         )
-                        editorSession.value += 1
+                        advanceEditorSession()
                         showCreateEditor = false
-                    }
-                ) { Text(if (pendingAttachmentReads > 0) "正在读取…" else "保存") }
-            },
-            dismissButton = { TextButton(onClick = { editorSession.value += 1; showCreateEditor = false }) { Text("取消") } }
-        )
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
     }
 
     editingTask?.let { task ->
-        AlertDialog(
-            onDismissRequest = { editorSession.value += 1; editingTask = null },
-            title = { Text("编辑任务") },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = editingTitle,
-                        onValueChange = { editingTitle = it },
-                        label = { Text("任务名称") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+        WeekyiiBottomSheet(
+            visible = true,
+            onDismiss = { advanceEditorSession(); editingTask = null }
+        ) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingMedium)
+            ) {
+                Text("编辑任务", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                WeekyiiTextField(editingTitle, { editingTitle = it }, "任务名称", Modifier.fillMaxWidth(), singleLine = true)
+                WeekyiiTextField(editingDescription, { editingDescription = it }, "任务说明", Modifier.fillMaxWidth(), minLines = 3)
+                WeekyiiTextField(editingStepsText, { editingStepsText = it }, "子任务（每行一项）", Modifier.fillMaxWidth(), minLines = 3)
+                TaskTypePicker(state.taskTypeDefinitions, editingTaskTypeId) { editingTaskTypeId = it }
+                WeekyiiButton(
+                    text = "添加附件 (${editingAttachments.size})",
+                    style = WeekyiiButtonStyle.Outline,
+                    onClick = ::pickAttachment,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+                    WeekyiiButton(
+                        text = "取消",
+                        style = WeekyiiButtonStyle.Outline,
+                        onClick = { advanceEditorSession(); editingTask = null },
+                        modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
-                        value = editingDescription,
-                        onValueChange = { editingDescription = it },
-                        label = { Text("任务说明") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
+                    WeekyiiButton(
+                        text = if (pendingAttachmentReads > 0) "正在读取…" else "保存",
+                        enabled = editingTitle.isNotBlank() && pendingAttachmentReads == 0,
+                        onClick = {
+                            val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
+                            if (task.zone.name == "FROZEN") {
+                                viewModel.updateFrozenTask(
+                                    task,
+                                    editingTitle,
+                                    editingDescription,
+                                    editingStepsText.lines(),
+                                    editingAttachments.toList(),
+                                    taskType = definition?.baseKind ?: task.taskType,
+                                    taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
+                                )
+                            } else {
+                                viewModel.updateDraftTask(
+                                    task,
+                                    editingTitle,
+                                    editingDescription,
+                                    editingStepsText.lines(),
+                                    editingAttachments.toList(),
+                                    taskType = definition?.baseKind ?: task.taskType,
+                                    taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
+                                )
+                            }
+                            advanceEditorSession()
+                            editingTask = null
+                        },
+                        modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
-                        value = editingStepsText,
-                        onValueChange = { editingStepsText = it },
-                        label = { Text("子任务（每行一项）") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    TaskTypePicker(
-                        definitions = state.taskTypeDefinitions,
-                        selectedId = editingTaskTypeId,
-                        onSelect = { editingTaskTypeId = it }
-                    )
-                    OutlinedButton(onClick = ::pickAttachment) {
-                        Text("添加附件 (${editingAttachments.size})")
-                    }
-                    attachmentError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = editingTitle.isNotBlank() && pendingAttachmentReads == 0,
-                    onClick = {
-                        if (task.zone.name == "FROZEN") {
-                            val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
-                            viewModel.updateFrozenTask(
-                                task,
-                                editingTitle,
-                                editingDescription,
-                                editingStepsText.lines(),
-                                editingAttachments.toList(),
-                                taskType = definition?.baseKind ?: task.taskType,
-                                taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
-                            )
-                        } else {
-                            val definition = state.taskTypeDefinitions.firstOrNull { it.idRaw == editingTaskTypeId }
-                            viewModel.updateDraftTask(
-                                task,
-                                editingTitle,
-                                editingDescription,
-                                editingStepsText.lines(),
-                                editingAttachments.toList(),
-                                taskType = definition?.baseKind ?: task.taskType,
-                                taskTypeIdRaw = definition?.idRaw ?: task.taskTypeIdRaw
-                            )
-                        }
-                        editorSession.value += 1
-                        editingTask = null
-                    }
-                ) { Text(if (pendingAttachmentReads > 0) "正在读取…" else "保存") }
-            },
-            dismissButton = { TextButton(onClick = { editorSession.value += 1; editingTask = null }) { Text("取消") } }
-        )
+            }
+        }
     }
 }
 
@@ -747,42 +702,6 @@ private fun StartRitualStep(
 }
 
 @Composable
-private fun TodayWeekSwitcher(showWeek: Boolean, onChange: (Boolean) -> Unit) {
-    WeekyiiSegmentedControl(
-        items = listOf("当下", "本周"),
-        selectedIndex = if (showWeek) 1 else 0,
-        onSelectedIndexChange = { onChange(it == 1) },
-        icons = listOf(Icons.Filled.WbSunny, Icons.Filled.CalendarMonth)
-    )
-}
-
-@Composable
-private fun StatusPill(status: DayStatus) {
-    val label = when (status) {
-        DayStatus.EMPTY -> "空"
-        DayStatus.DRAFT -> "草稿"
-        DayStatus.EXECUTE -> "执行中"
-        DayStatus.COMPLETED -> "已完成"
-        DayStatus.EXPIRED -> "已过期"
-    }
-    StatusBadge(
-        text = label,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
-    )
-}
-
-@Composable
-private fun statusAccentColor(status: DayStatus): Color = when (status) {
-    DayStatus.EMPTY -> MaterialTheme.colorScheme.outline
-    DayStatus.DRAFT -> MaterialTheme.colorScheme.primary
-    DayStatus.EXECUTE -> MaterialTheme.colorScheme.tertiary
-    DayStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
-    DayStatus.EXPIRED -> MaterialTheme.colorScheme.error
-}
-
-@Composable
 private fun KillTimeEditor(
     hour: Int,
     minute: Int,
@@ -794,21 +713,21 @@ private fun KillTimeEditor(
 ) {
     val context = LocalContext.current
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(
+        WeekyiiButton(
+            text = String.format("%02d:%02d", hour, minute),
+            icon = Icons.Filled.Schedule,
+            style = WeekyiiButtonStyle.Outline,
             enabled = enabled,
             onClick = {
                 TimePickerDialog(context, { _, selectedHour, selectedMinute ->
                     onChange(selectedHour, selectedMinute)
                 }, hour, minute, true).show()
             }
-        ) {
-            Icon(Icons.Filled.Schedule, contentDescription = null)
-            Text(String.format("  %02d:%02d", hour, minute))
-        }
+        )
         if (hasPendingChange) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onCancel) { Text("取消") }
-                FilledTonalButton(onClick = onConfirm) { Text("确认修改") }
+            Row(horizontalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+                WeekyiiButton(text = "取消", style = WeekyiiButtonStyle.Outline, onClick = onCancel)
+                WeekyiiButton(text = "确认修改", style = WeekyiiButtonStyle.Secondary, onClick = onConfirm)
             }
         }
     }
@@ -842,8 +761,11 @@ private fun ExecutionModePicker(selected: ExecutionMode, onSelect: (ExecutionMod
 
 @Composable
 private fun FilterButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    if (selected) FilledTonalButton(onClick = onClick) { Text(label) }
-    else OutlinedButton(onClick = onClick) { Text(label) }
+    WeekyiiButton(
+        text = label,
+        onClick = onClick,
+        style = if (selected) WeekyiiButtonStyle.Secondary else WeekyiiButtonStyle.Outline
+    )
 }
 
 @Composable
@@ -872,24 +794,18 @@ private fun FlexibleExecutionControls(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                OutlinedButton(onClick = onToggleUnlock) { Text(if (unlocked) "锁定" else "解锁") }
+                WeekyiiButton(text = if (unlocked) "锁定" else "解锁", style = WeekyiiButtonStyle.Outline, onClick = onToggleUnlock)
             }
             if (unlocked) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = onTitleChange,
-                    label = { Text("追加到冻结区") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                WeekyiiTextField(title, onTitleChange, "追加到冻结区", Modifier.fillMaxWidth(), singleLine = true)
                 TaskTypePicker(
                     definitions = taskTypes,
                     selectedId = selectedTaskTypeId,
                     onSelect = onTaskTypeSelect
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(onClick = onAdd, enabled = title.isNotBlank()) { Text("追加任务") }
-                    OutlinedButton(onClick = onExchange) { Text("交换 Focus") }
+                    WeekyiiButton(text = "追加任务", onClick = onAdd, enabled = title.isNotBlank(), style = WeekyiiButtonStyle.Secondary)
+                    WeekyiiButton(text = "交换 Focus", onClick = onExchange, style = WeekyiiButtonStyle.Outline)
                 }
             }
         }
@@ -987,29 +903,31 @@ private fun FocusTaskCard(
     onPostpone: (TaskUi, LocalDate) -> Unit
 ) {
     val context = LocalContext.current
+    val onGradient = LocalWeekyiiPalette.current.onGradient
     WeekyiiCard(modifier = Modifier.fillMaxWidth(), gradient = true) {
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
-                Text("专注区", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = onGradient)
+                Text("专注区", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, color = onGradient, fontWeight = FontWeight.SemiBold)
             }
-            Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
-            typeLabel?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f)) }
-            if (!task?.description.isNullOrBlank()) Text(task!!.description, color = Color.White.copy(alpha = 0.9f))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(task?.title ?: "正在加载专注任务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onGradient)
+            typeLabel?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = onGradient.copy(alpha = 0.85f)) }
+            if (!task?.description.isNullOrBlank()) Text(task!!.description, color = onGradient.copy(alpha = 0.9f))
+            Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall), modifier = Modifier.fillMaxWidth()) {
                 WeekyiiButton(
                     text = "完成当前任务",
                     icon = Icons.Filled.Check,
                     style = WeekyiiButtonStyle.OnGradient,
                     enabled = task != null,
                     onClick = onComplete,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
                 if (task != null) {
                     WeekyiiButton(
                         text = "后移",
                         style = WeekyiiButtonStyle.OnGradient,
-                        onClick = { val tomorrow = LocalDate.now().plusDays(1); TimePickerDateDialog(context, tomorrow) { onPostpone(task, it) } }
+                        onClick = { val tomorrow = LocalDate.now().plusDays(1); TimePickerDateDialog(context, tomorrow) { onPostpone(task, it) } },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -1154,15 +1072,16 @@ private fun taskTypeLabel(task: TaskUi, definitions: List<TaskTypeDefinitionEnti
 
 @Composable
 private fun CompletionCard(title: String, body: String) {
+    val onGradient = LocalWeekyiiPalette.current.onGradient
     WeekyiiCard(modifier = Modifier.fillMaxWidth(), gradient = true) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(Icons.Filled.Celebration, contentDescription = null, tint = Color.White, modifier = Modifier.height(44.dp))
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(body, color = Color.White.copy(alpha = 0.9f))
+            Icon(Icons.Filled.Celebration, contentDescription = null, tint = onGradient, modifier = Modifier.height(44.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = onGradient)
+            Text(body, color = onGradient.copy(alpha = 0.9f))
         }
     }
 }
@@ -1193,14 +1112,8 @@ private fun AddTaskCard(
 ) {
     WeekyiiCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = onTitleChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("添加任务") },
-                supportingText = { Text("任务会按当前顺序进入专注区") },
-                singleLine = true
-            )
+            WeekyiiTextField(title, onTitleChange, "添加任务", Modifier.fillMaxWidth(), singleLine = true)
+            Text("任务会按当前顺序进入专注区", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onAdvancedCreate) { Text("使用完整编辑器（描述、子任务、附件）") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 WeekyiiButton(

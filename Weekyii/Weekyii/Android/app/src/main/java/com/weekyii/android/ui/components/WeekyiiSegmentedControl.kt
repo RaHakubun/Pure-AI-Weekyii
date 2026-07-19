@@ -34,9 +34,9 @@ fun WeekyiiSegmentedControl(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), shape)
+            .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), shape)
             .background(MaterialTheme.colorScheme.surface, shape)
-            .padding(4.dp),
+            .padding(WeekyiiDimensions.segmentedInset),
         verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEachIndexed { index, item ->
@@ -50,7 +50,7 @@ fun WeekyiiSegmentedControl(
                         RoundedCornerShape(WeekyiiDimensions.radiusFull)
                     )
                     .clickable(role = Role.Tab, onClick = { onSelectedIndexChange(index) })
-                    .padding(vertical = 13.dp),
+                    .padding(vertical = WeekyiiDimensions.segmentedVerticalPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -1,18 +1,24 @@
 package com.weekyii.android.ui.screens.week
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weekyii.android.data.db.entities.DayStatus
@@ -50,6 +60,8 @@ import com.weekyii.android.ui.model.DayUi
 import com.weekyii.android.ui.model.TaskUi
 import com.weekyii.android.ui.viewmodel.WeekViewModel
 import com.weekyii.android.ui.components.WeekyiiCard
+import com.weekyii.android.ui.components.WeekyiiSegmentedControl
+import com.weekyii.android.ui.theme.WeekyiiDimensions
 import java.time.LocalDate
 import java.time.DayOfWeek
 
@@ -65,8 +77,11 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(
+            horizontal = WeekyiiDimensions.screenPadding,
+            vertical = WeekyiiDimensions.spacingBase
+        ),
+        verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.listGap)
     ) {
         if (week == null) {
             item { Text("当前周尚未准备好，请稍后重试。", color = MaterialTheme.colorScheme.error) }
@@ -82,11 +97,18 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
                 })
             }
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("本周详情", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.CARDS, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.CARDS) }, label = { Text("卡片") })
-                    FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.STRIPS, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.STRIPS) }, label = { Text("横条") })
-                    FilterChip(selected = state.displayMode == WeekViewModel.DisplayMode.COLLAPSED, onClick = { viewModel.setDisplayMode(WeekViewModel.DisplayMode.COLLAPSED) }, label = { Text("折叠") })
+                Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)) {
+                    Text("本周详情", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    val modes = listOf(
+                        WeekViewModel.DisplayMode.CARDS,
+                        WeekViewModel.DisplayMode.STRIPS,
+                        WeekViewModel.DisplayMode.COLLAPSED
+                    )
+                    WeekyiiSegmentedControl(
+                        items = listOf("当前状态", "信息横条", "折叠"),
+                        selectedIndex = modes.indexOf(state.displayMode).coerceAtLeast(0),
+                        onSelectedIndexChange = { viewModel.setDisplayMode(modes[it]) }
+                    )
                 }
             }
             when (state.displayMode) {
@@ -147,11 +169,11 @@ fun WeekScreen(viewModel: WeekViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun WeekStatsCard(week: com.weekyii.android.ui.model.WeekUi) {
-    WeekyiiCard(modifier = Modifier.fillMaxWidth(), accentColor = MaterialTheme.colorScheme.primary) {
+    WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("${week.startDate.monthValue}/${week.startDate.dayOfMonth} - ${week.endDate.monthValue}/${week.endDate.dayOfMonth}", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("${week.startDate.monthValue}/${week.startDate.dayOfMonth} - ${week.endDate.monthValue}/${week.endDate.dayOfMonth}", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             val completedDays = week.days.count { it.status == DayStatus.COMPLETED }
             val completion = completedDays / week.days.size.coerceAtLeast(1).toFloat()
@@ -160,13 +182,13 @@ private fun WeekStatsCard(week: com.weekyii.android.ui.model.WeekUi) {
                     Text("完成天数", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("$completedDays/${week.days.size}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                 }
-                Column(horizontalAlignment = Alignment.End) {
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(start = WeekyiiDimensions.spacingExtraLarge)) {
                     Text("${(completion * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.width(180.dp).height(12.dp).background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusSmall))
                     ) {
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.fillMaxWidth(completion).height(12.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth(completion).height(8.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusSmall))
                         )
                     }
                 }
@@ -183,38 +205,117 @@ private fun WeekTopologyCard(
     onSelect: (String) -> Unit
 ) {
     WeekyiiCard(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val sortedDays = week.days.sortedBy { it.date }
+        val density = LocalDensity.current
+        val outline = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f)
+        val surface = MaterialTheme.colorScheme.surface
+        val primary = MaterialTheme.colorScheme.tertiary
+        val fontScale = density.fontScale.coerceAtLeast(1f)
+        val topologyHeight = (286f * fontScale).dp
+        val dayStripHeight = (132f * fontScale).dp
+        val dayStripWidth = 364.dp
+        Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingMedium)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("本周拓扑", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(start = 8.dp))
-                IconButton(onClick = {}) { Icon(Icons.Filled.Refresh, contentDescription = "刷新") }
+                Text("本周拓扑", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(start = 8.dp))
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                week.days.sortedBy { it.date }.forEach { day ->
-                    val selected = day.dayId == selectedDayId
-                    val summary = summaries[day.dayId]
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.weight(1f).clickable { onSelect(day.dayId) }
-                    ) {
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier
-                                .width(42.dp)
-                                .height(42.dp)
-                                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
-                                .then(if (selected) Modifier else Modifier.padding(1.dp))
-                                .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), androidx.compose.foundation.shape.CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(day.date.dayOfMonth.toString(), fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(topologyHeight)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f), androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusMedium))
+                    .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusMedium))
+                    .padding(horizontal = WeekyiiDimensions.spacingSmall, vertical = WeekyiiDimensions.spacingMedium)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(dayStripHeight)
+                        .horizontalScroll(rememberScrollState())
+                ) {
+                    Box(modifier = Modifier.width(dayStripWidth).height(dayStripHeight)) {
+                        Canvas(modifier = Modifier.width(dayStripWidth).height(72.dp)) {
+                            val radius = with(density) { 22.dp.toPx() }
+                            val innerRadius = with(density) { 10.dp.toPx() }
+                            val y = size.height * 0.45f
+                            val step = size.width / sortedDays.size
+                            drawLine(
+                                color = outline,
+                                start = Offset(step / 2f, y),
+                                end = Offset(size.width - step / 2f, y),
+                                strokeWidth = with(density) { 6.dp.toPx() }
+                            )
+                            sortedDays.forEachIndexed { index, day ->
+                                val x = step * index + step / 2f
+                                val isToday = day.date == LocalDate.now()
+                                drawCircle(surface, radius, Offset(x, y))
+                                drawCircle(outline, radius, Offset(x, y), style = Stroke(with(density) { 5.dp.toPx() }))
+                                drawCircle(outline, innerRadius, Offset(x, y), style = Stroke(with(density) { 2.dp.toPx() }))
+                                if (isToday) {
+                                    drawCircle(
+                                        primary,
+                                        radius + with(density) { 5.dp.toPx() },
+                                        Offset(x, y),
+                                        style = Stroke(
+                                            width = with(density) { 2.dp.toPx() },
+                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 7f))
+                                        )
+                                    )
+                                }
+                            }
                         }
-                        Text(day.date.dayOfWeek.shortChineseName(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = if (summary?.highlightKind == WeekViewModel.DayHighlightKind.EMPTY) "·" else "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(modifier = Modifier.width(dayStripWidth).height(dayStripHeight)) {
+                            sortedDays.forEach { day ->
+                                val selected = day.dayId == selectedDayId
+                                val summary = summaries[day.dayId]
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingExtraSmall),
+                                    modifier = Modifier
+                                        .width(52.dp)
+                                        .heightIn(min = WeekyiiDimensions.minimumTouchTarget)
+                                        .clickable { onSelect(day.dayId) }
+                                ) {
+                                    Spacer(Modifier.height(48.dp))
+                                    Text(
+                                        "${day.date.dayOfMonth} ${day.date.dayOfWeek.shortChineseName()}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        if (summary?.highlightKind == WeekViewModel.DayHighlightKind.EMPTY) "空" else "${summary?.completedCount ?: 0}/${summary?.remainingCount ?: 0}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                val total = summaries.values.sumOf { it.remainingCount + it.completedCount + it.forgottenCount }
+                val completed = summaries.values.sumOf { it.completedCount }
+                val remaining = summaries.values.sumOf { it.remainingCount }
+                val forgotten = summaries.values.sumOf { it.forgottenCount }
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusMedium))
+                        .border(WeekyiiDimensions.hairline, MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(WeekyiiDimensions.radiusMedium))
+                        .padding(WeekyiiDimensions.spacingMedium),
+                    verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingSmall)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(WeekyiiDimensions.spacingExtraSmall)) {
+                        Text("整周概览", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("完成率 ${if (total == 0) 0 else completed * 100 / total}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        WeekMetric("总", total)
+                        WeekMetric("剩", remaining)
+                        WeekMetric("成", completed)
+                        WeekMetric("忘", forgotten)
                     }
                 }
             }
@@ -233,9 +334,9 @@ private fun DayOfWeek.shortChineseName(): String = when (this) {
 }
 
 @Composable
-private fun WeekMetric(label: String, value: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+private fun RowScope.WeekMetric(label: String, value: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+        Text(value.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
