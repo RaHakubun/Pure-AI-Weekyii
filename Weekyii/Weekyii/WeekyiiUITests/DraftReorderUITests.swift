@@ -1,6 +1,19 @@
 import XCTest
+import UIKit
 
 final class DraftReorderUITests: XCTestCase {
+    private func selectModule(_ title: String, sidebarID: String, in app: XCUIApplication) {
+        let tabButton = app.tabBars.buttons[title]
+        if tabButton.waitForExistence(timeout: 1) {
+            tabButton.tap()
+            return
+        }
+
+        let sidebarItem = app.descendants(matching: .any)[sidebarID]
+        XCTAssertTrue(sidebarItem.waitForExistence(timeout: 5))
+        sidebarItem.tap()
+    }
+
     func testExtensionsHubUsesSquareShortcutsAboveProjects() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -9,9 +22,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let extensionsTab = app.tabBars.buttons["扩展"]
-        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
-        extensionsTab.tap()
+        selectModule("扩展", sidebarID: "mainSidebar_extensions", in: app)
 
         let mindStamps = app.buttons["extensionsMindStampsSeeAllButton"]
         let suspended = app.buttons["extensionsSuspendedSeeAllButton"]
@@ -158,9 +169,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let settingsTab = app.tabBars.buttons["我的"]
-        XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
-        settingsTab.tap()
+        selectModule("我的", sidebarID: "mainSidebar_settings", in: app)
 
         let picker = app.segmentedControls["executionModePicker"]
         XCTAssertTrue(picker.waitForExistence(timeout: 3))
@@ -246,9 +255,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let extensionsTab = app.tabBars.buttons["扩展"]
-        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
-        extensionsTab.tap()
+        selectModule("扩展", sidebarID: "mainSidebar_extensions", in: app)
 
         let projectsSeeAll = app.buttons["extensionsProjectsSeeAllButton"]
         XCTAssertTrue(projectsSeeAll.waitForExistence(timeout: 5))
@@ -279,9 +286,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let extensionsTab = app.tabBars.buttons["扩展"]
-        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
-        extensionsTab.tap()
+        selectModule("扩展", sidebarID: "mainSidebar_extensions", in: app)
 
         let mindStampsSeeAll = app.buttons["extensionsMindStampsSeeAllButton"]
         XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
@@ -333,9 +338,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let extensionsTab = app.tabBars.buttons["扩展"]
-        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
-        extensionsTab.tap()
+        selectModule("扩展", sidebarID: "mainSidebar_extensions", in: app)
 
         let mindStampsSeeAll = app.buttons["extensionsMindStampsSeeAllButton"]
         XCTAssertTrue(mindStampsSeeAll.waitForExistence(timeout: 5))
@@ -359,9 +362,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let pendingTab = app.tabBars.buttons["未来"]
-        XCTAssertTrue(pendingTab.waitForExistence(timeout: 5))
-        pendingTab.tap()
+        selectModule("未来", sidebarID: "mainSidebar_pending", in: app)
 
         let weekCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'pendingWeekCard_'")).firstMatch
         XCTAssertTrue(weekCard.waitForExistence(timeout: 5))
@@ -420,9 +421,7 @@ final class DraftReorderUITests: XCTestCase {
         ]
         app.launch()
 
-        let extensionsTab = app.tabBars.buttons["扩展"]
-        XCTAssertTrue(extensionsTab.waitForExistence(timeout: 5))
-        extensionsTab.tap()
+        selectModule("扩展", sidebarID: "mainSidebar_extensions", in: app)
 
         let suspendedSeeAll = app.buttons["extensionsSuspendedSeeAllButton"]
         XCTAssertTrue(suspendedSeeAll.waitForExistence(timeout: 5))
@@ -507,5 +506,53 @@ final class DraftReorderUITests: XCTestCase {
         cardsButton.tap()
 
         XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))
+    }
+}
+
+final class IPadLayoutUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad responsive layout tests require an iPad destination.")
+        }
+    }
+
+    func testRegularWidthUsesSidebarAndTodayColumns() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedDraft",
+            "1"
+        ]
+        app.launch()
+
+        let sidebar = app.descendants(matching: .any)["mainSidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["todayTaskColumn"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["todayAuxiliaryColumn"].waitForExistence(timeout: 5))
+    }
+
+    func testRotationKeepsSelectedModule() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1"
+        ]
+        app.launch()
+
+        let pendingItem = app.descendants(matching: .any)["mainSidebar_pending"]
+        XCTAssertTrue(pendingItem.waitForExistence(timeout: 5))
+        pendingItem.tap()
+        XCTAssertTrue(app.buttons["pendingToolbarAddButton"].waitForExistence(timeout: 5))
+
+        XCUIDevice.shared.orientation = .portrait
+
+        XCTAssertTrue(app.buttons["pendingToolbarAddButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["mainSidebar_pending"].exists)
     }
 }
