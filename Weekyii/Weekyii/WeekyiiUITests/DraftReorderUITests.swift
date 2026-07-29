@@ -10,8 +10,25 @@ final class DraftReorderUITests: XCTestCase {
         }
 
         let sidebarItem = app.descendants(matching: .any)[sidebarID]
-        XCTAssertTrue(sidebarItem.waitForExistence(timeout: 5))
-        sidebarItem.tap()
+        if sidebarItem.waitForExistence(timeout: 1) {
+            sidebarItem.tap()
+            return
+        }
+
+        let workspaceID: String
+        switch sidebarID {
+        case "mainSidebar_pending":
+            workspaceID = "workspaceRoute_pending"
+        case "mainSidebar_settings":
+            workspaceID = "workspaceRoute_settings"
+        case "mainSidebar_extensions":
+            workspaceID = "workspaceRoute_projects"
+        default:
+            workspaceID = sidebarID
+        }
+        let workspaceItem = app.descendants(matching: .any)[workspaceID]
+        XCTAssertTrue(workspaceItem.waitForExistence(timeout: 5))
+        workspaceItem.tap()
     }
 
     func testExtensionsHubUsesSquareShortcutsAboveProjects() {
@@ -529,8 +546,9 @@ final class IPadLayoutUITests: XCTestCase {
         ]
         app.launch()
 
-        let sidebar = app.descendants(matching: .any)["mainSidebar"]
+        let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["todayHeroStage"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayTaskColumn"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayAuxiliaryColumn"].waitForExistence(timeout: 5))
     }
@@ -545,14 +563,55 @@ final class IPadLayoutUITests: XCTestCase {
         ]
         app.launch()
 
-        let pendingItem = app.descendants(matching: .any)["mainSidebar_pending"]
+        let pendingItem = app.descendants(matching: .any)["workspaceRoute_pending"]
         XCTAssertTrue(pendingItem.waitForExistence(timeout: 5))
         pendingItem.tap()
         XCTAssertTrue(app.buttons["pendingToolbarAddButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["pendingHeroStage"].waitForExistence(timeout: 5))
 
         XCUIDevice.shared.orientation = .portrait
 
         XCTAssertTrue(app.buttons["pendingToolbarAddButton"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["mainSidebar_pending"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceRoute_pending"].exists)
+    }
+
+    func testWorkspaceElevatesPlanningAndReflectionDestinations() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        for route in ["projects", "suspended", "insights", "mindStamps"] {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["workspaceRoute_\(route)"]
+                    .waitForExistence(timeout: 5)
+            )
+        }
+
+        app.descendants(matching: .any)["workspaceRoute_projects"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["projectsHeroStage"].waitForExistence(timeout: 5))
+
+        app.descendants(matching: .any)["workspaceRoute_insights"].tap()
+        XCTAssertTrue(app.staticTexts["洞察"].waitForExistence(timeout: 5))
+    }
+
+    func testCommandSearchAndInspectorStayInWorkspace() {
+        XCUIDevice.shared.orientation = .portrait
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        let searchButton = app.buttons["workspaceCommandSearch"]
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 5))
+        searchButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceSearch"].waitForExistence(timeout: 5))
+
+        let inspectorButton = app.buttons["workspaceInspectorButton"]
+        if inspectorButton.waitForExistence(timeout: 2) {
+            inspectorButton.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["workspaceInspector"].waitForExistence(timeout: 5))
+        }
     }
 }
