@@ -1,4 +1,5 @@
 :root {
+    color-scheme: dark;
     --ink: #080705;
     --ink-soft: #100d09;
     --ember: #1b120b;
@@ -14,6 +15,18 @@
     --body: "Cormorant Garamond", Georgia, serif;
     --ease: cubic-bezier(.16, 1, .3, 1);
     --page-pad: clamp(1rem, 4vw, 4.5rem);
+}
+
+[data-theme="light"] {
+    color-scheme: light;
+    --parchment: #34251a;
+    --parchment-dim: #665545;
+    --gold: #855c23;
+    --gold-bright: #744a17;
+    --copper: #9b5429;
+    --moss: #66715a;
+    --line: rgba(108, 73, 31, .27);
+    --panel: rgba(255, 250, 238, .7);
 }
 
 * {
@@ -38,7 +51,8 @@ body {
 }
 
 button,
-a {
+a,
+select {
     font: inherit;
 }
 
@@ -126,6 +140,50 @@ a {
     padding: .35rem .65rem;
     border: 1px solid var(--line);
     border-radius: 999px;
+}
+
+.appearance-picker {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.appearance-picker::before {
+    content: "◐";
+    position: absolute;
+    left: .62rem;
+    z-index: 1;
+    color: var(--gold);
+    pointer-events: none;
+}
+
+.appearance-picker select {
+    min-height: 2rem;
+    padding: .32rem 1.65rem .32rem 1.55rem;
+    color: var(--parchment-dim);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(8, 7, 5, .52);
+    cursor: pointer;
+}
+
+.appearance-picker select:hover,
+.appearance-picker select:focus-visible {
+    color: var(--gold-bright);
+    border-color: var(--gold);
+    outline: none;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .progress {
@@ -645,6 +703,79 @@ a {
     }
 }
 
+html[data-theme="light"],
+html[data-theme="light"] body {
+    background: #efe3ca;
+}
+
+[data-theme="light"] .site-shell::before {
+    background:
+        linear-gradient(90deg, rgba(116, 74, 23, .055) 1px, transparent 1px) 0 0 / 17vw 100%,
+        radial-gradient(circle at 50% 50%, transparent 56%, rgba(91, 56, 24, .14) 100%);
+    mix-blend-mode: multiply;
+    opacity: .6;
+}
+
+[data-theme="light"] .topbar {
+    background: linear-gradient(180deg, rgba(239, 227, 202, .96), rgba(239, 227, 202, 0));
+}
+
+[data-theme="light"] .appearance-picker select {
+    background: rgba(255, 250, 238, .66);
+}
+
+[data-theme="light"] .slide::before {
+    background:
+        radial-gradient(circle at 50% 0, rgba(178, 125, 48, .17), transparent 38%),
+        radial-gradient(circle at 16% 74%, rgba(102, 113, 90, .12), transparent 30%),
+        linear-gradient(135deg, #f5ead3, #ead9ba 52%, #f2e4c9);
+}
+
+[data-theme="light"] .slide:nth-child(even)::before {
+    background:
+        radial-gradient(circle at 82% 28%, rgba(155, 84, 41, .12), transparent 32%),
+        radial-gradient(circle at 18% 82%, rgba(140, 100, 42, .1), transparent 34%),
+        linear-gradient(145deg, #ead9ba, #f5ead3 58%, #e7d4b4);
+}
+
+[data-theme="light"] .slide::after {
+    border-color: rgba(116, 74, 23, .16);
+    box-shadow: inset 0 0 80px rgba(116, 74, 23, .11);
+}
+
+[data-theme="light"] .title {
+    text-shadow: 0 2px 28px rgba(116, 74, 23, .12);
+}
+
+[data-theme="light"] .seal,
+[data-theme="light"] .flow-step,
+[data-theme="light"] .arrow {
+    background: rgba(255, 250, 238, .48);
+}
+
+[data-theme="light"] .card {
+    background:
+        linear-gradient(135deg, rgba(155, 84, 41, .06), transparent 55%),
+        var(--panel);
+    box-shadow: 0 12px 38px rgba(84, 51, 24, .1);
+}
+
+[data-theme="light"] .figure-card img {
+    filter: drop-shadow(0 12px 24px rgba(84, 51, 24, .16));
+}
+
+[data-theme="light"] .nav-dot::before {
+    background: rgba(250, 241, 222, .96);
+}
+
+[data-theme="light"] .nav-dot.active {
+    box-shadow: 0 0 10px rgba(116, 74, 23, .32);
+}
+
+[data-theme="light"] .controls {
+    color: rgba(102, 85, 69, .78);
+}
+
 @media (max-width: 900px) {
     .grid.five {
         grid-template-columns: repeat(3, 1fr);
@@ -680,6 +811,18 @@ a {
 
     .top-actions .legacy-label {
         display: none;
+    }
+
+    .appearance-picker select {
+        width: 2.1rem;
+        padding-right: 0;
+        color: transparent;
+    }
+
+    .appearance-picker select:focus {
+        width: auto;
+        padding-right: 1.65rem;
+        color: var(--parchment-dim);
     }
 
     .slide {
