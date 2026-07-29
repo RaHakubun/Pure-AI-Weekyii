@@ -229,37 +229,41 @@ struct WeekOverviewContentView: View {
     var body: some View {
         ScrollView {
             if let week = viewModel?.presentWeek {
-                Group {
-                    if layoutMetrics.layoutClass.supportsTwoColumns {
-                        HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                VStack(alignment: .leading, spacing: WeekSpacing.xl) {
+                    weekHeroStage(week: week)
+
+                    Group {
+                        if layoutMetrics.layoutClass.supportsTwoColumns {
+                            HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                                    WeekStatCard(week: week)
+                                    topologyCard(week: week)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                                WeekOverviewDetailSection(
+                                    week: week,
+                                    displayMode: $displayMode,
+                                    selectedDayID: selectedDayID
+                                )
+                                .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                            }
+                        } else {
                             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                                 WeekStatCard(week: week)
                                 topologyCard(week: week)
+                                WeekOverviewDetailSection(
+                                    week: week,
+                                    displayMode: $displayMode,
+                                    selectedDayID: selectedDayID
+                                )
                             }
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                            WeekOverviewDetailSection(
-                                week: week,
-                                displayMode: $displayMode,
-                                selectedDayID: selectedDayID
-                            )
-                            .frame(width: layoutMetrics.auxiliaryColumnWidth)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                            WeekStatCard(week: week)
-                            topologyCard(week: week)
-                            WeekOverviewDetailSection(
-                                week: week,
-                                displayMode: $displayMode,
-                                selectedDayID: selectedDayID
-                            )
                         }
                     }
                 }
                 .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
                 .padding(.vertical, WeekSpacing.base)
-                .weekReadableContent()
+                .weekReadableContent(maxWidth: 1180)
                 .onAppear {
                     reconcileTopologyState(for: week)
                 }
@@ -313,6 +317,31 @@ struct WeekOverviewContentView: View {
                 onSave: { _, _, _, _, _ in }
             )
         }
+    }
+
+    private func weekHeroStage(week: WeekModel) -> some View {
+        let sortedDays = week.days.sorted { $0.date < $1.date }
+        let completed = sortedDays.reduce(0) { $0 + $1.completedTasks.count }
+        let forgotten = sortedDays.reduce(0) { $0 + $1.expiredCount }
+        let remaining = sortedDays.reduce(0) {
+            $0 + $1.sortedDraftTasks.count + $1.frozenTasks.count + ($1.focusTask == nil ? 0 : 1)
+        }
+        let activeDays = sortedDays.filter { $0.status != .empty }.count
+
+        return WorkspaceHeroStage(
+            eyebrow: "WEEK BOARD",
+            title: "七天不是七张卡片，\n而是一条承诺轨道",
+            subtitle: "同时看见今天的位置、尚未兑现的负载与已经结束的结果，再决定是否需要调整未来几天。",
+            systemImage: "rectangle.3.group"
+        ) {
+            WorkspaceMetricStrip(metrics: [
+                .init(value: "\(activeDays)/7", label: "已有内容"),
+                .init(value: "\(remaining)", label: "待兑现"),
+                .init(value: "\(completed)", label: "已完成"),
+                .init(value: "\(forgotten)", label: "已遗忘")
+            ])
+        }
+        .accessibilityIdentifier("weekHeroStage")
     }
 
     private func topologyCard(week: WeekModel) -> some View {
