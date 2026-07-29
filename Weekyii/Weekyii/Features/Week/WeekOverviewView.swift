@@ -130,12 +130,13 @@ struct WeekOverviewDayStripSummary: Equatable {
 
 struct WeekOverviewView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @State private var viewModel: WeekViewModel?
 
-    private let columns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
+    private var columns: [GridItem] {
+        let count = layoutMetrics.layoutClass == .wide ? 3 : 2
+        return Array(repeating: GridItem(.flexible(), spacing: WeekSpacing.md), count: count)
+    }
 
     var body: some View {
         NavigationStack {
@@ -157,7 +158,9 @@ struct WeekOverviewView: View {
                             }
                         }
                     }
-                    .weekPadding(WeekSpacing.base)
+                    .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                    .padding(.vertical, WeekSpacing.base)
+                    .weekReadableContent()
                 } else if let message = viewModel?.errorMessage {
                     errorState(message: message) {
                         viewModel?.refresh()
@@ -213,6 +216,7 @@ struct WeekOverviewView: View {
 struct WeekOverviewContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @EnvironmentObject private var appState: AppState
     @State private var viewModel: WeekViewModel?
     @State private var displayMode: WeekOverviewDisplayMode = .cards
@@ -225,29 +229,37 @@ struct WeekOverviewContentView: View {
     var body: some View {
         ScrollView {
             if let week = viewModel?.presentWeek {
-                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    WeekStatCard(week: week)
-                    WeekCard {
-                        WeekTopologyView(
-                            week: week,
-                            viewport: $topologyViewport,
-                            selectedDayID: $selectedDayID,
-                            isFullScreen: false,
-                            onOpenFullScreen: {
-                                showingTopologyFullScreen = true
-                            },
-                            onOpenTask: { taskID in
-                                selectedTopologyTask = task(with: taskID, in: week)
+                Group {
+                    if layoutMetrics.layoutClass.supportsTwoColumns {
+                        HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                                WeekStatCard(week: week)
+                                topologyCard(week: week)
                             }
-                        )
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                            WeekOverviewDetailSection(
+                                week: week,
+                                displayMode: $displayMode,
+                                selectedDayID: selectedDayID
+                            )
+                            .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                            WeekStatCard(week: week)
+                            topologyCard(week: week)
+                            WeekOverviewDetailSection(
+                                week: week,
+                                displayMode: $displayMode,
+                                selectedDayID: selectedDayID
+                            )
+                        }
                     }
-                    WeekOverviewDetailSection(
-                        week: week,
-                        displayMode: $displayMode,
-                        selectedDayID: selectedDayID
-                    )
                 }
-                .weekPadding(WeekSpacing.base)
+                .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                .padding(.vertical, WeekSpacing.base)
+                .weekReadableContent()
                 .onAppear {
                     reconcileTopologyState(for: week)
                 }
@@ -299,6 +311,23 @@ struct WeekOverviewContentView: View {
                 initialSteps: task.steps,
                 initialAttachments: task.attachments,
                 onSave: { _, _, _, _, _ in }
+            )
+        }
+    }
+
+    private func topologyCard(week: WeekModel) -> some View {
+        WeekCard {
+            WeekTopologyView(
+                week: week,
+                viewport: $topologyViewport,
+                selectedDayID: $selectedDayID,
+                isFullScreen: false,
+                onOpenFullScreen: {
+                    showingTopologyFullScreen = true
+                },
+                onOpenTask: { taskID in
+                    selectedTopologyTask = task(with: taskID, in: week)
+                }
             )
         }
     }

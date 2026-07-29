@@ -98,6 +98,7 @@ struct TodayView: View {
     }()
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
 
@@ -267,22 +268,48 @@ struct TodayView: View {
 
     private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                // 顶部状态卡片
-                statusCard(for: day)
+            Group {
+                if layoutMetrics.layoutClass.supportsTwoColumns {
+                    HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                        taskFlowSection(day: day, viewModel: viewModel)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .accessibilityIdentifier("todayTaskColumn")
 
-                // 任务流区域
-                taskFlowSection(day: day, viewModel: viewModel)
-
-                // 截止时间（放在最后）
-                killTimeCard(day: day, viewModel: viewModel)
+                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                            statusCard(for: day)
+                            killTimeCard(day: day, viewModel: viewModel)
+                        }
+                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                        .accessibilityIdentifier("todayAuxiliaryColumn")
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        statusCard(for: day)
+                        taskFlowSection(day: day, viewModel: viewModel)
+                        killTimeCard(day: day, viewModel: viewModel)
+                    }
+                }
             }
-            .weekPadding(WeekSpacing.base)
+            .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+            .padding(.vertical, WeekSpacing.base)
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
+            .weekReadableContent()
         }
         .overlay(alignment: .bottom) {
             if shouldShowFloatingStartButton(for: day) {
-                floatingStartButtonOverlay
+                if layoutMetrics.layoutClass.supportsTwoColumns {
+                    HStack(alignment: .bottom, spacing: WeekSpacing.xl) {
+                        floatingStartButtonOverlay
+                            .frame(maxWidth: .infinity)
+                        Color.clear
+                            .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                            .allowsHitTesting(false)
+                    }
+                    .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                    .weekReadableContent(alignment: .bottom)
+                } else {
+                    floatingStartButtonOverlay
+                }
             }
         }
     }
