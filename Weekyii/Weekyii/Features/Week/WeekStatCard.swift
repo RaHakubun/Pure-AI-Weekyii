@@ -1,11 +1,31 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - WeekStatCard - 周统计卡片
 
 struct WeekStatCard: View {
-    let week: WeekModel
+    @Environment(\.modelContext) private var modelContext
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter
+    }()
+
+    private let weekId: String
+    private let startDate: Date
+    private let endDate: Date
+
+    init(week: WeekModel) {
+        // Capture immutable snapshot values only.
+        self.weekId = week.weekId
+        self.startDate = week.startDate
+        self.endDate = week.endDate
+    }
     
     var body: some View {
+        let completedCount = completedDaysCount
+        let completionRate = Double(completedCount) / 7.0
+
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 // 日期范围
@@ -23,7 +43,7 @@ struct WeekStatCard: View {
                         Text(String(localized: "week.completed_days"))
                             .font(.caption)
                             .foregroundColor(.textSecondary)
-                        Text("\(completedDaysCount)/7")
+                        Text("\(completedCount)/7")
                             .font(.titleMedium)
                             .foregroundColor(.accentGreen)
                     }
@@ -44,31 +64,21 @@ struct WeekStatCard: View {
     }
     
     private var completedDaysCount: Int {
-        week.days.filter { $0.status == .completed }.count
-    }
-    
-    private var completionRate: Double {
-        Double(completedDaysCount) / 7.0
+        let descriptor = FetchDescriptor<DayModel>(
+            predicate: #Predicate { day in
+                day.date >= startDate &&
+                day.date <= endDate
+            }
+        )
+        let days = (try? modelContext.fetch(descriptor)) ?? []
+        return days.reduce(0) { partial, day in
+            partial + (day.status == .completed ? 1 : 0)
+        }
     }
     
     private func formatDateRange() -> String {
-        let sortedDays = week.days.sorted(by: { $0.date < $1.date })
-        guard let firstDay = sortedDays.first,
-              let lastDay = sortedDays.last else {
-            return ""
-        }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        
-        guard let startDate = formatter.date(from: firstDay.dayId),
-              let endDate = formatter.date(from: lastDay.dayId) else {
-            return ""
-        }
-        
-        formatter.dateFormat = "M月d日"
-        let start = formatter.string(from: startDate)
-        let end = formatter.string(from: endDate)
+        let start = Self.monthDayFormatter.string(from: startDate)
+        let end = Self.monthDayFormatter.string(from: endDate)
         
         return "\(start) - \(end)"
     }

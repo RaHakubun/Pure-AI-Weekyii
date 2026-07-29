@@ -7,6 +7,7 @@ final class TaskItem {
 
     var title: String
     var taskType: TaskType
+    var taskTypeIdRaw: String = TaskType.regular.rawValue
     var order: Int
     var zone: TaskZone
 
@@ -20,11 +21,13 @@ final class TaskItem {
     var completedOrder: Int = 0
 
     var day: DayModel?
+    var project: ProjectModel?
 
     init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
         self.title = title
         self.taskDescription = taskDescription
         self.taskType = taskType
+        self.taskTypeIdRaw = taskType.rawValue
         self.order = order
         self.zone = zone
     }

@@ -5,11 +5,13 @@ import SwiftUI
 struct TaskCard: View {
     let task: TaskItem
     let showStatus: Bool
+    let showsProjectOrigin: Bool
     let onTap: (() -> Void)?
     
-    init(task: TaskItem, showStatus: Bool = true, onTap: (() -> Void)? = nil) {
+    init(task: TaskItem, showStatus: Bool = true, showsProjectOrigin: Bool = false, onTap: (() -> Void)? = nil) {
         self.task = task
         self.showStatus = showStatus
+        self.showsProjectOrigin = showsProjectOrigin
         self.onTap = onTap
     }
     
@@ -52,6 +54,10 @@ struct TaskCard: View {
                     }
                 }
 
+                if showsProjectOrigin {
+                    TaskProjectOriginBadge(project: task.project)
+                }
+
                 // 时间信息
                 if let startedAt = task.startedAt {
                     HStack(spacing: WeekSpacing.xs) {
@@ -67,7 +73,11 @@ struct TaskCard: View {
         }
         .weekPadding(WeekSpacing.base)
         .background(Color.backgroundSecondary)
-        .cornerRadius(WeekRadius.medium)
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.medium)
+                .stroke(Color.backgroundTertiary, lineWidth: 1)
+        )
         .shadow(color: WeekShadow.light.color, radius: WeekShadow.light.radius, x: WeekShadow.light.x, y: WeekShadow.light.y)
     }
     

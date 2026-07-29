@@ -1,100 +1,48 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct DraftEditorView: View {
+    enum PresentationMode {
+        case draft
+        case flexibleExecution
+    }
+
     let day: DayModel
     let viewModel: TodayViewModel
+    var presentationMode: PresentationMode = .draft
+    let onAddTask: () -> Void
+    let onEditTask: (TaskItem) -> Void
+    let onPostponeTask: (TaskItem) -> Void
+    var onToggleLock: (() -> Void)? = nil
 
-    @State private var showingAddSheet = false
-    @State private var editingTask: TaskItem?
     @State private var errorMessage: String?
-    @State private var editMode: EditMode = .inactive
-    @State private var draggingTaskID: UUID?
-    @State private var lastDragTargetID: UUID?
-    @State private var dropTargetID: UUID?
-    
+    @State private var localEditMode: EditMode = .inactive
+
     private var isEditing: Bool {
-        editMode.isEditing
+        localEditMode == .active
+    }
+
+    private var tasks: [TaskItem] {
+        presentationMode == .draft ? day.sortedDraftTasks : day.frozenTasks
+    }
+
+    private var canEdit: Bool {
+        switch presentationMode {
+        case .draft:
+            return day.status == .draft || day.status == .empty
+        case .flexibleExecution:
+            return day.status == .execute
+                && day.executionMode == .flexible
+                && day.isDraftZoneUnlocked
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HStack {
-                Text(String(localized: "draft.title"))
-                    .font(.titleSmall)
-                    .foregroundColor(.textPrimary)
-                Spacer()
-                Text("\(day.sortedDraftTasks.count)")
-                    .font(.titleSmall)
-                    .foregroundColor(.weekyiiPrimary)
-                EditButton()
-                    .disabled(!(day.status == .draft || day.status == .empty))
-                    .accessibilityIdentifier("draftEditButton")
-                Button(action: { showingAddSheet = true }) {
-                    Image(systemName: "plus.circle")
-                        .font(.title2)
-                        .foregroundColor(.weekyiiPrimary)
-                }
-                .disabled(!(day.status == .draft || day.status == .empty))
-            }
-
-            if day.sortedDraftTasks.isEmpty {
-                Text(String(localized: "draft.empty"))
-                    .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
-                    .padding(.vertical, WeekSpacing.lg)
-            } else {
-                LazyVStack(spacing: WeekSpacing.sm) {
-                    ForEach(Array(day.sortedDraftTasks.enumerated()), id: \.element.id) { index, task in
-                        rowView(task: task, index: index)
-                            .onDrop(
-                                of: [UTType.text],
-                                delegate: DraftTaskDropDelegate(
-                                    target: task,
-                                    tasks: day.sortedDraftTasks,
-                                    isEnabled: canReorder,
-                                    draggingTaskID: $draggingTaskID,
-                                    lastDragTargetID: $lastDragTargetID,
-                                    dropTargetID: $dropTargetID,
-                                    onMove: moveTask(from:to:)
-                                )
-                            )
-                    }
-                }
-            }
+            header
+            guidance
+            taskList
         }
-        .environment(\.editMode, $editMode)
-        .sheet(isPresented: $showingAddSheet) {
-            TaskEditorSheet(
-                title: String(localized: "draft.add_title"),
-                onSave: { title, description, type, steps, attachments in
-                    do {
-                        try viewModel.addTask(title: title, description: description, type: type, steps: steps, attachments: attachments)
-                        showingAddSheet = false
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
-        }
-        .sheet(item: $editingTask) { task in
-            TaskEditorSheet(
-                title: String(localized: "draft.edit_title"),
-                initialTitle: task.title,
-                initialDescription: task.taskDescription,
-                initialType: task.taskType,
-                initialSteps: task.steps,
-                initialAttachments: task.attachments,
-                onSave: { newTitle, newDescription, newType, newSteps, newAttachments in
-                    do {
-                        try viewModel.updateTask(task, title: newTitle, description: newDescription, type: newType, steps: newSteps, attachments: newAttachments)
-                        editingTask = nil
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            )
-        }
+        .environment(\.editMode, $localEditMode)
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             errorMessage != nil
         }, set: { newValue in
@@ -104,119 +52,248 @@ struct DraftEditorView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .onChange(of: canEdit) { _, editable in
+            if !editable {
+                localEditMode = .inactive
+            }
+        }
     }
 
-    private var canReorder: Bool {
-        isEditing && day.status == .draft
-    }
-    
-    @ViewBuilder
-    private func rowView(task: TaskItem, index: Int) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            Button(action: { editingTask = task }) {
-                TaskRowView(task: task, titleAccessibilityIdentifier: "draftTaskTitle_\(index)")
+    private var header: some View {
+        HStack(spacing: 2) {
+            Text(presentationMode == .draft ? String(localized: "draft.title") : "草稿区")
+                .font(.titleSmall)
+                .foregroundColor(.textPrimary)
+            Spacer()
+            Text("\(tasks.count)")
+                .font(.titleSmall)
+                .foregroundColor(.weekyiiPrimary)
+
+            if presentationMode == .flexibleExecution {
+                temperatureToggle
             }
-            .buttonStyle(.plain)
-            .disabled(!(day.status == .draft || day.status == .empty))
-            
-            if isEditing {
-                VStack(spacing: WeekSpacing.xs) {
-                    dragHandle(task: task, index: index)
-                    
-                    Button(role: .destructive, action: { deleteTask(task) }) {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                    }
+
+            actionButton(
+                systemName: "plus",
+                accessibilityLabel: "新增任务",
+                accessibilityIdentifier: "draftAddButton",
+                isEnabled: canEdit,
+                action: onAddTask
+            )
+
+            actionButton(
+                systemName: isEditing ? "checkmark" : "pencil",
+                accessibilityLabel: isEditing ? "完成编辑" : "编辑草稿",
+                accessibilityIdentifier: "draftEditButton",
+                isEnabled: canEdit
+            ) {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    localEditMode = isEditing ? .inactive : .active
                 }
             }
         }
-        .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(
-                    dropTargetID == task.id ? Color.weekyiiPrimary.opacity(0.6) : Color.clear,
-                    lineWidth: 1
-                )
-        )
     }
-    
-    private func dragHandle(task: TaskItem, index: Int) -> some View {
-        let isEnabled = canReorder
-        return Image(systemName: "line.3.horizontal")
-            .font(.caption)
-            .foregroundColor(isEnabled ? .textSecondary : .textTertiary)
-            .padding(6)
-            .background(Color.backgroundTertiary.opacity(0.8), in: Capsule())
-            .accessibilityIdentifier("draftDragHandle_\(index)")
-            .opacity(isEditing ? 1 : 0)
-            .allowsHitTesting(isEditing)
-            .onDrag {
-                draggingTaskID = task.id
-                lastDragTargetID = task.id
-                return NSItemProvider(object: NSString(string: task.id.uuidString))
+
+    private var temperatureToggle: some View {
+        let isThawed = day.isDraftZoneUnlocked
+        let coldColor = Color(red: 0.15, green: 0.58, blue: 0.78)
+        let warmColor = Color(red: 0.94, green: 0.43, blue: 0.20)
+        let stateColor = isThawed ? warmColor : coldColor
+
+        return Button {
+            onToggleLock?()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(stateColor)
+                    .frame(width: 36, height: 36)
+                    .shadow(
+                        color: stateColor.opacity(0.28),
+                        radius: 4,
+                        y: 2
+                    )
+
+                Image(systemName: isThawed ? "flame.fill" : "snowflake")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .contentTransition(.symbolEffect(.replace))
+                    .accessibilityIdentifier(
+                        isThawed
+                            ? "executionQueueThawedIcon"
+                            : "executionQueueFrozenIcon"
+                    )
             }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(day.status != .execute)
+        .accessibilityLabel(isThawed ? "冻结草稿区" : "解冻草稿区")
+        .accessibilityValue(isThawed ? "解冻" : "冻结")
+        .accessibilityHint("在冻结和解冻状态之间切换")
+        .accessibilityIdentifier("executionQueueLockButton")
+        .animation(.spring(response: 0.28, dampingFraction: 0.76), value: isThawed)
     }
-    
-    private func deleteTask(_ task: TaskItem) {
-        guard let index = day.sortedDraftTasks.firstIndex(where: { $0.id == task.id }) else { return }
-        do {
-            try viewModel.deleteTasks(at: IndexSet(integer: index))
-        } catch {
-            errorMessage = error.localizedDescription
+
+    @ViewBuilder
+    private var guidance: some View {
+        switch presentationMode {
+        case .draft:
+            if day.status == .draft {
+                Text("点击任务可编辑；进入编辑模式后可删除并拖拽排序。")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+            }
+        case .flexibleExecution:
+            Text(day.isDraftZoneUnlocked
+                 ? "草稿区已解冻，可新增、编辑、删除、排序，并与当前专注任务交换。"
+                 : "草稿区已冻结，解冻后可调整待执行任务。")
+                .font(.caption)
+                .foregroundColor(.textSecondary)
         }
     }
-    
-    private func moveTask(from source: Int, to destination: Int) {
-        guard destination >= 0, destination < day.sortedDraftTasks.count else { return }
+
+    @ViewBuilder
+    private var taskList: some View {
+        if tasks.isEmpty {
+            Text(presentationMode == .draft ? String(localized: "draft.empty") : "暂无待执行任务。")
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+                .padding(.vertical, WeekSpacing.lg)
+        } else {
+            List {
+                ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                    rowView(task: task, index: index)
+                        .listRowInsets(EdgeInsets(
+                            top: WeekSpacing.xs,
+                            leading: WeekSpacing.xs,
+                            bottom: WeekSpacing.xs,
+                            trailing: WeekSpacing.xs
+                        ))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(Color.backgroundSecondary)
+                        )
+                }
+                .onMove(perform: moveTasks)
+                .onDelete(perform: deleteTasks)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.backgroundSecondary.opacity(0.65))
+            .frame(height: CGFloat(max(1, tasks.count)) * 82)
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(task: TaskItem, index: Int) -> some View {
+        HStack(spacing: WeekSpacing.sm) {
+            Button {
+                onEditTask(task)
+            } label: {
+                TaskRowView(
+                    task: task,
+                    titleAccessibilityIdentifier: "draftTaskTitle_\(index)",
+                    showsProjectOrigin: true,
+                    renderContext: .reorderList
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canEdit)
+            .contextMenu {
+                if canEdit {
+                    Button("后移任务", systemImage: "calendar.badge.clock") {
+                        onPostponeTask(task)
+                    }
+                }
+            }
+
+            if isEditing {
+                VStack(spacing: WeekSpacing.xs) {
+                    Button {
+                        moveTask(from: index, to: max(index - 1, 0))
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.caption.bold())
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index == 0)
+                    .accessibilityIdentifier("draftMoveUp_\(index)")
+
+                    Button {
+                        moveTask(from: index, to: index + 2)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.caption.bold())
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(index >= tasks.count - 1)
+                    .accessibilityIdentifier("draftMoveDown_\(index)")
+                }
+                .foregroundColor(.weekyiiPrimary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func moveTasks(from source: IndexSet, to destination: Int) {
         do {
-            try viewModel.moveDraftTasks(from: IndexSet(integer: source), to: destination)
+            switch presentationMode {
+            case .draft:
+                try viewModel.moveDraftTasks(from: source, to: destination)
+            case .flexibleExecution:
+                try viewModel.moveExecutionTasks(from: source, to: destination)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private struct DraftTaskDropDelegate: DropDelegate {
-        let target: TaskItem
-        let tasks: [TaskItem]
-        let isEnabled: Bool
-        @Binding var draggingTaskID: UUID?
-        @Binding var lastDragTargetID: UUID?
-        @Binding var dropTargetID: UUID?
-        let onMove: (Int, Int) -> Void
-        
-        func dropEntered(info: DropInfo) {
-            guard isEnabled else { return }
-            guard let draggingTaskID,
-                  draggingTaskID != target.id,
-                  let from = tasks.firstIndex(where: { $0.id == draggingTaskID }),
-                  let to = tasks.firstIndex(where: { $0.id == target.id }) else { return }
-            
-            dropTargetID = target.id
-            
-            if lastDragTargetID == target.id { return }
-            lastDragTargetID = target.id
-            
-            let destination = to
-            if from != destination {
-                onMove(from, destination)
+    private func deleteTasks(at offsets: IndexSet) {
+        do {
+            switch presentationMode {
+            case .draft:
+                try viewModel.deleteTasks(at: offsets)
+            case .flexibleExecution:
+                try viewModel.deleteExecutionTasks(at: offsets)
             }
+        } catch {
+            errorMessage = error.localizedDescription
         }
-        
-        func dropExited(info: DropInfo) {
-            if dropTargetID == target.id {
-                dropTargetID = nil
-            }
+    }
+
+    private func moveTask(from sourceIndex: Int, to destination: Int) {
+        moveTasks(from: IndexSet(integer: sourceIndex), to: destination)
+    }
+
+    private func actionButton(
+        systemName: String,
+        accessibilityLabel: String,
+        accessibilityIdentifier: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle()
+                        .fill(isEnabled ? Color.weekyiiPrimary : Color.textSecondary.opacity(0.55))
+                )
+                .shadow(
+                    color: (isEnabled ? Color.weekyiiPrimary : Color.textSecondary).opacity(0.22),
+                    radius: 4,
+                    y: 2
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
-        
-        func performDrop(info: DropInfo) -> Bool {
-            draggingTaskID = nil
-            lastDragTargetID = nil
-            dropTargetID = nil
-            return true
-        }
-        
-        func dropUpdated(info: DropInfo) -> DropProposal? {
-            DropProposal(operation: isEnabled ? .move : .cancel)
-        }
+        .disabled(!isEnabled)
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }

@@ -27,7 +27,7 @@ struct WeekLogo: View {
     
     var body: some View {
         Text("Weekyii")
-            .font(.custom("Snell Roundhand", size: size.fontSize * 1.15))
+            .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
             .italic()
             .foregroundStyle(
                 LinearGradient(
@@ -36,7 +36,7 @@ struct WeekLogo: View {
                     endPoint: .trailing
                 )
             )
-            .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+            .shadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
                 animated ? .easeInOut(duration: 2.0).repeatForever(autoreverses: true) : .default,

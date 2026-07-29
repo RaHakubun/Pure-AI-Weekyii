@@ -1,0 +1,49 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12100D"/>
+      <stop offset="1" stop-color="#1B1611"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#E0BA73"/>
+      <stop offset="1" stop-color="#B06A2B"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="800" rx="28" fill="url(#bg)"/>
+  <circle cx="600" cy="380" r="250" stroke="rgba(201,161,90,0.32)" stroke-width="2"/>
+  <circle cx="600" cy="380" r="190" stroke="rgba(201,161,90,0.2)" stroke-width="1"/>
+
+  <rect x="90" y="300" width="250" height="160" rx="16" fill="#19140F" stroke="#C9A15A"/>
+  <text x="215" y="355" fill="#EFD7AF" font-size="38" text-anchor="middle" font-family="Georgia, serif">Past</text>
+  <text x="215" y="400" fill="#B9AD9A" font-size="24" text-anchor="middle" font-family="Georgia, serif">sealed memory</text>
+
+  <rect x="475" y="230" width="250" height="220" rx="16" fill="#201810" stroke="#C9A15A" stroke-width="2"/>
+  <text x="600" y="295" fill="#F0E0C4" font-size="42" text-anchor="middle" font-family="Georgia, serif">Present</text>
+  <text x="600" y="338" fill="#D5BC8D" font-size="24" text-anchor="middle" font-family="Georgia, serif">only one week</text>
+  <text x="600" y="375" fill="#D5BC8D" font-size="24" text-anchor="middle" font-family="Georgia, serif">active timeline</text>
+
+  <rect x="860" y="300" width="250" height="160" rx="16" fill="#19140F" stroke="#C9A15A"/>
+  <text x="985" y="355" fill="#EFD7AF" font-size="38" text-anchor="middle" font-family="Georgia, serif">Pending</text>
+  <text x="985" y="400" fill="#B9AD9A" font-size="24" text-anchor="middle" font-family="Georgia, serif">future forge</text>
+
+  <path d="M340 380 C390 380 430 360 470 340" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M730 340 C770 360 810 380 860 380" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M600 450 C600 510 545 560 470 575" stroke="#C9A15A" stroke-width="4" stroke-dasharray="8 8"/>
+
+  <polygon points="470,340 456,333 456,347" fill="#E0BA73"/>
+  <polygon points="860,380 846,373 846,387" fill="#E0BA73"/>
+
+  <rect x="365" y="560" width="470" height="130" rx="14" fill="#14100C" stroke="rgba(201,161,90,0.65)"/>
+  <text x="600" y="615" fill="#F0E0C4" font-size="30" text-anchor="middle" font-family="Georgia, serif" filter="url(#glow)">Week-Driven Auto Progression</text>
+  <text x="600" y="652" fill="#B9AD9A" font-size="22" text-anchor="middle" font-family="Georgia, serif">daily state advances with real time</text>
+
+  <text x="70" y="760" fill="rgba(201,161,90,0.6)" font-size="20" font-family="Georgia, serif">Weekyii State Machine</text>
+</svg>
