@@ -571,7 +571,8 @@ private struct WorkspaceSearchView: View {
                             detail: "\(project.status.displayName) · \(project.totalTaskCount) 项任务",
                             icon: project.icon,
                             tint: Color(hex: project.color),
-                            route: .projects
+                            route: .projects,
+                            selection: $selectedRoute
                         )
                     }
                 }
@@ -582,8 +583,9 @@ private struct WorkspaceSearchView: View {
                             title: task.title,
                             detail: task.day?.date.formatted(date: .abbreviated, time: .omitted) ?? "未关联日期",
                             icon: icon(for: task.zone),
-                            tint: tint(for: task.zone),
-                            route: route(for: task)
+                            tint: taskZoneTint(for: task.zone),
+                            route: route(for: task),
+                            selection: $selectedRoute
                         )
                     }
                 }
@@ -595,7 +597,8 @@ private struct WorkspaceSearchView: View {
                             detail: "决策期限 \(task.decisionDeadline.formatted(date: .abbreviated, time: .omitted))",
                             icon: "hourglass",
                             tint: .suspendedModuleTint,
-                            route: .suspended
+                            route: .suspended,
+                            selection: $selectedRoute
                         )
                     }
                 }
@@ -607,7 +610,8 @@ private struct WorkspaceSearchView: View {
                             detail: stamp.createdAt.formatted(date: .abbreviated, time: .shortened),
                             icon: stamp.imageBlob == nil ? "note.text" : "photo",
                             tint: .accentPink,
-                            route: .mindStamps
+                            route: .mindStamps,
+                            selection: $selectedRoute
                         )
                     }
                 }
@@ -670,10 +674,11 @@ private struct WorkspaceSearchView: View {
         detail: String,
         icon: String,
         tint: Color,
-        route: WorkspaceRoute
+        route: WorkspaceRoute,
+        selection: Binding<WorkspaceRoute>
     ) -> some View {
         Button {
-            selectedRoute = route
+            selection.wrappedValue = route
         } label: {
             HStack(spacing: WeekSpacing.md) {
                 Image(systemName: icon)
@@ -721,7 +726,7 @@ private struct WorkspaceSearchView: View {
         }
     }
 
-    private func tint(for zone: TaskZone) -> Color {
+    private func taskZoneTint(for zone: TaskZone) -> Color {
         switch zone {
         case .draft: .weekyiiPrimary
         case .focus: .accentOrange
