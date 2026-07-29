@@ -658,7 +658,7 @@ private struct WorkspaceSearchView: View {
         _ title: String,
         icon: String,
         count: Int,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         if count > 0 {
             WorkspacePanel(title: title, systemImage: icon, trailing: "\(count)") {
