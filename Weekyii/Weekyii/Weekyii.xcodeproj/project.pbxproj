@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D7A2000130D0000100BEEF01 /* WorkspaceShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2000230D0000100BEEF01 /* WorkspaceShell.swift */; };
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
 		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
@@ -154,6 +155,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D7A2000230D0000100BEEF01 /* WorkspaceShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceShell.swift; sourceTree = "<group>"; };
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
 		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
@@ -406,6 +408,7 @@
 				944E58152F2B593A00DB2DEE /* Pending */,
 				944E581C2F2B593A00DB2DEE /* Today */,
 				944E58212F2B593A00DB2DEE /* Week */,
+				D7A2000330D0000100BEEF01 /* Workspace */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -545,6 +548,14 @@
 			children = (
 			);
 			path = Styles;
+			sourceTree = "<group>";
+		};
+		D7A2000330D0000100BEEF01 /* Workspace */ = {
+			isa = PBXGroup;
+			children = (
+				D7A2000230D0000100BEEF01 /* WorkspaceShell.swift */,
+			);
+			path = Workspace;
 			sourceTree = "<group>";
 		};
 		94C1D0EC2F3F64DC00AA8E13 /* Extensions */ = {
@@ -767,6 +778,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D7A2000130D0000100BEEF01 /* WorkspaceShell.swift in Sources */,
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
 				944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */,

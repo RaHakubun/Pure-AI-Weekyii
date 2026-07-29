@@ -48,7 +48,7 @@ struct ContentView: View {
     @EnvironmentObject private var userSettings: UserSettings
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var selectedTab: MainTab = .today
-    @State private var splitViewVisibility: NavigationSplitViewVisibility = .all
+    @State private var selectedWorkspaceRoute: WorkspaceRoute = .today
 
     private var visualIdentity: String {
         "\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)"
@@ -88,6 +88,7 @@ struct ContentView: View {
         .onOpenURL { url in
             guard LiveActivityAction.parse(url: url) != nil else { return }
             selectedTab = .today
+            selectedWorkspaceRoute = .today
             LiveActivityActionRouter.handle(
                 url: url,
                 modelContext: modelContext,
@@ -132,55 +133,9 @@ struct ContentView: View {
     }
 
     private var regularNavigation: some View {
-        NavigationSplitView(columnVisibility: $splitViewVisibility) {
-            List(MainTab.allCases, selection: sidebarSelection) { tab in
-                Label(tab.title, systemImage: tab.systemImage)
-                    .tag(tab)
-                    .accessibilityIdentifier("mainSidebar_\(tab.rawValue)")
-            }
-            .listStyle(.sidebar)
-            .accessibilityIdentifier("mainSidebar")
-            .navigationTitle("Weekyii")
-            .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
-        } detail: {
-            GeometryReader { proxy in
-                regularContentTabs
-                    .environment(
-                        \.weekLayoutMetrics,
-                        WeekLayoutMetrics(availableWidth: proxy.size.width)
-                    )
-                    .background(Color.backgroundPrimary)
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
-    }
-
-    /// A page-style TabView keeps every module's NavigationStack and local
-    /// selection alive while the sidebar changes the visible module.
-    private var regularContentTabs: some View {
-        TabView(selection: $selectedTab) {
-            tabContent(.past)
-                .tag(MainTab.past)
-            tabContent(.today)
-                .tag(MainTab.today)
-            tabContent(.pending)
-                .tag(MainTab.pending)
-            tabContent(.extensions)
-                .tag(MainTab.extensions)
-            tabContent(.settings)
-                .tag(MainTab.settings)
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-    }
-
-    private var sidebarSelection: Binding<MainTab?> {
-        Binding(
-            get: { selectedTab },
-            set: { newValue in
-                if let newValue {
-                    selectedTab = newValue
-                }
-            }
+        WorkspaceShell(
+            selectedRoute: $selectedWorkspaceRoute,
+            animationsActive: scenePhase == .active
         )
     }
 
