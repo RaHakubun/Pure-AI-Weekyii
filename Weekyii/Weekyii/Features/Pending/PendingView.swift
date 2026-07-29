@@ -19,6 +19,7 @@ private struct PendingMonthEditTarget: Identifiable {
 
 struct PendingView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: PendingViewModel?
@@ -30,32 +31,13 @@ struct PendingView: View {
     @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
     @State private var displayMode: PendingDisplayMode = .weekList
+    @State private var selectedWeekID: String?
     @State private var monthSummaries: [String: PendingViewModel.MonthDaySummary] = [:]
     private let calendar = Calendar(identifier: .iso8601)
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                if let viewModel {
-                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                        MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
-
-                        if displayMode == .weekList {
-                            let weeks = viewModel.weeks(in: selectedMonth)
-                            if weeks.isEmpty {
-                                emptyStateView
-                            } else {
-                                weeksList(weeks: weeks)
-                            }
-                        } else {
-                            monthOverview
-                        }
-                    }
-                    .weekPadding(WeekSpacing.base)
-                } else {
-                    ProgressView()
-                }
-            }
+            pendingBody
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -164,6 +146,7 @@ struct PendingView: View {
             viewModel?.refresh()
             viewModel?.seedPendingWeekForUITestsIfNeeded()
             refreshMonthSummaries()
+            normalizeSelectedWeek()
         }
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
@@ -177,6 +160,7 @@ struct PendingView: View {
             withTransaction(transaction) {
                 normalizeSelectedDateForMonth()
                 refreshMonthSummaries()
+                normalizeSelectedWeek()
             }
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
@@ -192,6 +176,57 @@ struct PendingView: View {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
             Text(errorMessage ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private var pendingBody: some View {
+        if let viewModel {
+            let weeks = viewModel.weeks(in: selectedMonth)
+
+            if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
+                HStack(spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                            MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
+                            weeksList(weeks: weeks, usesInlineSelection: true)
+                        }
+                        .padding(layoutMetrics.pageHorizontalPadding)
+                    }
+                    .frame(minWidth: 330, idealWidth: 370, maxWidth: 420)
+
+                    Divider()
+
+                    if let selectedWeek = selectedWeek(in: weeks) {
+                        PendingWeekDetailView(week: selectedWeek)
+                            .id(selectedWeek.weekId)
+                    } else {
+                        inlineSelectionPlaceholder
+                    }
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
+
+                        if displayMode == .weekList {
+                            if weeks.isEmpty {
+                                emptyStateView
+                            } else {
+                                weeksList(weeks: weeks)
+                            }
+                        } else {
+                            monthOverview
+                        }
+                    }
+                    .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                    .padding(.vertical, WeekSpacing.base)
+                    .weekReadableContent()
+                }
+            }
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -225,6 +260,25 @@ struct PendingView: View {
         } else {
             selectedDate = monthStart
         }
+    }
+
+    private func normalizeSelectedWeek() {
+        guard let viewModel else {
+            selectedWeekID = nil
+            return
+        }
+        let weeks = viewModel.weeks(in: selectedMonth)
+        guard !weeks.isEmpty else {
+            selectedWeekID = nil
+            return
+        }
+        if !weeks.contains(where: { $0.weekId == selectedWeekID }) {
+            selectedWeekID = weeks.first?.weekId
+        }
+    }
+
+    private func selectedWeek(in weeks: [WeekModel]) -> WeekModel? {
+        weeks.first(where: { $0.weekId == selectedWeekID }) ?? weeks.first
     }
 
     private var switchModeButton: some View {
@@ -273,21 +327,35 @@ struct PendingView: View {
     }
 
     private var monthOverview: some View {
-        VStack(spacing: WeekSpacing.md) {
-            WeekCard {
-                PendingMonthCalendarView(
-                    selectedDate: $selectedDate,
-                    selectedMonth: $selectedMonth,
-                    summaries: monthSummaries,
-                    showRegular: settings.pendingMonthShowRegular,
-                    showDDL: settings.pendingMonthShowDDL,
-                    showLeisure: settings.pendingMonthShowLeisure
-                )
-                // 月份变化时强制重建日历格视图树，消除 LazyVGrid cell 跨月复用时的 identity 错乱。
-                .id(calendar.dateComponents([.year, .month], from: selectedMonth))
+        Group {
+            if layoutMetrics.layoutClass.supportsTwoColumns {
+                HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                    monthCalendarCard
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    selectedDayDetailCard
+                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                }
+            } else {
+                VStack(spacing: WeekSpacing.md) {
+                    monthCalendarCard
+                    selectedDayDetailCard
+                }
             }
+        }
+    }
 
-            selectedDayDetailCard
+    private var monthCalendarCard: some View {
+        WeekCard {
+            PendingMonthCalendarView(
+                selectedDate: $selectedDate,
+                selectedMonth: $selectedMonth,
+                summaries: monthSummaries,
+                showRegular: settings.pendingMonthShowRegular,
+                showDDL: settings.pendingMonthShowDDL,
+                showLeisure: settings.pendingMonthShowLeisure
+            )
+            // 月份变化时强制重建日历格视图树，消除 LazyVGrid cell 跨月复用时的 identity 错乱。
+            .id(calendar.dateComponents([.year, .month], from: selectedMonth))
         }
     }
 
@@ -424,7 +492,7 @@ struct PendingView: View {
     
     // MARK: - Weeks List
     
-    private func weeksList(weeks: [WeekModel]) -> some View {
+    private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
         // .id 确保月份切换时整个列表整体替换而非逐个 diff，消除跨月卡片的残留动画。
         VStack(spacing: WeekSpacing.md) {
             // 统计信息
@@ -451,12 +519,39 @@ struct PendingView: View {
             ForEach(weeks) { week in
                 PendingWeekCard(
                     week: week,
-                    outlook: viewModel?.weekOutlook(for: week) ?? PendingViewModel.buildWeekOutlook(for: week)
+                    outlook: viewModel?.weekOutlook(for: week) ?? PendingViewModel.buildWeekOutlook(for: week),
+                    onSelect: usesInlineSelection ? {
+                        selectedWeekID = week.weekId
+                    } : nil
                 )
+                .overlay {
+                    if usesInlineSelection, selectedWeekID == week.weekId {
+                        RoundedRectangle(cornerRadius: WeekRadius.large)
+                            .stroke(Color.weekyiiPrimary, lineWidth: 2)
+                            .allowsHitTesting(false)
+                    }
+                }
             }
         }
         // 月份切换时整体重建，避免跨月卡片复用时的 identity 错乱与残留动画。
         .id(calendar.dateComponents([.year, .month], from: selectedMonth))
+    }
+
+    private var inlineSelectionPlaceholder: some View {
+        VStack(spacing: WeekSpacing.md) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.weekyiiGradient)
+            Text("选择未来周")
+                .font(.titleMedium)
+                .foregroundColor(.textPrimary)
+            Text("在左侧选择一周，查看七天任务与时间安排。")
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(WeekSpacing.xl)
     }
 }
 

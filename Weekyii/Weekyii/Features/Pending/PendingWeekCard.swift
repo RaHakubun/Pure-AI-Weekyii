@@ -6,6 +6,7 @@ struct PendingWeekCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let week: WeekModel
     let outlook: PendingViewModel.WeekOutlookSnapshot
+    var onSelect: (() -> Void)? = nil
 
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -14,11 +15,26 @@ struct PendingWeekCard: View {
     }()
     
     var body: some View {
-        NavigationLink {
-            PendingWeekDetailView(week: week)
-        } label: {
-            WeekCard {
-                VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        Group {
+            if let onSelect {
+                Button(action: onSelect) {
+                    cardContent
+                }
+            } else {
+                NavigationLink {
+                    PendingWeekDetailView(week: week)
+                } label: {
+                    cardContent
+                }
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("pendingWeekCard_\(week.weekId)")
+    }
+
+    private var cardContent: some View {
+        WeekCard {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     // 周标题行：图标中性化，仅周标签用主色，右侧显示日期范围
                     HStack(spacing: WeekSpacing.xs) {
                         Image(systemName: "calendar")
@@ -34,7 +50,7 @@ struct PendingWeekCard: View {
                             .font(.caption)
                             .foregroundColor(.textTertiary)
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: onSelect == nil ? "chevron.right" : "sidebar.right")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.textTertiary)
                     }
@@ -104,11 +120,8 @@ struct PendingWeekCard: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(forecastPanelBorder, lineWidth: 1)
                     )
-                }
             }
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityIdentifier("pendingWeekCard_\(week.weekId)")
     }
     
     private func formatDateRange() -> String {

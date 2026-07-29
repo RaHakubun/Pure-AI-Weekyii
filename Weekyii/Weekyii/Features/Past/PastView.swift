@@ -16,8 +16,10 @@ private struct PastMonthDaySummary: Equatable {
 struct PastView: View {
     @Query(sort: \WeekModel.startDate, order: .reverse) private var allWeeks: [WeekModel]
     @Query(sort: \DayModel.date, order: .reverse) private var allDays: [DayModel]
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @State private var selectedMonth = Date()
     @State private var selectedDate = Date()
+    @State private var selectedWeekID: String?
     @State private var displayMode: PastDisplayMode = .weekList
     @State private var showsMonthAnalytics = false
     private let analyticsService = PastAnalyticsService()
@@ -25,27 +27,7 @@ struct PastView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
-
-                    monthReviewCard
-
-                    if displayMode == .weekList {
-                        let weeks = weeksInSelectedMonth
-                        if weeks.isEmpty {
-                            emptyStateView
-                        } else {
-                            weeksList(weeks: weeks)
-                        }
-                    } else {
-                        monthOverview
-                    }
-
-                    analyticsSection
-                }
-                .weekPadding(WeekSpacing.base)
-            }
+            pastBody
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -59,9 +41,61 @@ struct PastView: View {
         }
         .onAppear {
             normalizeSelectedDateForMonth()
+            normalizeSelectedWeek()
         }
         .onChange(of: selectedMonth) { _, _ in
             normalizeSelectedDateForMonth()
+            normalizeSelectedWeek()
+        }
+    }
+
+    @ViewBuilder
+    private var pastBody: some View {
+        let weeks = weeksInSelectedMonth
+
+        if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
+            HStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
+                        monthReviewCard
+                        weeksList(weeks: weeks, usesInlineSelection: true)
+                    }
+                    .padding(layoutMetrics.pageHorizontalPadding)
+                }
+                .frame(minWidth: 330, idealWidth: 370, maxWidth: 420)
+
+                Divider()
+
+                if let selectedWeek = selectedWeek(in: weeks) {
+                    PastWeekDetailView(week: selectedWeek)
+                        .id(selectedWeek.weekId)
+                } else {
+                    inlineSelectionPlaceholder
+                }
+            }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                    MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
+                    monthReviewCard
+
+                    if displayMode == .weekList {
+                        if weeks.isEmpty {
+                            emptyStateView
+                        } else {
+                            weeksList(weeks: weeks)
+                        }
+                    } else {
+                        monthOverview
+                    }
+
+                    analyticsSection
+                }
+                .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                .padding(.vertical, WeekSpacing.base)
+                .weekReadableContent()
+            }
         }
     }
 
@@ -170,16 +204,30 @@ struct PastView: View {
     }
 
     private var monthOverview: some View {
-        VStack(spacing: WeekSpacing.md) {
-            WeekCard {
-                PastMonthCalendarView(
-                    selectedDate: $selectedDate,
-                    selectedMonth: $selectedMonth,
-                    summaries: monthSummaries
-                )
+        Group {
+            if layoutMetrics.layoutClass.supportsTwoColumns {
+                HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                    monthCalendarCard
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    selectedDayDetailCard
+                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                }
+            } else {
+                VStack(spacing: WeekSpacing.md) {
+                    monthCalendarCard
+                    selectedDayDetailCard
+                }
             }
+        }
+    }
 
-            selectedDayDetailCard
+    private var monthCalendarCard: some View {
+        WeekCard {
+            PastMonthCalendarView(
+                selectedDate: $selectedDate,
+                selectedMonth: $selectedMonth,
+                summaries: monthSummaries
+            )
         }
     }
 
@@ -317,6 +365,21 @@ struct PastView: View {
         }
     }
 
+    private func normalizeSelectedWeek() {
+        let weeks = weeksInSelectedMonth
+        guard !weeks.isEmpty else {
+            selectedWeekID = nil
+            return
+        }
+        if !weeks.contains(where: { $0.weekId == selectedWeekID }) {
+            selectedWeekID = weeks.first?.weekId
+        }
+    }
+
+    private func selectedWeek(in weeks: [WeekModel]) -> WeekModel? {
+        weeks.first(where: { $0.weekId == selectedWeekID }) ?? weeks.first
+    }
+
     // MARK: - Empty State
 
     private var monthReviewCard: some View {
@@ -397,17 +460,47 @@ struct PastView: View {
 
     // MARK: - Weeks List
 
-    private func weeksList(weeks: [WeekModel]) -> some View {
+    private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
         VStack(spacing: WeekSpacing.md) {
             ForEach(weeks) { week in
-                PastWeekCard(week: week)
+                PastWeekCard(
+                    week: week,
+                    onSelect: usesInlineSelection ? {
+                        selectedWeekID = week.weekId
+                    } : nil
+                )
+                .overlay {
+                    if usesInlineSelection, selectedWeekID == week.weekId {
+                        RoundedRectangle(cornerRadius: WeekRadius.large)
+                            .stroke(Color.weekyiiPrimary, lineWidth: 2)
+                            .allowsHitTesting(false)
+                    }
+                }
             }
         }
+    }
+
+    private var inlineSelectionPlaceholder: some View {
+        VStack(spacing: WeekSpacing.md) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.weekyiiGradient)
+            Text("选择历史周")
+                .font(.titleMedium)
+                .foregroundColor(.textPrimary)
+            Text("在左侧选择一周，同时查看完成记录、遗忘数量与趋势。")
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(WeekSpacing.xl)
     }
 }
 
 private struct PastWeekCard: View {
     let week: WeekModel
+    var onSelect: (() -> Void)? = nil
 
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -416,10 +509,24 @@ private struct PastWeekCard: View {
     }()
 
     var body: some View {
-        NavigationLink {
-            PastWeekDetailView(week: week)
-        } label: {
-            WeekCard {
+        Group {
+            if let onSelect {
+                Button(action: onSelect) {
+                    cardContent
+                }
+            } else {
+                NavigationLink {
+                    PastWeekDetailView(week: week)
+                } label: {
+                    cardContent
+                }
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var cardContent: some View {
+        WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
                         Image(systemName: "calendar.badge.checkmark")
@@ -430,7 +537,7 @@ private struct PastWeekCard: View {
 
                         Spacer()
 
-                        Image(systemName: "chevron.right")
+                        Image(systemName: onSelect == nil ? "chevron.right" : "sidebar.right")
                             .font(.caption)
                             .foregroundColor(.textTertiary)
                     }
@@ -467,8 +574,6 @@ private struct PastWeekCard: View {
                     }
                 }
             }
-        }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private func statBlock(title: String, value: Int, color: Color) -> some View {
