@@ -5,12 +5,38 @@
     const previous = document.querySelector("[data-previous]");
     const next = document.querySelector("[data-next]");
     const languageLink = document.querySelector("[data-language-link]");
+    const appearance = document.querySelector("[data-appearance]");
+    const themeColor = document.querySelector('meta[name="theme-color"]');
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const systemAppearance = window.matchMedia("(prefers-color-scheme: light)");
+    const appearanceKey = "weekyii-appearance";
     let current = 0;
     let wheelLocked = false;
     let touchStartY = null;
 
     if (!slides.length) return;
+
+    function resolveAppearance(mode) {
+        return mode === "system" ? (systemAppearance.matches ? "light" : "dark") : mode;
+    }
+
+    function applyAppearance(mode, persist = false) {
+        const safeMode = ["system", "light", "dark"].includes(mode) ? mode : "system";
+        const resolved = resolveAppearance(safeMode);
+        document.documentElement.dataset.themeMode = safeMode;
+        document.documentElement.dataset.theme = resolved;
+        if (appearance) appearance.value = safeMode;
+        if (themeColor) themeColor.content = resolved === "light" ? "#efe3ca" : "#080705";
+        if (persist) localStorage.setItem(appearanceKey, safeMode);
+    }
+
+    applyAppearance(document.documentElement.dataset.themeMode || "system");
+    appearance?.addEventListener("change", event => {
+        applyAppearance(event.target.value, true);
+    });
+    systemAppearance.addEventListener("change", () => {
+        if (document.documentElement.dataset.themeMode === "system") applyAppearance("system");
+    });
 
     slides.forEach((slide, index) => {
         const dot = document.createElement("button");

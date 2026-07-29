@@ -4,6 +4,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080705">
+    <script>
+        (() => {
+            const key = "weekyii-appearance";
+            const saved = localStorage.getItem(key);
+            const mode = ["system", "light", "dark"].includes(saved) ? saved : "system";
+            const resolved = mode === "system"
+                ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+                : mode;
+            document.documentElement.dataset.themeMode = mode;
+            document.documentElement.dataset.theme = resolved;
+        })();
+    </script>
     <meta name="description" content="Weekyii 不是另一张无限增长的待办清单，而是一套面向 iPhone 与 iPad、以周为边界、以启动为承诺、以完成为记忆的本地优先任务系统。">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Weekyii — 以周为核的承诺式任务系统">
@@ -28,6 +40,14 @@
             <nav class="top-actions" aria-label="网站链接">
                 <a href="legacy-zh.html"><span class="legacy-label">初代编年史 · </span>旧版</a>
                 <a href="https://github.com/RaHakubun/Pure-AI-Weekyii">GitHub</a>
+                <label class="appearance-picker">
+                    <span class="sr-only">网页外观</span>
+                    <select data-appearance aria-label="网页外观">
+                        <option value="system">跟随系统</option>
+                        <option value="light">浅色</option>
+                        <option value="dark">深色</option>
+                    </select>
+                </label>
                 <a class="language-link" data-language-link href="index.html" lang="en">EN</a>
             </nav>
         </header>
