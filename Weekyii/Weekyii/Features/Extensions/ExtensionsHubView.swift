@@ -11,6 +11,7 @@ struct SuspendedCountdownPreset {
 
 struct ExtensionsHubView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @EnvironmentObject private var appState: AppState
     @State private var viewModel: ExtensionsViewModel?
     @State private var mindStampViewModel: MindStampViewModel?
@@ -22,10 +23,7 @@ struct ExtensionsHubView: View {
                 VStack(spacing: WeekSpacing.lg) {
                     if let mindStampViewModel, let viewModel {
                         LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: WeekSpacing.md),
-                                GridItem(.flexible())
-                            ],
+                            columns: shortcutColumns,
                             spacing: WeekSpacing.md
                         ) {
                             MindStampsModulePreview(viewModel: mindStampViewModel)
@@ -35,8 +33,9 @@ struct ExtensionsHubView: View {
                         ProjectsModulePreview(viewModel: viewModel)
                     }
                 }
-                .padding(.horizontal, WeekSpacing.base)
+                .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
                 .padding(.vertical, WeekSpacing.md)
+                .weekReadableContent()
             }
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +71,11 @@ struct ExtensionsHubView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+
+    private var shortcutColumns: [GridItem] {
+        let minimum: CGFloat = layoutMetrics.layoutClass == .compact ? 150 : 260
+        return [GridItem(.adaptive(minimum: minimum, maximum: 380), spacing: WeekSpacing.md)]
     }
 }
 

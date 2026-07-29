@@ -59,6 +59,7 @@ struct CreateWeekSheet: View {
                     weekSelectionSection
                 }
             }
+            .weekFormWidth()
             .navigationTitle(String(localized: "pending.create.title"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

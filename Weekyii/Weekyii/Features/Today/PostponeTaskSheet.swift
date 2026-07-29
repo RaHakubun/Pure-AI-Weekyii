@@ -63,6 +63,7 @@ struct PostponeTaskSheet: View {
         Group {
             if presentationStyle == .sheet {
                 content
+                    .weekFormWidth()
                     .background(Color.backgroundPrimary)
             } else {
                 content

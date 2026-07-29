@@ -154,6 +154,7 @@ struct CreateProjectSheet: View {
                     }
                 }
                 .weekPadding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(projectToEdit == nil ? String(localized: "project.create.title") : "编辑项目")

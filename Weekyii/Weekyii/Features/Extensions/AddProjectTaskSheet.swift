@@ -158,6 +158,7 @@ struct AddProjectTaskSheet: View {
                     }
                 }
                 .weekPadding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(String(localized: "project.task.add.title"))

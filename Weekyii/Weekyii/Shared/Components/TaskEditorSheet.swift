@@ -194,6 +194,7 @@ struct TaskEditorSheet: View {
                     }
                 }
                 .weekPadding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(title)

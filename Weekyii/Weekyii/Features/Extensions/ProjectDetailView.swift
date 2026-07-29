@@ -15,6 +15,7 @@ struct ProjectDetailView: View {
     @State private var expandedTaskIDs: Set<UUID> = []
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
 
     private var projectColor: Color { Color(hex: project.color) }
     private var snapshot: ProjectDetailSnapshot { viewModel.projectDetailSnapshot(for: project) }
@@ -22,13 +23,31 @@ struct ProjectDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                identitySection
-                lifecycleSection
-                summarySection
-                ledgerSection
+            Group {
+                if layoutMetrics.layoutClass.supportsTwoColumns {
+                    HStack(alignment: .top, spacing: WeekSpacing.xl) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                            identitySection
+                            lifecycleSection
+                            summarySection
+                        }
+                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+
+                        ledgerSection
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        identitySection
+                        lifecycleSection
+                        summarySection
+                        ledgerSection
+                    }
+                }
             }
-            .weekPadding(WeekSpacing.base)
+            .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+            .padding(.vertical, WeekSpacing.base)
+            .weekReadableContent()
         }
         .background(Color.backgroundPrimary)
         .navigationTitle(snapshot.name)
@@ -36,9 +55,11 @@ struct ProjectDetailView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: $showingAddTaskSheet, onDismiss: { viewModel.refresh() }) {
             AddProjectTaskSheet(project: project, viewModel: viewModel)
+                .weekFormWidth()
         }
         .sheet(isPresented: $showingEditProjectSheet, onDismiss: { viewModel.refresh() }) {
             CreateProjectSheet(viewModel: viewModel, projectToEdit: project)
+                .weekFormWidth()
         }
         .sheet(item: $editingTask, onDismiss: { viewModel.refresh() }) { task in
             TaskEditorSheet(
@@ -62,6 +83,7 @@ struct ProjectDetailView: View {
                 )
                 editingTask = nil
             }
+            .weekFormWidth()
         }
         .confirmationDialog(
             String(localized: "project.delete.confirm"),

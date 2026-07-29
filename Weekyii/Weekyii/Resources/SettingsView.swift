@@ -14,6 +14,7 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: UserSettings
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -39,6 +40,8 @@ struct SettingsView: View {
             .navigationTitle(String(localized: "settings.title"))
             .tint(.weekyiiPrimary)
         }
+        .frame(maxWidth: layoutMetrics.layoutClass == .compact ? .infinity : 760)
+        .frame(maxWidth: .infinity)
         .onAppear {
             guard !hasInitializedPendingDefaultKillTime else { return }
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
