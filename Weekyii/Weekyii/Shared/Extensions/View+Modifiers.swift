@@ -60,4 +60,45 @@ extension View {
     func refreshOnStateTransitions(using appState: AppState, perform action: @escaping () -> Void) -> some View {
         modifier(StateTransitionRefreshModifier(appState: appState, action: action))
     }
+
+    /// Keeps long-form content readable on large iPad canvases while leaving
+    /// compact layouts edge-to-edge, matching the existing iPhone design.
+    func weekReadableContent(
+        maxWidth: CGFloat? = nil,
+        alignment: Alignment = .top
+    ) -> some View {
+        modifier(WeekReadableContentModifier(maxWidth: maxWidth, alignment: alignment))
+    }
+
+    /// Gives form-style sheets a consistent iPad width without constraining
+    /// their existing compact presentation.
+    func weekFormWidth() -> some View {
+        modifier(WeekFormWidthModifier())
+    }
+}
+
+private struct WeekReadableContentModifier: ViewModifier {
+    @Environment(\.weekLayoutMetrics) private var metrics
+    let maxWidth: CGFloat?
+    let alignment: Alignment
+
+    func body(content: Content) -> some View {
+        content
+            .frame(
+                maxWidth: maxWidth ?? metrics.pageMaxWidth,
+                maxHeight: .infinity,
+                alignment: alignment
+            )
+            .frame(maxWidth: .infinity, alignment: alignment)
+    }
+}
+
+private struct WeekFormWidthModifier: ViewModifier {
+    @Environment(\.weekLayoutMetrics) private var metrics
+
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: metrics.formMaxWidth)
+            .frame(maxWidth: .infinity)
+    }
 }

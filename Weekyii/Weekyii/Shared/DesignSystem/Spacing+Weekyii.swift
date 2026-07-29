@@ -31,6 +31,96 @@ enum WeekSpacing {
     static let xxxl: CGFloat = 40
 }
 
+// MARK: - Responsive Layout
+
+/// Weekyii responds to the width of its current window rather than the device
+/// model. This keeps iPad split view and Stage Manager layouts usable when the
+/// app is resized down to an iPhone-like width.
+enum WeekLayoutClass: String, Sendable {
+    case compact
+    case regular
+    case wide
+
+    init(availableWidth: CGFloat) {
+        switch availableWidth {
+        case ..<650:
+            self = .compact
+        case ..<1000:
+            self = .regular
+        default:
+            self = .wide
+        }
+    }
+
+    var supportsSidebar: Bool {
+        self != .compact
+    }
+
+    var supportsTwoColumns: Bool {
+        self != .compact
+    }
+}
+
+struct WeekLayoutMetrics: Equatable, Sendable {
+    let availableWidth: CGFloat
+    let layoutClass: WeekLayoutClass
+
+    init(availableWidth: CGFloat) {
+        self.availableWidth = max(availableWidth, 0)
+        self.layoutClass = WeekLayoutClass(availableWidth: availableWidth)
+    }
+
+    static let compact = WeekLayoutMetrics(availableWidth: 390)
+
+    var pageHorizontalPadding: CGFloat {
+        switch layoutClass {
+        case .compact:
+            return WeekSpacing.base
+        case .regular:
+            return WeekSpacing.xl
+        case .wide:
+            return WeekSpacing.xxl
+        }
+    }
+
+    var pageMaxWidth: CGFloat {
+        switch layoutClass {
+        case .compact:
+            return .infinity
+        case .regular:
+            return 920
+        case .wide:
+            return 1240
+        }
+    }
+
+    var auxiliaryColumnWidth: CGFloat {
+        switch layoutClass {
+        case .compact:
+            return availableWidth
+        case .regular:
+            return 286
+        case .wide:
+            return 332
+        }
+    }
+
+    var formMaxWidth: CGFloat {
+        layoutClass == .compact ? .infinity : 680
+    }
+}
+
+private struct WeekLayoutMetricsKey: EnvironmentKey {
+    static let defaultValue = WeekLayoutMetrics.compact
+}
+
+extension EnvironmentValues {
+    var weekLayoutMetrics: WeekLayoutMetrics {
+        get { self[WeekLayoutMetricsKey.self] }
+        set { self[WeekLayoutMetricsKey.self] = newValue }
+    }
+}
+
 // MARK: - Corner Radius
 
 enum WeekRadius {
