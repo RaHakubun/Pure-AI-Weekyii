@@ -33,6 +33,7 @@ struct PendingView: View {
     @State private var displayMode: PendingDisplayMode = .weekList
     @State private var selectedWeekID: String?
     @State private var monthSummaries: [String: PendingViewModel.MonthDaySummary] = [:]
+    @State private var planningExtensionsViewModel: ExtensionsViewModel?
     private let calendar = Calendar(identifier: .iso8601)
 
     var body: some View {
@@ -143,7 +144,11 @@ struct PendingView: View {
             if viewModel == nil {
                 viewModel = PendingViewModel(modelContext: modelContext)
             }
+            if planningExtensionsViewModel == nil {
+                planningExtensionsViewModel = ExtensionsViewModel(modelContext: modelContext)
+            }
             viewModel?.refresh()
+            planningExtensionsViewModel?.refresh(rebuildProjectSnapshots: false)
             viewModel?.seedPendingWeekForUITestsIfNeeded()
             refreshMonthSummaries()
             normalizeSelectedWeek()
@@ -185,28 +190,36 @@ struct PendingView: View {
             let weeks = viewModel.weeks(in: selectedMonth)
 
             if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
-                HStack(spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                            MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
-                            weeksList(weeks: weeks, usesInlineSelection: true)
+                VStack(spacing: 0) {
+                    pendingHeroStage(weeks: weeks)
+                        .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
+                        .padding(.top, WeekSpacing.base)
+                        .padding(.bottom, WeekSpacing.md)
+
+                    HStack(spacing: 0) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                                MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
+                                weeksList(weeks: weeks, usesInlineSelection: true)
+                            }
+                            .padding(layoutMetrics.pageHorizontalPadding)
                         }
-                        .padding(layoutMetrics.pageHorizontalPadding)
-                    }
-                    .frame(minWidth: 330, idealWidth: 370, maxWidth: 420)
+                        .frame(minWidth: 330, idealWidth: 370, maxWidth: 420)
 
-                    Divider()
+                        Divider()
 
-                    if let selectedWeek = selectedWeek(in: weeks) {
-                        PendingWeekDetailView(week: selectedWeek)
-                            .id(selectedWeek.weekId)
-                    } else {
-                        inlineSelectionPlaceholder
+                        if let selectedWeek = selectedWeek(in: weeks) {
+                            PendingWeekDetailView(week: selectedWeek)
+                                .id(selectedWeek.weekId)
+                        } else {
+                            inlineSelectionPlaceholder
+                        }
                     }
                 }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        pendingHeroStage(weeks: weeks)
                         MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
 
                         if displayMode == .weekList {
@@ -228,6 +241,35 @@ struct PendingView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func pendingHeroStage(weeks: [WeekModel]) -> some View {
+        let days = weeks.flatMap(\.days)
+        let plannedDays = days.filter { !$0.sortedDraftTasks.isEmpty }.count
+        let draftTasks = days.reduce(0) { $0 + $1.sortedDraftTasks.count }
+        let projectTasks = days.flatMap(\.sortedDraftTasks).filter { $0.project != nil }.count
+        let nearestDate = days
+            .filter { !$0.sortedDraftTasks.isEmpty }
+            .map(\.date)
+            .min()
+
+        return WorkspaceHeroStage(
+            eyebrow: "PLAN",
+            title: "把尚未发生的事，\n放进可兑现的七天",
+            subtitle: "未来不是任务仓库。先看负载，再把草稿和项目任务放到真正能够承担它们的日期。",
+            systemImage: "calendar.badge.plus"
+        ) {
+            WorkspaceMetricStrip(metrics: [
+                .init(value: "\(weeks.count)", label: "周"),
+                .init(value: "\(plannedDays)", label: "计划日"),
+                .init(value: "\(draftTasks)", label: "草稿任务"),
+                .init(
+                    value: nearestDate?.formatted(.dateTime.month().day()) ?? "—",
+                    label: projectTasks > 0 ? "最近计划 · \(projectTasks) 项目任务" : "最近计划"
+                )
+            ])
+        }
+        .accessibilityIdentifier("pendingHeroStage")
     }
 
     private var createSheetInitialDate: Date {
@@ -346,17 +388,47 @@ struct PendingView: View {
 
     private var monthCalendarCard: some View {
         WeekCard {
-            PendingMonthCalendarView(
-                selectedDate: $selectedDate,
-                selectedMonth: $selectedMonth,
-                summaries: monthSummaries,
-                showRegular: settings.pendingMonthShowRegular,
-                showDDL: settings.pendingMonthShowDDL,
-                showLeisure: settings.pendingMonthShowLeisure
-            )
-            // 月份变化时强制重建日历格视图树，消除 LazyVGrid cell 跨月复用时的 identity 错乱。
-            .id(calendar.dateComponents([.year, .month], from: selectedMonth))
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                if layoutMetrics.layoutClass.supportsSidebar {
+                    Label("从悬置箱拖动任务，悬停“未来”后放到具体日期", systemImage: "hand.draw")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.weekyiiPrimary)
+                }
+
+                PendingMonthCalendarView(
+                    selectedDate: $selectedDate,
+                    selectedMonth: $selectedMonth,
+                    summaries: monthSummaries,
+                    showRegular: settings.pendingMonthShowRegular,
+                    showDDL: settings.pendingMonthShowDDL,
+                    showLeisure: settings.pendingMonthShowLeisure,
+                    onDropSuspendedTask: assignSuspendedTaskPayload
+                )
+                // 月份变化时强制重建日历格视图树，消除 LazyVGrid cell 跨月复用时的 identity 错乱。
+                .id(calendar.dateComponents([.year, .month], from: selectedMonth))
+            }
         }
+    }
+
+    private func assignSuspendedTaskPayload(_ payload: String, to date: Date) -> Bool {
+        let prefix = "weekyii:suspended:"
+        guard payload.hasPrefix(prefix),
+              let id = UUID(uuidString: String(payload.dropFirst(prefix.count))),
+              let planningExtensionsViewModel,
+              let task = planningExtensionsViewModel.suspendedTasks.first(where: { $0.id == id })
+        else {
+            return false
+        }
+
+        planningExtensionsViewModel.assignSuspendedTask(task, to: date)
+        if let message = planningExtensionsViewModel.errorMessage {
+            errorMessage = message
+            return false
+        }
+
+        viewModel?.refresh()
+        refreshMonthSummaries()
+        return true
     }
 
     private var selectedDayDetailCard: some View {
@@ -562,6 +634,7 @@ private struct PendingMonthCalendarView: View {
     let showRegular: Bool
     let showDDL: Bool
     let showLeisure: Bool
+    let onDropSuspendedTask: (String, Date) -> Bool
 
     private let calendar = Calendar(identifier: .iso8601)
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
@@ -697,6 +770,17 @@ private struct PendingMonthCalendarView: View {
         }
         .buttonStyle(.plain)
         .disabled(!day.isCurrentMonth || isPastDate)
+        .dropDestination(for: String.self) { payloads, _ in
+            guard day.isCurrentMonth, !isPastDate else { return false }
+            return payloads.contains { payload in
+                onDropSuspendedTask(payload, day.date)
+            }
+        }
+        .accessibilityHint(
+            day.isCurrentMonth && !isPastDate
+                ? "可接收从悬置箱拖来的任务"
+                : ""
+        )
     }
 
     private func dayNumberColor(day: PendingCalendarDay, isSelected: Bool, isToday: Bool, isPastDate: Bool) -> Color {
