@@ -99,6 +99,7 @@ struct TodayView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
 
@@ -178,6 +179,9 @@ struct TodayView: View {
             viewModel?.refresh()
         }
         .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
             viewModel?.refresh()
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
@@ -270,7 +274,7 @@ struct TodayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
                 Group {
-                    if layoutMetrics.layoutClass.supportsTwoColumns {
+                    if layoutMetrics.layoutClass.supportsTwoColumns, workspaceSelectionStore == nil {
                         HStack(alignment: .top, spacing: WeekSpacing.xl) {
                             taskFlowSection(day: day, viewModel: viewModel)
                                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -522,7 +526,7 @@ struct TodayView: View {
                         .font(.titleMedium)
                         .foregroundColor(.white)
                         .onTapGesture {
-                            selectedTaskForDetail = focusTask
+                            selectTask(focusTask)
                         }
 
                     TaskProjectOriginBadge(
@@ -651,7 +655,7 @@ struct TodayView: View {
                         tasks: day.frozenTasks,
                         showsProjectOrigin: true,
                         onTapTask: { task in
-                            selectedTaskForDetail = task
+                            selectTask(task)
                         },
                         onPostponeTask: { task in
                             taskForPostpone = task
@@ -680,7 +684,7 @@ struct TodayView: View {
                     }
                     
                     CompleteZoneView(tasks: day.completedTasks, onTapTask: { task in
-                        selectedTaskForDetail = task
+                        selectTask(task)
                     })
                 }
             }
@@ -729,7 +733,7 @@ struct TodayView: View {
                         .foregroundColor(.accentGreen)
                 }
                 
-                CompleteZoneView(tasks: day.completedTasks)
+                CompleteZoneView(tasks: day.completedTasks, onTapTask: selectTask)
             }
         }
     }
@@ -779,7 +783,7 @@ struct TodayView: View {
                             .foregroundColor(.accentGreen)
                     }
                     
-                    CompleteZoneView(tasks: day.completedTasks)
+                    CompleteZoneView(tasks: day.completedTasks, onTapTask: selectTask)
                 }
             }
         }
@@ -1033,6 +1037,14 @@ struct TodayView: View {
             pendingTodayKillTimeMinute = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func selectTask(_ task: TaskItem) {
+        if let workspaceSelectionStore {
+            workspaceSelectionStore.select(.task(task.id), for: .today)
+        } else {
+            selectedTaskForDetail = task
         }
     }
 

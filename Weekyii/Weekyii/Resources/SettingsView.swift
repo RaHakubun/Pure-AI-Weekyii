@@ -4,6 +4,12 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    let workspaceSection: WorkspaceSettingsSection?
+
+    init(workspaceSection: WorkspaceSettingsSection? = nil) {
+        self.workspaceSection = workspaceSection
+    }
+
     private static let archiveFilenameFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -37,7 +43,13 @@ struct SettingsView: View {
     
     var body: some View {
         NavigationStack {
-            settingsHome
+            Group {
+                if let workspaceSection {
+                    workspaceSettingsPage(workspaceSection)
+                } else {
+                    settingsHome
+                }
+            }
             .navigationTitle(String(localized: "settings.title"))
             .tint(.weekyiiPrimary)
         }
@@ -189,6 +201,28 @@ struct SettingsView: View {
                     editingTaskTypeIdRaw = nil
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func workspaceSettingsPage(_ section: WorkspaceSettingsSection) -> some View {
+        switch section {
+        case .appearance:
+            appearanceSettingsPage
+        case .rhythm:
+            todayRhythmSettingsPage
+        case .taskTypes:
+            taskTypeSettingsPage
+        case .future:
+            futureSettingsPage
+        case .projects:
+            ProjectSettingsView()
+        case .data:
+            dataSettingsPage
+        case .about:
+            aboutSettingsPage
+        case .diagnostics:
+            developerSettingsPage
         }
     }
 

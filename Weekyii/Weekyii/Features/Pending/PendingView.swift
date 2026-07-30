@@ -20,6 +20,7 @@ private struct PendingMonthEditTarget: Identifiable {
 struct PendingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: PendingViewModel?
@@ -158,6 +159,11 @@ struct PendingView: View {
             viewModel?.refresh()
             refreshMonthSummaries()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
+            viewModel?.refresh()
+            planningExtensionsViewModel?.refresh(rebuildProjectSnapshots: false)
+            refreshMonthSummaries()
+        }
         .onChange(of: selectedMonth) { _, _ in
             // 在同一个无动画事务中完成 selectedDate 归位和 monthSummaries 刷新，
             // 避免两者分两帧更新导致 selectedDayDetailCard 在中间帧读到不一致数据而闪烁。
@@ -168,6 +174,9 @@ struct PendingView: View {
                 refreshMonthSummaries()
                 normalizeSelectedWeek()
             }
+        }
+        .onChange(of: selectedDate) { _, date in
+            workspaceSelectionStore?.select(.date(date), for: .pending)
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue {
@@ -190,7 +199,7 @@ struct PendingView: View {
         if let viewModel {
             let weeks = viewModel.weeks(in: selectedMonth)
 
-            if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
+            if displayMode == .weekList, layoutMetrics.layoutClass == .wide, workspaceSelectionStore == nil, !weeks.isEmpty {
                 VStack(spacing: 0) {
                     HStack(spacing: 0) {
                         ScrollView {
@@ -340,13 +349,17 @@ struct PendingView: View {
                 HStack(alignment: .top, spacing: WeekSpacing.xl) {
                     monthCalendarCard
                         .frame(maxWidth: .infinity, alignment: .top)
-                    selectedDayDetailCard
-                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                    if workspaceSelectionStore == nil {
+                        selectedDayDetailCard
+                            .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                    }
                 }
             } else {
                 VStack(spacing: WeekSpacing.md) {
                     monthCalendarCard
-                    selectedDayDetailCard
+                    if workspaceSelectionStore == nil {
+                        selectedDayDetailCard
+                    }
                 }
             }
         }
@@ -531,25 +544,28 @@ struct PendingView: View {
     // MARK: - Weeks List
     
     private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
+        let usesWorkspaceSelection = workspaceSelectionStore != nil
         // .id 确保月份切换时整个列表整体替换而非逐个 diff，消除跨月卡片的残留动画。
         VStack(spacing: WeekSpacing.md) {
             // 统计信息
-            WeekCard(accentColor: .accentOrange) {
-                HStack {
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "pending.total_weeks"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-                        Text("\(weeks.count)")
-                            .font(.titleLarge)
-                            .foregroundColor(.accentOrange)
+            if workspaceSelectionStore == nil {
+                WeekCard(accentColor: .accentOrange) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                            Text(String(localized: "pending.total_weeks"))
+                                .font(.caption)
+                                .foregroundColor(.textSecondary)
+                            Text("\(weeks.count)")
+                                .font(.titleLarge)
+                                .foregroundColor(.accentOrange)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 40))
+                            .foregroundColor(.accentOrange.opacity(0.3))
                     }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 40))
-                        .foregroundColor(.accentOrange.opacity(0.3))
                 }
             }
             
@@ -558,12 +574,13 @@ struct PendingView: View {
                 PendingWeekCard(
                     week: week,
                     outlook: viewModel?.weekOutlook(for: week) ?? PendingViewModel.buildWeekOutlook(for: week),
-                    onSelect: usesInlineSelection ? {
+                    onSelect: usesInlineSelection || usesWorkspaceSelection ? {
                         selectedWeekID = week.weekId
+                        workspaceSelectionStore?.select(.week(week.weekId), for: .pending)
                     } : nil
                 )
                 .overlay {
-                    if usesInlineSelection, selectedWeekID == week.weekId {
+                    if (usesInlineSelection || usesWorkspaceSelection), selectedWeekID == week.weekId {
                         RoundedRectangle(cornerRadius: WeekRadius.large)
                             .stroke(Color.weekyiiPrimary, lineWidth: 2)
                             .allowsHitTesting(false)

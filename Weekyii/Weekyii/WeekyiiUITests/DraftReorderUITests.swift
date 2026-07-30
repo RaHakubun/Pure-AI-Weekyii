@@ -623,4 +623,24 @@ final class IPadLayoutUITests: XCTestCase {
             XCTAssertTrue(app.descendants(matching: .any)["workspaceInspector"].waitForExistence(timeout: 5))
         }
     }
+
+    func testSettingsCategoryUsesRightInspectorForm() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        app.descendants(matching: .any)["workspaceRoute_settings"].tap()
+
+        let rhythmCategory = app.buttons["workspaceSettingsCategory_rhythm"]
+        XCTAssertTrue(rhythmCategory.waitForExistence(timeout: 5))
+        rhythmCategory.tap()
+
+        XCTAssertTrue(app.staticTexts["今日节奏"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["执行方式"].waitForExistence(timeout: 5))
+
+        app.descendants(matching: .any)["workspaceRoute_insights"].tap()
+        XCTAssertFalse(app.staticTexts["执行方式"].exists)
+    }
 }

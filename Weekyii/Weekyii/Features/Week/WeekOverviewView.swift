@@ -217,6 +217,7 @@ struct WeekOverviewContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @EnvironmentObject private var appState: AppState
     @State private var viewModel: WeekViewModel?
     @State private var displayMode: WeekOverviewDisplayMode = .cards
@@ -231,7 +232,7 @@ struct WeekOverviewContentView: View {
             if let week = viewModel?.presentWeek {
                 VStack(alignment: .leading, spacing: WeekSpacing.xl) {
                     Group {
-                        if layoutMetrics.layoutClass.supportsTwoColumns {
+                        if layoutMetrics.layoutClass.supportsTwoColumns, workspaceSelectionStore == nil {
                             HStack(alignment: .top, spacing: WeekSpacing.xl) {
                                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                                     WeekStatCard(week: week)
@@ -250,11 +251,13 @@ struct WeekOverviewContentView: View {
                             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                                 WeekStatCard(week: week)
                                 topologyCard(week: week)
-                                WeekOverviewDetailSection(
-                                    week: week,
-                                    displayMode: $displayMode,
-                                    selectedDayID: selectedDayID
-                                )
+                                if workspaceSelectionStore == nil {
+                                    WeekOverviewDetailSection(
+                                        week: week,
+                                        displayMode: $displayMode,
+                                        selectedDayID: selectedDayID
+                                    )
+                                }
                             }
                         }
                     }
@@ -290,6 +293,9 @@ struct WeekOverviewContentView: View {
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
+            viewModel?.refresh()
+        }
         .fullScreenCover(isPresented: $showingTopologyFullScreen) {
             if let week = viewModel?.presentWeek {
                 WeekTopologyFullScreenView(
@@ -297,7 +303,11 @@ struct WeekOverviewContentView: View {
                     viewport: $topologyViewport,
                     selectedDayID: $selectedDayID,
                     onOpenTask: { taskID in
-                        selectedTopologyTask = task(with: taskID, in: week)
+                        if let workspaceSelectionStore {
+                            workspaceSelectionStore.select(.task(taskID), for: .week)
+                        } else {
+                            selectedTopologyTask = task(with: taskID, in: week)
+                        }
                     }
                 )
             }
@@ -315,6 +325,11 @@ struct WeekOverviewContentView: View {
                 onSave: { _, _, _, _, _ in }
             )
         }
+        .onChange(of: selectedDayID) { _, dayID in
+            if let dayID {
+                workspaceSelectionStore?.select(.day(dayID), for: .week)
+            }
+        }
     }
 
     private func topologyCard(week: WeekModel) -> some View {
@@ -324,11 +339,16 @@ struct WeekOverviewContentView: View {
                 viewport: $topologyViewport,
                 selectedDayID: $selectedDayID,
                 isFullScreen: false,
+                showsInspector: workspaceSelectionStore == nil,
                 onOpenFullScreen: {
                     showingTopologyFullScreen = true
                 },
                 onOpenTask: { taskID in
-                    selectedTopologyTask = task(with: taskID, in: week)
+                    if let workspaceSelectionStore {
+                        workspaceSelectionStore.select(.task(taskID), for: .week)
+                    } else {
+                        selectedTopologyTask = task(with: taskID, in: week)
+                    }
                 }
             )
         }

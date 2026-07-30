@@ -2,9 +2,11 @@ import SwiftUI
 
 struct MindStampListView: View {
     let viewModel: MindStampViewModel
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @State private var editingItem: MindStampItem?
     @State private var deletingItem: MindStampItem?
     @State private var imagePreviewItem: ImagePreviewItem?
+    @State private var selectedItemID: UUID?
     private let actionButtonSize: CGFloat = 44
     private let actionIconFont: Font = .system(size: 17, weight: .semibold)
 
@@ -39,6 +41,12 @@ struct MindStampListView: View {
         }
         .fullScreenCover(item: $imagePreviewItem) { item in
             ImageViewerScreen(image: item.image)
+        }
+        .onAppear {
+            if workspaceSelectionStore != nil, selectedItemID == nil, let first = viewModel.stamps.first {
+                selectedItemID = first.id
+                workspaceSelectionStore?.select(.mindStamp(first.id), for: .mindStamps)
+            }
         }
     }
 
@@ -115,7 +123,12 @@ struct MindStampListView: View {
                 }
 
                 Button {
-                    editingItem = stamp
+                    if let workspaceSelectionStore {
+                        selectedItemID = stamp.id
+                        workspaceSelectionStore.select(.mindStamp(stamp.id), for: .mindStamps)
+                    } else {
+                        editingItem = stamp
+                    }
                 } label: {
                     VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                         Text(stamp.text.isEmpty ? "仅图片记录" : stamp.text)
@@ -141,7 +154,7 @@ struct MindStampListView: View {
 
                             Spacer(minLength: 0)
 
-                            Label("编辑", systemImage: "pencil")
+                            Label(workspaceSelectionStore == nil ? "编辑" : "查看", systemImage: workspaceSelectionStore == nil ? "pencil" : "sidebar.right")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Color.weekyiiPrimary)
                         }
@@ -151,14 +164,23 @@ struct MindStampListView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("mindstampItemCard_\(index)")
 
-                actionButton(
-                    systemImage: "trash",
-                    foreground: .taskDDL,
-                    background: Color.taskDDL.opacity(0.1),
-                    accessibilityID: "mindstampDeleteButton_\(index)"
-                ) {
-                    deletingItem = stamp
+                if workspaceSelectionStore == nil {
+                    actionButton(
+                        systemImage: "trash",
+                        foreground: .taskDDL,
+                        background: Color.taskDDL.opacity(0.1),
+                        accessibilityID: "mindstampDeleteButton_\(index)"
+                    ) {
+                        deletingItem = stamp
+                    }
                 }
+            }
+        }
+        .overlay {
+            if selectedItemID == stamp.id {
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .stroke(Color.accentPink, lineWidth: 2)
+                    .allowsHitTesting(false)
             }
         }
     }

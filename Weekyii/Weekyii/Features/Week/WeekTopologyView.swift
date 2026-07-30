@@ -6,8 +6,27 @@ struct WeekTopologyView: View {
     @Binding var viewport: WeekTopologyViewportState
     @Binding var selectedDayID: String?
     let isFullScreen: Bool
+    let showsInspector: Bool
     let onOpenFullScreen: () -> Void
     let onOpenTask: (UUID) -> Void
+
+    init(
+        week: WeekModel,
+        viewport: Binding<WeekTopologyViewportState>,
+        selectedDayID: Binding<String?>,
+        isFullScreen: Bool,
+        showsInspector: Bool = true,
+        onOpenFullScreen: @escaping () -> Void,
+        onOpenTask: @escaping (UUID) -> Void
+    ) {
+        self.week = week
+        _viewport = viewport
+        _selectedDayID = selectedDayID
+        self.isFullScreen = isFullScreen
+        self.showsInspector = showsInspector
+        self.onOpenFullScreen = onOpenFullScreen
+        self.onOpenTask = onOpenTask
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
@@ -40,7 +59,9 @@ struct WeekTopologyView: View {
                     .stroke(Color.backgroundTertiary, lineWidth: 1)
             )
 
-            inspector
+            if showsInspector {
+                inspector
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(isFullScreen ? "weekTopologyFullscreen" : "weekTopologyView")

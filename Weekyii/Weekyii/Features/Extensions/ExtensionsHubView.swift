@@ -244,8 +244,10 @@ struct SuspendedTasksFullView: View {
     @State private var deletingTask: SuspendedTaskItem?
     @State private var assigningTask: SuspendedTaskItem?
     @State private var errorMessage: String?
+    @State private var selectedTaskID: UUID?
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -272,7 +274,9 @@ struct SuspendedTasksFullView: View {
         let groups = taskGroups
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                statsCard
+                if workspaceSelectionStore == nil {
+                    statsCard
+                }
 
                 if viewModel.suspendedTasks.isEmpty {
                     emptyState
@@ -305,6 +309,12 @@ struct SuspendedTasksFullView: View {
         }
         .onAppear {
             viewModel.refresh()
+            if workspaceSelectionStore != nil, selectedTaskID == nil {
+                selectedTaskID = viewModel.suspendedTasks.first?.id
+                if let selectedTaskID {
+                    workspaceSelectionStore?.select(.suspendedTask(selectedTaskID), for: .suspended)
+                }
+            }
         }
         .onChange(of: viewModel.errorMessage) { _, newValue in
             if let newValue { errorMessage = newValue }
@@ -494,43 +504,58 @@ struct SuspendedTasksFullView: View {
 
             suspendedMetaRow(task)
 
-            HStack(spacing: WeekSpacing.sm) {
-                Spacer()
+            if workspaceSelectionStore == nil {
+                HStack(spacing: WeekSpacing.sm) {
+                    Spacer()
 
-                Menu {
-                    Button("分配到某天", systemImage: "calendar.badge.plus") {
-                        assigningTask = task
+                    Menu {
+                        Button("分配到某天", systemImage: "calendar.badge.plus") {
+                            assigningTask = task
+                        }
+                        Button("编辑", systemImage: "pencil") {
+                            editingTask = task
+                        }
+                        Button("续期 10 天", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
+                            viewModel.extendSuspendedTask(task, by: 10)
+                        }
+                        Button("续期 30 天", systemImage: "clock.badge") {
+                            viewModel.extendSuspendedTask(task, by: 30)
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundColor(.textSecondary)
                     }
-                    Button("编辑", systemImage: "pencil") {
-                        editingTask = task
-                    }
-                    Button("续期 10 天", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
-                        viewModel.extendSuspendedTask(task, by: 10)
-                    }
-                    Button("续期 30 天", systemImage: "clock.badge") {
-                        viewModel.extendSuspendedTask(task, by: 30)
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundColor(.textSecondary)
-                }
-                .accessibilityIdentifier("suspendedTaskMenuButton_\(task.id.uuidString)")
+                    .accessibilityIdentifier("suspendedTaskMenuButton_\(task.id.uuidString)")
 
-                Button {
-                    deletingTask = task
-                } label: {
-                    Image(systemName: "trash.circle")
-                        .font(.title3)
-                        .foregroundColor(.accent)
+                    Button {
+                        deletingTask = task
+                    } label: {
+                        Image(systemName: "trash.circle")
+                            .font(.title3)
+                            .foregroundColor(.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("suspendedDeleteButton_\(task.id.uuidString)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("suspendedDeleteButton_\(task.id.uuidString)")
             }
         }
         .padding(WeekSpacing.md)
         .background(Color.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+        .overlay {
+            if selectedTaskID == task.id {
+                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                    .stroke(Color.suspendedModuleTint, lineWidth: 2)
+                    .allowsHitTesting(false)
+            }
+        }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                selectedTaskID = task.id
+                workspaceSelectionStore?.select(.suspendedTask(task.id), for: .suspended)
+            }
+        )
         .draggable("weekyii:suspended:\(task.id.uuidString)") {
             HStack(spacing: WeekSpacing.sm) {
                 Image(systemName: "hourglass")
@@ -589,7 +614,7 @@ struct SuspendedTasksFullView: View {
     }
 }
 
-private struct SuspendedTaskEditorSheet: View {
+struct SuspendedTaskEditorSheet: View {
     let title: String
     let initialTitle: String
     let initialDescription: String
@@ -1028,7 +1053,7 @@ private struct SuspendedStepDraft: Identifiable {
     var sortOrder: Int
 }
 
-private struct SuspendedTaskAssignSheet: View {
+struct SuspendedTaskAssignSheet: View {
     let taskTitle: String
     let onAssign: (Date) -> Void
 
@@ -1296,7 +1321,9 @@ struct ProjectsFullView: View {
     @State private var deletingProject: ProjectModel?
     @State private var errorMessage: String?
     @State private var selectedFilter: ProjectFilter = .current
+    @State private var selectedProjectID: UUID?
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -1484,6 +1511,21 @@ struct ProjectsFullView: View {
                 project.status == .archived
             }
         }
+        if let workspaceSelectionStore {
+            let currentSelection = workspaceSelectionStore.selection(for: .projects)
+            let selectionIsVisible = tileProjects.contains { project in
+                currentSelection == .project(project.id)
+            }
+            if !selectionIsVisible {
+                workspaceSelectionStore.select(
+                    tileProjects.first.map { .project($0.id) },
+                    for: .projects
+                )
+                selectedProjectID = tileProjects.first?.id
+            } else if case .project(let projectID)? = currentSelection {
+                selectedProjectID = projectID
+            }
+        }
     }
 
     @ViewBuilder
@@ -1558,23 +1600,54 @@ struct ProjectsFullView: View {
                 }
             )
         } else {
-            NavigationLink(destination: ProjectDetailView(project: project, viewModel: viewModel)) {
-                ProjectMetroTileView(
-                    snapshot: snapshot,
-                    tileSize: project.tileSize,
-                    statusText: project.status.displayName,
-                    isEditing: false,
-                    isDragging: false
-                )
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.35).onEnded { _ in
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                        isEditingTiles = true
+            if let workspaceSelectionStore {
+                Button {
+                    selectedProjectID = project.id
+                    workspaceSelectionStore.select(.project(project.id), for: .projects)
+                } label: {
+                    ProjectMetroTileView(
+                        snapshot: snapshot,
+                        tileSize: project.tileSize,
+                        statusText: project.status.displayName,
+                        isEditing: false,
+                        isDragging: false
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: WeekRadius.medium)
+                            .stroke(
+                                selectedProjectID == project.id ? Color(hex: project.color) : Color.clear,
+                                lineWidth: 2
+                            )
+                            .allowsHitTesting(false)
                     }
                 }
-            )
+                .buttonStyle(.plain)
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            isEditingTiles = true
+                        }
+                    }
+                )
+            } else {
+                NavigationLink(destination: ProjectDetailView(project: project, viewModel: viewModel)) {
+                    ProjectMetroTileView(
+                        snapshot: snapshot,
+                        tileSize: project.tileSize,
+                        statusText: project.status.displayName,
+                        isEditing: false,
+                        isDragging: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            isEditingTiles = true
+                        }
+                    }
+                )
+            }
         }
     }
 

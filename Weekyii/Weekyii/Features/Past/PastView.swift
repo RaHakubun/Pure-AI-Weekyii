@@ -17,6 +17,7 @@ struct PastView: View {
     @Query(sort: \WeekModel.startDate, order: .reverse) private var allWeeks: [WeekModel]
     @Query(sort: \DayModel.date, order: .reverse) private var allDays: [DayModel]
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @State private var selectedMonth = Date()
     @State private var selectedDate = Date()
     @State private var selectedWeekID: String?
@@ -47,13 +48,16 @@ struct PastView: View {
             normalizeSelectedDateForMonth()
             normalizeSelectedWeek()
         }
+        .onChange(of: selectedDate) { _, date in
+            workspaceSelectionStore?.select(.date(date), for: .past)
+        }
     }
 
     @ViewBuilder
     private var pastBody: some View {
         let weeks = weeksInSelectedMonth
 
-        if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
+        if displayMode == .weekList, layoutMetrics.layoutClass == .wide, workspaceSelectionStore == nil, !weeks.isEmpty {
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     ScrollView {
@@ -211,13 +215,17 @@ struct PastView: View {
                 HStack(alignment: .top, spacing: WeekSpacing.xl) {
                     monthCalendarCard
                         .frame(maxWidth: .infinity, alignment: .top)
-                    selectedDayDetailCard
-                        .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                    if workspaceSelectionStore == nil {
+                        selectedDayDetailCard
+                            .frame(width: layoutMetrics.auxiliaryColumnWidth)
+                    }
                 }
             } else {
                 VStack(spacing: WeekSpacing.md) {
                     monthCalendarCard
-                    selectedDayDetailCard
+                    if workspaceSelectionStore == nil {
+                        selectedDayDetailCard
+                    }
                 }
             }
         }
@@ -463,16 +471,18 @@ struct PastView: View {
     // MARK: - Weeks List
 
     private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
+        let usesWorkspaceSelection = workspaceSelectionStore != nil
         VStack(spacing: WeekSpacing.md) {
             ForEach(weeks) { week in
                 PastWeekCard(
                     week: week,
-                    onSelect: usesInlineSelection ? {
+                    onSelect: usesInlineSelection || usesWorkspaceSelection ? {
                         selectedWeekID = week.weekId
+                        workspaceSelectionStore?.select(.week(week.weekId), for: .past)
                     } : nil
                 )
                 .overlay {
-                    if usesInlineSelection, selectedWeekID == week.weekId {
+                    if (usesInlineSelection || usesWorkspaceSelection), selectedWeekID == week.weekId {
                         RoundedRectangle(cornerRadius: WeekRadius.large)
                             .stroke(Color.weekyiiPrimary, lineWidth: 2)
                             .allowsHitTesting(false)
