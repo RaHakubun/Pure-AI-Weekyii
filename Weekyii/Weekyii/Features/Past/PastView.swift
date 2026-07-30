@@ -55,11 +55,6 @@ struct PastView: View {
 
         if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
             VStack(spacing: 0) {
-                pastHeroStage
-                    .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
-                    .padding(.top, WeekSpacing.base)
-                    .padding(.bottom, WeekSpacing.md)
-
                 HStack(spacing: 0) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: WeekSpacing.lg) {
@@ -84,7 +79,6 @@ struct PastView: View {
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                    pastHeroStage
                     MonthPickerView(month: $selectedMonth, restriction: .pastOnly)
                     monthReviewCard
 
@@ -105,33 +99,6 @@ struct PastView: View {
                 .weekReadableContent()
             }
         }
-    }
-
-    private var pastHeroStage: some View {
-        let stats = monthStats
-        let completed = stats?.totalCompletedTasks ?? 0
-        let forgotten = stats?.totalExpiredTasks ?? 0
-        let rate = Int((stats?.completionRate ?? 0) * 100)
-        let focusHours = stats?.totalFocusHours ?? 0
-
-        return WorkspaceHeroStage(
-            eyebrow: "REVIEW",
-            title: "回望结果，\n不重新背负失败",
-            subtitle: "已完成任务保留过程，过期任务只留下数量。复盘的目的是理解节奏，而不是把旧任务再次塞回未来。",
-            systemImage: "clock.arrow.circlepath"
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(completed)", label: "完成"),
-                .init(value: "\(forgotten)", label: "遗忘"),
-                .init(value: "\(rate)%", label: "完成率"),
-                .init(value: formatFocusHours(focusHours), label: "专注")
-            ])
-        }
-        .accessibilityIdentifier("pastHeroStage")
-    }
-
-    private func formatFocusHours(_ hours: Double) -> String {
-        hours < 1 ? "\(Int((hours * 60).rounded()))m" : String(format: "%.1fh", hours)
     }
 
     private var monthRange: ClosedRange<Date> {

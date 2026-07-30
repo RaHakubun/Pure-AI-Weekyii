@@ -30,21 +30,6 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .today: "承诺、执行与收尾"
-        case .week: "看见七天的真实负载"
-        case .pending: "把未发生的事安排清楚"
-        case .projects: "跨日期目标与任务台账"
-        case .suspended: "暂不决定，但必须回来处理"
-        case .past: "查看已经发生的每一天"
-        case .insights: "从完成与遗忘中理解节奏"
-        case .mindStamps: "留给启动与收尾的情绪线索"
-        case .search: "跨任务、项目与印记定位"
-        case .settings: "规则、主题与数据维护"
-        }
-    }
-
     var systemImage: String {
         switch self {
         case .today: "scope"
@@ -116,6 +101,7 @@ struct WorkspaceShell: View {
                         }
                     }
             }
+            .id(selectedRoute)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
@@ -153,8 +139,11 @@ struct WorkspaceShell: View {
             )
             .navigationSplitViewColumnWidth(min: 620, ideal: 800, max: 1100)
         } detail: {
-            WorkspaceInspectorView(route: selectedRoute)
-                .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 390)
+            NavigationStack {
+                WorkspaceInspectorView(route: selectedRoute)
+            }
+            .id(selectedRoute)
+            .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 390)
         }
         .navigationSplitViewStyle(.balanced)
     }
@@ -196,8 +185,6 @@ private struct WorkspaceSidebar: View {
 
     var body: some View {
         List(selection: routeSelection) {
-            brandHeader
-
             Button {
                 selectedRoute = .search
             } label: {
@@ -255,26 +242,6 @@ private struct WorkspaceSidebar: View {
                 }
             }
         )
-    }
-
-    private var brandHeader: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            HStack(spacing: WeekSpacing.sm) {
-                WeekLogo(size: .small, animated: false)
-                Spacer()
-                Text("WORKSPACE")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(Color.weekyiiPrimary)
-            }
-
-            Text("Plan once.\nExecute without interruption.")
-                .font(.caption)
-                .foregroundStyle(Color.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, WeekSpacing.sm)
-        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -443,19 +410,14 @@ struct WorkspaceInsightsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                WorkspaceHeroStage(
-                    eyebrow: "REVIEW",
-                    title: "从执行留下的痕迹，\n看见你的真实节奏",
-                    subtitle: "洞察只解释已经完成和已经遗忘的内容，不把未完成任务重新变成负担。",
-                    systemImage: "chart.xyaxis.line"
-                ) {
-                    WorkspaceMetricStrip(metrics: [
-                        .init(value: "\(overview.totalCompletedTasks)", label: "完成"),
-                        .init(value: "\(Int(overview.completionRate * 100))%", label: "完成率"),
-                        .init(value: formatFocusHours(overview.totalFocusHours), label: "专注"),
-                        .init(value: "\(overview.totalStartedDays)", label: "启动日")
-                    ])
-                }
+                WorkspaceMetricStrip(metrics: [
+                    .init(value: "\(overview.totalCompletedTasks)", label: "完成"),
+                    .init(value: "\(Int(overview.completionRate * 100))%", label: "完成率"),
+                    .init(value: formatFocusHours(overview.totalFocusHours), label: "专注"),
+                    .init(value: "\(overview.totalStartedDays)", label: "启动日")
+                ])
+                .padding(.vertical, WeekSpacing.sm)
+                .accessibilityIdentifier("insightsSummary")
 
                 if days.isEmpty {
                     WorkspacePanel(title: "尚未形成趋势", systemImage: "clock.badge.questionmark") {
@@ -552,16 +514,19 @@ private struct WorkspaceSearchView: View {
         }
     }
 
+    private var resultCount: Int {
+        matchingTasks.count + matchingProjects.count + matchingStamps.count + matchingSuspendedTasks.count
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                WorkspaceHeroStage(
-                    eyebrow: "COMMAND",
-                    title: "不用记住内容藏在哪里",
-                    subtitle: "搜索任务、项目、悬置内容与印记，然后直接回到负责处理它的工作区。",
-                    systemImage: "magnifyingglass"
-                ) {
-                    searchField
+                if resultCount == 0 {
+                    ContentUnavailableView(
+                        normalizedQuery.isEmpty ? "还没有可搜索内容" : "没有匹配结果",
+                        systemImage: "magnifyingglass"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
                 }
 
                 resultSection("项目", icon: "folder", count: matchingProjects.count) {
@@ -625,32 +590,6 @@ private struct WorkspaceSearchView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "任务、项目、印记")
         .accessibilityIdentifier("workspaceSearch")
-    }
-
-    private var searchField: some View {
-        HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.textSecondary)
-            TextField("输入关键词", text: $query)
-                .textFieldStyle(.plain)
-                .submitLabel(.search)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.textTertiary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, WeekSpacing.md)
-        .frame(height: 48)
-        .background(Color.backgroundPrimary.opacity(0.72), in: RoundedRectangle(cornerRadius: WeekRadius.medium))
-        .overlay {
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(Color.backgroundTertiary, lineWidth: 1)
-        }
     }
 
     @ViewBuilder
@@ -754,10 +693,9 @@ private struct WorkspaceInspectorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: WeekSpacing.xl) {
+            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 inspectorHeader
                 contextualSummary
-                commitmentRules
             }
             .padding(WeekSpacing.lg)
         }
@@ -766,28 +704,23 @@ private struct WorkspaceInspectorView: View {
     }
 
     private var inspectorHeader: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        HStack(spacing: WeekSpacing.md) {
             Image(systemName: route.systemImage)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(route.tint)
-                .frame(width: 42, height: 42)
+                .frame(width: 36, height: 36)
                 .background(route.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: WeekRadius.medium))
 
-            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                Text(route.title)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Color.textPrimary)
-                Text(route.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(route.title)
+                .font(.headline)
+                .foregroundStyle(Color.textPrimary)
+                .accessibilityIdentifier("workspaceInspectorTitle_\(route.rawValue)")
         }
     }
 
     @ViewBuilder
     private var contextualSummary: some View {
-        WorkspaceInspectorSection(title: "此刻") {
+        WorkspaceInspectorSection(title: "概览") {
             switch route {
             case .today:
                 inspectorValue("状态", value: today?.status.displayName ?? "尚未建立")
@@ -814,23 +747,13 @@ private struct WorkspaceInspectorView: View {
                 inspectorValue("印记", value: "\(stamps.count) 条")
                 inspectorValue("含图片", value: "\(stamps.filter { $0.imageBlob != nil }.count) 条")
             case .search:
-                Text("搜索结果会把你带回负责处理该对象的工作区，不在搜索页复制编辑流程。")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
+                inspectorValue("任务", value: "\(days.flatMap(\.tasks).count) 项")
+                inspectorValue("项目", value: "\(projects.count) 个")
+                inspectorValue("悬置", value: "\(activeSuspendedTasks.count) 项")
+                inspectorValue("印记", value: "\(stamps.count) 条")
             case .settings:
-                Text("设置改变规则与表现，不改变已经发生的历史记录。")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
+                inspectorValue("范围", value: "规则与外观")
             }
-        }
-    }
-
-    private var commitmentRules: some View {
-        WorkspaceInspectorSection(title: "Weekyii 原则") {
-            ruleRow("计划只在启动前重排", icon: "pencil.and.outline")
-            ruleRow("启动后只有一个 Focus", icon: "scope")
-            ruleRow("冻结队列不可跳过", icon: "snowflake")
-            ruleRow("过期任务只留下数量", icon: "eye.slash")
         }
     }
 
@@ -878,16 +801,6 @@ private struct WorkspaceInspectorView: View {
         }
     }
 
-    private func ruleRow(_ title: String, icon: String) -> some View {
-        Label {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(Color.textSecondary)
-        } icon: {
-            Image(systemName: icon)
-                .foregroundStyle(Color.weekyiiPrimary)
-        }
-    }
 }
 
 struct WorkspaceMetric: Identifiable {
@@ -917,81 +830,6 @@ struct WorkspaceMetricStrip: View {
                         .padding(.horizontal, WeekSpacing.md)
                 }
             }
-        }
-    }
-}
-
-struct WorkspaceHeroStage<Content: View>: View {
-    let eyebrow: String
-    let title: String
-    let subtitle: String
-    let systemImage: String
-    @ViewBuilder let content: () -> Content
-
-    init(
-        eyebrow: String,
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.eyebrow = eyebrow
-        self.title = title
-        self.subtitle = subtitle
-        self.systemImage = systemImage
-        self.content = content
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-            HStack(alignment: .top, spacing: WeekSpacing.lg) {
-                VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    Text(eyebrow)
-                        .font(.caption.weight(.bold))
-                        .tracking(1.6)
-                        .foregroundStyle(Color.weekyiiPrimary)
-
-                    Text(title)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        .foregroundStyle(Color.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(subtitle)
-                        .font(.body)
-                        .foregroundStyle(Color.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: WeekSpacing.md)
-
-                Image(systemName: systemImage)
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundStyle(Color.weekyiiPrimary)
-                    .frame(width: 72, height: 72)
-                    .background(Color.weekyiiPrimary.opacity(0.11), in: RoundedRectangle(cornerRadius: WeekRadius.large))
-            }
-
-            content()
-        }
-        .padding(WeekSpacing.xl)
-        .background {
-            ZStack {
-                Color.backgroundSecondary
-                LinearGradient(
-                    colors: [
-                        Color.weekyiiPrimary.opacity(0.14),
-                        Color.clear,
-                        Color.accentOrange.opacity(0.06)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous)
-                .stroke(Color.weekyiiPrimary.opacity(0.2), lineWidth: 1)
         }
     }
 }

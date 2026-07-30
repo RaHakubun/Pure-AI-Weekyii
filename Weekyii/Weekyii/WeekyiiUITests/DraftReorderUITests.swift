@@ -548,7 +548,7 @@ final class IPadLayoutUITests: XCTestCase {
 
         let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["todayHeroStage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["todayWorkspaceContent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayTaskColumn"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayAuxiliaryColumn"].waitForExistence(timeout: 5))
     }
@@ -567,7 +567,7 @@ final class IPadLayoutUITests: XCTestCase {
         XCTAssertTrue(pendingItem.waitForExistence(timeout: 5))
         pendingItem.tap()
         XCTAssertTrue(app.buttons["pendingToolbarAddButton"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["pendingHeroStage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["pendingWorkspaceContent"].waitForExistence(timeout: 5))
 
         XCUIDevice.shared.orientation = .portrait
 
@@ -590,10 +590,19 @@ final class IPadLayoutUITests: XCTestCase {
         }
 
         app.descendants(matching: .any)["workspaceRoute_projects"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["projectsHeroStage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["projectsWorkspaceContent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["workspaceInspectorTitle_projects"]
+                .waitForExistence(timeout: 5)
+        )
 
         app.descendants(matching: .any)["workspaceRoute_insights"].tap()
         XCTAssertTrue(app.staticTexts["洞察"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["workspaceInspectorTitle_insights"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["workspaceInspectorTitle_projects"].exists)
     }
 
     func testCommandSearchAndInspectorStayInWorkspace() {

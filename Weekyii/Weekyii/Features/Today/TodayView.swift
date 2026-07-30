@@ -269,8 +269,6 @@ struct TodayView: View {
     private func todayContent(day: DayModel, viewModel: TodayViewModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                todayHeroStage(for: day)
-
                 Group {
                     if layoutMetrics.layoutClass.supportsTwoColumns {
                         HStack(alignment: .top, spacing: WeekSpacing.xl) {
@@ -298,6 +296,7 @@ struct TodayView: View {
             .padding(.vertical, WeekSpacing.base)
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
             .weekReadableContent()
+            .accessibilityIdentifier("todayWorkspaceContent")
         }
         .overlay(alignment: .bottom) {
             if shouldShowFloatingStartButton(for: day) {
@@ -315,66 +314,6 @@ struct TodayView: View {
                     floatingStartButtonOverlay
                 }
             }
-        }
-    }
-
-    private func todayHeroStage(for day: DayModel) -> some View {
-        let presentation = todayStagePresentation(for: day)
-        return WorkspaceHeroStage(
-            eyebrow: presentation.eyebrow,
-            title: presentation.title,
-            subtitle: presentation.subtitle,
-            systemImage: presentation.systemImage
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(day.sortedDraftTasks.count)", label: "草稿"),
-                .init(value: day.focusTask == nil ? "—" : "1", label: "Focus"),
-                .init(value: "\(day.frozenTasks.count)", label: "冻结"),
-                .init(value: "\(day.completedTasks.count)", label: "完成")
-            ])
-        }
-        .accessibilityIdentifier("todayHeroStage")
-    }
-
-    private func todayStagePresentation(
-        for day: DayModel
-    ) -> (eyebrow: String, title: String, subtitle: String, systemImage: String) {
-        switch day.status {
-        case .empty:
-            return (
-                "PLAN",
-                "今天尚未被定义",
-                "先决定今天真正值得承诺的内容，再排列唯一的执行顺序。",
-                "square.and.pencil"
-            )
-        case .draft:
-            return (
-                "COMMIT",
-                "在启动之前，\n把顺序想清楚",
-                "\(day.sortedDraftTasks.count) 项任务仍可编辑。点击开始后，计划将转化为不可随意改写的执行承诺。",
-                "list.number"
-            )
-        case .execute:
-            return (
-                "EXECUTE",
-                day.focusTask?.title ?? "保持执行",
-                "只处理眼前这一项。后续任务已经冻结，不需要再次进行选择。",
-                "scope"
-            )
-        case .completed:
-            return (
-                "CLOSE",
-                "今天的承诺已经兑现",
-                "所有进入执行序列的任务都已完成。现在只需要结束今天，而不是继续追加计划。",
-                "checkmark.seal.fill"
-            )
-        case .expired:
-            return (
-                "RELEASE",
-                "时间边界已经到达",
-                "未完成的内容已经被遗忘，只保留数量。Weekyii 不把昨天的负担重新交还给今天。",
-                "sunset.fill"
-            )
         }
     }
 

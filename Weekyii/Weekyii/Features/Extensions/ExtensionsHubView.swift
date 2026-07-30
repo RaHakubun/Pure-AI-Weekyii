@@ -272,8 +272,6 @@ struct SuspendedTasksFullView: View {
         let groups = taskGroups
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                suspendedHeroStage
-                guidanceCard
                 statsCard
 
                 if viewModel.suspendedTasks.isEmpty {
@@ -293,6 +291,7 @@ struct SuspendedTasksFullView: View {
             .padding(.vertical, WeekSpacing.base)
             .weekReadableContent(maxWidth: 1040)
         }
+        .accessibilityIdentifier("suspendedWorkspaceContent")
         .background(Color.backgroundPrimary)
         .navigationTitle("悬置箱")
         .navigationBarTitleDisplayMode(.inline)
@@ -385,41 +384,6 @@ struct SuspendedTasksFullView: View {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
             Text(errorMessage ?? "")
-        }
-    }
-
-    private var suspendedHeroStage: some View {
-        WorkspaceHeroStage(
-            eyebrow: "DECIDE LATER",
-            title: "暂时不做决定，\n不等于永远逃避决定",
-            subtitle: "悬置内容拥有明确的返回期限。到期前把它安排进某一天，或者承认它不值得继续保留。",
-            systemImage: "hourglass"
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(stats.total)", label: "等待决定"),
-                .init(value: "\(stats.dueSoon)", label: "七天内"),
-                .init(value: "\(stats.dueToday)", label: "今天到期"),
-                .init(
-                    value: "\(viewModel.suspendedTasks.reduce(0) { $0 + $1.snoozeCount })",
-                    label: "累计延后"
-                )
-            ])
-        }
-        .accessibilityIdentifier("suspendedHeroStage")
-    }
-
-    private var guidanceCard: some View {
-        WeekCard(accentColor: .suspendedModuleTint) {
-            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                Text("在这里记录任务思绪")
-                    .font(.headline)
-                    .foregroundColor(.textPrimary)
-
-                Text("暂存未分配日期的任务。到期前可续期、分配或删除。")
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                    .lineLimit(2)
-            }
         }
     }
 
@@ -1392,8 +1356,6 @@ struct ProjectsFullView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                projectHeroStage
-
                 if viewModel.projects.isEmpty {
                     emptyStateView
                 } else {
@@ -1474,28 +1436,7 @@ struct ProjectsFullView: View {
             .weekReadableContent(maxWidth: 1180)
             .frame(maxWidth: .infinity, alignment: .top)
         }
-    }
-
-    private var projectHeroStage: some View {
-        let active = viewModel.projects.filter { $0.status == .planning || $0.status == .active }
-        let completed = viewModel.projects.filter { $0.status == .completed }.count
-        let totalTasks = active.reduce(0) { $0 + $1.totalTaskCount }
-        let finishedTasks = active.reduce(0) { $0 + $1.completedTaskCount }
-
-        return WorkspaceHeroStage(
-            eyebrow: "PROJECTS",
-            title: "项目不是另一个任务列表，\n而是跨越日期的承诺来源",
-            subtitle: "在这里维护项目身份与任务台账，再把具体任务安排到未来日期。日期负责执行，项目负责解释为什么。",
-            systemImage: "folder"
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(active.count)", label: "进行中"),
-                .init(value: "\(totalTasks)", label: "项目任务"),
-                .init(value: "\(finishedTasks)", label: "已完成"),
-                .init(value: "\(completed)", label: "完成项目")
-            ])
-        }
-        .accessibilityIdentifier("projectsHeroStage")
+        .accessibilityIdentifier("projectsWorkspaceContent")
     }
 
     @ToolbarContentBuilder
@@ -2280,8 +2221,6 @@ struct MindStampsFullView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.xl) {
-                mindStampHeroStage
-
                 if viewModel.stamps.isEmpty {
                     emptyState
                 } else {
@@ -2293,6 +2232,7 @@ struct MindStampsFullView: View {
             .weekReadableContent(maxWidth: 980)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .accessibilityIdentifier("mindStampsWorkspaceContent")
         .background(Color.backgroundPrimary.ignoresSafeArea())
         .navigationTitle(String(localized: "extensions.tab.mindstamps"))
         .navigationBarTitleDisplayMode(.inline)
@@ -2315,24 +2255,6 @@ struct MindStampsFullView: View {
         }) {
             MindStampEditorSheet(viewModel: viewModel)
         }
-    }
-
-    private var mindStampHeroStage: some View {
-        let withImages = viewModel.stamps.filter { $0.imageBlob != nil }.count
-        return WorkspaceHeroStage(
-            eyebrow: "RITUAL",
-            title: "让计划拥有记忆，\n让执行不只剩下数字",
-            subtitle: "印记会在启动和收尾仪式中重新出现，提醒你为什么愿意开始，也留下完成之后的情绪线索。",
-            systemImage: "bookmark"
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(viewModel.stamps.count)", label: "全部印记"),
-                .init(value: "\(withImages)", label: "含图片"),
-                .init(value: "\(viewModel.stamps.count - withImages)", label: "文字"),
-                .init(value: viewModel.stamps.first?.createdAt.formatted(.dateTime.month().day()) ?? "—", label: "最近记录")
-            ])
-        }
-        .accessibilityIdentifier("mindStampHeroStage")
     }
 
     private var emptyState: some View {

@@ -39,6 +39,7 @@ struct PendingView: View {
     var body: some View {
         NavigationStack {
             pendingBody
+            .accessibilityIdentifier("pendingWorkspaceContent")
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -191,11 +192,6 @@ struct PendingView: View {
 
             if displayMode == .weekList, layoutMetrics.layoutClass == .wide, !weeks.isEmpty {
                 VStack(spacing: 0) {
-                    pendingHeroStage(weeks: weeks)
-                        .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
-                        .padding(.top, WeekSpacing.base)
-                        .padding(.bottom, WeekSpacing.md)
-
                     HStack(spacing: 0) {
                         ScrollView {
                             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
@@ -219,7 +215,6 @@ struct PendingView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                        pendingHeroStage(weeks: weeks)
                         MonthPickerView(month: $selectedMonth, restriction: .futureOnly)
 
                         if displayMode == .weekList {
@@ -241,35 +236,6 @@ struct PendingView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-
-    private func pendingHeroStage(weeks: [WeekModel]) -> some View {
-        let days = weeks.flatMap(\.days)
-        let plannedDays = days.filter { !$0.sortedDraftTasks.isEmpty }.count
-        let draftTasks = days.reduce(0) { $0 + $1.sortedDraftTasks.count }
-        let projectTasks = days.flatMap(\.sortedDraftTasks).filter { $0.project != nil }.count
-        let nearestDate = days
-            .filter { !$0.sortedDraftTasks.isEmpty }
-            .map(\.date)
-            .min()
-
-        return WorkspaceHeroStage(
-            eyebrow: "PLAN",
-            title: "把尚未发生的事，\n放进可兑现的七天",
-            subtitle: "未来不是任务仓库。先看负载，再把草稿和项目任务放到真正能够承担它们的日期。",
-            systemImage: "calendar.badge.plus"
-        ) {
-            WorkspaceMetricStrip(metrics: [
-                .init(value: "\(weeks.count)", label: "周"),
-                .init(value: "\(plannedDays)", label: "计划日"),
-                .init(value: "\(draftTasks)", label: "草稿任务"),
-                .init(
-                    value: nearestDate?.formatted(.dateTime.month().day()) ?? "—",
-                    label: projectTasks > 0 ? "最近计划 · \(projectTasks) 项目任务" : "最近计划"
-                )
-            ])
-        }
-        .accessibilityIdentifier("pendingHeroStage")
     }
 
     private var createSheetInitialDate: Date {
