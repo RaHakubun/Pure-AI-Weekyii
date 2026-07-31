@@ -39,7 +39,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .suspended: "hourglass"
         case .past: "clock.arrow.circlepath"
         case .insights: "chart.xyaxis.line"
-        case .mindStamps: "bookmark"
+        case .mindStamps: "bandage.fill"
         case .search: "magnifyingglass"
         case .settings: "gearshape"
         }
@@ -382,8 +382,12 @@ private struct WorkspaceRouteTabs: View {
             }
         case .pending:
             PendingView()
-        case .projects, .suspended, .mindStamps:
-            WorkspaceExtensionsRouteHost(route: route)
+        case .projects:
+            WorkspaceProjectsRouteHost()
+        case .suspended:
+            WorkspaceSuspendedRouteHost()
+        case .mindStamps:
+            WorkspaceMindStampsRouteHost()
         case .past:
             PastView()
         case .insights:
@@ -400,63 +404,102 @@ private struct WorkspaceRouteTabs: View {
     }
 }
 
-private struct WorkspaceExtensionsRouteHost: View {
-    let route: WorkspaceRoute
-
+/// These route hosts intentionally have different concrete view types. Keeping
+/// them separate prevents SwiftUI from reusing a suspended-task navigation
+/// stack and its state for the mind-stamp route during tab/size transitions.
+private struct WorkspaceProjectsRouteHost: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @State private var extensionsViewModel: ExtensionsViewModel?
-    @State private var mindStampViewModel: MindStampViewModel?
+    @State private var viewModel: ExtensionsViewModel?
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch route {
-                case .projects:
-                    if let extensionsViewModel {
-                        ProjectsFullView(viewModel: extensionsViewModel)
-                    } else {
-                        ProgressView()
-                    }
-                case .suspended:
-                    if let extensionsViewModel {
-                        SuspendedTasksFullView(viewModel: extensionsViewModel)
-                    } else {
-                        ProgressView()
-                    }
-                case .mindStamps:
-                    if let mindStampViewModel {
-                        MindStampsFullView(viewModel: mindStampViewModel)
-                    } else {
-                        ProgressView()
-                    }
-                default:
-                    EmptyView()
-                }
+            if let viewModel {
+                ProjectsFullView(viewModel: viewModel)
+            } else {
+                ProgressView()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
         }
-        .onAppear(perform: prepareViewModels)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.backgroundPrimary)
+        .onAppear(perform: prepareViewModel)
         .refreshOnStateTransitions(using: appState) {
-            extensionsViewModel?.refresh()
-            mindStampViewModel?.refresh()
+            viewModel?.refresh()
         }
         .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
-            extensionsViewModel?.refresh()
-            mindStampViewModel?.refresh()
+            viewModel?.refresh()
         }
     }
 
-    private func prepareViewModels() {
-        if extensionsViewModel == nil {
-            extensionsViewModel = ExtensionsViewModel(modelContext: modelContext)
+    private func prepareViewModel() {
+        if viewModel == nil {
+            viewModel = ExtensionsViewModel(modelContext: modelContext)
         }
-        if mindStampViewModel == nil {
-            mindStampViewModel = MindStampViewModel(modelContext: modelContext)
+        viewModel?.refresh()
+    }
+}
+
+private struct WorkspaceSuspendedRouteHost: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
+    @State private var viewModel: ExtensionsViewModel?
+
+    var body: some View {
+        NavigationStack {
+            if let viewModel {
+                SuspendedTasksFullView(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
         }
-        extensionsViewModel?.refresh()
-        mindStampViewModel?.refresh()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.backgroundPrimary)
+        .onAppear(perform: prepareViewModel)
+        .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh(rebuildProjectSnapshots: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
+            viewModel?.refresh(rebuildProjectSnapshots: false)
+        }
+    }
+
+    private func prepareViewModel() {
+        if viewModel == nil {
+            viewModel = ExtensionsViewModel(modelContext: modelContext)
+        }
+        viewModel?.refresh(rebuildProjectSnapshots: false)
+    }
+}
+
+private struct WorkspaceMindStampsRouteHost: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
+    @State private var viewModel: MindStampViewModel?
+
+    var body: some View {
+        NavigationStack {
+            if let viewModel {
+                MindStampsFullView(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.backgroundPrimary)
+        .onAppear(perform: prepareViewModel)
+        .refreshOnStateTransitions(using: appState) {
+            viewModel?.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceDataDidChange)) { _ in
+            viewModel?.refresh()
+        }
+    }
+
+    private func prepareViewModel() {
+        if viewModel == nil {
+            viewModel = MindStampViewModel(modelContext: modelContext)
+        }
+        viewModel?.refresh()
     }
 }
 
@@ -872,15 +915,31 @@ private struct WorkspaceInspectorView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                inspectorHeader
-                inspectorContent
+        Group {
+            if route == .settings, case .setting(let section)? = resolvedSelection {
+                // Settings already own their Form/List scrolling. Rendering that
+                // inside the generic inspector ScrollView caused nested scrolling
+                // and duplicated navigation chrome in the right column.
+                settingsSectionInspector(section)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                        inspectorHeader
+                        inspectorContent
+                    }
+                    .padding(WeekSpacing.lg)
+                }
             }
-            .padding(WeekSpacing.lg)
         }
         .background(Color.backgroundSecondary)
         .accessibilityIdentifier("workspaceInspector")
+        .onAppear(perform: reconcileSelection)
+        .onChange(of: route) { _, _ in
+            reconcileSelection()
+        }
+        .onChange(of: selectionDataFingerprint) { _, _ in
+            reconcileSelection()
+        }
     }
 
     private var inspectorHeader: some View {
@@ -953,7 +1012,7 @@ private struct WorkspaceInspectorView: View {
                 emptyInspector("选择一条搜索结果即可预览", systemImage: "magnifyingglass")
             }
         case .settings:
-            settingsInspector
+            EmptyView()
         }
     }
 
@@ -1197,17 +1256,59 @@ private struct WorkspaceInspectorView: View {
         }
     }
 
-    private var settingsInspector: some View {
-        Group {
-            if case .setting(let section)? = resolvedSelection {
-                settingsSectionInspector(section)
-            }
+    private func settingsSectionInspector(_ section: WorkspaceSettingsSection) -> some View {
+        SettingsView(workspaceSection: section)
+    }
+
+    /// A lightweight, route-scoped identity set used only to repair stale
+    /// selections after an object is moved, completed, or deleted.
+    private var selectionDataFingerprint: [String] {
+        switch route {
+        case .today, .week:
+            return days.map(\.dayId) + tasks.map { "task-\($0.id.uuidString)-\($0.zone.rawValue)" }
+        case .pending:
+            return days
+                .filter {
+                    $0.week?.status == .pending
+                        && $0.date >= calendar.startOfDay(for: Date())
+                }
+                .map(\.dayId)
+                + tasks.map { "task-\($0.id.uuidString)-\($0.zone.rawValue)" }
+        case .projects:
+            return projects.map { "project-\($0.id.uuidString)-\($0.status.rawValue)" }
+        case .suspended:
+            return suspendedTasks.map { "suspended-\($0.id.uuidString)-\($0.status.rawValue)" }
+        case .past, .insights:
+            return days
+                .filter {
+                    $0.week?.status == .past
+                        && $0.date < calendar.startOfDay(for: Date())
+                }
+                .map(\.dayId)
+        case .mindStamps:
+            return stamps.map { "stamp-\($0.id.uuidString)" }
+        case .search:
+            return days.map(\.dayId)
+                + weeks.map(\.weekId)
+                + tasks.map { "task-\($0.id.uuidString)" }
+                + projects.map { "project-\($0.id.uuidString)" }
+                + suspendedTasks.map { "suspended-\($0.id.uuidString)" }
+                + stamps.map { "stamp-\($0.id.uuidString)" }
+        case .settings:
+            return WorkspaceSettingsSection.allCases.map(\.rawValue)
         }
     }
 
-    private func settingsSectionInspector(_ section: WorkspaceSettingsSection) -> some View {
-        SettingsView(workspaceSection: section)
-            .frame(minHeight: 720)
+    private func reconcileSelection() {
+        guard let requestedSelection else {
+            selectionStore.select(defaultSelection, for: route)
+            return
+        }
+
+        guard selectionExists(requestedSelection) else {
+            selectionStore.select(defaultSelection, for: route)
+            return
+        }
     }
 
     private func searchDestinationButton(for selection: WorkspaceSelection) -> some View {
@@ -1231,11 +1332,9 @@ private struct WorkspaceInspectorView: View {
         switch selection {
         case .day(let dayID), .insightDay(let dayID):
             guard let day = days.first(where: { $0.dayId == dayID }) else { return nil }
-            if calendar.isDateInToday(day.date) { return .today }
-            return day.date > calendar.startOfDay(for: Date()) ? .pending : .past
+            return workspaceRoute(for: day.date, weekStatus: day.week?.status)
         case .date(let date):
-            if calendar.isDateInToday(date) { return .today }
-            return date > calendar.startOfDay(for: Date()) ? .pending : .past
+            return workspaceRoute(for: date, weekStatus: nil)
         case .week(let weekID):
             guard let week = weeks.first(where: { $0.weekId == weekID }) else { return nil }
             if week.status == .present { return .week }
@@ -1243,8 +1342,7 @@ private struct WorkspaceInspectorView: View {
         case .task(let taskID):
             guard let task = tasks.first(where: { $0.id == taskID }) else { return nil }
             if let date = task.day?.date {
-                if calendar.isDateInToday(date) { return .today }
-                return date > calendar.startOfDay(for: Date()) ? .pending : .past
+                return workspaceRoute(for: date, weekStatus: task.day?.week?.status)
             }
             return task.project == nil ? nil : .projects
         case .project: return .projects
@@ -1252,6 +1350,28 @@ private struct WorkspaceInspectorView: View {
         case .mindStamp: return .mindStamps
         case .setting: return .settings
         }
+    }
+
+    private func workspaceRoute(for date: Date, weekStatus: WeekStatus?) -> WorkspaceRoute {
+        if calendar.isDateInToday(date) {
+            return .today
+        }
+        switch weekStatus {
+        case .present:
+            return .week
+        case .pending:
+            return .pending
+        case .past:
+            return .past
+        case nil:
+            break
+        }
+
+        let today = calendar.startOfDay(for: Date())
+        if date > today, calendar.isDate(date, equalTo: Date(), toGranularity: .weekOfYear) {
+            return .week
+        }
+        return date > today ? .pending : .past
     }
 
     private var defaultSelection: WorkspaceSelection? {
@@ -1269,19 +1389,34 @@ private struct WorkspaceInspectorView: View {
             }
             return days.first(where: { $0.date >= start && $0.date <= end }).map { .day($0.dayId) }
         case .pending:
-            return days
-                .filter { $0.date > calendar.startOfDay(for: Date()) }
+            let futureDays = days
+                .filter {
+                    $0.week?.status == .pending
+                        && $0.date > calendar.startOfDay(for: Date())
+                }
                 .sorted { $0.date < $1.date }
-                .first
-                .map { .day($0.dayId) }
+            return (futureDays.first(where: { !$0.tasks.isEmpty }) ?? futureDays.first)
+                .map { .date($0.date) }
         case .projects:
             return projects.first(where: { $0.status == .active || $0.status == .planning }).map { .project($0.id) }
         case .suspended:
             return suspendedTasks.first(where: { $0.status == .active }).map { .suspendedTask($0.id) }
         case .past:
-            return days.first(where: { $0.date < calendar.startOfDay(for: Date()) }).map { .day($0.dayId) }
+            return days
+                .first(where: {
+                    $0.date < calendar.startOfDay(for: Date())
+                        && $0.week?.status == .past
+                        && (!$0.completedTasks.isEmpty || $0.expiredCount > 0)
+                })
+                .map { .date($0.date) }
         case .insights:
-            return days.first(where: { $0.date < calendar.startOfDay(for: Date()) }).map { .insightDay($0.dayId) }
+            return days
+                .first(where: {
+                    $0.date < calendar.startOfDay(for: Date())
+                        && $0.week?.status == .past
+                        && (!$0.completedTasks.isEmpty || $0.expiredCount > 0)
+                })
+                .map { .insightDay($0.dayId) }
         case .mindStamps:
             return stamps.first.map { .mindStamp($0.id) }
         case .search:
@@ -1292,15 +1427,148 @@ private struct WorkspaceInspectorView: View {
     }
 
     private func selectionExists(_ selection: WorkspaceSelection) -> Bool {
+        guard selectionIsCompatibleWithCurrentRoute(selection) else { return false }
+
         switch selection {
-        case .day(let id), .insightDay(let id): days.contains { $0.dayId == id }
-        case .date: true
-        case .week(let id): weeks.contains { $0.weekId == id }
-        case .task(let id): tasks.contains { $0.id == id }
+        case .day(let id), .insightDay(let id):
+            guard let day = days.first(where: { $0.dayId == id }) else { return false }
+            return dayBelongsToCurrentRoute(day)
+        case .date(let date):
+            return dateBelongsToCurrentRoute(date)
+        case .week(let id):
+            guard let week = weeks.first(where: { $0.weekId == id }) else { return false }
+            return weekBelongsToCurrentRoute(week)
+        case .task(let id):
+            guard let task = tasks.first(where: { $0.id == id }) else { return false }
+            return taskBelongsToCurrentRoute(task)
         case .project(let id): projects.contains { $0.id == id }
         case .suspendedTask(let id): suspendedTasks.contains { $0.id == id && $0.status == .active }
         case .mindStamp(let id): stamps.contains { $0.id == id }
         case .setting: true
+        }
+    }
+
+    private func dayBelongsToCurrentRoute(_ day: DayModel) -> Bool {
+        switch route {
+        case .today:
+            return calendar.isDateInToday(day.date)
+        case .week:
+            return day.week?.status == .present
+        case .pending:
+            return day.week?.status == .pending
+                && day.date > calendar.startOfDay(for: Date())
+        case .past, .insights:
+            return day.week?.status == .past
+                && day.date < calendar.startOfDay(for: Date())
+        case .search:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func dateBelongsToCurrentRoute(_ date: Date) -> Bool {
+        let today = calendar.startOfDay(for: Date())
+        switch route {
+        case .today:
+            return calendar.isDateInToday(date)
+        case .week:
+            return calendar.isDate(date, equalTo: Date(), toGranularity: .weekOfYear)
+        case .pending:
+            return calendar.startOfDay(for: date) > today
+        case .past, .insights:
+            return calendar.startOfDay(for: date) < today
+        case .search:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func weekBelongsToCurrentRoute(_ week: WeekModel) -> Bool {
+        switch route {
+        case .week:
+            return week.status == .present
+        case .pending:
+            return week.status == .pending
+        case .past:
+            return week.status == .past
+        case .search:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func taskBelongsToCurrentRoute(_ task: TaskItem) -> Bool {
+        switch route {
+        case .today:
+            return task.day.map { calendar.isDateInToday($0.date) } == true
+        case .week:
+            return task.day?.week?.status == .present
+        case .pending:
+            return task.day.map {
+                $0.week?.status == .pending
+                    && $0.date > calendar.startOfDay(for: Date())
+            } == true
+        case .projects:
+            return task.project != nil
+        case .past:
+            return task.day.map {
+                $0.week?.status == .past
+                    && $0.date < calendar.startOfDay(for: Date())
+            } == true
+        case .search:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// A stored selection is never allowed to make a route render another
+    /// route's object. This is the last line of defence for state restored
+    /// after rotations, search navigation, or an object deletion.
+    private func selectionIsCompatibleWithCurrentRoute(_ selection: WorkspaceSelection) -> Bool {
+        switch route {
+        case .today:
+            if case .day = selection { return true }
+            if case .task = selection { return true }
+            return false
+        case .week:
+            if case .day = selection { return true }
+            if case .week = selection { return true }
+            if case .task = selection { return true }
+            return false
+        case .pending:
+            if case .day = selection { return true }
+            if case .date = selection { return true }
+            if case .week = selection { return true }
+            if case .task = selection { return true }
+            return false
+        case .projects:
+            if case .project = selection { return true }
+            if case .task = selection { return true }
+            return false
+        case .suspended:
+            if case .suspendedTask = selection { return true }
+            return false
+        case .past:
+            if case .day = selection { return true }
+            if case .date = selection { return true }
+            if case .week = selection { return true }
+            if case .task = selection { return true }
+            return false
+        case .insights:
+            if case .insightDay = selection { return true }
+            return false
+        case .mindStamps:
+            if case .mindStamp = selection { return true }
+            return false
+        case .search:
+            return true
+        case .settings:
+            if case .setting = selection { return true }
+            return false
         }
     }
 

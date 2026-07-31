@@ -309,12 +309,10 @@ struct SuspendedTasksFullView: View {
         }
         .onAppear {
             viewModel.refresh()
-            if workspaceSelectionStore != nil, selectedTaskID == nil {
-                selectedTaskID = viewModel.suspendedTasks.first?.id
-                if let selectedTaskID {
-                    workspaceSelectionStore?.select(.suspendedTask(selectedTaskID), for: .suspended)
-                }
-            }
+            synchronizeWorkspaceSelection()
+        }
+        .onChange(of: viewModel.suspendedTasks.map(\.id)) { _, _ in
+            synchronizeWorkspaceSelection()
         }
         .onChange(of: viewModel.errorMessage) { _, newValue in
             if let newValue { errorMessage = newValue }
@@ -445,6 +443,27 @@ struct SuspendedTasksFullView: View {
         .accessibilityIdentifier("suspendedFooterCreateButton")
         .padding(.top, WeekSpacing.md)
         .padding(.bottom, WeekSpacing.xl)
+    }
+
+    /// Keep the list highlight and the right-column inspector on the same
+    /// active item. This is especially important after the selected task has
+    /// been assigned out of, or deleted from, the suspended box.
+    private func synchronizeWorkspaceSelection() {
+        guard let workspaceSelectionStore else { return }
+
+        let selectedID: UUID?
+        if case .suspendedTask(let id)? = workspaceSelectionStore.selection(for: .suspended),
+           viewModel.suspendedTasks.contains(where: { $0.id == id }) {
+            selectedID = id
+        } else {
+            selectedID = viewModel.suspendedTasks.first?.id
+        }
+
+        selectedTaskID = selectedID
+        workspaceSelectionStore.select(
+            selectedID.map { .suspendedTask($0) },
+            for: .suspended
+        )
     }
 
     private func statColumn(value: String, label: String) -> some View {

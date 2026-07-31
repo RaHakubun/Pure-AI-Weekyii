@@ -605,6 +605,32 @@ final class IPadLayoutUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["workspaceInspectorTitle_projects"].exists)
     }
 
+    func testMindStampsNeverReuseSuspendedTaskWorkspace() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        let suspendedRoute = app.descendants(matching: .any)["workspaceRoute_suspended"]
+        XCTAssertTrue(suspendedRoute.waitForExistence(timeout: 5))
+        suspendedRoute.tap()
+
+        let suspendedContent = app.descendants(matching: .any)["suspendedWorkspaceContent"]
+        XCTAssertTrue(suspendedContent.waitForExistence(timeout: 5))
+        XCTAssertTrue(suspendedContent.isHittable)
+
+        let mindStampsRoute = app.descendants(matching: .any)["workspaceRoute_mindStamps"]
+        XCTAssertTrue(mindStampsRoute.waitForExistence(timeout: 5))
+        mindStampsRoute.tap()
+
+        let mindStampsContent = app.descendants(matching: .any)["mindStampsWorkspaceContent"]
+        XCTAssertTrue(mindStampsContent.waitForExistence(timeout: 5))
+        XCTAssertTrue(mindStampsContent.isHittable)
+        XCTAssertTrue(app.buttons["mindstampsToolbarCreateButton"].waitForExistence(timeout: 5))
+        XCTAssertFalse(suspendedContent.isHittable)
+    }
+
     func testCommandSearchAndInspectorStayInWorkspace() {
         XCUIDevice.shared.orientation = .portrait
 

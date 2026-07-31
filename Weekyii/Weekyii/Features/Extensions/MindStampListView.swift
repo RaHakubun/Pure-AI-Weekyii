@@ -43,10 +43,10 @@ struct MindStampListView: View {
             ImageViewerScreen(image: item.image)
         }
         .onAppear {
-            if workspaceSelectionStore != nil, selectedItemID == nil, let first = viewModel.stamps.first {
-                selectedItemID = first.id
-                workspaceSelectionStore?.select(.mindStamp(first.id), for: .mindStamps)
-            }
+            synchronizeWorkspaceSelection()
+        }
+        .onChange(of: viewModel.stamps.map(\.id)) { _, _ in
+            synchronizeWorkspaceSelection()
         }
     }
 
@@ -204,6 +204,27 @@ struct MindStampListView: View {
         .buttonStyle(.plain)
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier(accessibilityID)
+    }
+
+    /// The inspector can delete or edit an item independently of this list.
+    /// Always advance to the next surviving stamp rather than leaving a stale
+    /// outline in the middle column or a stale selection in the right column.
+    private func synchronizeWorkspaceSelection() {
+        guard let workspaceSelectionStore else { return }
+
+        let selectedID: UUID?
+        if case .mindStamp(let id)? = workspaceSelectionStore.selection(for: .mindStamps),
+           viewModel.stamps.contains(where: { $0.id == id }) {
+            selectedID = id
+        } else {
+            selectedID = viewModel.stamps.first?.id
+        }
+
+        selectedItemID = selectedID
+        workspaceSelectionStore.select(
+            selectedID.map { .mindStamp($0) },
+            for: .mindStamps
+        )
     }
 
 }

@@ -42,16 +42,17 @@ struct SettingsView: View {
     @State private var showingImportConfirm = false
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if let workspaceSection {
-                    workspaceSettingsPage(workspaceSection)
-                } else {
-                    settingsHome
+        Group {
+            if workspaceSection == nil {
+                NavigationStack {
+                    settingsContent
                 }
+            } else {
+                // The iPad workspace already supplies the detail-column
+                // NavigationStack. Adding a second stack here creates a nested
+                // navigation bar and an independently scrolling right pane.
+                settingsContent
             }
-            .navigationTitle(String(localized: "settings.title"))
-            .tint(.weekyiiPrimary)
         }
         .frame(maxWidth: layoutMetrics.layoutClass == .compact ? .infinity : 760)
         .frame(maxWidth: .infinity)
@@ -202,6 +203,18 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var settingsContent: some View {
+        Group {
+            if let workspaceSection {
+                workspaceSettingsPage(workspaceSection)
+            } else {
+                settingsHome
+            }
+        }
+        .navigationTitle(String(localized: "settings.title"))
+        .tint(.weekyiiPrimary)
     }
 
     @ViewBuilder

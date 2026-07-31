@@ -154,6 +154,7 @@ struct PendingView: View {
             viewModel?.seedPendingWeekForUITestsIfNeeded()
             refreshMonthSummaries()
             normalizeSelectedWeek()
+            initializeWorkspaceSelectionIfNeeded()
         }
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
@@ -292,6 +293,29 @@ struct PendingView: View {
         if !weeks.contains(where: { $0.weekId == selectedWeekID }) {
             selectedWeekID = weeks.first?.weekId
         }
+    }
+
+    /// The calendar and the right inspector must start from the same future
+    /// date. Prefer the nearest planned day, then the nearest empty future
+    /// day when the user has created a week but has not filled it yet.
+    private func initializeWorkspaceSelectionIfNeeded() {
+        guard let workspaceSelectionStore,
+              workspaceSelectionStore.selection(for: .pending) == nil,
+              let viewModel else {
+            return
+        }
+
+        let futureDays = viewModel.pendingWeeks
+            .flatMap(\.days)
+            .filter { $0.date > calendar.startOfDay(for: Date()) }
+            .sorted { $0.date < $1.date }
+        guard let target = futureDays.first(where: { !$0.tasks.isEmpty }) ?? futureDays.first else {
+            return
+        }
+
+        selectedMonth = target.date
+        selectedDate = target.date
+        workspaceSelectionStore.select(.date(target.date), for: .pending)
     }
 
     private func selectedWeek(in weeks: [WeekModel]) -> WeekModel? {

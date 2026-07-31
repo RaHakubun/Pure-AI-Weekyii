@@ -43,6 +43,7 @@ struct PastView: View {
         .onAppear {
             normalizeSelectedDateForMonth()
             normalizeSelectedWeek()
+            initializeWorkspaceSelectionIfNeeded()
         }
         .onChange(of: selectedMonth) { _, _ in
             normalizeSelectedDateForMonth()
@@ -384,6 +385,27 @@ struct PastView: View {
         if !weeks.contains(where: { $0.weekId == selectedWeekID }) {
             selectedWeekID = weeks.first?.weekId
         }
+    }
+
+    /// Align the month calendar with the same latest meaningful record shown
+    /// in the inspector instead of opening a blank historical day by default.
+    private func initializeWorkspaceSelectionIfNeeded() {
+        guard let workspaceSelectionStore,
+              workspaceSelectionStore.selection(for: .past) == nil else {
+            return
+        }
+
+        guard let target = allDays.first(where: {
+            $0.date < calendar.startOfDay(for: Date())
+                && ($0.week?.status == .past)
+                && (!$0.completedTasks.isEmpty || $0.expiredCount > 0)
+        }) else {
+            return
+        }
+
+        selectedMonth = target.date
+        selectedDate = target.date
+        workspaceSelectionStore.select(.date(target.date), for: .past)
     }
 
     private func selectedWeek(in weeks: [WeekModel]) -> WeekModel? {
