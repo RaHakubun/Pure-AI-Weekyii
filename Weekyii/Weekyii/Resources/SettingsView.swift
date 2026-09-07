@@ -790,39 +790,119 @@ struct SettingsView: View {
         }
     }
     
-    // MARK: - Kill Time Settings
+    // MARK: - Execution Mode Settings
     @ViewBuilder
     private var executionModeSettings: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 SettingsIcon(icon: "slider.horizontal.3", color: .weekyiiPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("执行模式")
-                    Text("修改将在下一次开始任务流时生效")
+                    Text("选择后会立即同步尚未结束的今日，并成为以后默认方式")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Picker("执行模式", selection: Binding(
-                get: { settings.defaultExecutionModeRaw },
-                set: { settings.defaultExecutionModeRaw = $0 }
-            )) {
+            HStack(alignment: .top, spacing: 10) {
                 ForEach(ExecutionMode.allCases) { mode in
-                    Text(mode.displayName)
-                        .tag(mode.rawValue)
+                    Button {
+                        applyExecutionMode(mode)
+                    } label: {
+                        ExecutionModeOptionCard(
+                            mode: mode,
+                            isSelected: displayedExecutionMode == mode
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .accessibilityIdentifier("executionModeOption.\(mode.rawValue)")
+                    .accessibilityLabel("\(mode.displayName)执行模式")
+                    .accessibilityValue(displayedExecutionMode == mode ? "已选择" : "未选择")
+                    .accessibilityHint("点按后立即同步尚未结束的今日")
                 }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("executionModePicker")
 
-            Text(settings.defaultExecutionMode == .strict
-                 ? "严格模式：开始后按固定顺序逐项推进。"
-                 : "灵动模式：开始后可解冻草稿区，调整任务并与专注任务交换。")
+            Label(executionModeApplicationDescription, systemImage: "bolt.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.weekyiiPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("两种模式都遵守")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 2)
         }
         .padding(.vertical, 4)
+    }
+
+    private var executionModeApplicationDescription: String {
+        guard let today = todayDayModel() else {
+            return "此选择会用于以后每一次启动任务流。"
+        }
+
+        switch today.status {
+        case .empty, .draft, .execute:
+            if today.executionMode == settings.defaultExecutionMode {
+                return "今日正在使用\(today.executionMode.displayName)，也会作为以后启动任务流的默认方式。"
+            }
+            return "今日正在使用\(today.executionMode.displayName)；以后默认是\(settings.defaultExecutionMode.displayName)。点按任一模式会立刻统一两者。"
+        case .completed:
+            return "今日已完成，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+        case .expired:
+            return "今日已过期，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+        }
+    }
+
+    private var displayedExecutionMode: ExecutionMode {
+        guard let today = todayDayModel() else { return settings.defaultExecutionMode }
+        switch today.status {
+        case .empty, .draft, .execute:
+            return today.executionMode
+        case .completed, .expired:
+            return settings.defaultExecutionMode
+        }
+    }
+
+    private func applyExecutionMode(_ mode: ExecutionMode) {
+        // Resolve the clock boundary before deciding whether "today" is still mutable.
+        // This prevents a mode tap just after the daily deadline from reviving an expired day.
+        _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
+
+        let previousDefaultModeRaw = settings.defaultExecutionModeRaw
+        settings.defaultExecutionModeRaw = mode.rawValue
+
+        guard let today = todayDayModel() else { return }
+        guard today.status == .empty || today.status == .draft || today.status == .execute else { return }
+        guard today.executionMode != mode else { return }
+
+        let previousMode = today.executionMode
+        let previousDraftZoneUnlocked = today.isDraftZoneUnlocked
+        today.executionMode = mode
+
+        // A mode choice must never silently reopen a committed queue. Switching either way
+        // returns the execution queue to its explicit, user-controlled locked state.
+        today.isDraftZoneUnlocked = false
+
+        do {
+            try modelContext.save()
+            appState.bumpStateTransitionRevision()
+        } catch {
+            today.executionMode = previousMode
+            today.isDraftZoneUnlocked = previousDraftZoneUnlocked
+            settings.defaultExecutionModeRaw = previousDefaultModeRaw
+            seedAlertMessage = "执行模式未能保存：\(error.localizedDescription)"
+        }
     }
 
     // MARK: - Kill Time Settings
@@ -1842,6 +1922,90 @@ private struct ProjectSettingsView: View {
         case .medium: "中型"
         case .wide: "宽幅"
         }
+    }
+}
+
+private struct ExecutionModeOptionCard: View {
+    let mode: ExecutionMode
+    let isSelected: Bool
+
+    private var accentColor: Color {
+        mode == .strict ? .accentOrange : .weekyiiPrimary
+    }
+
+    private var symbolName: String {
+        mode == .strict ? "lock.fill" : "arrow.triangle.2.circlepath"
+    }
+
+    private var summary: String {
+        mode == .strict ? "把今天当成一份已经签下的清单。" : "保留专注，也为真实变化留出入口。"
+    }
+
+    private var detailRows: [(String, String)] {
+        switch mode {
+        case .strict:
+            return [
+                ("开始后", "按既定顺序推进"),
+                ("今日队列", "保持冻结"),
+                ("允许变化", "仅后移到未来"),
+                ("过期任务", "不显示明细，仅留计数")
+            ]
+        case .flexible:
+            return [
+                ("开始后", "仍只专注一件事"),
+                ("今日队列", "默认保持冻结"),
+                ("主动解冻后", "可增改、排序、交换"),
+                ("过期任务", "不显示明细，仅留计数")
+            ]
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : symbolName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isSelected ? accentColor : .secondary)
+                    .frame(width: 18, height: 18)
+
+                Text(mode.displayName)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            Text(summary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(detailRows, id: \.0) { row in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.0)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(row.1)
+                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 246, alignment: .topLeading)
+        .background(
+            isSelected ? accentColor.opacity(0.12) : Color.backgroundSecondary,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isSelected ? accentColor : Color.backgroundTertiary, lineWidth: isSelected ? 2 : 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

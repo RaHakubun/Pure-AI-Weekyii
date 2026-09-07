@@ -150,7 +150,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["draftTaskTitle_0"].label, "Flexible Focus Task")
     }
 
-    func testSettingsExecutionModePickerCanSelectFlexibleMode() {
+    func testSettingsExecutionModeCardsCanSelectFlexibleMode() {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting",
@@ -162,12 +162,14 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
         settingsTab.tap()
 
-        let picker = app.segmentedControls["executionModePicker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 3))
-        let flexibleButton = picker.buttons["灵动模式"]
-        XCTAssertTrue(flexibleButton.exists)
+        let todayRhythm = app.cells.containing(.staticText, identifier: "今日节奏").firstMatch
+        XCTAssertTrue(todayRhythm.waitForExistence(timeout: 3))
+        todayRhythm.tap()
+
+        let flexibleButton = app.buttons["executionModeOption.flexible"]
+        XCTAssertTrue(flexibleButton.waitForExistence(timeout: 3))
         flexibleButton.tap()
-        XCTAssertTrue(flexibleButton.isSelected)
+        XCTAssertEqual(flexibleButton.value as? String, "已选择")
     }
 
     func testDraftShowsFloatingStartButton() {
