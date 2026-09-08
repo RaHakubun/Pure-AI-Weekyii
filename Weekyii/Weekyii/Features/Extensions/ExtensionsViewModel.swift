@@ -5,11 +5,11 @@ import SwiftData
 @MainActor
 @Observable
 final class ExtensionsViewModel {
-    private let modelContext: ModelContext
-    private let notificationService: any NotificationScheduling
-    private let taskMutationService: TaskMutationService
-    private let weekCalculator = WeekCalculator()
-    private let calendar = Calendar(identifier: .iso8601)
+    @ObservationIgnored private let modelContext: ModelContext
+    @ObservationIgnored private let notificationService: any NotificationScheduling
+    @ObservationIgnored private let taskMutationService: TaskMutationService
+    @ObservationIgnored private let weekCalculator = WeekCalculator()
+    @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
 
     var projects: [ProjectModel] = []
     var suspendedTasks: [SuspendedTaskItem] = []
@@ -21,6 +21,8 @@ final class ExtensionsViewModel {
         self.notificationService = notificationService ?? NotificationService.shared
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
     }
+
+    nonisolated deinit {}
 
     // MARK: - Refresh
 

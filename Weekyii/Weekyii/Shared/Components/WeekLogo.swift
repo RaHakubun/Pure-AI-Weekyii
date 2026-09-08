@@ -61,9 +61,9 @@ struct WeekLogoWithIcon: View {
     
     var body: some View {
         HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "calendar.circle.fill")
+            Image(systemName: "calendar")
                 .font(.system(size: size.fontSize))
-                .foregroundStyle(Color.weekyiiGradient)
+                .foregroundStyle(Color.weekyiiPrimary)
             
             WeekLogo(size: size, animated: false)
         }

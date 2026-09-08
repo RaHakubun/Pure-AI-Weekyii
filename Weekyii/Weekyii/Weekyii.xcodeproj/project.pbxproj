@@ -8,9 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
-		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
-		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
-		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
@@ -32,8 +29,6 @@
 		944E58612F2B593A00DB2DEE /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58092F2B593A00DB2DEE /* AppState.swift */; };
 		944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581D2F2B593A00DB2DEE /* DayCardView.swift */; };
 		944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */; };
-		C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00230A0000100BEEF01 /* WeekTopology.swift */; };
-		C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */; };
 		944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580A2F2B593A00DB2DEE /* ContentView.swift */; };
 		944E58662F2B593A00DB2DEE /* DayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58232F2B593A00DB2DEE /* DayStatus.swift */; };
 		944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58182F2B593A00DB2DEE /* FocusZoneView.swift */; };
@@ -62,6 +57,8 @@
 		944E58842F2B593A00DB2DEE /* PendingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58142F2B593A00DB2DEE /* PendingViewModel.swift */; };
 		944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */; };
 		944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 944E582D2F2B593A00DB2DEE /* Assets.xcassets */; };
+		D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
+		D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
 		9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945022892F433A83000D67FF /* MindStampItem.swift */; };
 		9450228E2F433AA7000D67FF /* MindStampListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228C2F433AA7000D67FF /* MindStampListView.swift */; };
 		9450228F2F433AA7000D67FF /* MindStampViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228D2F433AA7000D67FF /* MindStampViewModel.swift */; };
@@ -102,17 +99,22 @@
 		B10000042F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
 		B10000052F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
 		B10000062F90000000AAA001 /* WidgetSnapshotComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */; };
+		C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00230A0000100BEEF01 /* WeekTopology.swift */; };
+		C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */; };
+		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
+		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
+		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
+		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
 		DF3C2419516E4D6FB1ABAE0F /* DraftReorderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */; };
 		E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7A6CE6657A22194F5108AB /* TaskStep.swift */; };
 		F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
 		F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58432F2B593A00DB2DEE /* StateMachineTests.swift */; };
 		F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */; };
-		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
 		F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A100102F6A000100AAA001 /* ProjectTileSize.swift */; };
 		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
-		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
 		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
+		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -181,19 +183,15 @@
 		944E58182F2B593A00DB2DEE /* FocusZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusZoneView.swift; sourceTree = "<group>"; };
 		944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrozenZoneView.swift; sourceTree = "<group>"; };
 		944E581A2F2B593A00DB2DEE /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
-		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
 		944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayViewModel.swift; sourceTree = "<group>"; };
 		944E581D2F2B593A00DB2DEE /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		944E581E2F2B593A00DB2DEE /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
 		944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
-		C0D3A00230A0000100BEEF01 /* WeekTopology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopology.swift; sourceTree = "<group>"; };
-		C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopologyView.swift; sourceTree = "<group>"; };
 		944E58202F2B593A00DB2DEE /* WeekViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekViewModel.swift; sourceTree = "<group>"; };
 		944E58232F2B593A00DB2DEE /* DayStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayStatus.swift; sourceTree = "<group>"; };
 		944E58242F2B593A00DB2DEE /* TaskType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskType.swift; sourceTree = "<group>"; };
 		944E58252F2B593A00DB2DEE /* TaskZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskZone.swift; sourceTree = "<group>"; };
 		944E58262F2B593A00DB2DEE /* WeekStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStatus.swift; sourceTree = "<group>"; };
-		C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTypeDefinition.swift; sourceTree = "<group>"; };
 		944E58282F2B593A00DB2DEE /* DayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayModel.swift; sourceTree = "<group>"; };
 		944E58292F2B593A00DB2DEE /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
 		944E582A2F2B593A00DB2DEE /* WeekModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekModel.swift; sourceTree = "<group>"; };
@@ -216,7 +214,6 @@
 		944E58422F2B593A00DB2DEE /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		944E58432F2B593A00DB2DEE /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
 		944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalculatorTests.swift; sourceTree = "<group>"; };
-		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		944E584B2F2B593A00DB2DEE /* Weekyii.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = Weekyii.xcodeproj; sourceTree = "<group>"; };
 		945022892F433A83000D67FF /* MindStampItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampItem.swift; sourceTree = "<group>"; };
 		9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampEditorSheet.swift; sourceTree = "<group>"; };
@@ -226,6 +223,7 @@
 		9466DE4F2F69868200EF5E24 /* KillTimeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillTimeSlider.swift; sourceTree = "<group>"; };
 		94982D702F2BB70700CE8621 /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
 		94982D722F2BB71F00CE8621 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
 		94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCard.swift; sourceTree = "<group>"; };
 		94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekButton.swift; sourceTree = "<group>"; };
@@ -260,12 +258,17 @@
 		B20000062F90000000AAA001 /* WeekyiiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeekyiiWidget.entitlements; sourceTree = "<group>"; };
 		B20000072F90000000AAA001 /* Weekyii.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Weekyii.entitlements; sourceTree = "<group>"; };
 		B20000082F90000000AAA001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		C0D3A00230A0000100BEEF01 /* WeekTopology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopology.swift; sourceTree = "<group>"; };
+		C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopologyView.swift; sourceTree = "<group>"; };
 		C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderedTaskRow.swift; sourceTree = "<group>"; };
+		C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTypeDefinition.swift; sourceTree = "<group>"; };
+		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
+		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
 		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
 		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
-		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
+		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -448,6 +451,7 @@
 				180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */,
 				944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */,
 				B20000072F90000000AAA001 /* Weekyii.entitlements */,
+				D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */,
 				94982D702F2BB70700CE8621 /* UserSettings.swift */,
 				94982D722F2BB71F00CE8621 /* SettingsView.swift */,
 			);
@@ -735,6 +739,7 @@
 			files = (
 				944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */,
 				944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */,
+				D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,
 				6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -757,6 +762,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1039,20 +1045,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.fluentdesign.Weekyii";
-						CFBundleURLSchemes = (
-							weekyii,
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1067,6 +1066,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -1083,20 +1083,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.fluentdesign.Weekyii";
-						CFBundleURLSchemes = (
-							weekyii,
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1111,6 +1104,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii App Store";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -1126,7 +1120,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
@@ -1147,7 +1141,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
@@ -1167,7 +1161,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
@@ -1186,7 +1180,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
@@ -1207,8 +1201,8 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
@@ -1235,9 +1229,10 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
@@ -1249,6 +1244,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii Widget App Store";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

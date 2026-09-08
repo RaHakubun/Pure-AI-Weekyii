@@ -6,9 +6,15 @@ enum MonthRestriction {
     case futureOnly // 只能看未来和当前月份（用于「未来」视图）
 }
 
+enum MonthPickerPresentation {
+    case card
+    case integrated
+}
+
 struct MonthPickerView: View {
     @Binding var month: Date
     var restriction: MonthRestriction = .none
+    var presentation: MonthPickerPresentation = .card
     private let calendar = Calendar(identifier: .iso8601)
     
     // 当前月份的第一天（用于比较）
@@ -49,12 +55,21 @@ struct MonthPickerView: View {
         HStack(spacing: 16) {
             Button(action: { month = previousMonth(from: month) }) {
                 Image(systemName: "chevron.left")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        presentation == .integrated
+                            ? Color.backgroundSecondary.opacity(0.72)
+                            : Color.clear,
+                        in: Circle()
+                    )
             }
             .disabled(!canGoPrevious)
             .opacity(canGoPrevious ? 1 : 0.3)
 
             Text(month, format: Date.FormatStyle().year().month())
-                .font(.headline)
+                .font(presentation == .integrated ? .titleMedium.weight(.bold) : .headline)
+                .foregroundStyle(Color.textPrimary)
                 .frame(maxWidth: .infinity)
                 // 文字内容切换时保持视觉稳定，不触发跨帧 fade
                 .contentTransition(.identity)
@@ -62,15 +77,23 @@ struct MonthPickerView: View {
 
             Button(action: { month = nextMonth(from: month) }) {
                 Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        presentation == .integrated
+                            ? Color.backgroundSecondary.opacity(0.72)
+                            : Color.clear,
+                        in: Circle()
+                    )
             }
             .disabled(!canGoNext)
             .opacity(canGoNext ? 1 : 0.3)
         }
-        .padding(12)
+        .padding(presentation == .integrated ? 0 : 12)
         // ultraThinMaterial 在内容变化时会重新合成 blur 层导致闪烁；
         // 改用静态背景色，视觉效果相同但不触发 vibrancy 重采样。
-        .background(Color.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(presentation == .integrated ? Color.clear : Color.backgroundSecondary)
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
     }
 
     private func previousMonth(from date: Date) -> Date {
@@ -81,4 +104,3 @@ struct MonthPickerView: View {
         calendar.date(byAdding: .month, value: 1, to: date) ?? date
     }
 }
-

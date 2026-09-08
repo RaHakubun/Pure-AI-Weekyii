@@ -66,7 +66,7 @@ struct TodayActivityAttributes: ActivityAttributes {
 
 // Shared bridge used by app and widget extension.
 enum WeekyiiWidgetBridge {
-    static let appGroupIdentifier = "group.com.fluentdesign.Weekyii.shared"
+    static let appGroupIdentifier = "group.com.fluentdesign.Weekyii"
     static let snapshotFileName = "weekyii-widget-snapshot.json"
     static let selectedThemeKey = "selectedTheme"
     static let appearanceModeKey = "appearanceMode"

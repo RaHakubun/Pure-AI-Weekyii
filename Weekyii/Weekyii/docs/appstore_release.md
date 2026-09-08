@@ -6,7 +6,7 @@ This doc is filled with repo-known details. Anything not found is marked as `UNK
 - App Name (Display): Weekyii
 - Bundle ID (App): com.fluentdesign.Weekyii
 - Bundle ID (Widget): com.fluentdesign.Weekyii.widget
-- App Group ID: group.com.fluentdesign.Weekyii.shared
+- App Group ID: group.com.fluentdesign.Weekyii
 - Marketing Version (CFBundleShortVersionString): 1.0
 - Build Number (CFBundleVersion): 1
 

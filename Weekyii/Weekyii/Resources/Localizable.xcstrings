@@ -7,6 +7,9 @@
     "·" : {
 
     },
+    "“" : {
+
+    },
     "%" : {
 
     },
@@ -16,6 +19,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@行为" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@行为"
           }
         }
       }
@@ -53,13 +66,28 @@
         }
       }
     },
+    "%@安排" : {
+
+    },
+    "%@执行模式" : {
+
+    },
     "%lld" : {
 
     },
-    "%lld 个类型 · 自定义分类外观" : {
+    "%lld 个数据库文件" : {
+
+    },
+    "%lld 个步骤" : {
 
     },
     "%lld 分钟" : {
+
+    },
+    "%lld 天" : {
+
+    },
+    "%lld 项" : {
 
     },
     "%lld/%lld" : {
@@ -74,6 +102,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "%lld/%lld 个任务" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld 个任务"
           }
         }
       }
@@ -1250,6 +1288,7 @@
       }
     },
     "past.total_weeks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1519,39 +1558,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无未来周"
-          }
-        }
-      }
-    },
-    "pending.month.ddl_count" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "DDL"
-          }
-        }
-      }
-    },
-    "pending.month.selected" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "已选日期"
-          }
-        }
-      }
-    },
-    "pending.month.task_count" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "任务"
           }
         }
       }
@@ -2302,6 +2308,7 @@
       }
     },
     "project.error.date_out_of_range" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2318,6 +2325,7 @@
       }
     },
     "project.error.day_completed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2897,6 +2905,7 @@
       }
     },
     "settings.appearance.mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2929,6 +2938,7 @@
       }
     },
     "settings.data.export" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2945,6 +2955,7 @@
       }
     },
     "settings.data.export.coming_soon" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3670,28 +3681,6 @@
         }
       }
     },
-    "settings.past.summary.note" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "completed 计入完成详情；expired 仅保留数量，不保留任务详情。"
-          }
-        }
-      }
-    },
-    "settings.past.summary.title" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "统计口径说明"
-          }
-        }
-      }
-    },
     "settings.reminder.15min" : {
       "localizations" : {
         "en" : {
@@ -3772,17 +3761,6 @@
         }
       }
     },
-    "settings.section.display_theme" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "显示与主题"
-          }
-        }
-      }
-    },
     "settings.section.future" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3790,28 +3768,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "未来"
-          }
-        }
-      }
-    },
-    "settings.section.past" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "过去"
-          }
-        }
-      }
-    },
-    "settings.section.present" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "当下"
           }
         }
       }
@@ -3851,6 +3807,7 @@
       }
     },
     "settings.theme.color" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3866,51 +3823,8 @@
         }
       }
     },
-    "settings.theme.premium.badge" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Premium"
-          }
-        }
-      }
-    },
-    "settings.theme.premium.footer" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "解锁后可切换到魔戒主题；当前会回落到普通主题。"
-          }
-        }
-      }
-    },
-    "settings.theme.premium.locked" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "魔戒 为 Premium 主题"
-          }
-        }
-      }
-    },
-    "settings.theme.premium.locked_short" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "锁定"
-          }
-        }
-      }
-    },
     "settings.theme.preview" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4956,16 +4870,25 @@
     "下移" : {
 
     },
-    "严格模式：开始后按固定顺序逐项推进。" : {
+    "两种模式都遵守" : {
+
+    },
+    "个性化" : {
 
     },
     "临近截止" : {
+
+    },
+    "主题" : {
 
     },
     "交换" : {
 
     },
     "仅对明日以后生效" : {
+
+    },
+    "仅影响以后新建的项目，不会修改现有项目。" : {
 
     },
     "今日任务流已过期，无法同步到今天。本次提交已取消。" : {
@@ -4977,16 +4900,37 @@
     "今日已过期" : {
 
     },
+    "今日节奏" : {
+
+    },
+    "从归档恢复" : {
+
+    },
     "任务已遗忘" : {
+
+    },
+    "任务管理" : {
 
     },
     "任务类型" : {
 
     },
-    "任务类型管理" : {
+    "任务行为" : {
+
+    },
+    "任务记录仍然保留，恢复后可重新打开项目。" : {
 
     },
     "你可以选择同步今日，或只让新默认值从明日开始生效。" : {
+
+    },
+    "使用上方“添加”为这一天创建任务" : {
+
+    },
+    "使用历程" : {
+
+    },
+    "使用方式" : {
 
     },
     "保存" : {
@@ -4998,9 +4942,6 @@
     "保存图片" : {
 
     },
-    "修改将在下一次开始任务流时生效" : {
-
-    },
     "倒计时" : {
 
     },
@@ -5010,7 +4951,13 @@
     "全局视图" : {
 
     },
+    "关于 Weekyii" : {
+
+    },
     "关闭全屏" : {
+
+    },
+    "决定该类型在截止提醒、未来标记和统计中的归类；名称、图标和颜色仍保持自定义。" : {
 
     },
     "冻结" : {
@@ -5037,6 +4984,9 @@
     "到期" : {
 
     },
+    "单文件包含任务、项目、标签、图片与设置" : {
+
+    },
     "取消" : {
 
     },
@@ -5050,6 +5000,9 @@
 
     },
     "同步至今日及以后" : {
+
+    },
+    "名称" : {
 
     },
     "后移" : {
@@ -5067,7 +5020,10 @@
     "含图片" : {
 
     },
-    "呆胶布内容" : {
+    "呆胶布内容：%@" : {
+
+    },
+    "周列表" : {
 
     },
     "回滚到最新备份" : {
@@ -5094,7 +5050,10 @@
     "在这里记录未决定具体时限的任务" : {
 
     },
-    "基础" : {
+    "外观与主题" : {
+
+    },
+    "完成任务保留详情；过期任务仅保留数量。" : {
 
     },
     "完成率 %lld%%" : {
@@ -5103,10 +5062,25 @@
     "完成编辑" : {
 
     },
+    "完成项目前必须先完成全部开放任务" : {
+
+    },
+    "完整恢复" : {
+
+    },
+    "完整替换当前数据？" : {
+
+    },
+    "导出 Weekyii 数据" : {
+
+    },
     "导出状态诊断" : {
 
     },
     "导出诊断信息" : {
+
+    },
+    "将导入 %@。当前数据会被完整替换；开始前会自动建立一份本地恢复点。" : {
 
     },
     "将直接替换当前数据库文件，可能丢失最新数据。" : {
@@ -5115,10 +5089,34 @@
     "将移动到" : {
 
     },
+    "已完成项目保持只读。你可以归档收纳，或重新打开继续添加任务。" : {
+
+    },
+    "已归档类型" : {
+
+    },
+    "已有同名类型，请换一个名称" : {
+
+    },
+    "已选择" : {
+
+    },
     "已遗忘任务，无详情" : {
 
     },
+    "应用" : {
+
+    },
+    "应用启动和数据导入前会自动建立恢复点。" : {
+
+    },
     "应用新的默认截止时间" : {
+
+    },
+    "建立恢复点并导入" : {
+
+    },
+    "开发者与诊断" : {
 
     },
     "开始 %@" : {
@@ -5130,19 +5128,55 @@
     "开始任务流风险提示" : {
 
     },
+    "归档" : {
+
+    },
+    "归档始终由你主动执行" : {
+
+    },
     "归档类型" : {
+
+    },
+    "归档采用带版本与 SHA-256 校验的 JSON 格式。导入不会合并数据。" : {
+
+    },
+    "归档项目" : {
+
+    },
+    "当前主题" : {
 
     },
     "当前仅可选择 23:59，请使用时间选择器确认。" : {
 
     },
+    "当前数据库会被替换。完成后请立即完全退出并重新打开应用。" : {
+
+    },
     "快捷选择" : {
+
+    },
+    "恢复" : {
+
+    },
+    "恢复到已完成" : {
+
+    },
+    "恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。" : {
+
+    },
+    "恢复这个时间点？" : {
 
     },
     "悬置箱" : {
 
     },
     "悬置箱不是回收站。删除后不会保留后路。" : {
+
+    },
+    "所有项目任务均已完成" : {
+
+    },
+    "执行方式" : {
 
     },
     "执行模式" : {
@@ -5172,7 +5206,16 @@
     "提前 120 分钟" : {
 
     },
+    "提醒" : {
+
+    },
     "提醒时刻" : {
+
+    },
+    "数据" : {
+
+    },
+    "数据与安全" : {
 
     },
     "数据库不可用" : {
@@ -5196,6 +5239,9 @@
     "新增步骤" : {
 
     },
+    "新建项目默认值" : {
+
+    },
     "新截止时间会导致今日任务立即过期" : {
 
     },
@@ -5208,7 +5254,13 @@
     "是否开始今日任务流？" : {
 
     },
+    "显示模式" : {
+
+    },
     "暂存未分配日期的任务。到期前可续期、分配或删除。" : {
+
+    },
+    "暂无本地恢复点" : {
 
     },
     "暂无步骤" : {
@@ -5217,7 +5269,16 @@
     "暂时不属于任何一天、须在倒计时内再次决策。" : {
 
     },
+    "月历" : {
+
+    },
     "月趋势" : {
+
+    },
+    "未来" : {
+
+    },
+    "未选择" : {
 
     },
     "本周拓扑" : {
@@ -5226,10 +5287,19 @@
     "本周详情" : {
 
     },
+    "本地恢复点" : {
+
+    },
+    "本月回顾" : {
+
+    },
     "查看任务详情" : {
 
     },
     "查看当天" : {
+
+    },
+    "校验完成后完整替换当前数据" : {
 
     },
     "步骤" : {
@@ -5244,13 +5314,22 @@
     "步骤内容" : {
 
     },
+    "每套主题仍保留独立的色彩与印象画。" : {
+
+    },
+    "每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。" : {
+
+    },
     "添加" : {
 
     },
-    "灵动模式：开始后可解冻草稿区，调整任务并与专注任务交换。" : {
+    "点击任务可编辑；进入编辑模式后可删除并拖拽排序。" : {
 
     },
-    "点击任务可编辑；进入编辑模式后可删除并拖拽排序。" : {
+    "点按后立即同步尚未结束的今日" : {
+
+    },
+    "生命周期" : {
 
     },
     "目标周尚未创建" : {
@@ -5274,10 +5353,25 @@
     "确认回滚" : {
 
     },
+    "确认结项" : {
+
+    },
+    "确认结项后，项目将进入只读状态。" : {
+
+    },
     "立即重算状态" : {
 
     },
+    "管理已完成项目" : {
+
+    },
+    "管理已归档项目" : {
+
+    },
     "类型名称" : {
+
+    },
+    "类型管理" : {
 
     },
     "系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。" : {
@@ -5301,6 +5395,9 @@
     "编辑任务类型" : {
 
     },
+    "编辑项目信息" : {
+
+    },
     "缩放后展开结果组和任务" : {
 
     },
@@ -5319,16 +5416,16 @@
     "解冻草稿区" : {
 
     },
+    "设置中的预览保持静止；动态印象画仅在“今日”页面播放。" : {
+
+    },
     "诊断信息已复制到剪贴板" : {
 
     },
-    "该日期暂无任务。" : {
-
-    },
-    "该日期暂无任务记录。" : {
-
-    },
     "调整顺序或删除任务" : {
+
+    },
+    "趋势与洞察" : {
 
     },
     "轻点选择，轻点两次聚焦当天分支" : {
@@ -5343,7 +5440,25 @@
     "过去日期仅可查看，不可新增。" : {
 
     },
+    "这个月还没有可以回顾的记录。" : {
+
+    },
+    "这里还没有%@的项目" : {
+
+    },
     "进入后将按任务顺序推进，直到完成或截止。" : {
+
+    },
+    "选择后会立即同步尚未结束的今日，并成为以后默认方式" : {
+
+    },
+    "逾期项目不会自动隐藏或改变状态" : {
+
+    },
+    "重新打开" : {
+
+    },
+    "重新打开项目" : {
 
     },
     "阶段 2/2 · 呆胶布" : {
@@ -5355,16 +5470,40 @@
     "附件 %lld" : {
 
     },
+    "项目" : {
+
+    },
+    "项目已完成" : {
+
+    },
+    "项目已归档" : {
+
+    },
     "项目暂无待办" : {
 
     },
     "项目概览" : {
 
     },
+    "项目状态" : {
+
+    },
     "预览呆胶布图片" : {
 
     },
     "颜色" : {
+
+    },
+    "默认" : {
+
+    },
+    "默认卡片尺寸" : {
+
+    },
+    "默认周期" : {
+
+    },
+    "默认类型" : {
 
     }
   },

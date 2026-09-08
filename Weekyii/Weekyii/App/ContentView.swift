@@ -26,34 +26,34 @@ struct ContentView: View {
             PastView()
                 .id(visualIdentity)
                 .tabItem {
-                    Label(String(localized: "tab.past"), systemImage: "clock.arrow.circlepath")
+                    tabLabel(String(localized: "tab.past"), systemImage: "clock.arrow.circlepath")
                 }
                 .tag(MainTab.past)
             
             TodayView(animationsActive: selectedTab == .today && scenePhase == .active)
                 .id(visualIdentity)
                 .tabItem {
-                    Label(String(localized: "tab.today"), systemImage: "sun.max")
+                    tabLabel(String(localized: "tab.today"), systemImage: "sun.max")
                 }
                 .tag(MainTab.today)
 
             PendingView()
                 .id(visualIdentity)
                 .tabItem {
-                    Label(String(localized: "tab.pending"), systemImage: "calendar.badge.plus")
+                    tabLabel(String(localized: "tab.pending"), systemImage: "calendar")
                 }
                 .tag(MainTab.pending)
 
             ExtensionsHubView()
                 .id(visualIdentity)
                 .tabItem {
-                    Label(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
+                    tabLabel(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
                 }
                 .tag(MainTab.extensions)
 
             SettingsView()
                 .tabItem {
-                    Label(String(localized: "tab.settings"), systemImage: "gearshape")
+                    tabLabel(String(localized: "tab.settings"), systemImage: "gearshape")
                 }
                 .tag(MainTab.settings)
         }
@@ -84,6 +84,15 @@ struct ContentView: View {
                 appState: appState,
                 userSettings: userSettings
             )
+        }
+    }
+
+    private func tabLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .symbolVariant(.none)
         }
     }
 }

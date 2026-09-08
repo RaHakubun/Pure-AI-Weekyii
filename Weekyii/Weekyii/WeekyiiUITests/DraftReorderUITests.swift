@@ -229,7 +229,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(warningPrimaryButton.waitForExistence(timeout: 2))
         warningPrimaryButton.tap()
 
-        let ritualCard = app.otherElements["startFlowRitualCard"]
+        let ritualCard = app.descendants(matching: .any)["startFlowRitualCard"]
         XCTAssertTrue(ritualCard.waitForExistence(timeout: 3))
 
         let ritualSecondaryButton = app.buttons["startFlowSecondaryButton"]
@@ -412,6 +412,39 @@ final class DraftReorderUITests: XCTestCase {
         destructiveButtons.element(boundBy: 0).tap()
 
         XCTAssertFalse(app.buttons["pendingDraftTask_1"].waitForExistence(timeout: 2))
+    }
+
+    func testPendingMonthViewShowsDynamicSelectedDayTypeSummaryWithoutFixedTypeCards() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedPendingWeek",
+            "1"
+        ]
+        app.launch()
+
+        let pendingTab = app.tabBars.buttons["未来"]
+        XCTAssertTrue(pendingTab.waitForExistence(timeout: 5))
+        pendingTab.tap()
+
+        let switchToMonth = app.buttons["pendingSwitchToMonthButton"]
+        XCTAssertTrue(switchToMonth.waitForExistence(timeout: 3))
+        switchToMonth.tap()
+
+        let seededDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let seededDayButton = app.buttons["pendingMonthDay_\(dateFormatter.string(from: seededDate))"]
+        XCTAssertTrue(seededDayButton.waitForExistence(timeout: 3))
+        seededDayButton.tap()
+
+        XCTAssertTrue(app.staticTexts["pendingSelectedDayTaskCount"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["pendingSelectedDayTypeSummary"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_regular"].exists)
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_ddl"].exists)
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_leisure"].exists)
     }
 
     func testSuspendedTasksCanBeCreatedAndDeletedWithConfirmation() {

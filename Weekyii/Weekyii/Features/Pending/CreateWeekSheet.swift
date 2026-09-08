@@ -427,6 +427,7 @@ private struct CustomCalendarView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("pendingMonthDay_\(dayIdStr)")
         .disabled(!day.isCurrentMonth)
     }
 

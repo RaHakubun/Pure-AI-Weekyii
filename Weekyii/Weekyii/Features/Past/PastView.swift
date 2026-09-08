@@ -46,8 +46,10 @@ struct PastView: View {
                 }
                 .weekPadding(WeekSpacing.base)
             }
-            .background(Color.backgroundPrimary)
+            .background(Color.backgroundPrimary.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .small, animated: false)
@@ -160,7 +162,11 @@ struct PastView: View {
                 displayMode = displayMode == .weekList ? .month : .weekList
             }
         } label: {
-            Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
+            HStack(spacing: WeekSpacing.xs) {
+                Image(systemName: displayMode == .weekList ? "calendar" : "list.bullet.rectangle")
+                Text(displayMode == .weekList ? "月历" : "周列表")
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .accessibilityLabel(
             displayMode == .weekList
@@ -171,7 +177,7 @@ struct PastView: View {
 
     private var monthOverview: some View {
         VStack(spacing: WeekSpacing.md) {
-            WeekCard {
+            pastSurface {
                 PastMonthCalendarView(
                     selectedDate: $selectedDate,
                     selectedMonth: $selectedMonth,
@@ -189,7 +195,7 @@ struct PastView: View {
         let expiredCount = selectedDaySummary?.expiredCount ?? 0
         let tasks = selectedDay?.completedTasks ?? []
 
-        return WeekCard(accentColor: selectedDay?.status.color ?? .weekyiiPrimary) {
+        return pastSurface {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
@@ -258,7 +264,7 @@ struct PastView: View {
 
     private var analyticsSection: some View {
         VStack(spacing: WeekSpacing.md) {
-            WeekCard {
+            pastSurface {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
                         Text("趋势与洞察")
@@ -320,7 +326,7 @@ struct PastView: View {
     // MARK: - Empty State
 
     private var monthReviewCard: some View {
-        WeekCard(accentColor: .weekyiiPrimary) {
+        pastSurface {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -340,8 +346,8 @@ struct PastView: View {
                     HStack(spacing: WeekSpacing.lg) {
                         reviewMetric("完成", value: "\(stats.totalCompletedTasks)", color: .accentGreen)
                         reviewMetric("完成率", value: stats.completionRate.formatted(.percent.precision(.fractionLength(0))), color: .weekyiiPrimary)
-                        reviewMetric("专注", value: String(format: "%.1fh", stats.totalFocusHours), color: .orange)
-                        reviewMetric("活跃", value: "\(stats.totalStartedDays)天", color: .blue)
+                        reviewMetric("专注", value: String(format: "%.1fh", stats.totalFocusHours), color: .weekyiiPrimaryLight)
+                        reviewMetric("活跃", value: "\(stats.totalStartedDays)天", color: .weekyiiPrimary)
                     }
 
                     if let monthComparisonText {
@@ -370,6 +376,20 @@ struct PastView: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 保留过去页既有卡片与信息顺序，只统一其表面材质、圆角、边界和阴影。
+    private func pastSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(WeekSpacing.base)
+            .background(Color.backgroundSecondary)
+            .clipShape(.rect(cornerRadius: WeekRadius.xlarge))
+            .overlay {
+                RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous)
+                    .stroke(Color.backgroundTertiary.opacity(0.55), lineWidth: 0.75)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: WeekShadow.light.color, radius: 14, x: 0, y: 5)
     }
 
     private var emptyStateView: some View {
@@ -544,10 +564,10 @@ private struct PastMonthCalendarView: View {
     }
 
     var body: some View {
-        VStack(spacing: WeekSpacing.md) {
+        VStack(spacing: WeekSpacing.sm) {
             weekdayHeader
 
-            LazyVGrid(columns: columns, spacing: WeekSpacing.xs) {
+            LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(calendarDays) { day in
                     dayCell(day)
                 }
@@ -596,19 +616,21 @@ private struct PastMonthCalendarView: View {
 
         Button {
             guard day.isCurrentMonth, !isFutureDate else { return }
-            selectedDate = day.date
+            withAnimation(.snappy(duration: 0.22)) {
+                selectedDate = day.date
+            }
         } label: {
             VStack(spacing: 3) {
                 ZStack(alignment: .topTrailing) {
                     ZStack {
                         if isSelected && day.isCurrentMonth && !isFutureDate {
-                            Circle()
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                                 .fill(Color.weekyiiPrimary)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 38, height: 40)
                         } else if isToday && day.isCurrentMonth && !isFutureDate {
-                            Circle()
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                                 .stroke(Color.weekyiiPrimary, lineWidth: 1.5)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 38, height: 40)
                         }
 
                         Text("\(dayNumber)")
@@ -623,7 +645,7 @@ private struct PastMonthCalendarView: View {
                                 )
                             )
                     }
-                    .frame(width: 36, height: 36)
+                    .frame(width: 38, height: 40)
 
                     if day.isCurrentMonth && completedCount > 0 && !isFutureDate {
                         Text(completedCount > 99 ? "99+" : "\(completedCount)")

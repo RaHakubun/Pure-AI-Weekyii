@@ -918,7 +918,7 @@ final class ModelTests: XCTestCase {
             appearanceModeRaw: AppearanceMode.dark.rawValue
         )
 
-        let palette = theme.resolvedLockPalette(isDarkSystem: false)
+        let palette = theme.resolvedLockPalette(prefersDarkLock: true)
 
         XCTAssertEqual(palette.backgroundHex, "#101010")
         XCTAssertEqual(palette.textPrimaryHex, "#EFEFEF")
@@ -927,7 +927,7 @@ final class ModelTests: XCTestCase {
 
     func test_lotrLiveActivityThemeSnapshot_usesDarkIslandContrastAndResolvedLockPalette() {
         let snapshot = WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system)
-        let darkLockPalette = snapshot.resolvedLockPalette(isDarkSystem: true)
+        let darkLockPalette = snapshot.resolvedLockPalette(prefersDarkLock: true)
 
         XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E6DECf")
         XCTAssertEqual(snapshot.islandKeylineHex, "#C6AA79")
