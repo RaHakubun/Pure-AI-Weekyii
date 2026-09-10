@@ -10,6 +10,7 @@ struct SuspendedCountdownPreset {
 // MARK: - Extensions Hub View (New Architecture)
 
 struct ExtensionsHubView: View {
+    let animationsActive: Bool
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @State private var viewModel: ExtensionsViewModel?
@@ -28,11 +29,11 @@ struct ExtensionsHubView: View {
                             ],
                             spacing: WeekSpacing.md
                         ) {
-                            MindStampsModulePreview(viewModel: mindStampViewModel)
-                            SuspendedTasksModulePreview(viewModel: viewModel)
+                            MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: animationsActive)
+                            SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: animationsActive)
                         }
 
-                        ProjectsModulePreview(viewModel: viewModel)
+                        ProjectsModulePreview(viewModel: viewModel, animationsActive: animationsActive)
                     }
                 }
                 .padding(.horizontal, WeekSpacing.base)
@@ -79,23 +80,30 @@ struct ExtensionsHubView: View {
 
 private struct SuspendedTasksModulePreview: View {
     let viewModel: ExtensionsViewModel
-
-    private var stats: (total: Int, dueSoon: Int, dueToday: Int) {
-        viewModel.suspendedTaskStats()
-    }
+    let animationsActive: Bool
 
     var body: some View {
-        ExtensionShortcutTile(
-            title: "悬置箱",
-            icon: "hourglass.circle.fill",
-            tint: .suspendedModuleTint,
-            value: "\(stats.total)",
-            detail: "项未决任务",
-            accessibilityIdentifier: "extensionsSuspendedSeeAllButton",
-            destination: {
-                SuspendedTasksFullView(viewModel: viewModel)
+        NavigationLink {
+            SuspendedTasksFullView(viewModel: viewModel)
+        } label: {
+            LiveModuleTile(
+                items: viewModel.hubSuspendedTasks(),
+                initialDelay: .seconds(4.0),
+                isActive: animationsActive,
+                accessibilityIdentifier: "extensionsSuspendedLiveTile"
+            ) { task in
+                SuspendedTaskLiveTile(task: task, totalCount: viewModel.suspendedTasks.count)
+            } emptyContent: {
+                HubEmptyTile(
+                    title: String(localized: "extensions.module.suspended.title"),
+                    message: String(localized: "extensions.hub.suspended.empty"),
+                    icon: "hourglass.circle.fill",
+                    tint: .suspendedModuleTint
+                )
             }
-        )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("extensionsSuspendedSeeAllButton")
     }
 }
 
@@ -103,126 +111,25 @@ private struct SuspendedTasksModulePreview: View {
 
 private struct ProjectsModulePreview: View {
     let viewModel: ExtensionsViewModel
-    @State private var showingCreateSheet = false
-
-    private var activeProjects: [ProjectModel] {
-        Array(viewModel.activeProjects().prefix(3))
-    }
-
-    private var completedProjects: [ProjectModel] {
-        Array(viewModel.completedProjects().prefix(2))
-    }
-
-    private var allProjects: [ProjectModel] {
-        Array((activeProjects + completedProjects).prefix(5))
-    }
+    let animationsActive: Bool
 
     var body: some View {
-        ModuleContainer(
-            title: String(localized: "extensions.module.projects.title"),
-            subtitle: String(localized: "extensions.module.projects.subtitle"),
-            icon: "folder.fill",
-            iconColor: .weekyiiPrimary,
-            seeAllAccessibilityID: "extensionsProjectsSeeAllButton",
-            destination: {
-                ProjectsFullView(viewModel: viewModel)
+        NavigationLink {
+            ProjectsFullView(viewModel: viewModel)
+        } label: {
+            LiveModuleTile(
+                items: viewModel.hubProjectSnapshots(),
+                initialDelay: .seconds(5.6),
+                isActive: animationsActive,
+                accessibilityIdentifier: "extensionsProjectsLiveTile"
+            ) { snapshot in
+                ProjectFocusLiveTile(snapshot: snapshot, projectCount: viewModel.activeProjects().count)
+            } emptyContent: {
+                ProjectEmptyLiveTile()
             }
-        ) {
-            if allProjects.isEmpty {
-                moduleEmptyState
-            } else {
-                VStack(spacing: WeekSpacing.sm) {
-                    ForEach(allProjects) { project in
-                        projectPreviewRow(project)
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingCreateSheet, onDismiss: {
-            viewModel.refresh()
-        }) {
-            CreateProjectSheet(viewModel: viewModel)
-        }
-    }
-
-    private var moduleEmptyState: some View {
-        VStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "folder.badge.plus")
-                .font(.system(size: 32))
-                .foregroundStyle(Color.weekyiiGradient)
-
-            Text(String(localized: "project.empty.title"))
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
-
-            Button {
-                showingCreateSheet = true
-            } label: {
-                Text(String(localized: "project.add"))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, WeekSpacing.md)
-                    .padding(.vertical, WeekSpacing.sm)
-                    .background(Color.weekyiiGradient)
-                    .clipShape(Capsule())
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, WeekSpacing.lg)
-    }
-
-    private func projectPreviewRow(_ project: ProjectModel) -> some View {
-        NavigationLink(destination: ProjectDetailView(project: project, viewModel: viewModel)) {
-            HStack(spacing: WeekSpacing.sm) {
-                Image(systemName: project.icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(hex: project.color))
-                    .frame(width: 28, height: 28)
-                    .background(Color(hex: project.color).opacity(0.12))
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(project.name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(.textPrimary)
-                        .lineLimit(1)
-
-                    HStack(spacing: WeekSpacing.xs) {
-                        Text(project.status.displayName)
-                            .font(.caption)
-                            .foregroundColor(.textTertiary)
-
-                        Text("·")
-                            .font(.caption)
-                            .foregroundColor(.textTertiary)
-
-                        Text(String(format: String(localized: "project.tasks.count"), project.totalTaskCount))
-                            .font(.caption)
-                            .foregroundColor(.textTertiary)
-                    }
-                }
-
-                Spacer()
-
-                ZStack {
-                    Circle()
-                        .stroke(Color(hex: project.color).opacity(0.15), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(min(project.progress, 1.0)))
-                        .stroke(Color(hex: project.color), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 22, height: 22)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.textTertiary)
-            }
-            .padding(WeekSpacing.sm)
-            .background(Color.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("extensionsProjectsSeeAllButton")
     }
 }
 
@@ -1115,146 +1022,377 @@ enum SuspendedTaskMetaFormatter {
 
 private struct MindStampsModulePreview: View {
     let viewModel: MindStampViewModel
-
-    var body: some View {
-        ExtensionShortcutTile(
-            title: String(localized: "extensions.module.mindstamps.title"),
-            icon: "bandage.fill",
-            tint: .accentPink,
-            value: "\(viewModel.stamps.count)",
-            detail: "张呆胶布",
-            accessibilityIdentifier: "extensionsMindStampsSeeAllButton",
-            destination: {
-                MindStampsFullView(viewModel: viewModel)
-            }
-        )
-    }
-}
-
-private struct ExtensionShortcutTile<Destination: View>: View {
-    let title: String
-    let icon: String
-    let tint: Color
-    let value: String
-    let detail: String
-    let accessibilityIdentifier: String
-    @ViewBuilder let destination: () -> Destination
+    let animationsActive: Bool
 
     var body: some View {
         NavigationLink {
-            destination()
+            MindStampsFullView(viewModel: viewModel)
         } label: {
-            tileContent
+            LiveModuleTile(
+                items: viewModel.stamps,
+                initialDelay: .seconds(2.4),
+                isActive: animationsActive,
+                accessibilityIdentifier: "extensionsMindStampsLiveTile"
+            ) { stamp in
+                MindStampLiveTile(stamp: stamp, totalCount: viewModel.stamps.count)
+            } emptyContent: {
+                HubEmptyTile(
+                    title: String(localized: "extensions.module.mindstamps.title"),
+                    message: String(localized: "extensions.hub.mindstamps.empty"),
+                    icon: "bandage.fill",
+                    tint: .accentPink
+                )
+            }
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityIdentifier("extensionsMindStampsSeeAllButton")
+    }
+}
+
+// MARK: - Live Hub Tile Faces
+
+extension ProjectTileSnapshot: Identifiable {
+    var id: UUID { projectID }
+}
+
+private struct HubSquareSurface<Content: View>: View {
+    let tint: Color
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(WeekSpacing.md)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .aspectRatio(1, contentMode: .fit)
+            .background(Color.backgroundSecondary)
+            .clipShape(.rect(cornerRadius: WeekRadius.medium))
+            .overlay {
+                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    .stroke(tint.opacity(0.14), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+            .contentShape(Rectangle())
+    }
+}
+
+private struct HubEmptyTile: View {
+    let title: String
+    let message: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HubSquareSurface(tint: tint) {
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HubTileHeader(title: title, icon: icon, tint: tint, trailing: "")
+                Spacer(minLength: 0)
+                Text(message)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(2)
+                Text(String(localized: "extensions.hub.empty.tap_to_see_all"))
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+            }
+        }
+    }
+}
+
+private struct MindStampLiveTile: View {
+    let stamp: MindStampItem
+    let totalCount: Int
+
+    private var image: UIImage? {
+        guard let blob = stamp.imageBlob else { return nil }
+        return UIImage(data: blob)
     }
 
-    private var tileContent: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            tileHeader
-            Spacer(minLength: 0)
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                LinearGradient(
+                    colors: [.black.opacity(0.02), .black.opacity(0.62)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            } else {
+                Color.accentPink.opacity(0.08)
+            }
 
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HubTileHeader(
+                    title: String(localized: "extensions.module.mindstamps.title"),
+                    icon: "bandage.fill",
+                    tint: image == nil ? .accentPink : .white,
+                    trailing: "\(totalCount)"
+                )
 
-            tileMetric
+                Spacer(minLength: 0)
+
+                Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : stamp.text)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(image == nil ? Color.textPrimary : .white)
+                    .lineLimit(image == nil ? 3 : 2)
+                    .multilineTextAlignment(.leading)
+
+                Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
+                    .font(.caption2)
+                    .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
+            }
+            .padding(WeekSpacing.md)
         }
-        .padding(WeekSpacing.md)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
-        .background(Color.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(tint.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                .stroke(Color.accentPink.opacity(0.18), lineWidth: 1)
         }
         .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
         .contentShape(Rectangle())
     }
+}
 
-    private var tileHeader: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 42, height: 42)
-                .background(tint.opacity(0.12), in: Circle())
+private struct SuspendedTaskLiveTile: View {
+    let task: SuspendedTaskItem
+    let totalCount: Int
+    private let calendar = Calendar(identifier: .iso8601)
 
-            Spacer()
+    private var deadline: Date { calendar.startOfDay(for: task.decisionDeadline) }
+    private var today: Date { calendar.startOfDay(for: Date()) }
 
-            Image(systemName: "arrow.up.right")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.textTertiary)
-                .frame(width: 28, height: 28)
+    private var deadlineLabel: String {
+        if deadline < today { return String(localized: "extensions.hub.suspended.deadline.overdue") }
+        if calendar.isDate(deadline, inSameDayAs: today) { return String(localized: "extensions.hub.suspended.deadline.today") }
+        let days = calendar.dateComponents([.day], from: today, to: deadline).day ?? 0
+        if days <= 7 {
+            return String(
+                format: String(localized: "extensions.hub.suspended.deadline.days"),
+                locale: Locale.current,
+                Int64(days)
+            )
         }
+        return String(
+            format: String(localized: "extensions.hub.suspended.deadline.date"),
+            locale: Locale.current,
+            deadline.formatted(.dateTime.month().day())
+        )
     }
 
-    private var tileMetric: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text(value)
-                .font(.system(size: 25, weight: .bold))
-                .foregroundStyle(tint)
-                .lineLimit(1)
+    private var deadlineColor: Color {
+        deadline <= today ? .taskDDL : .suspendedModuleTint
+    }
 
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
+    var body: some View {
+        HubSquareSurface(tint: .suspendedModuleTint) {
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HubTileHeader(
+                    title: String(localized: "extensions.module.suspended.title"),
+                    icon: "hourglass.circle.fill",
+                    tint: .suspendedModuleTint,
+                    trailing: String(
+                        format: String(localized: "extensions.hub.suspended.count"),
+                        locale: Locale.current,
+                        Int64(totalCount)
+                    )
+                )
+
+                Spacer(minLength: 0)
+
+                Text(task.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: WeekSpacing.xs) {
+                    Label(task.taskType.displayName, systemImage: task.taskType.iconName)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(task.taskType.color)
+                    Spacer(minLength: 0)
+                }
+
+                Text(deadlineLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(deadlineColor)
+            }
         }
     }
 }
 
-// MARK: - Module Container
+private struct ProjectFocusLiveTile: View {
+    let snapshot: ProjectTileSnapshot
+    let projectCount: Int
 
-private struct ModuleContainer<Content: View, Destination: View>: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let iconColor: Color
-    let seeAllAccessibilityID: String?
-    @ViewBuilder let destination: () -> Destination
-    @ViewBuilder let content: () -> Content
+    private var projectColor: Color { Color(hex: snapshot.colorHex) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            HStack {
-                Image(systemName: icon)
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            HStack(spacing: WeekSpacing.sm) {
+                Image(systemName: snapshot.icon)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(iconColor)
+                    .foregroundStyle(projectColor)
+                    .frame(width: 34, height: 34)
+                    .background(projectColor.opacity(0.12), in: Circle())
 
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.textPrimary)
-
-                Spacer()
-
-                NavigationLink(destination: destination()) {
-                    HStack(spacing: 2) {
-                        Text(String(localized: "extensions.module.see_all"))
-                            .font(.subheadline.weight(.medium))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundColor(.weekyiiPrimary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(String(localized: "extensions.module.projects.title"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                    Text(snapshot.name)
+                        .font(.headline)
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
                 }
-                .accessibilityIdentifier(seeAllAccessibilityID ?? "")
+
+                Spacer(minLength: WeekSpacing.sm)
+
+                Text(String(localized: "extensions.module.see_all"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(projectColor)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(projectColor)
             }
 
-            Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.textSecondary)
+            HStack(alignment: .center, spacing: WeekSpacing.md) {
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    Text(String(localized: "extensions.hub.projects.next_step"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                    Text(snapshot.nextTaskTitle ?? String(localized: "extensions.hub.projects.no_next_task"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(2)
+                }
 
-            content()
+                Spacer(minLength: WeekSpacing.sm)
+
+                ProjectHubProgressRing(progress: snapshot.progress, color: projectColor)
+            }
+
+            HStack(spacing: WeekSpacing.sm) {
+                Text(
+                    String(
+                        format: String(localized: "extensions.hub.projects.remaining"),
+                        locale: Locale.current,
+                        Int64(snapshot.remainingCount)
+                    )
+                )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                if let nextTaskDate = snapshot.nextTaskDate {
+                    Text("·")
+                        .foregroundStyle(Color.textTertiary)
+                    Text(nextTaskDate, format: .dateTime.month().day())
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(projectColor)
+                }
+
+                Spacer(minLength: 0)
+                Text(
+                    String(
+                        format: String(localized: "extensions.hub.projects.active_count"),
+                        locale: Locale.current,
+                        Int64(projectCount)
+                    )
+                )
+                    .font(.caption2)
+                    .foregroundStyle(Color.textTertiary)
+            }
         }
         .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .leading)
         .background(Color.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
-        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+        .overlay {
+            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                .stroke(projectColor.opacity(0.16), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct ProjectEmptyLiveTile: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HubTileHeader(
+                title: String(localized: "extensions.module.projects.title"),
+                icon: "folder.fill",
+                tint: .weekyiiPrimary,
+                trailing: String(localized: "extensions.module.see_all")
+            )
+            Spacer(minLength: 0)
+            Text(String(localized: "extensions.hub.projects.empty"))
+                .font(.headline)
+                .foregroundStyle(Color.textSecondary)
+            Text(String(localized: "extensions.hub.projects.tap_to_see_all"))
+                .font(.caption)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .leading)
+        .background(Color.backgroundSecondary)
+        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+        .overlay {
+            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                .stroke(Color.weekyiiPrimary.opacity(0.14), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct HubTileHeader: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let trailing: String
+
+    var body: some View {
+        HStack(spacing: WeekSpacing.xs) {
+            Image(systemName: icon)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .background(tint.opacity(0.12), in: Circle())
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+            Spacer(minLength: 0)
+            if !trailing.isEmpty {
+                Text(trailing)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(tint)
+            }
+        }
+    }
+}
+
+private struct ProjectHubProgressRing: View {
+    let progress: Double
+    let color: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.14), lineWidth: 5)
+            Circle()
+                .trim(from: 0, to: min(max(progress, 0), 1))
+                .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text(progress, format: .percent.precision(.fractionLength(0)))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(color)
+        }
+        .frame(width: 48, height: 48)
     }
 }
 

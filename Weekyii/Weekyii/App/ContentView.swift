@@ -44,7 +44,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.pending)
 
-            ExtensionsHubView()
+            ExtensionsHubView(animationsActive: selectedTab == .extensions && scenePhase == .active)
                 .id(visualIdentity)
                 .tabItem {
                     tabLabel(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")

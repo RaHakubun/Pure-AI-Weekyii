@@ -389,6 +389,51 @@ final class ExtensionsViewModel {
         Array(suspendedTasks.prefix(limit))
     }
 
+    /// 扩展首页的悬置箱预览：先让用户看见最需要作出决定的事项。
+    func hubSuspendedTasks(referenceDate: Date = Date()) -> [SuspendedTaskItem] {
+        let today = calendar.startOfDay(for: referenceDate)
+        let soonLimit = today.addingDays(7)
+
+        return suspendedTasks.sorted { lhs, rhs in
+            let lhsDeadline = calendar.startOfDay(for: lhs.decisionDeadline)
+            let rhsDeadline = calendar.startOfDay(for: rhs.decisionDeadline)
+
+            func urgencyRank(for deadline: Date) -> Int {
+                if deadline < today { return 0 }
+                if calendar.isDate(deadline, inSameDayAs: today) { return 1 }
+                if deadline <= soonLimit { return 2 }
+                return 3
+            }
+
+            let lhsRank = urgencyRank(for: lhsDeadline)
+            let rhsRank = urgencyRank(for: rhsDeadline)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            if lhsDeadline != rhsDeadline { return lhsDeadline < rhsDeadline }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
+    /// 复用现有项目快照，按下一步任务的日期优先展示可推进的项目。
+    func hubProjectSnapshots() -> [ProjectTileSnapshot] {
+        activeProjects()
+            .compactMap { tileSnapshotsByProjectID[$0.id] }
+            .sorted { lhs, rhs in
+                switch (lhs.nextTaskDate, rhs.nextTaskDate) {
+                case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
+                    return lhsDate < rhsDate
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                default:
+                    if lhs.remainingCount != rhs.remainingCount {
+                        return lhs.remainingCount > rhs.remainingCount
+                    }
+                    return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                }
+            }
+    }
+
     func suspendedTaskStats(referenceDate: Date = Date()) -> (total: Int, dueSoon: Int, dueToday: Int) {
         let today = calendar.startOfDay(for: referenceDate)
         let soonLimit = today.addingDays(7)
@@ -872,9 +917,9 @@ struct SuspendedTaskLifecycleService {
         }
 
         task.status = .assigned
+        notificationService.cancelSuspendedTaskNotifications(for: task)
         modelContext.delete(task)
         try modelContext.save()
-        notificationService.cancelSuspendedTaskNotifications(for: task)
     }
 
     func deleteTask(_ task: SuspendedTaskItem) throws {

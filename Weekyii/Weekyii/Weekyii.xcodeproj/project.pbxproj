@@ -88,6 +88,7 @@
 		94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */; };
 		94C1D0F32F3F64FD00AA8E13 /* ProjectStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */; };
 		94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */; };
+		B81F7C102F7B000100000001 /* LiveModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81F7C112F7B000100000001 /* LiveModuleTile.swift */; };
 		94C1D0F62F3F650B00AA8E13 /* ProjectModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */; };
 		94C1D0F72F3F650B00AA8E13 /* Analytics+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */; };
 		94E266502F2E5D180083581A /* PendingWeekDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */; };
@@ -246,6 +247,7 @@
 		94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStatus.swift; sourceTree = "<group>"; };
 		94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Analytics+Extensions.swift"; sourceTree = "<group>"; };
 		94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsHubView.swift; sourceTree = "<group>"; };
+		B81F7C112F7B000100000001 /* LiveModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModuleTile.swift; sourceTree = "<group>"; };
 		94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectModel.swift; sourceTree = "<group>"; };
 		94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingWeekDetailView.swift; sourceTree = "<group>"; };
 		A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostponeTaskSheet.swift; sourceTree = "<group>"; };
@@ -561,6 +563,7 @@
 				94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */,
 				94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */,
 				94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
+				B81F7C112F7B000100000001 /* LiveModuleTile.swift */,
 				94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */,
 				F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */,
 				94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */,
@@ -802,6 +805,7 @@
 				94C1D0F02F3F64DC00AA8E13 /* ExtensionsViewModel.swift in Sources */,
 				94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */,
 				94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */,
+				B81F7C102F7B000100000001 /* LiveModuleTile.swift in Sources */,
 				94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */,
 				94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */,
 				944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */,
