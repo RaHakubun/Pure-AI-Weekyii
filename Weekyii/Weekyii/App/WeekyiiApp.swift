@@ -497,7 +497,12 @@ struct WeekyiiApp: App {
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)
-                        cloudSyncMonitor.start()
+                        if CloudSyncMonitor.shouldStart(
+                            isRunningTests: Self.isRunningTests,
+                            isUITesting: Self.isUITesting
+                        ) {
+                            cloudSyncMonitor.start()
+                        }
                         Task { await NotificationService.shared.requestAuthorization() }
                         _ = appHealthCoordinator?.reconcile(trigger: .launch, force: false)
                         refreshWidgetSnapshot(modelContainer: modelContainer)

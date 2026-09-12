@@ -21,23 +21,53 @@ enum CloudSyncState: Equatable {
     var detail: String {
         switch self {
         case .checking:
-            return "正在检查 iCloud…"
+            return String(
+                localized: "settings.icloud.status.checking",
+                defaultValue: "正在检查 iCloud…"
+            )
         case .available:
-            return "已开启，将通过 iCloud 自动同步"
+            return String(
+                localized: "settings.icloud.status.available",
+                defaultValue: "已开启，将通过 iCloud 自动同步"
+            )
         case .syncing:
-            return "正在同步…"
+            return String(
+                localized: "settings.icloud.status.syncing",
+                defaultValue: "正在同步…"
+            )
         case .synced:
-            return "已同步"
+            return String(
+                localized: "settings.icloud.status.synced",
+                defaultValue: "已同步"
+            )
         case .unavailable(.noAccount):
-            return "请先在系统设置中登录 iCloud"
+            return String(
+                localized: "settings.icloud.status.no_account",
+                defaultValue: "请先在系统设置中登录 iCloud"
+            )
         case .unavailable(.restricted):
-            return "此设备限制了 iCloud 访问"
+            return String(
+                localized: "settings.icloud.status.restricted",
+                defaultValue: "此设备限制了 iCloud 访问"
+            )
         case .unavailable(.temporarilyUnavailable):
-            return "iCloud 暂时不可用，将自动重试"
+            return String(
+                localized: "settings.icloud.status.temporarily_unavailable",
+                defaultValue: "iCloud 暂时不可用，将自动重试"
+            )
         case .unavailable(.unknown):
-            return "暂时无法确认 iCloud 状态"
+            return String(
+                localized: "settings.icloud.status.unknown",
+                defaultValue: "暂时无法确认 iCloud 状态"
+            )
         case .failed(let message):
-            return "同步遇到问题：\(message)"
+            return String(
+                format: String(
+                    localized: "settings.icloud.status.failed",
+                    defaultValue: "同步遇到问题：%@"
+                ),
+                message
+            )
         }
     }
 
@@ -80,6 +110,10 @@ final class CloudSyncMonitor {
     ) {
         self.containerIdentifier = containerIdentifier
         self.notificationCenter = notificationCenter
+    }
+
+    nonisolated static func shouldStart(isRunningTests: Bool, isUITesting: Bool) -> Bool {
+        !isRunningTests && !isUITesting
     }
 
     func start() {
@@ -150,7 +184,13 @@ final class CloudSyncMonitor {
                 importRevision &+= 1
             }
         } else {
-            state = .failed(event.error?.localizedDescription ?? "未知错误")
+            state = .failed(
+                event.error?.localizedDescription
+                    ?? String(
+                        localized: "settings.icloud.status.unknown_error",
+                        defaultValue: "未知错误"
+                    )
+            )
         }
     }
 
