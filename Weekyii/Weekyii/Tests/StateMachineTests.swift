@@ -713,6 +713,39 @@ final class StateMachineTests: XCTestCase {
     }
 
     @MainActor
+    func test_dataInvariantRepair_mergesDuplicateCloudWeeksAndDaysWithoutDroppingTasks() throws {
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let start = today.startOfWeek
+        let end = Calendar(identifier: .iso8601).date(byAdding: .day, value: 6, to: start)!
+
+        let firstWeek = WeekModel(weekId: today.weekId, startDate: start, endDate: end, status: .present)
+        let firstDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        firstDay.tasks.append(TaskItem(title: "来自 iPhone", order: 1))
+        firstWeek.days.append(firstDay)
+
+        let secondWeek = WeekModel(weekId: today.weekId, startDate: start, endDate: end, status: .present)
+        let secondDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        secondDay.tasks.append(TaskItem(title: "来自 iPad", order: 1))
+        secondWeek.days.append(secondDay)
+
+        context.insert(firstWeek)
+        context.insert(secondWeek)
+        try context.save()
+
+        let report = DataInvariantRepairService(modelContainer: container).repair(referenceDate: today)
+        let matchingWeeks = try context.fetch(FetchDescriptor<WeekModel>())
+            .filter { $0.weekId == today.weekId }
+        let matchingDays = try context.fetch(FetchDescriptor<DayModel>())
+            .filter { $0.dayId == today.dayId }
+
+        XCTAssertGreaterThanOrEqual(report.repairedDuplicateCount, 2)
+        XCTAssertEqual(matchingWeeks.count, 1)
+        XCTAssertEqual(matchingDays.count, 1)
+        XCTAssertEqual(Set(matchingDays[0].tasks.map(\.title)), ["来自 iPhone", "来自 iPad"])
+    }
+
+    @MainActor
     func test_taskMutationService_createPreservesPayloadFields() throws {
         let context = container.mainContext
         let today = Date().startOfDay

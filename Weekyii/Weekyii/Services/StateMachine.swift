@@ -24,10 +24,11 @@ struct StateReconcileReport: Equatable {
     var repairedFocusCount: Int = 0
     var repairedStatusCount: Int = 0
     var repairedOrderCount: Int = 0
+    var repairedDuplicateCount: Int = 0
     var createdTodayDayCount: Int = 0
 
     var totalRepairCount: Int {
-        repairedFocusCount + repairedStatusCount + repairedOrderCount + createdTodayDayCount
+        repairedFocusCount + repairedStatusCount + repairedOrderCount + repairedDuplicateCount + createdTodayDayCount
     }
 }
 
@@ -35,10 +36,11 @@ struct DataInvariantRepairReport: Equatable {
     var repairedFocusCount: Int = 0
     var repairedStatusCount: Int = 0
     var repairedOrderCount: Int = 0
+    var repairedDuplicateCount: Int = 0
     var createdTodayDayCount: Int = 0
 
     var totalRepairs: Int {
-        repairedFocusCount + repairedStatusCount + repairedOrderCount + createdTodayDayCount
+        repairedFocusCount + repairedStatusCount + repairedOrderCount + repairedDuplicateCount + createdTodayDayCount
     }
 }
 
@@ -111,6 +113,7 @@ struct StateMachine {
         report.repairedFocusCount = repairReport.repairedFocusCount
         report.repairedStatusCount = repairReport.repairedStatusCount
         report.repairedOrderCount = repairReport.repairedOrderCount
+        report.repairedDuplicateCount = repairReport.repairedDuplicateCount
         report.createdTodayDayCount = repairReport.createdTodayDayCount
 
         refreshWeekSummaryMetrics()
@@ -394,6 +397,7 @@ struct DataInvariantRepairService: DataInvariantRepairing {
 
     func repair(referenceDate: Date) -> DataInvariantRepairReport {
         var report = DataInvariantRepairReport()
+        report.repairedDuplicateCount = mergeDuplicateWeeksAndDays()
         let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
         let today = calendar.startOfDay(for: referenceDate)
 
@@ -417,6 +421,113 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             try? modelContext.save()
         }
         return report
+    }
+
+    private func mergeDuplicateWeeksAndDays() -> Int {
+        var repairCount = 0
+        let weeks = (try? modelContext.fetch(FetchDescriptor<WeekModel>())) ?? []
+        let weekGroups = Dictionary(grouping: weeks.filter { !$0.weekId.isEmpty }, by: \.weekId)
+
+        for group in weekGroups.values where group.count > 1 {
+            let canonical = group.max { weekRichness($0) < weekRichness($1) } ?? group[0]
+            for duplicate in group where duplicate !== canonical {
+                canonical.startDate = min(canonical.startDate, duplicate.startDate)
+                canonical.endDate = max(canonical.endDate, duplicate.endDate)
+                canonical.status = preferredWeekStatus(canonical.status, duplicate.status)
+                canonical.completedTasksCount = max(canonical.completedTasksCount, duplicate.completedTasksCount)
+                canonical.expiredTasksCount = max(canonical.expiredTasksCount, duplicate.expiredTasksCount)
+                canonical.totalStartedDays = max(canonical.totalStartedDays, duplicate.totalStartedDays)
+
+                for day in duplicate.days {
+                    day.week = canonical
+                    if !canonical.days.contains(where: { $0 === day }) {
+                        canonical.days.append(day)
+                    }
+                }
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
+        let dayGroups = Dictionary(grouping: days.filter { !$0.dayId.isEmpty }, by: \.dayId)
+        for group in dayGroups.values where group.count > 1 {
+            let canonical = group.max { dayRichness($0) < dayRichness($1) } ?? group[0]
+            for duplicate in group where duplicate !== canonical {
+                mergeDay(duplicate, into: canonical)
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        return repairCount
+    }
+
+    private func weekRichness(_ week: WeekModel) -> Int {
+        week.days.reduce(week.days.count) { $0 + $1.tasks.count }
+    }
+
+    private func dayRichness(_ day: DayModel) -> Int {
+        day.tasks.count * 10 + dayStatusRank(day.status)
+    }
+
+    private func mergeDay(_ source: DayModel, into target: DayModel) {
+        for task in source.tasks {
+            task.day = target
+            if !target.tasks.contains(where: { $0 === task }) {
+                target.tasks.append(task)
+            }
+        }
+
+        if dayStatusRank(source.status) > dayStatusRank(target.status) {
+            target.status = source.status
+        }
+        target.expiredCount = max(target.expiredCount, source.expiredCount)
+        target.initiatedAt = earliest(target.initiatedAt, source.initiatedAt)
+        target.closedAt = latest(target.closedAt, source.closedAt)
+        target.isDraftZoneUnlocked = target.isDraftZoneUnlocked || source.isDraftZoneUnlocked
+        if target.executionMode == .strict, source.executionMode == .flexible {
+            target.executionMode = .flexible
+        }
+    }
+
+    private func preferredWeekStatus(_ lhs: WeekStatus, _ rhs: WeekStatus) -> WeekStatus {
+        let rank: (WeekStatus) -> Int = { status in
+            switch status {
+            case .past: return 0
+            case .pending: return 1
+            case .present: return 2
+            }
+        }
+        return rank(lhs) >= rank(rhs) ? lhs : rhs
+    }
+
+    private func dayStatusRank(_ status: DayStatus) -> Int {
+        switch status {
+        case .empty: return 0
+        case .draft: return 1
+        case .execute: return 2
+        case .expired: return 3
+        case .completed: return 4
+        }
+    }
+
+    private func earliest(_ lhs: Date?, _ rhs: Date?) -> Date? {
+        switch (lhs, rhs) {
+        case let (left?, right?): return min(left, right)
+        case let (left?, nil): return left
+        case let (nil, right?): return right
+        case (nil, nil): return nil
+        }
+    }
+
+    private func latest(_ lhs: Date?, _ rhs: Date?) -> Date? {
+        switch (lhs, rhs) {
+        case let (left?, right?): return max(left, right)
+        case let (left?, nil): return left
+        case let (nil, right?): return right
+        case (nil, nil): return nil
+        }
     }
 
     private func normalizeFocusZone(in day: DayModel) -> Bool {

@@ -466,6 +466,7 @@ struct WeekyiiApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var userSettings = UserSettings()
     @State private var appHealthCoordinator: AppHealthCoordinator?
+    @State private var cloudSyncMonitor = CloudSyncMonitor()
     @Environment(\.scenePhase) private var scenePhase
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -490,11 +491,13 @@ struct WeekyiiApp: App {
                 ContentView()
                     .environmentObject(appState)
                     .environmentObject(userSettings)
+                    .environment(cloudSyncMonitor)
                     .modelContainer(modelContainer)
                     .preferredColorScheme(userSettings.effectiveColorScheme)
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)
+                        cloudSyncMonitor.start()
                         Task { await NotificationService.shared.requestAuthorization() }
                         _ = appHealthCoordinator?.reconcile(trigger: .launch, force: false)
                         refreshWidgetSnapshot(modelContainer: modelContainer)
@@ -503,6 +506,7 @@ struct WeekyiiApp: App {
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
+                            Task { await cloudSyncMonitor.refreshAccountStatus() }
                             _ = appHealthCoordinator?.reconcile(trigger: .sceneActive, force: false)
                             refreshWidgetSnapshot(modelContainer: modelContainer)
                             refreshLiveActivity(modelContainer: modelContainer)
@@ -525,6 +529,12 @@ struct WeekyiiApp: App {
                     }
                     .onChange(of: appState.dataRevision) { _, _ in
                         guard !Self.isRunningTests else { return }
+                        refreshWidgetSnapshot(modelContainer: modelContainer)
+                        refreshLiveActivity(modelContainer: modelContainer)
+                    }
+                    .onChange(of: cloudSyncMonitor.importRevision) { _, _ in
+                        guard !Self.isRunningTests else { return }
+                        _ = appHealthCoordinator?.reconcile(trigger: .manualResync, force: true)
                         refreshWidgetSnapshot(modelContainer: modelContainer)
                         refreshLiveActivity(modelContainer: modelContainer)
                     }

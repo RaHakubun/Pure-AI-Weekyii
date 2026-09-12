@@ -64,11 +64,6 @@ final class UserSettings: ObservableObject {
         didSet { save() }
     }
     
-    // iCloud Sync (placeholder)
-    @Published var iCloudSyncEnabled: Bool {
-        didSet { save() }
-    }
-
     // Theme Settings
     @Published var selectedThemeRaw: String {
         didSet { save() }
@@ -143,7 +138,6 @@ final class UserSettings: ObservableObject {
         self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
         self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
         self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
-        self.iCloudSyncEnabled = defaults.object(forKey: "iCloudSyncEnabled") as? Bool ?? false
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
@@ -181,7 +175,6 @@ final class UserSettings: ObservableObject {
         defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
         defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
         defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
-        defaults.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(appearanceModeRaw, forKey: "appearanceMode")
         defaults.set(premiumThemeUnlocked, forKey: "premiumThemeUnlocked")

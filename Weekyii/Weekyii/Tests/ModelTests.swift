@@ -68,6 +68,16 @@ final class ModelTests: XCTestCase {
         )
     }
 
+    func test_cloudSyncState_explainsAutomaticSyncAndAccountProblems() {
+        XCTAssertEqual(CloudSyncState.available.detail, "已开启，将通过 iCloud 自动同步")
+        XCTAssertEqual(CloudSyncState.syncing.detail, "正在同步…")
+        XCTAssertEqual(
+            CloudSyncState.unavailable(.noAccount).detail,
+            "请先在系统设置中登录 iCloud"
+        )
+        XCTAssertTrue(CloudSyncState.failed("网络不可用").detail.contains("网络不可用"))
+    }
+
     @MainActor
     func test_publishedV6FixtureMigratesToV7() throws {
         let storeURL = try makeTemporaryStoreURL()

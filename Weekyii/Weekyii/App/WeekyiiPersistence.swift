@@ -3,7 +3,7 @@ import SwiftData
 import CryptoKit
 
 enum WeekyiiPersistence {
-    static let cloudKitContainerIdentifier = "iCloud.com.fluentdesign.Weekyii"
+    nonisolated static let cloudKitContainerIdentifier = "iCloud.com.fluentdesign.Weekyii"
 
     enum StoreMode: Equatable {
         case production

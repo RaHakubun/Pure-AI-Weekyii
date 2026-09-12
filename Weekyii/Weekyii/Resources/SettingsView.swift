@@ -15,6 +15,7 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: UserSettings
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudSyncMonitor.self) private var cloudSyncMonitor
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -506,18 +507,21 @@ struct SettingsView: View {
     @ViewBuilder
     private var dataPrivacySection: some View {
         Section {
-            Toggle(isOn: .constant(false)) {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "icloud.fill", color: .blue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.icloud.sync"))
-                        Text(String(localized: "settings.icloud.coming_soon"))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+            HStack(spacing: 12) {
+                SettingsIcon(icon: cloudSyncMonitor.state.symbolName, color: cloudSyncStatusColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.icloud.sync", defaultValue: "iCloud 同步"))
+                    Text(cloudSyncMonitor.state.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if cloudSyncMonitor.state.isWorking {
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
-            .disabled(true)
+            .accessibilityElement(children: .combine)
 
             Button {
                 exportArchive()
@@ -559,6 +563,15 @@ struct SettingsView: View {
             Text(String(localized: "settings.section.data"))
         } footer: {
             Text("归档采用带版本与 SHA-256 校验的 JSON 格式。导入不会合并数据。")
+        }
+    }
+
+    private var cloudSyncStatusColor: Color {
+        switch cloudSyncMonitor.state {
+        case .unavailable, .failed:
+            return .orange
+        default:
+            return .blue
         }
     }
 

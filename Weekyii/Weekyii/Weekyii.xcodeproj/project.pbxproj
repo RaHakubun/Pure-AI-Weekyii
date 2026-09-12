@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C3A0000130D0000100CAFE01 /* CloudSyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */; };
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
@@ -157,6 +158,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncMonitor.swift; sourceTree = "<group>"; };
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
 		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
@@ -463,6 +465,7 @@
 		944E58352F2B593A00DB2DEE /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
 				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
 				944E58322F2B593A00DB2DEE /* StateMachine.swift */,
@@ -787,6 +790,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C3A0000130D0000100CAFE01 /* CloudSyncMonitor.swift in Sources */,
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
 				944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */,
