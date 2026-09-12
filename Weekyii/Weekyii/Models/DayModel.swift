@@ -3,10 +3,10 @@ import SwiftData
 
 @Model
 final class DayModel {
-    @Attribute(.unique) var dayId: String
-    var date: Date
-    var dayOfWeek: String
-    var status: DayStatus
+    var dayId: String = ""
+    var date: Date = Date.distantPast
+    var dayOfWeek: String = ""
+    var status: DayStatus = DayStatus.empty
 
     var killTimeHour: Int = 23
     var killTimeMinute: Int = 45
@@ -19,8 +19,8 @@ final class DayModel {
 
     var week: WeekModel?
 
-    @Relationship(deleteRule: .cascade, inverse: \TaskItem.day)
-    var tasks: [TaskItem] = []
+    @Relationship(deleteRule: .cascade, originalName: "tasks", inverse: \TaskItem.day)
+    private var taskRecords: [TaskItem]? = []
 
     var expiredCount: Int = 0
 
@@ -29,6 +29,11 @@ final class DayModel {
         self.date = date
         self.dayOfWeek = date.dayOfWeekShort
         self.status = status
+    }
+
+    var tasks: [TaskItem] {
+        get { taskRecords ?? [] }
+        set { taskRecords = newValue }
     }
 
     var killTime: DateComponents {

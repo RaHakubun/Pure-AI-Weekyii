@@ -44,7 +44,7 @@ enum WeekyiiArchiveError: LocalizedError {
 enum WeekyiiDataArchiveService {
     static let formatIdentifier = "com.fluentdesign.weekyii.archive"
     static let currentFormatVersion = 1
-    static let currentSchemaVersion = 6
+    static let currentSchemaVersion = 7
 
     struct Inspection: Equatable {
         let exportedAt: Date

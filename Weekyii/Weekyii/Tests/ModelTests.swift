@@ -7,6 +7,119 @@ import SwiftUI
 final class ModelTests: XCTestCase {
     private static var retainedUserSettings: [UserSettings] = []
 
+    func test_cloudSyncSchema_isCloudKitCompatible() {
+        let schema = WeekyiiPersistence.currentSchema
+
+        XCTAssertEqual(schema.version, Schema.Version(7, 0, 0))
+
+        let entitiesWithUniqueConstraints = schema.entities.compactMap { entity in
+            entity.uniquenessConstraints.isEmpty ? nil : entity.name
+        }
+        XCTAssertTrue(
+            entitiesWithUniqueConstraints.isEmpty,
+            "CloudKit does not support unique constraints: \(entitiesWithUniqueConstraints)"
+        )
+
+        let requiredRelationships = schema.entities.flatMap { entity in
+            entity.relationships.compactMap { relationship in
+                relationship.isOptional ? nil : "\(entity.name).\(relationship.name)"
+            }
+        }
+        XCTAssertTrue(
+            requiredRelationships.isEmpty,
+            "CloudKit requires optional relationships: \(requiredRelationships)"
+        )
+
+        let relationshipsWithoutInverse = schema.entities.flatMap { entity in
+            entity.relationships.compactMap { relationship in
+                relationship.inverseName == nil ? "\(entity.name).\(relationship.name)" : nil
+            }
+        }
+        XCTAssertTrue(
+            relationshipsWithoutInverse.isEmpty,
+            "CloudKit requires relationship inverses: \(relationshipsWithoutInverse)"
+        )
+
+        let deniedRelationships = schema.entities.flatMap { entity in
+            entity.relationships.compactMap { relationship in
+                relationship.deleteRule == .deny ? "\(entity.name).\(relationship.name)" : nil
+            }
+        }
+        XCTAssertTrue(
+            deniedRelationships.isEmpty,
+            "CloudKit does not support deny delete rules: \(deniedRelationships)"
+        )
+    }
+
+    @MainActor
+    func test_publishedV6FixtureMigratesToV7() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        do {
+            let legacySchema = Schema(versionedSchema: WeekyiiSchemaV6.self)
+            let legacyConfiguration = ModelConfiguration(
+                "Weekyii",
+                schema: legacySchema,
+                url: storeURL,
+                allowsSave: true,
+                cloudKitDatabase: .none
+            )
+            let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfiguration)
+            let context = legacyContainer.mainContext
+            let week = WeekyiiSchemaV6.WeekModel(
+                weekId: "2026-W37",
+                startDate: Date(timeIntervalSince1970: 1_789_000_000),
+                endDate: Date(timeIntervalSince1970: 1_789_518_400),
+                status: .present
+            )
+            let day = WeekyiiSchemaV6.DayModel(
+                dayId: "2026-09-07",
+                date: Date(timeIntervalSince1970: 1_789_000_000),
+                status: .execute
+            )
+            let project = WeekyiiSchemaV6.ProjectModel(
+                name: "Cloud migration",
+                startDate: Date(timeIntervalSince1970: 1_789_000_000),
+                endDate: Date(timeIntervalSince1970: 1_789_518_400)
+            )
+            let task = WeekyiiSchemaV6.TaskItem(
+                title: "Keep local data",
+                taskDescription: "V6 payload",
+                taskType: .ddl,
+                order: 1,
+                zone: .focus
+            )
+            task.steps.append(WeekyiiSchemaV6.TaskStep(title: "Preserve step", isCompleted: true, sortOrder: 1))
+            task.attachments.append(WeekyiiSchemaV6.TaskAttachment(data: Data([1, 2, 3]), fileName: "proof.bin", fileType: "application/octet-stream"))
+            task.project = project
+            day.tasks.append(task)
+            week.days.append(day)
+            context.insert(week)
+            context.insert(project)
+            context.insert(WeekyiiSchemaV6.MindStampItem(text: "V6 stamp", imageBlob: Data([4, 5, 6])))
+            context.insert(WeekyiiSchemaV6.SuspendedTaskItem(title: "V6 suspended", decisionDeadline: Date(timeIntervalSince1970: 1_789_600_000), preferredCountdownDays: 3))
+            context.insert(WeekyiiSchemaV6.TaskTypeDefinition(idRaw: "custom-v6", name: "V6 Type", iconName: "cloud", colorHex: "#336699", baseKindRaw: TaskType.regular.rawValue, sortOrder: 10))
+            try context.save()
+        }
+
+        let container = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let context = container.mainContext
+        let weeks = try context.fetch(FetchDescriptor<WeekModel>())
+        let tasks = try context.fetch(FetchDescriptor<TaskItem>())
+        let projects = try context.fetch(FetchDescriptor<ProjectModel>())
+        let stamps = try context.fetch(FetchDescriptor<MindStampItem>())
+        let suspended = try context.fetch(FetchDescriptor<SuspendedTaskItem>())
+        let taskTypes = try context.fetch(FetchDescriptor<TaskTypeDefinition>())
+
+        XCTAssertEqual(weeks.map(\.weekId), ["2026-W37"])
+        XCTAssertEqual(tasks.map(\.title), ["Keep local data"])
+        XCTAssertEqual(tasks.first?.steps.map(\.title), ["Preserve step"])
+        XCTAssertEqual(tasks.first?.attachments.first?.data, Data([1, 2, 3]))
+        XCTAssertEqual(projects.map(\.name), ["Cloud migration"])
+        XCTAssertEqual(stamps.map(\.text), ["V6 stamp"])
+        XCTAssertEqual(suspended.map(\.title), ["V6 suspended"])
+        XCTAssertTrue(taskTypes.contains { $0.idRaw == "custom-v6" })
+    }
+
     @MainActor
     func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
         let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"

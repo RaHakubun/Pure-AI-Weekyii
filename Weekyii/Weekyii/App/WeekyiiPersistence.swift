@@ -8,7 +8,7 @@ enum WeekyiiPersistence {
         case failed(String)
     }
 
-    static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV6.self)
+    static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV7.self)
 
     static func bootstrapPersistentContainer() -> LaunchState {
         let storeURL = persistentStoreURL()
@@ -74,7 +74,7 @@ enum WeekyiiPersistence {
 
         return [
             "store=\(storeURL.path)",
-            "schema=6.0.0",
+            "schema=7.0.0",
             "snapshot_count=\(snapshots.count)",
             "recent=\n\(recent.joined(separator: "\n"))"
         ].joined(separator: "\n")
@@ -104,7 +104,7 @@ enum WeekyiiPersistence {
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let manifest = BackupManifest(
             createdAt: Date(),
-            schemaVersion: "6.0.0",
+            schemaVersion: "7.0.0",
             appVersion: appVersion,
             files: files
         )
@@ -496,6 +496,7 @@ enum WeekyiiMigrationPlan: SchemaMigrationPlan {
             WeekyiiSchemaV4.self,
             WeekyiiSchemaV5.self,
             WeekyiiSchemaV6.self,
+            WeekyiiSchemaV7.self,
         ]
     }
 
@@ -513,6 +514,7 @@ enum WeekyiiMigrationPlan: SchemaMigrationPlan {
             .lightweight(fromVersion: WeekyiiSchemaV3.self, toVersion: WeekyiiSchemaV4.self),
             .lightweight(fromVersion: WeekyiiSchemaV4.self, toVersion: WeekyiiSchemaV5.self),
             .lightweight(fromVersion: WeekyiiSchemaV5.self, toVersion: WeekyiiSchemaV6.self),
+            .lightweight(fromVersion: WeekyiiSchemaV6.self, toVersion: WeekyiiSchemaV7.self),
         ]
     }
 
@@ -993,6 +995,244 @@ enum WeekyiiSchemaV5: VersionedSchema {
 
 enum WeekyiiSchemaV6: VersionedSchema {
     static var versionIdentifier: Schema.Version { .init(6, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self,
+            SuspendedTaskItem.self,
+            TaskTypeDefinition.self,
+        ]
+    }
+
+    @Model
+    final class WeekModel {
+        @Attribute(.unique) var weekId: String
+        var startDate: Date
+        var endDate: Date
+        var status: WeekStatus
+        @Relationship(deleteRule: .cascade, inverse: \DayModel.week) var days: [DayModel] = []
+        var completedTasksCount: Int = 0
+        var expiredTasksCount: Int = 0
+        var totalStartedDays: Int = 0
+
+        init(weekId: String, startDate: Date, endDate: Date, status: WeekStatus = .pending) {
+            self.weekId = weekId
+            self.startDate = startDate
+            self.endDate = endDate
+            self.status = status
+        }
+    }
+
+    @Model
+    final class DayModel {
+        @Attribute(.unique) var dayId: String
+        var date: Date
+        var dayOfWeek: String
+        var status: DayStatus
+        var killTimeHour: Int = 23
+        var killTimeMinute: Int = 45
+        var followsDefaultKillTime: Bool = true
+        var initiatedAt: Date?
+        var closedAt: Date?
+        var executionModeRaw: String = ExecutionMode.strict.rawValue
+        var isDraftZoneUnlocked: Bool = false
+        var week: WeekModel?
+        @Relationship(deleteRule: .cascade, inverse: \TaskItem.day) var tasks: [TaskItem] = []
+        var expiredCount: Int = 0
+
+        init(dayId: String, date: Date, status: DayStatus = .empty) {
+            self.dayId = dayId
+            self.date = date
+            self.dayOfWeek = date.dayOfWeekShort
+            self.status = status
+        }
+    }
+
+    @Model
+    final class TaskItem {
+        @Attribute(.unique) var id: UUID = UUID()
+        var title: String
+        var taskType: TaskType
+        var taskTypeIdRaw: String = TaskType.regular.rawValue
+        var order: Int
+        var zone: TaskZone
+        var taskDescription: String = ""
+        @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
+        @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+        var startedAt: Date?
+        var endedAt: Date?
+        var completedOrder: Int = 0
+        var day: DayModel?
+        var project: ProjectModel?
+
+        init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
+            self.title = title
+            self.taskDescription = taskDescription
+            self.taskType = taskType
+            self.taskTypeIdRaw = taskType.rawValue
+            self.order = order
+            self.zone = zone
+        }
+    }
+
+    @Model
+    final class TaskStep {
+        var title: String
+        var isCompleted: Bool
+        var sortOrder: Int
+        var createdAt: Date
+
+        init(title: String, isCompleted: Bool = false, sortOrder: Int = 0) {
+            self.title = title
+            self.isCompleted = isCompleted
+            self.sortOrder = sortOrder
+            self.createdAt = Date()
+        }
+    }
+
+    @Model
+    final class TaskAttachment {
+        var id: UUID = UUID()
+        @Attribute(.externalStorage) var data: Data?
+        var fileName: String
+        var fileType: String
+        var createdAt: Date
+
+        init(data: Data?, fileName: String, fileType: String) {
+            self.data = data
+            self.fileName = fileName
+            self.fileType = fileType
+            self.createdAt = Date()
+        }
+    }
+
+    @Model
+    final class ProjectModel {
+        @Attribute(.unique) var id: UUID = UUID()
+        var name: String
+        var projectDescription: String
+        var color: String
+        var icon: String
+        var status: ProjectStatus
+        var startDate: Date
+        var endDate: Date
+        var createdAt: Date
+        var tileSizeRaw: String = ProjectTileSize.medium.rawValue
+        var tileOrder: Int = 0
+        @Relationship(deleteRule: .nullify, inverse: \TaskItem.project) var tasks: [TaskItem] = []
+
+        init(
+            name: String,
+            projectDescription: String = "",
+            color: String = "#C46A1A",
+            icon: String = "folder.fill",
+            status: ProjectStatus = .planning,
+            startDate: Date,
+            endDate: Date
+        ) {
+            self.name = name
+            self.projectDescription = projectDescription
+            self.color = color
+            self.icon = icon
+            self.status = status
+            self.startDate = startDate
+            self.endDate = endDate
+            self.createdAt = Date()
+        }
+    }
+
+    @Model
+    final class MindStampItem {
+        @Attribute(.unique) var id: UUID = UUID()
+        var text: String
+        @Attribute(.externalStorage) var imageBlob: Data?
+        var createdAt: Date
+
+        init(text: String = "", imageBlob: Data? = nil) {
+            self.text = text
+            self.imageBlob = imageBlob
+            self.createdAt = Date()
+        }
+    }
+
+    @Model
+    final class SuspendedTaskItem {
+        @Attribute(.unique) var id: UUID = UUID()
+        var title: String
+        var taskDescription: String
+        var taskType: TaskType
+        var taskTypeIdRaw: String = TaskType.regular.rawValue
+        var createdAt: Date
+        var decisionDeadline: Date
+        var preferredCountdownDays: Int
+        var snoozeCount: Int
+        var statusRaw: String
+        @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
+        @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+
+        init(
+            title: String,
+            taskDescription: String = "",
+            taskType: TaskType = .regular,
+            createdAt: Date = Date(),
+            decisionDeadline: Date,
+            preferredCountdownDays: Int,
+            snoozeCount: Int = 0,
+            statusRaw: String = SuspendedTaskStatus.active.rawValue
+        ) {
+            self.title = title
+            self.taskDescription = taskDescription
+            self.taskType = taskType
+            self.taskTypeIdRaw = taskType.rawValue
+            self.createdAt = createdAt
+            self.decisionDeadline = decisionDeadline
+            self.preferredCountdownDays = preferredCountdownDays
+            self.snoozeCount = snoozeCount
+            self.statusRaw = statusRaw
+        }
+    }
+
+    @Model
+    final class TaskTypeDefinition {
+        @Attribute(.unique) var idRaw: String
+        var name: String
+        var iconName: String
+        var colorHex: String
+        var baseKindRaw: String
+        var sortOrder: Int
+        var isBuiltIn: Bool
+        var isArchived: Bool
+
+        init(
+            idRaw: String = UUID().uuidString,
+            name: String,
+            iconName: String,
+            colorHex: String,
+            baseKindRaw: String,
+            sortOrder: Int,
+            isBuiltIn: Bool = false,
+            isArchived: Bool = false
+        ) {
+            self.idRaw = idRaw
+            self.name = name
+            self.iconName = iconName
+            self.colorHex = colorHex
+            self.baseKindRaw = baseKindRaw
+            self.sortOrder = sortOrder
+            self.isBuiltIn = isBuiltIn
+            self.isArchived = isArchived
+        }
+    }
+}
+
+enum WeekyiiSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(7, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [

@@ -8,11 +8,11 @@ enum SuspendedTaskStatus: String, Codable, CaseIterable {
 
 @Model
 final class MindStampItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var text: String
+    var text: String = ""
     @Attribute(.externalStorage) var imageBlob: Data?
-    var createdAt: Date
+    var createdAt: Date = Date()
 
     init(text: String = "", imageBlob: Data? = nil) {
         self.text = text
@@ -28,19 +28,21 @@ final class MindStampItem {
 
 @Model
 final class SuspendedTaskItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var title: String
-    var taskDescription: String
-    var taskType: TaskType
+    var title: String = ""
+    var taskDescription: String = ""
+    var taskType: TaskType = TaskType.regular
     var taskTypeIdRaw: String = TaskType.regular.rawValue
-    var createdAt: Date
-    var decisionDeadline: Date
-    var preferredCountdownDays: Int
-    var snoozeCount: Int
-    var statusRaw: String
-    @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
-    @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+    var createdAt: Date = Date()
+    var decisionDeadline: Date = Date()
+    var preferredCountdownDays: Int = 0
+    var snoozeCount: Int = 0
+    var statusRaw: String = SuspendedTaskStatus.active.rawValue
+    @Relationship(deleteRule: .cascade, originalName: "steps", inverse: \TaskStep.suspendedTask)
+    private var stepRecords: [TaskStep]? = []
+    @Relationship(deleteRule: .cascade, originalName: "attachments", inverse: \TaskAttachment.suspendedTask)
+    private var attachmentRecords: [TaskAttachment]? = []
 
     init(
         title: String,
@@ -61,6 +63,16 @@ final class SuspendedTaskItem {
         self.preferredCountdownDays = preferredCountdownDays
         self.snoozeCount = snoozeCount
         self.statusRaw = status.rawValue
+    }
+
+    var steps: [TaskStep] {
+        get { stepRecords ?? [] }
+        set { stepRecords = newValue }
+    }
+
+    var attachments: [TaskAttachment] {
+        get { attachmentRecords ?? [] }
+        set { attachmentRecords = newValue }
     }
 
     var status: SuspendedTaskStatus {

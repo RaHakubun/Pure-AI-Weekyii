@@ -4,14 +4,14 @@ import SwiftUI
 
 @Model
 final class TaskTypeDefinition {
-    @Attribute(.unique) var idRaw: String
-    var name: String
-    var iconName: String
-    var colorHex: String
-    var baseKindRaw: String
-    var sortOrder: Int
-    var isBuiltIn: Bool
-    var isArchived: Bool
+    var idRaw: String = ""
+    var name: String = ""
+    var iconName: String = "tag"
+    var colorHex: String = "#4A90A4"
+    var baseKindRaw: String = TaskType.regular.rawValue
+    var sortOrder: Int = 0
+    var isBuiltIn: Bool = false
+    var isArchived: Bool = false
 
     init(
         idRaw: String = UUID().uuidString,

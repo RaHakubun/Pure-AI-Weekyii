@@ -3,21 +3,21 @@ import SwiftData
 
 @Model
 final class ProjectModel {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var name: String
-    var projectDescription: String
-    var color: String
-    var icon: String
-    var status: ProjectStatus
-    var startDate: Date
-    var endDate: Date
-    var createdAt: Date
+    var name: String = ""
+    var projectDescription: String = ""
+    var color: String = "#C46A1A"
+    var icon: String = "folder.fill"
+    var status: ProjectStatus = ProjectStatus.planning
+    var startDate: Date = Date.distantPast
+    var endDate: Date = Date.distantPast
+    var createdAt: Date = Date()
     var tileSizeRaw: String = ProjectTileSize.medium.rawValue
     var tileOrder: Int = 0
 
-    @Relationship(deleteRule: .nullify, inverse: \TaskItem.project)
-    var tasks: [TaskItem] = []
+    @Relationship(deleteRule: .nullify, originalName: "tasks", inverse: \TaskItem.project)
+    private var taskRecords: [TaskItem]? = []
 
     init(
         name: String,
@@ -36,6 +36,11 @@ final class ProjectModel {
         self.startDate = startDate
         self.endDate = endDate
         self.createdAt = Date()
+    }
+
+    var tasks: [TaskItem] {
+        get { taskRecords ?? [] }
+        set { taskRecords = newValue }
     }
 
     // MARK: - Computed Properties
