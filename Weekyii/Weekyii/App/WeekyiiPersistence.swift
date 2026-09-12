@@ -32,16 +32,20 @@ enum WeekyiiPersistence {
     }
 
     static func bootstrapPersistentContainer(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        storeURL: URL? = nil,
+        storeMode: StoreMode? = nil,
+        referenceDate: Date = Date()
     ) -> LaunchState {
-        let storeURL = persistentStoreURL()
-        backupPersistentStoreIfExists(storeURL: storeURL)
+        let resolvedStoreURL = storeURL ?? persistentStoreURL()
+        backupPersistentStoreIfExists(storeURL: resolvedStoreURL)
 
         do {
             let container = try makeModelContainer(
-                storeURL: storeURL,
-                storeMode: launchStoreMode(environment: environment)
+                storeURL: resolvedStoreURL,
+                storeMode: storeMode ?? launchStoreMode(environment: environment)
             )
+            _ = DataInvariantRepairService(modelContainer: container).repair(referenceDate: referenceDate)
             try validateContainerConsistency(container: container)
             return .ready(container)
         } catch {

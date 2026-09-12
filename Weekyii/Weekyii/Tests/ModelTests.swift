@@ -82,6 +82,88 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_bootstrapRepairsDuplicateCloudWeeksBeforeConsistencyValidation() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let today = makeDate(2026, 9, 13)
+
+        do {
+            let container = try WeekyiiPersistence.makeModelContainer(
+                storeURL: storeURL,
+                storeMode: .localOnly
+            )
+            let context = container.mainContext
+            let firstWeek = WeekCalculator().makeWeek(for: today, status: .present)
+            let secondWeek = WeekCalculator().makeWeek(for: today, status: .present)
+            firstWeek.days.first { $0.dayId == today.dayId }?.tasks.append(
+                TaskItem(title: "来自 iPhone", order: 1)
+            )
+            secondWeek.days.first { $0.dayId == today.dayId }?.tasks.append(
+                TaskItem(title: "来自 iPad", order: 1)
+            )
+            context.insert(firstWeek)
+            context.insert(secondWeek)
+            try context.save()
+        }
+
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            environment: [:],
+            storeURL: storeURL,
+            storeMode: .localOnly,
+            referenceDate: today
+        )
+
+        guard case .ready(let container) = launchState else {
+            XCTFail("A recoverable CloudKit merge must not block app launch")
+            return
+        }
+        let weeks = try container.mainContext.fetch(FetchDescriptor<WeekModel>())
+            .filter { $0.weekId == today.weekId }
+        let days = try container.mainContext.fetch(FetchDescriptor<DayModel>())
+            .filter { $0.dayId == today.dayId }
+        XCTAssertEqual(weeks.count, 1)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertEqual(Set(days[0].tasks.map(\.title)), ["来自 iPhone", "来自 iPad"])
+    }
+
+    @MainActor
+    func test_bootstrapNormalizesCompetingPresentWeeksFromDifferentDevices() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let today = makeDate(2026, 9, 13)
+        let previousWeekDate = Calendar(identifier: .iso8601).date(
+            byAdding: .day,
+            value: -7,
+            to: today
+        )!
+
+        do {
+            let container = try WeekyiiPersistence.makeModelContainer(
+                storeURL: storeURL,
+                storeMode: .localOnly
+            )
+            let context = container.mainContext
+            context.insert(WeekCalculator().makeWeek(for: previousWeekDate, status: .present))
+            context.insert(WeekCalculator().makeWeek(for: today, status: .present))
+            try context.save()
+        }
+
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            environment: [:],
+            storeURL: storeURL,
+            storeMode: .localOnly,
+            referenceDate: today
+        )
+
+        guard case .ready(let container) = launchState else {
+            XCTFail("Competing present-week updates must be repaired during launch")
+            return
+        }
+        let weeks = try container.mainContext.fetch(FetchDescriptor<WeekModel>())
+        let presentWeeks = weeks.filter { $0.status == .present }
+        XCTAssertEqual(presentWeeks.map(\.weekId), [today.weekId])
+        XCTAssertEqual(weeks.first { $0.weekId == previousWeekDate.weekId }?.status, .past)
+    }
+
+    @MainActor
     func test_publishedV6FixtureMigratesToV7() throws {
         let storeURL = try makeTemporaryStoreURL()
         do {

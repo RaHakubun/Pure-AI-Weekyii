@@ -398,6 +398,7 @@ struct DataInvariantRepairService: DataInvariantRepairing {
     func repair(referenceDate: Date) -> DataInvariantRepairReport {
         var report = DataInvariantRepairReport()
         report.repairedDuplicateCount = mergeDuplicateWeeksAndDays()
+        report.repairedStatusCount += normalizeWeekStatuses(referenceDate: referenceDate)
         let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
         let today = calendar.startOfDay(for: referenceDate)
 
@@ -421,6 +422,31 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             try? modelContext.save()
         }
         return report
+    }
+
+    private func normalizeWeekStatuses(referenceDate: Date) -> Int {
+        let today = calendar.startOfDay(for: referenceDate)
+        let currentWeekId = today.weekId
+        let weeks = (try? modelContext.fetch(FetchDescriptor<WeekModel>())) ?? []
+        var changedCount = 0
+
+        for week in weeks {
+            let expectedStatus: WeekStatus
+            if week.weekId == currentWeekId {
+                expectedStatus = .present
+            } else if week.endDate < today {
+                expectedStatus = .past
+            } else {
+                expectedStatus = .pending
+            }
+
+            if week.status != expectedStatus {
+                week.status = expectedStatus
+                changedCount += 1
+            }
+        }
+
+        return changedCount
     }
 
     private func mergeDuplicateWeeksAndDays() -> Int {
