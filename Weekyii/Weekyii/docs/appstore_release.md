@@ -8,7 +8,7 @@ This doc is filled with repo-known details. Anything not found is marked as `UNK
 - Bundle ID (Widget): com.fluentdesign.Weekyii.widget
 - App Group ID: group.com.fluentdesign.Weekyii
 - Marketing Version (CFBundleShortVersionString): 1.0
-- Build Number (CFBundleVersion): 1
+- Build Number (CFBundleVersion): 4 (next TestFlight candidate; build 3 is already uploaded)
 
 Sources:
 - /Users/luobowen/handwrittenfnn/weekyii/Weekyii/Weekyii/Weekyii.xcodeproj/project.pbxproj
@@ -17,6 +17,9 @@ Sources:
 ## 2. Capabilities & Permissions (from project)
 - Photo Library (Read): "用于选择任务图片"
 - Photo Library (Add): "用于将图片保存到相册"
+- App Group: `group.com.fluentdesign.Weekyii`
+- CloudKit private database: `iCloud.com.fluentdesign.Weekyii`
+- Background remote notifications: enabled for SwiftData/CloudKit imports
 
 Source:
 - /Users/luobowen/handwrittenfnn/weekyii/Weekyii/Weekyii/Resources/Info.plist
@@ -24,7 +27,7 @@ Source:
 ## 3. Feature Summary (from repo notes)
 Use this to draft the App Store description.
 - Core views: Today / Week / Pending / Past / Settings
-- Data: SwiftData local persistence; iCloud is placeholder only
+- Data: SwiftData local persistence mirrored automatically through the user's private iCloud database
 - Week/Day/Task/Step/Attachment models with state transitions
 - Past week detail with stats and completed tasks list
 - Task editor supports steps, attachments, and type
@@ -81,7 +84,7 @@ Source:
 - Archive in Xcode: Product -> Archive
 - Distribute: App Store Connect -> Upload
 
-Note: App target uses generated Info.plist (GENERATE_INFOPLIST_FILE=YES).
+Note: App target merges `Resources/Info.plist` with generated values (`GENERATE_INFOPLIST_FILE=YES`).
 
 ## 6. App Store Connect Submission Steps (high-level)
 1. Create new app record in App Store Connect (My Apps -> + -> New App).
@@ -96,7 +99,7 @@ Note: App target uses generated Info.plist (GENERATE_INFOPLIST_FILE=YES).
 These may impact review readiness.
 - App icon final design missing (currently placeholder).
 - Launch screen is placeholder (color + text).
-- iCloud sync not implemented (placeholder).
+- iCloud production container/schema deployment and two-device smoke test remain required before release.
 - Pending view UX for future months may need improvement.
 
 Source:

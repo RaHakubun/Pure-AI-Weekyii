@@ -46,6 +46,8 @@ View 和 ViewModel 只读写 SwiftData，不直接依赖 CloudKit。`WeekyiiPers
 
 远端数据进入本地存储后，现有 `AppHealthCoordinator` 执行领域不变量修复。重点约束包括：当前周唯一、单日 Focus 任务不超过一个、任务顺序稳定。冲突采用确定性规则收敛，不能依赖界面恰好最后写入的一台设备。
 
+当两台离线设备同时创建同一 `weekId` / `dayId` 时，修复器会合并重复周与日期，将双方任务迁入同一日期后再规范 Focus 和顺序。随机 UUID 标识的普通任务不做语义去重，以免误删用户分别创建但文本相同的任务。
+
 ## 失败策略
 
 - 未登录 iCloud、账号受限或网络不可用：继续使用本地副本，设置页显示明确状态。
@@ -61,4 +63,3 @@ View 和 ViewModel 只读写 SwiftData，不直接依赖 CloudKit。`WeekyiiPers
 - iPhone/iPad 真机同账号双向新增、编辑、删除、离线恢复测试。
 - 并发修改后领域不变量仍成立。
 - Debug 使用 CloudKit development，TestFlight 前将 Schema 部署到 production。
-
