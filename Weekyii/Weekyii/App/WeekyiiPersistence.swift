@@ -3,6 +3,23 @@ import SwiftData
 import CryptoKit
 
 enum WeekyiiPersistence {
+    static let cloudKitContainerIdentifier = "iCloud.com.fluentdesign.Weekyii"
+
+    enum StoreMode: Equatable {
+        case production
+        case localOnly
+        case inMemory
+
+        var cloudKitContainerIdentifier: String? {
+            switch self {
+            case .production:
+                return WeekyiiPersistence.cloudKitContainerIdentifier
+            case .localOnly, .inMemory:
+                return nil
+            }
+        }
+    }
+
     enum LaunchState {
         case ready(ModelContainer)
         case failed(String)
@@ -10,12 +27,21 @@ enum WeekyiiPersistence {
 
     static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV7.self)
 
-    static func bootstrapPersistentContainer() -> LaunchState {
+    static func launchStoreMode(environment: [String: String]) -> StoreMode {
+        environment["XCTestConfigurationFilePath"] == nil ? .production : .localOnly
+    }
+
+    static func bootstrapPersistentContainer(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> LaunchState {
         let storeURL = persistentStoreURL()
         backupPersistentStoreIfExists(storeURL: storeURL)
 
         do {
-            let container = try makeModelContainer(storeURL: storeURL)
+            let container = try makeModelContainer(
+                storeURL: storeURL,
+                storeMode: launchStoreMode(environment: environment)
+            )
             try validateContainerConsistency(container: container)
             return .ready(container)
         } catch {
@@ -24,13 +50,27 @@ enum WeekyiiPersistence {
         }
     }
 
-    static func makeModelContainer(storeURL: URL? = nil, inMemory: Bool = false) throws -> ModelContainer {
+    static func makeModelContainer(
+        storeURL: URL? = nil,
+        inMemory: Bool = false,
+        storeMode: StoreMode? = nil
+    ) throws -> ModelContainer {
+        let resolvedMode = storeMode ?? (inMemory ? .inMemory : .localOnly)
         let config: ModelConfiguration
-        if inMemory {
+        if resolvedMode == .inMemory {
             config = ModelConfiguration("Weekyii", schema: currentSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         } else {
             let url = storeURL ?? persistentStoreURL()
-            config = ModelConfiguration("Weekyii", schema: currentSchema, url: url, allowsSave: true, cloudKitDatabase: .none)
+            let cloudKitDatabase = resolvedMode.cloudKitContainerIdentifier.map {
+                ModelConfiguration.CloudKitDatabase.private($0)
+            } ?? .none
+            config = ModelConfiguration(
+                "Weekyii",
+                schema: currentSchema,
+                url: url,
+                allowsSave: true,
+                cloudKitDatabase: cloudKitDatabase
+            )
         }
 
         let container = try ModelContainer(

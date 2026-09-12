@@ -51,6 +51,23 @@ final class ModelTests: XCTestCase {
         )
     }
 
+    func test_persistenceMode_usesPrivateCloudForProductionOnly() {
+        XCTAssertEqual(
+            WeekyiiPersistence.StoreMode.production.cloudKitContainerIdentifier,
+            "iCloud.com.fluentdesign.Weekyii"
+        )
+        XCTAssertNil(WeekyiiPersistence.StoreMode.localOnly.cloudKitContainerIdentifier)
+        XCTAssertNil(WeekyiiPersistence.StoreMode.inMemory.cloudKitContainerIdentifier)
+        XCTAssertEqual(
+            WeekyiiPersistence.launchStoreMode(environment: [:]),
+            .production
+        )
+        XCTAssertEqual(
+            WeekyiiPersistence.launchStoreMode(environment: ["XCTestConfigurationFilePath": "/tmp/tests.xctestconfiguration"]),
+            .localOnly
+        )
+    }
+
     @MainActor
     func test_publishedV6FixtureMigratesToV7() throws {
         let storeURL = try makeTemporaryStoreURL()
