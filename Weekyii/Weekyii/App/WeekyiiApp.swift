@@ -473,6 +473,22 @@ struct WeekyiiApp: App {
     private static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
 
     init() {
+        #if DEBUG
+        if WeekyiiPersistence.shouldInitializeCloudKitSchema(
+            arguments: ProcessInfo.processInfo.arguments
+        ) {
+            do {
+                try WeekyiiPersistence.initializeCloudKitDevelopmentSchema()
+                print("Weekyii: CloudKit development schema initialized.")
+            } catch {
+                launchState = .failed(
+                    "CloudKit 开发 Schema 初始化失败：\(error.localizedDescription)"
+                )
+                return
+            }
+        }
+        #endif
+
         if Self.isUITesting {
             do {
                 launchState = .ready(try WeekyiiPersistence.makeModelContainer(inMemory: true))

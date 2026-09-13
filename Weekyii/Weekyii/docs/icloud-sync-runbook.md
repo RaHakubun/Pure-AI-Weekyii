@@ -16,11 +16,11 @@
 1. 在 Apple Developer → Certificates, Identifiers & Profiles → Identifiers 中创建或确认 `iCloud.com.fluentdesign.Weekyii`。
 2. 编辑 `com.fluentdesign.Weekyii` App ID，启用 iCloud（CloudKit），选择上述 Container，并启用 Push Notifications。
 3. 重新生成 Development 与 App Store Distribution provisioning profiles。旧的 `Weekyii App Store` profile 不包含新 entitlement，不能继续用于本次归档。
-4. 在 Xcode 下载新 profiles，用签名 Development 构建启动一次 App。查看设置页应显示“已开启”或同步事件状态。
-5. 在 CloudKit Console 选择 development 环境，确认 Weekyii 的 Record Types 已由 SwiftData 创建。
-6. 使用同一个 iCloud 测试账号在 iPhone 与 iPad 完成双向与离线测试。
-7. 在 CloudKit Console 将 development Schema 部署到 production。
-8. 将 `CURRENT_PROJECT_VERSION` 增加到尚未上传过的值，使用包含新 entitlement 的 App Store profile 归档并上传 TestFlight。
+4. 使用当前 Team 正规签名的 Development 构建，在已登录 iCloud 的 iOS Simulator 上加入启动参数 `-initializeCloudKitSchema` 并启动一次。该入口只存在于 Debug 构建，使用独立临时本地库，不接触用户正式数据；成功日志为 `Weekyii: CloudKit development schema initialized.`。
+5. 在 CloudKit Console 选择 development 环境，确认 Weekyii 的 Record Types 已由 SwiftData 创建，然后移除启动参数。整个初始化过程不需要向 `Sunday` 或其他真机有线安装。
+6. 在 CloudKit Console 将 development Schema 部署到 production。
+7. 将 `CURRENT_PROJECT_VERSION` 增加到尚未上传过的值，使用包含新 entitlement 的 App Store profile 归档并上传 TestFlight。
+8. 仅通过 TestFlight 覆盖安装到 iPhone 与 iPad，使用同一个 iCloud 账号完成双向、离线和旧数据保留测试。
 
 ## 双设备验收
 

@@ -68,6 +68,16 @@ final class ModelTests: XCTestCase {
         )
     }
 
+    func test_cloudKitSchemaInitialization_requiresExplicitDevelopmentLaunchFlag() {
+        XCTAssertFalse(WeekyiiPersistence.shouldInitializeCloudKitSchema(arguments: []))
+        XCTAssertFalse(WeekyiiPersistence.shouldInitializeCloudKitSchema(arguments: ["-uiTesting"]))
+        XCTAssertTrue(
+            WeekyiiPersistence.shouldInitializeCloudKitSchema(
+                arguments: ["-initializeCloudKitSchema"]
+            )
+        )
+    }
+
     func test_cloudSyncState_explainsAutomaticSyncAndAccountProblems() {
         XCTAssertFalse(CloudSyncState.available.detail.isEmpty)
         XCTAssertFalse(CloudSyncState.syncing.detail.isEmpty)

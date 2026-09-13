@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+#if DEBUG
+import CoreData
+#endif
 import CryptoKit
 
 enum WeekyiiPersistence {
@@ -26,6 +29,62 @@ enum WeekyiiPersistence {
     }
 
     static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV7.self)
+
+    static func shouldInitializeCloudKitSchema(arguments: [String]) -> Bool {
+        #if DEBUG
+        arguments.contains("-initializeCloudKitSchema")
+        #else
+        false
+        #endif
+    }
+
+    #if DEBUG
+    static func initializeCloudKitDevelopmentSchema() throws {
+        guard let managedObjectModel = NSManagedObjectModel.makeManagedObjectModel(
+            for: WeekyiiSchemaV7.models
+        ) else {
+            throw WeekyiiPersistenceError.inconsistentState(
+                "Unable to synthesize the CloudKit managed object model."
+            )
+        }
+
+        let fileManager = FileManager.default
+        let schemaFolder = fileManager.temporaryDirectory
+            .appendingPathComponent("WeekyiiCloudKitSchema", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: schemaFolder, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: schemaFolder) }
+
+        try autoreleasepool {
+            let storeURL = schemaFolder.appendingPathComponent("Schema.store")
+            let description = NSPersistentStoreDescription(url: storeURL)
+            description.shouldAddStoreAsynchronously = false
+            description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+                containerIdentifier: cloudKitContainerIdentifier
+            )
+
+            let container = NSPersistentCloudKitContainer(
+                name: "WeekyiiCloudKitSchema",
+                managedObjectModel: managedObjectModel
+            )
+            container.persistentStoreDescriptions = [description]
+
+            var loadError: Error?
+            container.loadPersistentStores { _, error in
+                loadError = error
+            }
+            if let loadError { throw loadError }
+
+            defer {
+                if let store = container.persistentStoreCoordinator.persistentStores.first {
+                    try? container.persistentStoreCoordinator.remove(store)
+                }
+            }
+
+            try container.initializeCloudKitSchema()
+        }
+    }
+    #endif
 
     static func launchStoreMode(environment: [String: String]) -> StoreMode {
         environment["XCTestConfigurationFilePath"] == nil ? .production : .localOnly
