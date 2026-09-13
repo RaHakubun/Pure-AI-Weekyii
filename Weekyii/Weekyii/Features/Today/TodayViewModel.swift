@@ -34,7 +34,6 @@ final class TodayViewModel {
     private let taskMutationService: TaskMutationService
     private let liveActivityService: (any LiveActivityManaging)?
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     var today: DayModel?
     var errorMessage: String?
@@ -571,9 +570,14 @@ final class TodayViewModel {
         for week in presentWeeks {
             week.status = .past
         }
-        let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
-        modelContext.insert(week)
-        persistOrRecordError()
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: timeProvider.today, status: .present)
+            resolution.week.status = .present
+            persistOrRecordError()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func createMissingDay(for date: Date) -> DayModel? {

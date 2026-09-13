@@ -8,7 +8,6 @@ final class ExtensionsViewModel {
     @ObservationIgnored private let modelContext: ModelContext
     @ObservationIgnored private let notificationService: any NotificationScheduling
     @ObservationIgnored private let taskMutationService: TaskMutationService
-    @ObservationIgnored private let weekCalculator = WeekCalculator()
     @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
 
     var projects: [ProjectModel] = []
@@ -342,33 +341,16 @@ final class ExtensionsViewModel {
 
     /// 找到或创建某日期对应的 DayModel（自动创建 Week）
     private func findOrCreateDay(for date: Date) -> DayModel? {
-        let dayId = calendar.startOfDay(for: date).dayId
-
-        // 先查找已有 Day
-        let dayDescriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
-        if let existingDay = try? modelContext.fetch(dayDescriptor).first {
-            return existingDay
-        }
-
-        // Day 不存在 → 查找或创建 Week
-        let weekId = date.weekId
-        let weekDescriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
-
-        if let existingWeek = try? modelContext.fetch(weekDescriptor).first {
-            // Week 存在但 Day 缺失（不应发生，但保险起见）
-            return existingWeek.days.first { $0.dayId == dayId }
-        }
-
-        // Week 也不存在 → 创建 Week（pending 状态）
-        let week = weekCalculator.makeWeek(for: date, status: .pending)
-        modelContext.insert(week)
         do {
-            try modelContext.save()
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: date, weekStatus: .pending)
+            if resolution.createdWeek || resolution.createdDay {
+                try modelContext.save()
+            }
+            return resolution.day
         } catch {
             return nil
         }
-
-        return week.days.first { $0.dayId == dayId }
     }
 
     // MARK: - Project Queries
@@ -798,7 +780,6 @@ struct SuspendedTaskLifecycleService {
     private let notificationService: any NotificationScheduling
     private let taskMutationService: TaskMutationService
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(modelContext: ModelContext, notificationService: any NotificationScheduling) {
         self.modelContext = modelContext
@@ -959,12 +940,9 @@ struct SuspendedTaskLifecycleService {
         }
 
         let weekStatus: WeekStatus = date.startOfWeek == today.startOfWeek ? .present : .pending
-        let week = weekCalculator.makeWeek(for: date, status: weekStatus)
-        modelContext.insert(week)
-        guard let targetDay = week.days.first(where: { $0.dayId == dayId }) else {
-            throw WeekyiiError.dayNotFound(dayId)
-        }
-        return (targetDay, true)
+        let resolution = try WeekDataStore(modelContext: modelContext)
+            .resolveDay(on: date, weekStatus: weekStatus)
+        return (resolution.day, resolution.createdWeek)
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {

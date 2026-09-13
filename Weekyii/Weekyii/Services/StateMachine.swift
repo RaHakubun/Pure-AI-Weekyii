@@ -64,7 +64,6 @@ struct StateMachine {
     private let userSettings: any KillTimeSettings
     private let repairService: any DataInvariantRepairing
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(
         modelContainer: ModelContainer,
@@ -296,9 +295,14 @@ struct StateMachine {
     }
 
     private func createPresentWeek(for date: Date) {
-        let week = weekCalculator.makeWeek(for: date, status: .present)
-        modelContext.insert(week)
-        persist()
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: date, status: .present)
+            resolution.week.status = .present
+            persist()
+        } catch {
+            appState.runtimeErrorMessage = error.localizedDescription
+        }
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {
@@ -385,7 +389,6 @@ private extension DayModel {
 struct DataInvariantRepairService: DataInvariantRepairing {
     private let modelContainer: ModelContainer
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -397,7 +400,8 @@ struct DataInvariantRepairService: DataInvariantRepairing {
 
     func repair(referenceDate: Date) -> DataInvariantRepairReport {
         var report = DataInvariantRepairReport()
-        report.repairedDuplicateCount = mergeDuplicateWeeksAndDays()
+        report.repairedDuplicateCount = mergeDuplicateBuiltInTaskTypes()
+        report.repairedDuplicateCount += mergeDuplicateWeeksAndDays()
         report.repairedStatusCount += normalizeWeekStatuses(referenceDate: referenceDate)
         let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
         let today = calendar.startOfDay(for: referenceDate)
@@ -470,6 +474,7 @@ struct DataInvariantRepairService: DataInvariantRepairing {
                         canonical.days.append(day)
                     }
                 }
+                duplicate.days = []
                 modelContext.delete(duplicate)
                 repairCount += 1
             }
@@ -481,6 +486,32 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             let canonical = group.max { dayRichness($0) < dayRichness($1) } ?? group[0]
             for duplicate in group where duplicate !== canonical {
                 mergeDay(duplicate, into: canonical)
+                duplicate.tasks = []
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        return repairCount
+    }
+
+    private func mergeDuplicateBuiltInTaskTypes() -> Int {
+        let definitions = (try? modelContext.fetch(FetchDescriptor<TaskTypeDefinition>())) ?? []
+        var repairCount = 0
+
+        for expected in TaskTypeDefinition.builtInDefinitions() {
+            let matches = definitions.filter { $0.idRaw == expected.idRaw }
+            guard matches.count > 1, let canonical = matches.first else { continue }
+
+            canonical.name = expected.name
+            canonical.iconName = expected.iconName
+            canonical.colorHex = expected.colorHex
+            canonical.baseKindRaw = expected.baseKindRaw
+            canonical.sortOrder = expected.sortOrder
+            canonical.isBuiltIn = true
+            canonical.isArchived = false
+
+            for duplicate in matches.dropFirst() {
                 modelContext.delete(duplicate)
                 repairCount += 1
             }
@@ -670,24 +701,14 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             return false
         }
 
-        let weekId = today.weekId
-        let week: WeekModel
-        if let existing = fetchWeek(by: weekId) {
-            week = existing
-            if week.status != .present {
-                week.status = .present
-            }
-        } else {
-            week = weekCalculator.makeWeek(for: today, status: .present)
-            modelContext.insert(week)
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: today, weekStatus: .present)
+            resolution.day.week?.status = .present
+            return resolution.createdWeek || resolution.createdDay
+        } catch {
+            return false
         }
-
-        if week.days.contains(where: { $0.dayId == today.dayId }) == false {
-            let day = DayModel(dayId: today.dayId, date: today, status: .empty)
-            week.days.append(day)
-        }
-
-        return true
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {

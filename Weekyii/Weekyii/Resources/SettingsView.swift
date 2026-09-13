@@ -1430,7 +1430,7 @@ private struct SampleDataSeeder {
     
     func seed(options: SeedOptions) throws -> SeedResult {
         let descriptor = FetchDescriptor<WeekModel>()
-        let existingWeeks = (try? modelContext.fetch(descriptor)) ?? []
+        let existingWeeks = try modelContext.fetch(descriptor)
         if !options.allowExisting, !existingWeeks.isEmpty {
             return .skippedExisting
         }
@@ -1445,9 +1445,10 @@ private struct SampleDataSeeder {
                 continue
             }
             let status: WeekStatus = offset < 0 ? .past : (offset == 0 ? .present : .pending)
-            let week = weekCalculator.makeWeek(for: weekDate, status: status)
-            seedWeek(week, relativeTo: today, options: options)
-            modelContext.insert(week)
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: weekDate, status: status)
+            guard resolution.created else { continue }
+            seedWeek(resolution.week, relativeTo: today, options: options)
             inserted += 1
         }
         try modelContext.save()

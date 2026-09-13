@@ -234,7 +234,6 @@ struct TaskPostponeService {
 
     private let modelContainer: ModelContainer
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     private var modelContext: ModelContext {
         modelContainer.mainContext
@@ -382,15 +381,9 @@ struct TaskPostponeService {
         }
 
         let status = statusForNewWeek(targetDate: preview.targetDate, today: today)
-        let week = weekCalculator.makeWeek(for: preview.targetDate, status: status)
-        modelContext.insert(week)
-
-        guard let day = week.days.first(where: { $0.dayId == preview.targetDayId }) else {
-            let createdDay = DayModel(dayId: preview.targetDayId, date: preview.targetDate, status: .empty)
-            week.days.append(createdDay)
-            return (createdDay, true)
-        }
-        return (day, true)
+        let resolution = try WeekDataStore(modelContext: modelContext)
+            .resolveDay(on: preview.targetDate, weekStatus: status)
+        return (resolution.day, resolution.createdWeek)
     }
 
     private func statusForNewWeek(targetDate: Date, today: Date) -> WeekStatus {

@@ -153,15 +153,25 @@ enum WeekyiiPersistence {
     }
 
     static func backupPersistentStoreIfExists(storeURL: URL) {
-        _ = try? BackupRecoveryService.createSnapshot(storeURL: storeURL)
+        let preflightReason = "preflight-v7"
+        let alreadyProtected = BackupRecoveryService.listSnapshots(storeURL: storeURL)
+            .contains { $0.isValid && $0.folderName.contains(preflightReason) }
+        guard !alreadyProtected else { return }
+        _ = try? BackupRecoveryService.createSnapshot(
+            storeURL: storeURL,
+            reason: preflightReason
+        )
     }
 
     fileprivate static func pruneSnapshots(in backupFolder: URL) {
         pruneBackups(in: backupFolder)
     }
 
-    fileprivate static func fileEntry(for fileURL: URL) -> BackupManifest.FileEntry? {
-        makeFileEntry(for: fileURL)
+    fileprivate static func fileEntry(
+        for fileURL: URL,
+        relativePath: String? = nil
+    ) -> BackupManifest.FileEntry? {
+        makeFileEntry(for: fileURL, relativePath: relativePath)
     }
 
     fileprivate static func persistManifest(in folder: URL, files: [BackupManifest.FileEntry]) {
@@ -185,20 +195,37 @@ enum WeekyiiPersistence {
 
     private static func validateContainerConsistency(container: ModelContainer) throws {
         let context = container.mainContext
-        let weeks = (try? context.fetch(FetchDescriptor<WeekModel>())) ?? []
+        let weeks = try context.fetch(FetchDescriptor<WeekModel>())
         let presentWeeks = weeks.filter { $0.status == .present }
         if presentWeeks.count > 1 {
             throw WeekyiiPersistenceError.inconsistentState("Detected \(presentWeeks.count) present weeks.")
         }
     }
 
-    private static func makeFileEntry(for fileURL: URL) -> BackupManifest.FileEntry? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
-        let hash = SHA256.hash(data: data)
-        let digest = hash.map { String(format: "%02x", $0) }.joined()
+    private static func makeFileEntry(
+        for fileURL: URL,
+        relativePath: String? = nil
+    ) -> BackupManifest.FileEntry? {
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        var fileSize: Int64 = 0
+        do {
+            while true {
+                let chunk = try handle.read(upToCount: 1024 * 1024) ?? Data()
+                guard !chunk.isEmpty else { break }
+                fileSize += Int64(chunk.count)
+                hasher.update(data: chunk)
+            }
+        } catch {
+            return nil
+        }
+
+        let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         return BackupManifest.FileEntry(
-            fileName: fileURL.lastPathComponent,
-            fileSize: Int64(data.count),
+            fileName: relativePath ?? fileURL.lastPathComponent,
+            fileSize: fileSize,
             sha256: digest
         )
     }
@@ -230,23 +257,7 @@ enum WeekyiiPersistence {
             return lhsDate > rhsDate
         }
 
-        var keep = Set<URL>(snapshots.prefix(40))
-        var dailyBuckets = Set<String>()
-        var weeklyBuckets = Set<String>()
-        let calendar = Calendar(identifier: .iso8601)
-        for snapshot in snapshots {
-            guard let date = (try? snapshot.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) else { continue }
-            let day = "\(calendar.component(.year, from: date))-\(calendar.ordinality(of: .day, in: .year, for: date) ?? 0)"
-            if dailyBuckets.count < 14 && !dailyBuckets.contains(day) {
-                keep.insert(snapshot)
-                dailyBuckets.insert(day)
-            }
-            let week = "\(calendar.component(.yearForWeekOfYear, from: date))-\(calendar.component(.weekOfYear, from: date))"
-            if weeklyBuckets.count < 8 && !weeklyBuckets.contains(week) {
-                keep.insert(snapshot)
-                weeklyBuckets.insert(week)
-            }
-        }
+        let keep = Set<URL>(snapshots.prefix(8))
 
         for snapshot in snapshots where !keep.contains(snapshot) {
             try? fileManager.removeItem(at: snapshot)
@@ -293,22 +304,39 @@ enum BackupRecoveryService {
 
         let backupFolder = storeURL.deletingLastPathComponent().appendingPathComponent("Backups", isDirectory: true)
         try fileManager.createDirectory(at: backupFolder, withIntermediateDirectories: true)
+        var backupFolderValues = URLResourceValues()
+        backupFolderValues.isExcludedFromBackup = true
+        var mutableBackupFolder = backupFolder
+        try mutableBackupFolder.setResourceValues(backupFolderValues)
         let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let suffix = reason.map { "-\($0)" } ?? ""
-        let snapshotFolder = backupFolder.appendingPathComponent("snapshot-\(timestamp)\(suffix)", isDirectory: true)
+        let uniqueID = UUID().uuidString.prefix(8)
+        let snapshotFolder = backupFolder.appendingPathComponent(
+            "snapshot-\(timestamp)\(suffix)-\(uniqueID)",
+            isDirectory: true
+        )
         try fileManager.createDirectory(at: snapshotFolder, withIntermediateDirectories: true)
 
         do {
-            let candidates = [
+            var candidates = [
                 storeURL,
                 URL(fileURLWithPath: storeURL.path + "-wal"),
                 URL(fileURLWithPath: storeURL.path + "-shm"),
             ]
-            var entries: [BackupManifest.FileEntry] = []
+            candidates.append(contentsOf: supportDirectoryCandidates(for: storeURL))
+
             for source in candidates where fileManager.fileExists(atPath: source.path) {
                 let destination = snapshotFolder.appendingPathComponent(source.lastPathComponent)
                 try fileManager.copyItem(at: source, to: destination)
-                guard let entry = WeekyiiPersistence.fileEntry(for: destination) else {
+            }
+
+            var entries: [BackupManifest.FileEntry] = []
+            for fileURL in regularFiles(recursivelyUnder: snapshotFolder) {
+                let relativePath = relativePath(of: fileURL, under: snapshotFolder)
+                guard let entry = WeekyiiPersistence.fileEntry(
+                    for: fileURL,
+                    relativePath: relativePath
+                ) else {
                     throw WeekyiiPersistenceError.inconsistentState("无法计算恢复点校验摘要。")
                 }
                 entries.append(entry)
@@ -371,10 +399,15 @@ enum BackupRecoveryService {
         }
 
         for file in manifest.files {
-            let fileURL = folder.appendingPathComponent(file.fileName)
-            guard let content = try? Data(contentsOf: fileURL) else { return false }
-            let digest = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
-            guard digest == file.sha256, Int64(content.count) == file.fileSize else { return false }
+            guard let fileURL = safeURL(for: file.fileName, under: folder),
+                  let current = WeekyiiPersistence.fileEntry(
+                    for: fileURL,
+                    relativePath: file.fileName
+                  ),
+                  current.sha256 == file.sha256,
+                  current.fileSize == file.fileSize else {
+                return false
+            }
         }
         return true
     }
@@ -387,24 +420,82 @@ enum BackupRecoveryService {
             throw WeekyiiPersistenceError.inconsistentState("Snapshot verification failed.")
         }
 
-        let candidates = [
+        let manifestURL = snapshotFolder.appendingPathComponent("manifest.json")
+        let manifestData = try Data(contentsOf: manifestURL)
+        let manifest = try JSONDecoder().decode(BackupManifest.self, from: manifestData)
+
+        var candidates = [
             storeURL,
             URL(fileURLWithPath: storeURL.path + "-wal"),
             URL(fileURLWithPath: storeURL.path + "-shm"),
         ]
+        candidates.append(contentsOf: supportDirectoryCandidates(for: storeURL).filter { directory in
+            let prefix = directory.lastPathComponent + "/"
+            return manifest.files.contains { $0.fileName.hasPrefix(prefix) }
+        })
         for candidate in candidates where fileManager.fileExists(atPath: candidate.path) {
-            try? fileManager.removeItem(at: candidate)
+            try fileManager.removeItem(at: candidate)
         }
 
-        let sourceFiles = [
-            snapshotFolder.appendingPathComponent(storeURL.lastPathComponent),
-            snapshotFolder.appendingPathComponent(storeURL.lastPathComponent + "-wal"),
-            snapshotFolder.appendingPathComponent(storeURL.lastPathComponent + "-shm"),
-        ]
-        let targets = candidates
-        for (source, target) in zip(sourceFiles, targets) where fileManager.fileExists(atPath: source.path) {
+        for file in manifest.files {
+            guard let source = safeURL(for: file.fileName, under: snapshotFolder),
+                  let target = safeURL(for: file.fileName, under: storeURL.deletingLastPathComponent()) else {
+                throw WeekyiiPersistenceError.inconsistentState("Snapshot contains an invalid file path.")
+            }
+            try fileManager.createDirectory(
+                at: target.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try fileManager.copyItem(at: source, to: target)
         }
+    }
+
+    @discardableResult
+    static func restoreLatestValidSnapshot(to storeURL: URL) throws -> SnapshotSummary? {
+        guard let snapshot = listSnapshots(storeURL: storeURL).first(where: \.isValid) else {
+            return nil
+        }
+        try restoreSnapshot(named: snapshot.folderName, to: storeURL)
+        return snapshot
+    }
+
+    private static func supportDirectoryCandidates(for storeURL: URL) -> [URL] {
+        let parent = storeURL.deletingLastPathComponent()
+        let baseName = storeURL.deletingPathExtension().lastPathComponent
+        return [
+            parent.appendingPathComponent(".\(baseName)_SUPPORT", isDirectory: true),
+            parent.appendingPathComponent("\(storeURL.lastPathComponent)_SUPPORT", isDirectory: true),
+        ]
+    }
+
+    private static func regularFiles(recursivelyUnder folder: URL) -> [URL] {
+        let keys: [URLResourceKey] = [.isRegularFileKey]
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder,
+            includingPropertiesForKeys: keys,
+            options: [],
+            errorHandler: nil
+        ) else { return [] }
+
+        return enumerator.compactMap { element in
+            guard let url = element as? URL,
+                  (try? url.resourceValues(forKeys: Set(keys)).isRegularFile) == true else {
+                return nil
+            }
+            return url
+        }
+    }
+
+    private static func relativePath(of fileURL: URL, under folder: URL) -> String {
+        String(fileURL.standardizedFileURL.path.dropFirst(folder.standardizedFileURL.path.count + 1))
+    }
+
+    private static func safeURL(for relativePath: String, under folder: URL) -> URL? {
+        guard !relativePath.isEmpty, !relativePath.hasPrefix("/") else { return nil }
+        let root = folder.standardizedFileURL
+        let candidate = root.appendingPathComponent(relativePath).standardizedFileURL
+        guard candidate.path.hasPrefix(root.path + "/") else { return nil }
+        return candidate
     }
 }
 

@@ -120,6 +120,7 @@ final class StateMachineTests: XCTestCase {
             TaskAttachment.self,
             ProjectModel.self,
             SuspendedTaskItem.self,
+            TaskTypeDefinition.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: config)
@@ -743,6 +744,47 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(matchingWeeks.count, 1)
         XCTAssertEqual(matchingDays.count, 1)
         XCTAssertEqual(Set(matchingDays[0].tasks.map(\.title)), ["来自 iPhone", "来自 iPad"])
+    }
+
+    @MainActor
+    func test_dataInvariantRepair_mergesDuplicateBuiltInTaskTypes() throws {
+        let context = container.mainContext
+        let canonicalCandidate = TaskTypeDefinition(
+            idRaw: TaskType.regular.rawValue,
+            name: TaskType.regular.displayName,
+            iconName: TaskType.regular.iconName,
+            colorHex: "#4A90A4",
+            baseKind: .regular,
+            sortOrder: 0,
+            isBuiltIn: true
+        )
+        let duplicate = TaskTypeDefinition(
+            idRaw: TaskType.regular.rawValue,
+            name: "重复的普通类型",
+            iconName: "questionmark",
+            colorHex: "#000000",
+            baseKind: .ddl,
+            sortOrder: 99,
+            isBuiltIn: true,
+            isArchived: true
+        )
+        context.insert(canonicalCandidate)
+        context.insert(duplicate)
+        try context.save()
+        let beforeRepair = try context.fetch(FetchDescriptor<TaskTypeDefinition>())
+            .filter { $0.idRaw == TaskType.regular.rawValue }
+        XCTAssertEqual(beforeRepair.count, 2)
+
+        let report = DataInvariantRepairService(modelContainer: container).repair(referenceDate: Date())
+        let regularDefinitions = try context.fetch(FetchDescriptor<TaskTypeDefinition>())
+            .filter { $0.idRaw == TaskType.regular.rawValue }
+
+        XCTAssertGreaterThanOrEqual(report.repairedDuplicateCount, 1)
+        let regularDefinition = try XCTUnwrap(regularDefinitions.first)
+        XCTAssertEqual(regularDefinitions.count, 1)
+        XCTAssertEqual(regularDefinition.name, TaskType.regular.displayName)
+        XCTAssertEqual(regularDefinition.baseKind, .regular)
+        XCTAssertFalse(regularDefinition.isArchived)
     }
 
     @MainActor

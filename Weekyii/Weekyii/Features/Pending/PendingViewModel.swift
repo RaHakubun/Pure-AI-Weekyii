@@ -149,18 +149,16 @@ final class PendingViewModel {
             return nil
         }
 
-        let weekId = date.weekId
-        guard !weekExists(weekId) else {
-            errorMessage = "该周已存在"
-            return nil
-        }
-
-        let week = weekCalculator.makeWeek(for: date, status: .pending)
-        modelContext.insert(week)
         do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: date, status: .pending)
+            guard resolution.created else {
+                errorMessage = "该周已存在"
+                return nil
+            }
             try modelContext.save()
             refresh()
-            return week
+            return resolution.week
         } catch {
             errorMessage = error.localizedDescription
             return nil
@@ -170,10 +168,6 @@ final class PendingViewModel {
     @discardableResult
     func createWeek(weekId: String) -> WeekModel? {
         let normalizedWeekId = weekId.uppercased()
-        guard !weekExists(normalizedWeekId) else {
-            errorMessage = "该周已存在"
-            return nil
-        }
         guard let startDate = weekCalculator.weekStartDate(for: normalizedWeekId) else {
             errorMessage = String(localized: "error.date_format_invalid")
             return nil
@@ -185,12 +179,16 @@ final class PendingViewModel {
             return nil
         }
 
-        let week = weekCalculator.makeWeek(weekId: normalizedWeekId, startDate: startDate, status: .pending)
-        modelContext.insert(week)
         do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: startDate, status: .pending)
+            guard resolution.created else {
+                errorMessage = "该周已存在"
+                return nil
+            }
             try modelContext.save()
             refresh()
-            return week
+            return resolution.week
         } catch {
             errorMessage = error.localizedDescription
             return nil

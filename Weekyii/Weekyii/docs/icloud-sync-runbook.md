@@ -9,7 +9,7 @@
 - iCloud Container: `iCloud.com.fluentdesign.Weekyii`
 - Database: CloudKit Private Database
 
-主 App 同步 SwiftData 业务实体；Widget 继续从 App Group 快照读取，不直接连接 CloudKit。通知授权、主题和开发者偏好保持设备本地。
+主 App 同步 SwiftData 业务实体；Widget 继续从 App Group 快照读取，不直接连接 CloudKit。通知授权与排程、默认 kill time、执行模式、主题、默认项目时长和开发者偏好保持设备本地，因此同一 Apple Account 的不同设备可以使用不同设置。用户创建的任务类型属于业务数据，会随任务同步。
 
 ## 首次启用顺序
 

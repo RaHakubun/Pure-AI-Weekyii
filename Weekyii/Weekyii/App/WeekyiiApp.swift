@@ -462,7 +462,7 @@ final class AppHealthCoordinator: AppHealthCoordinating {
 
 @main
 struct WeekyiiApp: App {
-    let launchState: WeekyiiPersistence.LaunchState
+    @State private var launchState: WeekyiiPersistence.LaunchState
     @StateObject private var appState = AppState()
     @StateObject private var userSettings = UserSettings()
     @State private var appHealthCoordinator: AppHealthCoordinator?
@@ -481,8 +481,10 @@ struct WeekyiiApp: App {
                 try WeekyiiPersistence.initializeCloudKitDevelopmentSchema()
                 print("Weekyii: CloudKit development schema initialized.")
             } catch {
-                launchState = .failed(
-                    "CloudKit 开发 Schema 初始化失败：\(error.localizedDescription)"
+                _launchState = State(
+                    initialValue: .failed(
+                        "CloudKit 开发 Schema 初始化失败：\(error.localizedDescription)"
+                    )
                 )
                 return
             }
@@ -491,12 +493,22 @@ struct WeekyiiApp: App {
 
         if Self.isUITesting {
             do {
-                launchState = .ready(try WeekyiiPersistence.makeModelContainer(inMemory: true))
+                _launchState = State(
+                    initialValue: .ready(
+                        try WeekyiiPersistence.makeModelContainer(inMemory: true)
+                    )
+                )
             } catch {
-                launchState = .failed("UI 测试容器初始化失败：\(error.localizedDescription)")
+                _launchState = State(
+                    initialValue: .failed(
+                        "UI 测试容器初始化失败：\(error.localizedDescription)"
+                    )
+                )
             }
         } else {
-            launchState = WeekyiiPersistence.bootstrapPersistentContainer()
+            _launchState = State(
+                initialValue: WeekyiiPersistence.bootstrapPersistentContainer()
+            )
         }
     }
 
@@ -568,9 +580,33 @@ struct WeekyiiApp: App {
                         }
                     }
             case .failed(let message):
-                PersistenceFailureView(message: message)
+                PersistenceFailureView(
+                    message: message,
+                    canRestore: BackupRecoveryService.listSnapshots(
+                        storeURL: WeekyiiPersistence.persistentStoreURL()
+                    ).contains(where: \.isValid),
+                    onRetry: retryPersistentStore,
+                    onRestore: restoreLatestPersistentStoreSnapshot
+                )
                     .preferredColorScheme(userSettings.effectiveColorScheme)
             }
+        }
+    }
+
+    private func retryPersistentStore() {
+        launchState = WeekyiiPersistence.bootstrapPersistentContainer()
+    }
+
+    private func restoreLatestPersistentStoreSnapshot() {
+        let storeURL = WeekyiiPersistence.persistentStoreURL()
+        do {
+            guard try BackupRecoveryService.restoreLatestValidSnapshot(to: storeURL) != nil else {
+                launchState = .failed("没有找到可用的本地恢复点。")
+                return
+            }
+            launchState = WeekyiiPersistence.bootstrapPersistentContainer(storeURL: storeURL)
+        } catch {
+            launchState = .failed("恢复本地数据库失败：\(error.localizedDescription)")
         }
     }
 
@@ -609,6 +645,9 @@ struct WeekyiiApp: App {
 
 private struct PersistenceFailureView: View {
     let message: String
+    let canRestore: Bool
+    let onRetry: () -> Void
+    let onRestore: () -> Void
     @State private var copied = false
 
     var body: some View {
@@ -631,12 +670,20 @@ private struct PersistenceFailureView: View {
                     .multilineTextAlignment(.center)
 
                 VStack(spacing: WeekSpacing.sm) {
+                    Button("重试打开数据库", action: onRetry)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.weekyiiPrimary)
+
+                    if canRestore {
+                        Button("从最近恢复点还原", action: onRestore)
+                            .buttonStyle(.bordered)
+                    }
+
                     Button("导出诊断信息") {
                         UIPasteboard.general.string = WeekyiiPersistence.failureDiagnostics()
                         copied = true
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.weekyiiPrimary)
+                    .buttonStyle(.bordered)
 
                     if copied {
                         Text("诊断信息已复制到剪贴板")

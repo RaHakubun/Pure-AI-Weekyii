@@ -10,6 +10,20 @@ enum CloudSyncUnavailableReason: Equatable {
     case unknown
 }
 
+enum CloudSyncAccountState: Equatable {
+    case checking
+    case available
+    case unavailable(CloudSyncUnavailableReason)
+    case failed(String)
+}
+
+enum CloudSyncEventState: Equatable {
+    case idle
+    case syncing
+    case synced(Date)
+    case failed(String)
+}
+
 enum CloudSyncState: Equatable {
     case checking
     case available
@@ -17,6 +31,31 @@ enum CloudSyncState: Equatable {
     case synced(Date)
     case unavailable(CloudSyncUnavailableReason)
     case failed(String)
+
+    static func resolve(
+        account: CloudSyncAccountState,
+        event: CloudSyncEventState
+    ) -> CloudSyncState {
+        switch account {
+        case .checking:
+            return .checking
+        case .unavailable(let reason):
+            return .unavailable(reason)
+        case .failed(let message):
+            return .failed(message)
+        case .available:
+            switch event {
+            case .idle:
+                return .available
+            case .syncing:
+                return .syncing
+            case .synced(let date):
+                return .synced(date)
+            case .failed(let message):
+                return .failed(message)
+            }
+        }
+    }
 
     var detail: String {
         switch self {
@@ -95,21 +134,31 @@ enum CloudSyncState: Equatable {
 @MainActor
 @Observable
 final class CloudSyncMonitor {
-    private(set) var state: CloudSyncState = .checking
+    private(set) var accountState: CloudSyncAccountState = .checking
+    private(set) var eventState: CloudSyncEventState = .idle
     private(set) var importRevision = 0
+
+    var state: CloudSyncState {
+        CloudSyncState.resolve(account: accountState, event: eventState)
+    }
 
     @ObservationIgnored private let containerIdentifier: String
     @ObservationIgnored private var cloudContainer: CKContainer?
     @ObservationIgnored private let notificationCenter: NotificationCenter
-    @ObservationIgnored private var eventObserver: NSObjectProtocol?
+    @ObservationIgnored private var eventObserverTask: Task<Void, Never>?
+    @ObservationIgnored private var accountObserverTask: Task<Void, Never>?
+    @ObservationIgnored private var importDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private let importDebounceDuration: Duration
     @ObservationIgnored private var hasStarted = false
 
     init(
         containerIdentifier: String = WeekyiiPersistence.cloudKitContainerIdentifier,
-        notificationCenter: NotificationCenter = .default
+        notificationCenter: NotificationCenter = .default,
+        importDebounceDuration: Duration = .seconds(1)
     ) {
         self.containerIdentifier = containerIdentifier
         self.notificationCenter = notificationCenter
+        self.importDebounceDuration = importDebounceDuration
     }
 
     nonisolated static func shouldStart(isRunningTests: Bool, isUITesting: Bool) -> Bool {
@@ -120,13 +169,18 @@ final class CloudSyncMonitor {
         guard !hasStarted else { return }
         hasStarted = true
         cloudContainer = CKContainer(identifier: containerIdentifier)
-        eventObserver = notificationCenter.addObserver(
-            forName: NSPersistentCloudKitContainer.eventChangedNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                self?.consume(notification)
+        eventObserverTask = Task { @MainActor [weak self, notificationCenter] in
+            for await notification in notificationCenter.notifications(
+                named: NSPersistentCloudKitContainer.eventChangedNotification
+            ) {
+                guard let self else { return }
+                consume(notification)
+            }
+        }
+        accountObserverTask = Task { @MainActor [weak self, notificationCenter] in
+            for await _ in notificationCenter.notifications(named: .CKAccountChanged) {
+                guard let self else { return }
+                await refreshAccountStatus()
             }
         }
 
@@ -139,31 +193,20 @@ final class CloudSyncMonitor {
             let accountStatus = try await cloudContainer.accountStatus()
             switch accountStatus {
             case .available:
-                if state == .checking || isUnavailableOrFailed {
-                    state = .available
-                }
+                accountState = .available
             case .noAccount:
-                state = .unavailable(.noAccount)
+                accountState = .unavailable(.noAccount)
             case .restricted:
-                state = .unavailable(.restricted)
+                accountState = .unavailable(.restricted)
             case .temporarilyUnavailable:
-                state = .unavailable(.temporarilyUnavailable)
+                accountState = .unavailable(.temporarilyUnavailable)
             case .couldNotDetermine:
-                state = .unavailable(.unknown)
+                accountState = .unavailable(.unknown)
             @unknown default:
-                state = .unavailable(.unknown)
+                accountState = .unavailable(.unknown)
             }
         } catch {
-            state = .failed(error.localizedDescription)
-        }
-    }
-
-    private var isUnavailableOrFailed: Bool {
-        switch state {
-        case .unavailable, .failed:
-            return true
-        default:
-            return false
+            accountState = .failed(error.localizedDescription)
         }
     }
 
@@ -174,17 +217,17 @@ final class CloudSyncMonitor {
         }
 
         guard event.endDate != nil else {
-            state = .syncing
+            eventState = .syncing
             return
         }
 
         if event.succeeded {
-            state = .synced(event.endDate ?? Date())
+            eventState = .synced(event.endDate ?? Date())
             if event.type == .import {
-                importRevision &+= 1
+                scheduleImportedChanges()
             }
         } else {
-            state = .failed(
+            eventState = .failed(
                 event.error?.localizedDescription
                     ?? String(
                         localized: "settings.icloud.status.unknown_error",
@@ -194,9 +237,23 @@ final class CloudSyncMonitor {
         }
     }
 
-    deinit {
-        if let eventObserver {
-            notificationCenter.removeObserver(eventObserver)
+    func scheduleImportedChanges() {
+        importDebounceTask?.cancel()
+        importDebounceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(for: importDebounceDuration)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            importRevision &+= 1
         }
+    }
+
+    deinit {
+        eventObserverTask?.cancel()
+        accountObserverTask?.cancel()
+        importDebounceTask?.cancel()
     }
 }

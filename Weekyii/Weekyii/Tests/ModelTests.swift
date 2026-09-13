@@ -85,10 +85,153 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(CloudSyncState.failed("网络不可用").detail.contains("网络不可用"))
     }
 
+    @MainActor
+    func test_cloudSyncDisplayStatePrioritizesCurrentAccountAvailability() {
+        XCTAssertEqual(
+            CloudSyncState.resolve(
+                account: .unavailable(.noAccount),
+                event: .synced(Date())
+            ),
+            .unavailable(.noAccount)
+        )
+        XCTAssertEqual(
+            CloudSyncState.resolve(
+                account: .available,
+                event: .syncing
+            ),
+            .syncing
+        )
+    }
+
+    @MainActor
+    func test_cloudSyncMonitorDebouncesBurstImports() async throws {
+        let monitor = CloudSyncMonitor(importDebounceDuration: .milliseconds(20))
+
+        monitor.scheduleImportedChanges()
+        monitor.scheduleImportedChanges()
+        monitor.scheduleImportedChanges()
+        try await Task.sleep(for: .milliseconds(80))
+
+        XCTAssertEqual(monitor.importRevision, 1)
+    }
+
+    @MainActor
+    func test_weekDataStoreUpsertsWeekAndDayByDeterministicKeys() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let date = makeDate(2026, 9, 14)
+        let store = WeekDataStore(modelContext: context)
+
+        let first = try store.resolveDay(on: date, weekStatus: .present)
+        let second = try store.resolveDay(on: date, weekStatus: .present)
+        try context.save()
+
+        let weeks = try context.fetch(FetchDescriptor<WeekModel>())
+            .filter { $0.weekId == date.weekId }
+        let days = try context.fetch(FetchDescriptor<DayModel>())
+            .filter { $0.dayId == date.dayId }
+        XCTAssertTrue(first.createdWeek)
+        XCTAssertFalse(second.createdWeek)
+        XCTAssertTrue(first.day === second.day)
+        XCTAssertEqual(weeks.count, 1)
+        XCTAssertEqual(days.count, 1)
+    }
+
     func test_cloudSyncMonitor_startsOnlyForNormalAppLaunches() {
         XCTAssertTrue(CloudSyncMonitor.shouldStart(isRunningTests: false, isUITesting: false))
         XCTAssertFalse(CloudSyncMonitor.shouldStart(isRunningTests: true, isUITesting: false))
         XCTAssertFalse(CloudSyncMonitor.shouldStart(isRunningTests: false, isUITesting: true))
+    }
+
+    func test_backupSnapshotPreservesAndRestoresExternalStorageFiles() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let fileManager = FileManager.default
+        let supportFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent(".Weekyii_SUPPORT", isDirectory: true)
+        let externalDataFolder = supportFolder
+            .appendingPathComponent("_EXTERNAL_DATA", isDirectory: true)
+        let externalFile = externalDataFolder.appendingPathComponent("attachment.bin")
+
+        try Data("database".utf8).write(to: storeURL)
+        try fileManager.createDirectory(at: externalDataFolder, withIntermediateDirectories: true)
+        try Data(repeating: 0xA5, count: 1024 * 1024).write(to: externalFile)
+
+        let snapshot = try XCTUnwrap(
+            BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "external-storage-test")
+        )
+        let snapshotFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups", isDirectory: true)
+            .appendingPathComponent(snapshot.folderName, isDirectory: true)
+        let snapshottedExternalFile = snapshotFolder
+            .appendingPathComponent(".Weekyii_SUPPORT/_EXTERNAL_DATA/attachment.bin")
+
+        XCTAssertTrue(fileManager.fileExists(atPath: snapshottedExternalFile.path))
+        XCTAssertTrue(BackupRecoveryService.verifySnapshot(folder: snapshotFolder))
+
+        try Data("damaged".utf8).write(to: storeURL)
+        try fileManager.removeItem(at: supportFolder)
+        try BackupRecoveryService.restoreSnapshot(named: snapshot.folderName, to: storeURL)
+
+        XCTAssertEqual(try Data(contentsOf: storeURL), Data("database".utf8))
+        XCTAssertEqual(
+            try Data(contentsOf: externalFile),
+            Data(repeating: 0xA5, count: 1024 * 1024)
+        )
+    }
+
+    func test_backupFolderIsExcludedFromSystemBackup() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        try Data("database".utf8).write(to: storeURL)
+
+        _ = try BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "exclusion-test")
+
+        let backupFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups", isDirectory: true)
+        let values = try backupFolder.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(values.isExcludedFromBackup, true)
+    }
+
+    func test_preflightSnapshotIsCreatedOnlyOncePerSchemaVersion() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        try Data("original".utf8).write(to: storeURL)
+
+        WeekyiiPersistence.backupPersistentStoreIfExists(storeURL: storeURL)
+        try Data("newer data".utf8).write(to: storeURL)
+        WeekyiiPersistence.backupPersistentStoreIfExists(storeURL: storeURL)
+
+        let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL)
+            .filter { $0.folderName.contains("preflight-v7") }
+        XCTAssertEqual(snapshots.count, 1)
+    }
+
+    func test_restoreLatestValidSnapshotSkipsNewerCorruptSnapshot() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        try Data("recover me".utf8).write(to: storeURL)
+        let valid = try XCTUnwrap(
+            BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "valid")
+        )
+        let validFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups/\(valid.folderName)", isDirectory: true)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -60)],
+            ofItemAtPath: validFolder.path
+        )
+
+        try Data("newer".utf8).write(to: storeURL)
+        let corrupt = try XCTUnwrap(
+            BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "corrupt")
+        )
+        let corruptFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups/\(corrupt.folderName)", isDirectory: true)
+        try Data("tampered".utf8).write(
+            to: corruptFolder.appendingPathComponent(storeURL.lastPathComponent)
+        )
+        try Data("broken current store".utf8).write(to: storeURL)
+
+        let restored = try BackupRecoveryService.restoreLatestValidSnapshot(to: storeURL)
+
+        XCTAssertEqual(restored?.folderName, valid.folderName)
+        XCTAssertEqual(try Data(contentsOf: storeURL), Data("recover me".utf8))
     }
 
     @MainActor
