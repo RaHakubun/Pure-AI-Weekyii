@@ -204,6 +204,34 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(snapshots.count, 1)
     }
 
+    func test_preflightLookupVerifiesOnlyMatchingSnapshots() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let backupFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups", isDirectory: true)
+        let unrelated = backupFolder.appendingPathComponent(
+            "snapshot-2026-09-13T10-00-00Z-manual-AAAAAAAA",
+            isDirectory: true
+        )
+        let matching = backupFolder.appendingPathComponent(
+            "snapshot-2026-09-13T11-00-00Z-preflight-v7-BBBBBBBB",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: matching, withIntermediateDirectories: true)
+
+        var verifiedFolders: [String] = []
+        let found = BackupRecoveryService.hasValidSnapshot(
+            storeURL: storeURL,
+            reason: "preflight-v7"
+        ) { folder in
+            verifiedFolders.append(folder.lastPathComponent)
+            return true
+        }
+
+        XCTAssertTrue(found)
+        XCTAssertEqual(verifiedFolders, [matching.lastPathComponent])
+    }
+
     func test_restoreLatestValidSnapshotSkipsNewerCorruptSnapshot() throws {
         let storeURL = try makeTemporaryStoreURL()
         try Data("recover me".utf8).write(to: storeURL)

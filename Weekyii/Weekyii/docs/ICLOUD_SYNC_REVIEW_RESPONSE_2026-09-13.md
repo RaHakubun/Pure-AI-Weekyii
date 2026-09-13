@@ -45,3 +45,9 @@
 - 在 CloudKit Development 环境成功初始化 Schema，并部署到 Production；此前模拟器账号因 iCloud 容量已满返回 quota exceeded。
 - 上传后由另一个具有可用 iCloud 空间的 Apple Account 通过 TestFlight 覆盖安装，验证双设备新增、编辑、删除、离线恢复及附件同步。
 - 本轮没有上传、没有推送、没有合并到 `online-chatgpt-develop`。
+
+## 第二轮复审整改
+
+- N1：冷启动判断 V7 preflight 恢复点是否存在时，不再调用会急切校验全部快照的 `listSnapshots`。新增按恢复点名称先筛选、再只校验候选目录的查询入口，避免启动时读取并哈希无关快照及其附件。
+- 新增回归测试，注入校验器并断言只有名称匹配 `preflight-v7` 的目录会进入完整性校验。
+- N2–N6 未纳入本次最小整改；其中 N2、N3、N5、N6 可作为后续增强，N4 已由复审方实测确认当前关系层级正确。

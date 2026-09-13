@@ -154,8 +154,10 @@ enum WeekyiiPersistence {
 
     static func backupPersistentStoreIfExists(storeURL: URL) {
         let preflightReason = "preflight-v7"
-        let alreadyProtected = BackupRecoveryService.listSnapshots(storeURL: storeURL)
-            .contains { $0.isValid && $0.folderName.contains(preflightReason) }
+        let alreadyProtected = BackupRecoveryService.hasValidSnapshot(
+            storeURL: storeURL,
+            reason: preflightReason
+        )
         guard !alreadyProtected else { return }
         _ = try? BackupRecoveryService.createSnapshot(
             storeURL: storeURL,
@@ -295,6 +297,27 @@ enum BackupRecoveryService {
         let createdAt: Date
         let fileCount: Int
         let isValid: Bool
+    }
+
+    static func hasValidSnapshot(
+        storeURL: URL,
+        reason: String,
+        verify: (URL) -> Bool = { verifySnapshot(folder: $0) }
+    ) -> Bool {
+        let backupFolder = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("Backups", isDirectory: true)
+        let folders = (try? FileManager.default.contentsOfDirectory(
+            at: backupFolder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        return folders
+            .filter {
+                $0.lastPathComponent.hasPrefix("snapshot-") &&
+                    $0.lastPathComponent.contains(reason)
+            }
+            .contains(where: verify)
     }
 
     @discardableResult
