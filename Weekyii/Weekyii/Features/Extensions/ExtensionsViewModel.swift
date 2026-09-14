@@ -909,10 +909,18 @@ struct SuspendedTaskLifecycleService {
         try modelContext.save()
     }
 
-    func sweepExpiredTasks(now: Date) throws -> Int {
+    /// Sweeps suspended tasks whose decision deadline has passed.
+    ///
+    /// Returns the number of records actually deleted. Under `.keepOverdue` the
+    /// overdue records are deliberately left in place, so the count is `0` even
+    /// though expired tasks were found — the user decides what to do with them.
+    @discardableResult
+    func sweepExpiredTasks(now: Date, policy: SuspendedExpiryPolicy = .autoDelete) throws -> Int {
         let descriptor = FetchDescriptor<SuspendedTaskItem>()
         let allTasks = try modelContext.fetch(descriptor)
         let expired = allTasks.filter { $0.status == .active && $0.decisionDeadline <= now }
+
+        guard policy == .autoDelete else { return 0 }
 
         for task in expired {
             notificationService.cancelSuspendedTaskNotifications(for: task)

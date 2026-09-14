@@ -72,17 +72,21 @@ struct MindStampEditorSheet: View {
 
                             if let imageData, let uiImage = UIImage(data: imageData) {
                                 ZStack(alignment: .topTrailing) {
+                                    Color.backgroundTertiary
+
                                     Image(uiImage: uiImage)
                                         .resizable()
-                                        .scaledToFill()
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 180)
-                                        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                                        .contentShape(RoundedRectangle(cornerRadius: WeekRadius.small))
-                                        .onTapGesture {
-                                            imagePreviewItem = ImagePreviewItem(image: uiImage)
-                                        }
-
+                                        .scaledToFit()
+                                        .padding(WeekSpacing.xs)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 180)
+                                .clipShape(.rect(cornerRadius: WeekRadius.small))
+                                .contentShape(.rect(cornerRadius: WeekRadius.small))
+                                .onTapGesture {
+                                    imagePreviewItem = ImagePreviewItem(image: uiImage)
+                                }
+                                .overlay(alignment: .topTrailing) {
                                     Button {
                                         self.imageData = nil
                                     } label: {

@@ -14,6 +14,11 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case mint
     case midnight
     case lotr
+    // Personalised themes: these ship with their own visual language, not just a palette.
+    case brutal
+    case neon
+    case paper
+    case terminal
 
     var id: String { rawValue }
 
@@ -29,11 +34,33 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .mint: return "薄荷"
         case .midnight: return "极夜"
         case .lotr: return "魔戒"
+        case .brutal: return String(localized: "theme.brutal.name", defaultValue: "粗野")
+        case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
+        case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
+        case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
         }
     }
 
     var isPremiumTheme: Bool {
         self == .lotr
+    }
+
+    /// Visual form (not colour): corner radius, borders, shadows and icon style.
+    /// The ten original themes keep `.classic` so their appearance never changes;
+    /// personalised themes override it to ship a different visual language.
+    var visualStyle: ThemeVisualStyle {
+        switch self {
+        case .brutal:
+            return .brutalist
+        case .neon:
+            return .neon
+        case .paper:
+            return .paper
+        case .terminal:
+            return .terminal
+        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr:
+            return .classic
+        }
     }
 
     var primaryColor: Color {
@@ -152,6 +179,168 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             rawValue: defaults.string(forKey: WeekyiiWidgetBridge.selectedThemeKey),
             premiumThemeUnlocked: defaults.bool(forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
         )
+    }
+}
+
+// MARK: - Theme visual language (form, not colour)
+
+/// How a theme renders frames, bars and icons. Deliberately separated from
+/// `WeekThemePalette` so a theme can change its *shape* without touching its colours.
+struct ThemeVisualStyle: Equatable {
+    /// Corner radius for cards and frames.
+    var cornerRadius: CGFloat
+    /// Border width; `0` renders no stroke.
+    var borderWidth: CGFloat
+    /// Border colour in light mode. `nil` falls back to `backgroundTertiary`.
+    var borderColorHexLight: String?
+    /// Border colour in dark mode. Kept separate because an ink border vanishes on a dark surface.
+    var borderColorHexDark: String?
+    /// `nil` renders no shadow.
+    var shadow: ThemeShadowStyle?
+    /// SF Symbol variant applied app-wide through `.symbolVariant(_:)`.
+    var symbolVariant: ThemeSymbolVariant
+    /// Multiplier applied to the thickness a caller asked for on rings/bars.
+    /// `1.0` keeps the original Weekyii weight, which is why this is a scale
+    /// rather than an absolute width: call sites pass 4, 8, 12 … and every one
+    /// of them has to stay pixel-identical under `.classic`.
+    var barScale: CGFloat
+    /// Bar corner radius in points. `nil` keeps the pill shape (half the height).
+    var barCornerRadius: CGFloat?
+
+    /// The original Weekyii look: soft radius, hairline border, diffuse shadow, outline icons.
+    static let classic = ThemeVisualStyle(
+        cornerRadius: 12,
+        borderWidth: 1,
+        borderColorHexLight: nil,
+        borderColorHexDark: nil,
+        shadow: ThemeShadowStyle(colorHex: "#3A2A22", opacity: 0.08, radius: 10, x: 0, y: 3),
+        symbolVariant: .none,
+        barScale: 1.0,
+        barCornerRadius: nil
+    )
+
+    /// Neo-brutalism: near-square corners, heavy ink border, hard offset shadow, filled icons.
+    static let brutalist = ThemeVisualStyle(
+        cornerRadius: 4,
+        borderWidth: 2.5,
+        borderColorHexLight: "#111111",
+        borderColorHexDark: "#F2F2F2",
+        shadow: ThemeShadowStyle(colorHex: "#000000", opacity: 1.0, radius: 0, x: 4, y: 4),
+        symbolVariant: .fill,
+        barScale: 1.5,
+        barCornerRadius: 0
+    )
+
+    /// Cyberpunk neon: medium radius, glowing accent border, neon bloom, filled icons.
+    static let neon = ThemeVisualStyle(
+        cornerRadius: 14,
+        borderWidth: 1.5,
+        borderColorHexLight: "#0091A8",
+        borderColorHexDark: "#00F0FF",
+        shadow: ThemeShadowStyle(colorHex: "#00F0FF", opacity: 0.35, radius: 16, x: 0, y: 0),
+        symbolVariant: .fill,
+        barScale: 1.25,
+        barCornerRadius: nil
+    )
+
+    /// Printed page: near-square cards, hairline rules, no elevation, thin square bars.
+    static let paper = ThemeVisualStyle(
+        cornerRadius: 2,
+        borderWidth: 0.75,
+        borderColorHexLight: "#D6C9B4",
+        borderColorHexDark: "#4A453D",
+        shadow: .flat,
+        symbolVariant: .none,
+        barScale: 0.6,
+        barCornerRadius: 0.5
+    )
+
+    /// Phosphor terminal: absolute right angles, 1pt phosphor rule, filled glyphs.
+    static let terminal = ThemeVisualStyle(
+        cornerRadius: 0,
+        borderWidth: 1,
+        borderColorHexLight: "#2F7A3F",
+        borderColorHexDark: "#33FF66",
+        shadow: .flat,
+        symbolVariant: .fill,
+        barScale: 0.8,
+        barCornerRadius: 0
+    )
+
+    func borderColor(isDark: Bool) -> Color? {
+        let hex = isDark ? borderColorHexDark : borderColorHexLight
+        return hex.map { Color(hex: $0) }
+    }
+}
+
+struct ThemeShadowStyle: Equatable {
+    var colorHex: String
+    var opacity: Double
+    /// `0` produces a hard, unblurred offset shadow (the brutalist signature).
+    var radius: CGFloat
+    var x: CGFloat
+    var y: CGFloat
+
+    var color: Color {
+        Color(hex: colorHex).opacity(opacity)
+    }
+
+    /// The original diffuse Weekyii shadow, used whenever a theme does not define one.
+    static let classic = ThemeShadowStyle(colorHex: "#3A2A22", opacity: 0.08, radius: 10, x: 0, y: 3)
+
+    /// No elevation. Expressed as a zeroed style rather than `nil`, because a
+    /// `nil` shadow falls back to `.classic` and would silently re-add one.
+    static let flat = ThemeShadowStyle(colorHex: "#000000", opacity: 0, radius: 0, x: 0, y: 0)
+}
+
+extension ThemeVisualStyle {
+    /// Shadow to render, falling back to the classic diffuse shadow.
+    var resolvedShadow: ThemeShadowStyle {
+        shadow ?? .classic
+    }
+
+    /// Thickness for a ring/bar that the call site sized at `base`.
+    /// Scaling (rather than an absolute width) is what keeps `.classic` unchanged
+    /// across every call site, which pass 4, 8 and 12 points.
+    func barThickness(_ base: CGFloat) -> CGFloat {
+        base * barScale
+    }
+
+    /// Corner radius for a bar: `nil` means the pill shape the original used.
+    func barCornerRadius(for thickness: CGFloat) -> CGFloat {
+        barCornerRadius ?? thickness / 2
+    }
+
+    // MARK: - Settings picker swatch
+
+    /// The 30pt theme swatch in 设置 is derived from the card form, so the picker
+    /// previews the shape language too. Both factors are chosen so `.classic`
+    /// reproduces the 7pt radius / 0.5pt rule the swatch has always had.
+    var swatchRadius: CGFloat { cornerRadius * (7.0 / 12.0) }
+    var swatchBorderWidth: CGFloat { borderWidth * 0.5 }
+
+    /// Border colour that adapts to light/dark, falling back to `backgroundTertiary`.
+    var resolvedBorderColor: Color {
+        if let light = borderColorHexLight, let dark = borderColorHexDark {
+            return Color.dynamic(lightHex: light, darkHex: dark)
+        }
+        return Color.backgroundTertiary
+    }
+}
+
+enum ThemeSymbolVariant: Equatable {
+    case none
+    case fill
+    case circle
+    case square
+
+    var symbolVariants: SymbolVariants {
+        switch self {
+        case .none: return .none
+        case .fill: return .fill
+        case .circle: return .circle
+        case .square: return .square
+        }
     }
 }
 
@@ -657,6 +846,194 @@ private struct WeekThemePalettePair {
                     taskDDLBg: "#291C15",
                     taskLeisure: "#A48FC8",
                     taskLeisureBg: "#211D2E"
+                )
+            )
+        case .brutal:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#2B50FF",
+                    primaryLight: "#5C7BFF",
+                    primaryDark: "#1A34CC",
+                    accentOrange: "#FF5C39",
+                    accentOrangeLight: "#FF8A70",
+                    accentGreen: "#00A86B",
+                    accentGreenLight: "#3FC98D",
+                    accentPink: "#FF3D7F",
+                    backgroundPrimary: "#FFFDF5",
+                    backgroundSecondary: "#FFFFFF",
+                    backgroundTertiary: "#EFEBE0",
+                    textPrimary: "#111111",
+                    textSecondary: "#4A4A4A",
+                    textTertiary: "#8A8A8A",
+                    taskRegular: "#2B50FF",
+                    taskRegularBg: "#DCE3FF",
+                    taskDDL: "#E23E1D",
+                    taskDDLBg: "#FFE0D9",
+                    taskLeisure: "#7B4DCC",
+                    taskLeisureBg: "#EDE4FA"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#7B96FF",
+                    primaryLight: "#A3B5FF",
+                    primaryDark: "#2B50FF",
+                    accentOrange: "#FF7A5C",
+                    accentOrangeLight: "#FF9E88",
+                    accentGreen: "#3FC98D",
+                    accentGreenLight: "#6FDCA8",
+                    accentPink: "#FF6B9D",
+                    backgroundPrimary: "#111111",
+                    backgroundSecondary: "#1C1C1C",
+                    backgroundTertiary: "#2A2A2A",
+                    textPrimary: "#FFFDF5",
+                    textSecondary: "#C4C4C4",
+                    textTertiary: "#8A8A8A",
+                    taskRegular: "#7B96FF",
+                    taskRegularBg: "#1E2A5C",
+                    taskDDL: "#FF7A5C",
+                    taskDDLBg: "#4A2018",
+                    taskLeisure: "#C9A6FF",
+                    taskLeisureBg: "#2E2440"
+                )
+            )
+        case .neon:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#0091A8",
+                    primaryLight: "#00B8D4",
+                    primaryDark: "#00697A",
+                    accentOrange: "#E5007D",
+                    accentOrangeLight: "#FF3DA0",
+                    accentGreen: "#00B87A",
+                    accentGreenLight: "#38D9A0",
+                    accentPink: "#E5007D",
+                    backgroundPrimary: "#F0F8FA",
+                    backgroundSecondary: "#FFFFFF",
+                    backgroundTertiary: "#DDEEF2",
+                    textPrimary: "#0A1A20",
+                    textSecondary: "#3E5A63",
+                    textTertiary: "#6E8C95",
+                    taskRegular: "#0091A8",
+                    taskRegularBg: "#D6F2F7",
+                    taskDDL: "#C5006B",
+                    taskDDLBg: "#FFDCEF",
+                    taskLeisure: "#6B3FD4",
+                    taskLeisureBg: "#E9E0FA"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#00F0FF",
+                    primaryLight: "#7DF5FF",
+                    primaryDark: "#00A8B8",
+                    accentOrange: "#FF4DA6",
+                    accentOrangeLight: "#FF85C2",
+                    accentGreen: "#00E5A0",
+                    accentGreenLight: "#5CFFCB",
+                    accentPink: "#FF4DA6",
+                    backgroundPrimary: "#0A0E1A",
+                    backgroundSecondary: "#121826",
+                    backgroundTertiary: "#1C2436",
+                    textPrimary: "#E8FDFF",
+                    textSecondary: "#A8C4CC",
+                    textTertiary: "#6E8A94",
+                    taskRegular: "#00F0FF",
+                    taskRegularBg: "#0E2A33",
+                    taskDDL: "#FF4DA6",
+                    taskDDLBg: "#33102A",
+                    taskLeisure: "#B08CFF",
+                    taskLeisureBg: "#221A3D"
+                )
+            )
+        case .paper:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#B23A2E",
+                    primaryLight: "#D2695A",
+                    primaryDark: "#8A2A20",
+                    accentOrange: "#C08A3E",
+                    accentOrangeLight: "#D9AE72",
+                    accentGreen: "#4A6C58",
+                    accentGreenLight: "#7A9A85",
+                    accentPink: "#B4576B",
+                    backgroundPrimary: "#FBF6EC",
+                    backgroundSecondary: "#FFFDF8",
+                    backgroundTertiary: "#F1E9DA",
+                    textPrimary: "#2C2A26",
+                    textSecondary: "#5F594F",
+                    textTertiary: "#8C8377",
+                    taskRegular: "#3F6B62",
+                    taskRegularBg: "#E2EDE7",
+                    taskDDL: "#B23A2E",
+                    taskDDLBg: "#F7E2DE",
+                    taskLeisure: "#7A5FA8",
+                    taskLeisureBg: "#EAE3F2"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#E0705F",
+                    primaryLight: "#F0A091",
+                    primaryDark: "#B23A2E",
+                    accentOrange: "#D9AE72",
+                    accentOrangeLight: "#E8C79B",
+                    accentGreen: "#8FBF9F",
+                    accentGreenLight: "#B5D8BF",
+                    accentPink: "#DE8D9C",
+                    backgroundPrimary: "#1B1917",
+                    backgroundSecondary: "#232019",
+                    backgroundTertiary: "#2E2A22",
+                    textPrimary: "#F0EADF",
+                    textSecondary: "#B8AFA1",
+                    textTertiary: "#8A8175",
+                    taskRegular: "#8FBF9F",
+                    taskRegularBg: "#223029",
+                    taskDDL: "#E0705F",
+                    taskDDLBg: "#3A221E",
+                    taskLeisure: "#B79AE0",
+                    taskLeisureBg: "#2C2438"
+                )
+            )
+        case .terminal:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#1B7F3B",
+                    primaryLight: "#3FA35C",
+                    primaryDark: "#0F5A28",
+                    accentOrange: "#B26A00",
+                    accentOrangeLight: "#D18F2E",
+                    accentGreen: "#1B7F3B",
+                    accentGreenLight: "#3FA35C",
+                    accentPink: "#A31F5B",
+                    backgroundPrimary: "#F2F5F2",
+                    backgroundSecondary: "#FBFDFB",
+                    backgroundTertiary: "#E2E9E2",
+                    textPrimary: "#0F1A12",
+                    textSecondary: "#3E4F42",
+                    textTertiary: "#6E7F72",
+                    taskRegular: "#1B7F3B",
+                    taskRegularBg: "#DCEDE1",
+                    taskDDL: "#A32B1B",
+                    taskDDLBg: "#F5DFDB",
+                    taskLeisure: "#5A4FA8",
+                    taskLeisureBg: "#E4E2F5"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#33FF66",
+                    primaryLight: "#8CFFA8",
+                    primaryDark: "#1FA84A",
+                    accentOrange: "#FFB000",
+                    accentOrangeLight: "#FFC94D",
+                    accentGreen: "#33FF66",
+                    accentGreenLight: "#8CFFA8",
+                    accentPink: "#FF4D9E",
+                    backgroundPrimary: "#05100A",
+                    backgroundSecondary: "#0A1A10",
+                    backgroundTertiary: "#12291A",
+                    textPrimary: "#D6FFE1",
+                    textSecondary: "#7FB892",
+                    textTertiary: "#4E7A5C",
+                    taskRegular: "#33FF66",
+                    taskRegularBg: "#0C2415",
+                    taskDDL: "#FF5A5A",
+                    taskDDLBg: "#2A0F0F",
+                    taskLeisure: "#9D8CFF",
+                    taskLeisureBg: "#171334"
                 )
             )
         }

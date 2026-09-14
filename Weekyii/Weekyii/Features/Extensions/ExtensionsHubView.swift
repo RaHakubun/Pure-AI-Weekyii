@@ -5,6 +5,13 @@ import PhotosUI
 
 struct SuspendedCountdownPreset {
     static let defaultOptions = [1, 2, 3, 5, 7, 10, 30]
+
+    /// Presets plus the user's configured default, so the default is always selectable.
+    static func options(includingDefault defaultDays: Int) -> [Int] {
+        let normalized = max(1, defaultDays)
+        guard !defaultOptions.contains(normalized) else { return defaultOptions }
+        return (defaultOptions + [normalized]).sorted()
+    }
 }
 
 // MARK: - Extensions Hub View (New Architecture)
@@ -13,9 +20,15 @@ struct ExtensionsHubView: View {
     let animationsActive: Bool
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: ExtensionsViewModel?
     @State private var mindStampViewModel: MindStampViewModel?
     @State private var errorMessage: String?
+
+    /// Module tiles only rotate when the user left auto-rotation on.
+    private var moduleTilesActive: Bool {
+        animationsActive && settings.moduleTileRotationEnabled
+    }
 
     var body: some View {
         NavigationStack {
@@ -29,11 +42,11 @@ struct ExtensionsHubView: View {
                             ],
                             spacing: WeekSpacing.md
                         ) {
-                            MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: animationsActive)
-                            SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: animationsActive)
+                            MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: moduleTilesActive)
+                            SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
                         }
 
-                        ProjectsModulePreview(viewModel: viewModel, animationsActive: animationsActive)
+                        ProjectsModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
                     }
                 }
                 .padding(.horizontal, WeekSpacing.base)
@@ -148,6 +161,7 @@ private struct SuspendedTasksFullView: View {
     @State private var assigningTask: SuspendedTaskItem?
     @State private var errorMessage: String?
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+    @EnvironmentObject private var settings: UserSettings
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -213,7 +227,10 @@ private struct SuspendedTasksFullView: View {
         .sheet(isPresented: $showingCreateSheet, onDismiss: {
             viewModel.refresh(rebuildProjectSnapshots: false)
         }) {
-            SuspendedTaskEditorSheet(title: "新增悬置任务") { title, description, type, typeIdRaw, countdownDays, steps, attachments in
+            SuspendedTaskEditorSheet(
+                title: "新增悬置任务",
+                initialCountdownDays: settings.suspendedDefaultCountdownDays
+            ) { title, description, type, typeIdRaw, countdownDays, steps, attachments in
                 _ = viewModel.createSuspendedTask(
                     title: title,
                     description: description,
@@ -504,6 +521,7 @@ private struct SuspendedTaskEditorSheet: View {
     let onSave: (String, String, TaskType, String, Int, [TaskStep], [TaskAttachment]) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: UserSettings
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var taskTitle: String
     @State private var taskDescription: String
@@ -684,7 +702,7 @@ private struct SuspendedTaskEditorSheet: View {
                                 .font(.titleSmall)
                                 .foregroundColor(.textPrimary)
 
-                            let presets = SuspendedCountdownPreset.defaultOptions
+                            let presets = SuspendedCountdownPreset.options(includingDefault: countdownDays)
                             let columns = [GridItem(.adaptive(minimum: 62), spacing: WeekSpacing.sm)]
                             LazyVGrid(columns: columns, spacing: WeekSpacing.sm) {
                                 ForEach(presets, id: \.self) { value in
@@ -1003,7 +1021,15 @@ private func suspendedCountdownBadge(_ task: SuspendedTaskItem) -> some View {
 
 enum SuspendedTaskMetaFormatter {
     static func deadlineText(remainingDays: Int) -> String {
-        if remainingDays <= 0 {
+        if remainingDays < 0 {
+            // Reachable once the suspended box is configured to keep overdue
+            // tasks instead of deleting them at the deadline.
+            return String(
+                format: String(localized: "suspended.deadline.overdue", defaultValue: "已逾期 %d 天"),
+                abs(remainingDays)
+            )
+        }
+        if remainingDays == 0 {
             return "今日到期"
         }
         return "\(remainingDays) 天后到期"
@@ -1108,43 +1134,45 @@ private struct MindStampLiveTile: View {
     }
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                LinearGradient(
-                    colors: [.black.opacity(0.02), .black.opacity(0.62)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            } else {
+        GeometryReader { proxy in
+            ZStack {
                 Color.accentPink.opacity(0.08)
+
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+
+                    LinearGradient(
+                        colors: [.black.opacity(0.02), .black.opacity(0.58)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                    HubTileHeader(
+                        title: String(localized: "extensions.module.mindstamps.title"),
+                        icon: "bandage.fill",
+                        tint: image == nil ? .accentPink : .white,
+                        trailing: "\(totalCount)"
+                    )
+
+                    Spacer(minLength: 0)
+
+                    Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : stamp.text)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(image == nil ? Color.textPrimary : .white)
+                        .lineLimit(image == nil ? 3 : 2)
+                        .multilineTextAlignment(.leading)
+
+                    Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
+                        .font(.caption2)
+                        .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
+                }
+                .padding(WeekSpacing.md)
             }
-
-            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                HubTileHeader(
-                    title: String(localized: "extensions.module.mindstamps.title"),
-                    icon: "bandage.fill",
-                    tint: image == nil ? .accentPink : .white,
-                    trailing: "\(totalCount)"
-                )
-
-                Spacer(minLength: 0)
-
-                Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : stamp.text)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(image == nil ? Color.textPrimary : .white)
-                    .lineLimit(image == nil ? 3 : 2)
-                    .multilineTextAlignment(.leading)
-
-                Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
-                    .font(.caption2)
-                    .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
-            }
-            .padding(WeekSpacing.md)
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
@@ -1415,13 +1443,13 @@ private struct ProjectsFullView: View {
     }
 
     private enum BoardMetrics {
-        static let columns = 4
         static let columnSpacing: CGFloat = 6
         static let rowSpacing: CGFloat = 6
         static let horizontalPadding: CGFloat = 16
         static let footerSpacing: CGFloat = 32
     }
 
+    @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: ExtensionsViewModel
     @State private var showingCreateSheet = false
     @State private var tileProjects: [ProjectModel] = []
@@ -1520,7 +1548,7 @@ private struct ProjectsFullView: View {
                         }
 
                         ProjectTileGridLayout(
-                            columns: BoardMetrics.columns,
+                            columns: settings.effectiveBoardColumnCount,
                             columnSpacing: BoardMetrics.columnSpacing,
                             rowSpacing: BoardMetrics.rowSpacing
                         ) {

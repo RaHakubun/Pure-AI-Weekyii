@@ -39,6 +39,42 @@ final class UserSettings: ObservableObject {
     @Published var fixedReminderMinute: Int {
         didSet { save() }
     }
+
+    // Morning Reminder Rhythm (shared by the daily kill-time reminder and the
+    // suspended-task morning checkpoints)
+    @Published var morningReminderHour: Int {
+        didSet { save() }
+    }
+    @Published var morningReminderMinute: Int {
+        didSet { save() }
+    }
+
+    // Suspended Task Reminder Rhythm
+    @Published var suspendedReminderEnabled: Bool {
+        didSet { save() }
+    }
+    @Published var suspendedReminderIntensityRaw: String {
+        didSet { save() }
+    }
+    @Published var suspendedReminderAdvanceDays: Int {
+        didSet { save() }
+    }
+    @Published var suspendedReminderEveningHour: Int {
+        didSet { save() }
+    }
+    @Published var suspendedReminderEveningMinute: Int {
+        didSet { save() }
+    }
+
+    // Suspended Task Defaults
+    @Published var suspendedDefaultCountdownDays: Int {
+        didSet { save() }
+    }
+
+    // What happens when a suspended task passes its decision deadline.
+    @Published var suspendedExpiryPolicyRaw: String {
+        didSet { save() }
+    }
     
     // Week Settings
     @Published var weekStartsOnMonday: Bool {
@@ -50,6 +86,36 @@ final class UserSettings: ObservableObject {
         didSet { save() }
     }
     @Published var defaultProjectTileSizeRaw: String {
+        didSet { save() }
+    }
+    @Published var defaultProjectColorHex: String {
+        didSet { save() }
+    }
+    @Published var defaultProjectIconName: String {
+        didSet { save() }
+    }
+    @Published var boardColumnCount: Int {
+        didSet { save() }
+    }
+
+    // Motion Settings
+    @Published var reduceMotionEnabled: Bool {
+        didSet { save() }
+    }
+    @Published var moduleTileRotationEnabled: Bool {
+        didSet { save() }
+    }
+    @Published var startRitualEnabled: Bool {
+        didSet { save() }
+    }
+
+    // Language Settings
+    @Published var languageOverrideRaw: String {
+        didSet { save() }
+    }
+
+    // Data Settings
+    @Published var recoveryPointRetentionCount: Int {
         didSet { save() }
     }
 
@@ -132,9 +198,26 @@ final class UserSettings: ObservableObject {
         self.fixedReminderEnabled = defaults.object(forKey: "fixedReminderEnabled") as? Bool ?? false
         self.fixedReminderHour = defaults.object(forKey: "fixedReminderHour") as? Int ?? 21
         self.fixedReminderMinute = defaults.object(forKey: "fixedReminderMinute") as? Int ?? 0
+        self.morningReminderHour = defaults.object(forKey: "morningReminderHour") as? Int ?? 9
+        self.morningReminderMinute = defaults.object(forKey: "morningReminderMinute") as? Int ?? 0
+        self.suspendedReminderEnabled = defaults.object(forKey: "suspendedReminderEnabled") as? Bool ?? true
+        self.suspendedReminderIntensityRaw = defaults.string(forKey: "suspendedReminderIntensity") ?? SuspendedReminderIntensity.full.rawValue
+        self.suspendedReminderAdvanceDays = defaults.object(forKey: "suspendedReminderAdvanceDays") as? Int ?? 3
+        self.suspendedReminderEveningHour = defaults.object(forKey: "suspendedReminderEveningHour") as? Int ?? 19
+        self.suspendedReminderEveningMinute = defaults.object(forKey: "suspendedReminderEveningMinute") as? Int ?? 30
+        self.suspendedDefaultCountdownDays = defaults.object(forKey: "suspendedDefaultCountdownDays") as? Int ?? 10
+        self.suspendedExpiryPolicyRaw = defaults.string(forKey: "suspendedExpiryPolicy") ?? SuspendedExpiryPolicy.autoDelete.rawValue
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.defaultProjectDurationDays = defaults.object(forKey: "defaultProjectDurationDays") as? Int ?? 7
         self.defaultProjectTileSizeRaw = defaults.string(forKey: "defaultProjectTileSize") ?? ProjectTileSize.medium.rawValue
+        self.defaultProjectColorHex = defaults.string(forKey: "defaultProjectColor") ?? "#C46A1A"
+        self.defaultProjectIconName = defaults.string(forKey: "defaultProjectIcon") ?? "folder.fill"
+        self.boardColumnCount = defaults.object(forKey: "boardColumnCount") as? Int ?? 4
+        self.reduceMotionEnabled = defaults.object(forKey: "reduceMotionEnabled") as? Bool ?? false
+        self.moduleTileRotationEnabled = defaults.object(forKey: "moduleTileRotationEnabled") as? Bool ?? true
+        self.startRitualEnabled = defaults.object(forKey: "startRitualEnabled") as? Bool ?? true
+        self.languageOverrideRaw = defaults.string(forKey: "languageOverride") ?? LanguageOverride.system.rawValue
+        self.recoveryPointRetentionCount = defaults.object(forKey: "recoveryPointRetentionCount") as? Int ?? 8
         self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
         self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
         self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
@@ -157,6 +240,8 @@ final class UserSettings: ObservableObject {
         sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
         sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
         sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
+
+        syncNotificationConfiguration()
     }
     
     func save() {
@@ -169,9 +254,26 @@ final class UserSettings: ObservableObject {
         defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
         defaults.set(fixedReminderHour, forKey: "fixedReminderHour")
         defaults.set(fixedReminderMinute, forKey: "fixedReminderMinute")
+        defaults.set(morningReminderHour, forKey: "morningReminderHour")
+        defaults.set(morningReminderMinute, forKey: "morningReminderMinute")
+        defaults.set(suspendedReminderEnabled, forKey: "suspendedReminderEnabled")
+        defaults.set(suspendedReminderIntensityRaw, forKey: "suspendedReminderIntensity")
+        defaults.set(suspendedReminderAdvanceDays, forKey: "suspendedReminderAdvanceDays")
+        defaults.set(suspendedReminderEveningHour, forKey: "suspendedReminderEveningHour")
+        defaults.set(suspendedReminderEveningMinute, forKey: "suspendedReminderEveningMinute")
+        defaults.set(suspendedDefaultCountdownDays, forKey: "suspendedDefaultCountdownDays")
+        defaults.set(suspendedExpiryPolicyRaw, forKey: "suspendedExpiryPolicy")
         defaults.set(weekStartsOnMonday, forKey: "weekStartsOnMonday")
         defaults.set(defaultProjectDurationDays, forKey: "defaultProjectDurationDays")
         defaults.set(defaultProjectTileSizeRaw, forKey: "defaultProjectTileSize")
+        defaults.set(defaultProjectColorHex, forKey: "defaultProjectColor")
+        defaults.set(defaultProjectIconName, forKey: "defaultProjectIcon")
+        defaults.set(boardColumnCount, forKey: "boardColumnCount")
+        defaults.set(reduceMotionEnabled, forKey: "reduceMotionEnabled")
+        defaults.set(moduleTileRotationEnabled, forKey: "moduleTileRotationEnabled")
+        defaults.set(startRitualEnabled, forKey: "startRitualEnabled")
+        defaults.set(languageOverrideRaw, forKey: "languageOverride")
+        defaults.set(recoveryPointRetentionCount, forKey: "recoveryPointRetentionCount")
         defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
         defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
         defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
@@ -194,6 +296,8 @@ final class UserSettings: ObservableObject {
         sharedDefaults.set(selectedThemeRaw, forKey: WeekyiiWidgetBridge.selectedThemeKey)
         sharedDefaults.set(appearanceModeRaw, forKey: WeekyiiWidgetBridge.appearanceModeKey)
         sharedDefaults.set(premiumThemeUnlocked, forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
+
+        syncNotificationConfiguration()
 
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadAllTimelines()
@@ -233,6 +337,75 @@ final class UserSettings: ObservableObject {
     var defaultProjectTileSize: ProjectTileSize {
         get { ProjectTileSize(storedValue: defaultProjectTileSizeRaw) ?? .medium }
         set { defaultProjectTileSizeRaw = newValue.rawValue }
+    }
+
+    var suspendedReminderIntensity: SuspendedReminderIntensity {
+        get { SuspendedReminderIntensity(rawValue: suspendedReminderIntensityRaw) ?? .full }
+        set { suspendedReminderIntensityRaw = newValue.rawValue }
+    }
+
+    var suspendedExpiryPolicy: SuspendedExpiryPolicy {
+        get { SuspendedExpiryPolicy(rawValue: suspendedExpiryPolicyRaw) ?? .autoDelete }
+        set { suspendedExpiryPolicyRaw = newValue.rawValue }
+    }
+
+    var languageOverride: LanguageOverride {
+        get { LanguageOverride(rawValue: languageOverrideRaw) ?? .system }
+        set { languageOverrideRaw = newValue.rawValue }
+    }
+
+    /// Board columns are clamped so a `wide` tile can still be laid out.
+    var effectiveBoardColumnCount: Int {
+        min(max(boardColumnCount, 2), 6)
+    }
+
+    var effectiveRecoveryPointRetentionCount: Int {
+        min(max(recoveryPointRetentionCount, 1), 50)
+    }
+
+    var isMorningReminderValid: Bool {
+        morningReminderHour >= 0 && morningReminderHour <= 23 &&
+        morningReminderMinute >= 0 && morningReminderMinute <= 59
+    }
+
+    var isSuspendedEveningReminderValid: Bool {
+        suspendedReminderEveningHour >= 0 && suspendedReminderEveningHour <= 23 &&
+        suspendedReminderEveningMinute >= 0 && suspendedReminderEveningMinute <= 59
+    }
+
+    /// Single source of truth for reminder timing consumed by `NotificationService`.
+    var notificationConfiguration: NotificationConfiguration {
+        NotificationConfiguration(
+            morningHour: morningReminderHour,
+            morningMinute: morningReminderMinute,
+            suspendedReminderEnabled: suspendedReminderEnabled,
+            suspendedReminderIntensity: suspendedReminderIntensity,
+            suspendedAdvanceDays: min(max(suspendedReminderAdvanceDays, 1), 14),
+            suspendedEveningHour: suspendedReminderEveningHour,
+            suspendedEveningMinute: suspendedReminderEveningMinute,
+            suspendedExpiryPolicy: suspendedExpiryPolicy
+        )
+    }
+
+    /// Pushes the current reminder rhythm into the notification scheduler so that
+    /// call sites never have to thread settings through.
+    func syncNotificationConfiguration() {
+        NotificationService.shared.configuration = notificationConfiguration
+    }
+
+    /// Applies an in-app language override. The change takes effect after the app restarts.
+    func setLanguageOverride(_ override: LanguageOverride) {
+        languageOverrideRaw = override.rawValue
+        applyLanguageOverride()
+    }
+
+    private func applyLanguageOverride() {
+        let key = "AppleLanguages"
+        if languageOverride == .system {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set([languageOverride.rawValue], forKey: key)
+        }
     }
 
     var effectiveColorScheme: ColorScheme? {

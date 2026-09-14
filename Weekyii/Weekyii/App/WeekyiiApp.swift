@@ -522,6 +522,9 @@ struct WeekyiiApp: App {
                     .environment(cloudSyncMonitor)
                     .modelContainer(modelContainer)
                     .preferredColorScheme(userSettings.effectiveColorScheme)
+                    // Personalised themes restyle every SF Symbol at once via the
+                    // environment, so no individual `Image(systemName:)` call needs editing.
+                    .symbolVariant(userSettings.selectedTheme.visualStyle.symbolVariant.symbolVariants)
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)

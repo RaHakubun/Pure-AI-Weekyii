@@ -1,5 +1,61 @@
 import XCTest
 
+// MARK: - Manual screenshot harness
+
+/// Ad-hoc screenshot helpers used to capture UI for review. They live in the UI
+/// test target because it is the one place where the host controls the app
+/// launch and can dismiss system alerts (notification permission) before
+/// snapping. They are skipped by CI via the `-skip-ui-screenshots` launch arg
+/// filter that we set in the production target, and they ignore their own
+/// outcome: success is "the file was written to /tmp/weekyii_shots/".
+final class ThemePickerScreenshotTests: XCTestCase {
+    func test_themePickerRenders() throws {
+        let app = XCUIApplication()
+        addUIInterruptionMonitor(withDescription: "Notifications") { alert in
+            if alert.buttons["允许"].exists { alert.buttons["允许"].tap(); return true }
+            if alert.buttons["Allow"].exists { alert.buttons["Allow"].tap(); return true }
+            return false
+        }
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let mineTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(mineTab.waitForExistence(timeout: 8))
+        mineTab.tap()
+
+        var appearanceLink = app.staticTexts["外观与主题"]
+        if !appearanceLink.exists { app.swipeUp() }
+        appearanceLink = app.staticTexts["外观与主题"]
+        guard appearanceLink.waitForExistence(timeout: 5) else {
+            XCTFail("Couldn't find 外观与主题")
+            return
+        }
+        appearanceLink.tap()
+
+        // Give the navigation transition a moment before snapping.
+        _ = app.staticTexts["主题"].waitForExistence(timeout: 5)
+        sleep(1)
+
+        let screenshot = app.screenshot()
+        try screenshot.pngRepresentation.write(
+            to: URL(fileURLWithPath: "/tmp/weekyii_shots/uitest_picker.png")
+        )
+
+        // Scroll the page so the personalised themes (粗野 / 霓虹 / 纸感 / 终端)
+        // appear in the screenshot. Form pages use a UI element whose swipe
+        // can be invoked at the application level.
+        for _ in 0..<4 {
+            app.swipeUp()
+            sleep(1)
+        }
+        sleep(1)
+        let scrolled = app.screenshot()
+        try scrolled.pngRepresentation.write(
+            to: URL(fileURLWithPath: "/tmp/weekyii_shots/uitest_picker_scrolled.png")
+        )
+    }
+}
+
 final class DraftReorderUITests: XCTestCase {
     func testExtensionsHubUsesSquareShortcutsAboveProjects() {
         let app = XCUIApplication()
@@ -492,9 +548,12 @@ final class DraftReorderUITests: XCTestCase {
 
     func testWeekOverviewSupportsCardsStripsAndCollapsedModes() {
         let app = XCUIApplication()
+        // The topology card is replaced by an empty state when the week holds no
+        // tasks, so seed today's draft tasks to reach the tree itself.
         app.launchArguments = [
             "-uiTesting",
-            "1"
+            "1",
+            "-uiTestingSeedDraft"
         ]
         app.launch()
 
@@ -542,5 +601,52 @@ final class DraftReorderUITests: XCTestCase {
         cardsButton.tap()
 
         XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))
+    }
+
+    /// Tapping a task node must land on the task inspector.
+    ///
+    /// The inspector picks its variant from the selected node id. A task belongs
+    /// to a day but matches neither that day's id nor a group id, so it has to be
+    /// checked *before* the forgotten fallback — otherwise a live task renders as
+    /// "任务已遗忘". This guards that ordering.
+    func testWeekTopologyTaskNodeShowsTaskInspectorNotForgotten() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedDraft"
+        ]
+        app.launch()
+
+        let weekButton = app.buttons["todaySectionWeekButton"]
+        XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
+        weekButton.tap()
+
+        let topology = app.descendants(matching: .any)["weekTopologyView"]
+        XCTAssertTrue(topology.waitForExistence(timeout: 3))
+
+        // Focusing a day is what brings the task layer into the compact canvas.
+        app.buttons["weekTopologyDay_0"].tap()
+
+        // Task cards carry a label (title + type) but no identifier.
+        let taskCard = topology.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Draft Task A"))
+            .firstMatch
+        XCTAssertTrue(taskCard.waitForExistence(timeout: 3))
+        taskCard.tap()
+
+        // `.accessibilityIdentifier("weekTopologyInspector")` propagates to every
+        // child of the inspector, so the id is not unique and scoping a query to
+        // it is unreliable. Assert on labels that only one variant renders:
+        // "查看任务详情" exists only in the task inspector, "任务已遗忘" only in
+        // the forgotten one.
+        XCTAssertTrue(
+            app.buttons["查看任务详情"].waitForExistence(timeout: 3),
+            "轻点任务卡后没有出现任务详情入口，可能落到了别的 inspector"
+        )
+        XCTAssertFalse(
+            app.staticTexts["任务已遗忘"].exists,
+            "轻点任务卡错误地显示成了「任务已遗忘」"
+        )
     }
 }

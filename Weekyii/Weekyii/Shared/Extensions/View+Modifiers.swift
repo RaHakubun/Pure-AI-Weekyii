@@ -13,7 +13,10 @@ private struct StateTransitionRefreshModifier: ViewModifier {
 
 extension View {
     func weekyiiCard() -> some View {
-        let isPremiumTheme = WeekTheme.activeTheme.isPremiumTheme
+        let theme = WeekTheme.activeTheme
+        let isPremiumTheme = theme.isPremiumTheme
+        let style = theme.visualStyle
+        let shadow = style.resolvedShadow
 
         return self
             .padding(12)
@@ -46,15 +49,17 @@ extension View {
                     }
                 }
             }
-            .clipShape(.rect(cornerRadius: WeekRadius.medium))
+            .clipShape(.rect(cornerRadius: style.cornerRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: WeekRadius.medium)
+                RoundedRectangle(cornerRadius: style.cornerRadius)
                     .stroke(
-                        isPremiumTheme ? Color.weekyiiPrimary.opacity(0.28) : Color.backgroundTertiary,
-                        lineWidth: 1
+                        // The premium accent border is a deliberate exception that
+                        // predates `visualStyle`; keep it so classic themes are unchanged.
+                        isPremiumTheme ? Color.weekyiiPrimary.opacity(0.28) : style.resolvedBorderColor,
+                        lineWidth: style.borderWidth
                     )
             )
-            .shadow(color: WeekShadow.light.color, radius: WeekShadow.light.radius, x: WeekShadow.light.x, y: WeekShadow.light.y)
+            .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
     }
 
     func refreshOnStateTransitions(using appState: AppState, perform action: @escaping () -> Void) -> some View {

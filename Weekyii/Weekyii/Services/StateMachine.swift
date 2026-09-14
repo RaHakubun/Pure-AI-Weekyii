@@ -345,11 +345,19 @@ struct StateMachine {
     private func processExpiredSuspendedTasks() -> Int {
         let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
         do {
-            return try service.sweepExpiredTasks(now: timeProvider.now)
+            return try service.sweepExpiredTasks(now: timeProvider.now, policy: Self.suspendedExpiryPolicy)
         } catch {
             appState.runtimeErrorMessage = error.localizedDescription
             return 0
         }
+    }
+
+    /// Read straight from `UserDefaults` so `StateMachine` stays decoupled from
+    /// `UserSettings`, mirroring `WeekyiiPersistence.backupRetentionCount`.
+    private static var suspendedExpiryPolicy: SuspendedExpiryPolicy {
+        let raw = UserDefaults.standard.string(forKey: "suspendedExpiryPolicy")
+            ?? SuspendedExpiryPolicy.autoDelete.rawValue
+        return SuspendedExpiryPolicy(rawValue: raw) ?? .autoDelete
     }
 
     private func updateMetrics(for week: WeekModel) {

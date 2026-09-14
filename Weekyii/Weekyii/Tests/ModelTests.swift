@@ -7,6 +7,16 @@ import SwiftUI
 final class ModelTests: XCTestCase {
     private static var retainedUserSettings: [UserSettings] = []
 
+    override func tearDown() {
+        // `UserSettings.save()` pushes its reminder rhythm into the shared
+        // `NotificationService` singleton. Without this reset, a settings test
+        // that changes the morning time or disables suspended reminders would
+        // leak that rhythm into `NotificationServiceTests`, which relies on the
+        // historical defaults when it does not pass an explicit configuration.
+        NotificationService.shared.configuration = .default
+        super.tearDown()
+    }
+
     func test_cloudSyncSchema_isCloudKitCompatible() {
         let schema = WeekyiiPersistence.currentSchema
 
@@ -457,6 +467,147 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(defaults.integer(forKey: "defaultProjectDurationDays"), 21)
         XCTAssertEqual(defaults.string(forKey: "defaultProjectTileSize"), ProjectTileSize.wide.rawValue)
+    }
+
+    @MainActor
+    func test_userSettings_reminderRhythmDefaultsAndPersistence() {
+        let suiteName = "ModelTests.ReminderRhythm.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        XCTAssertEqual(settings.morningReminderHour, 9)
+        XCTAssertEqual(settings.morningReminderMinute, 0)
+        XCTAssertTrue(settings.suspendedReminderEnabled)
+        XCTAssertEqual(settings.suspendedReminderIntensity, .full)
+        XCTAssertEqual(settings.suspendedReminderAdvanceDays, 3)
+        XCTAssertEqual(settings.suspendedReminderEveningHour, 19)
+        XCTAssertEqual(settings.suspendedReminderEveningMinute, 30)
+
+        settings.morningReminderHour = 7
+        settings.suspendedReminderIntensity = .minimal
+        settings.suspendedReminderEveningHour = 21
+
+        XCTAssertEqual(defaults.integer(forKey: "morningReminderHour"), 7)
+        XCTAssertEqual(defaults.string(forKey: "suspendedReminderIntensity"), SuspendedReminderIntensity.minimal.rawValue)
+        XCTAssertEqual(defaults.integer(forKey: "suspendedReminderEveningHour"), 21)
+    }
+
+    @MainActor
+    func test_userSettings_notificationConfigurationMirrorsRhythmAndClampsAdvanceDays() {
+        let suiteName = "ModelTests.NotificationConfig.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        settings.morningReminderHour = 6
+        settings.morningReminderMinute = 30
+        settings.suspendedReminderIntensity = .standard
+        settings.suspendedReminderAdvanceDays = 99
+        settings.suspendedReminderEnabled = false
+        settings.suspendedExpiryPolicy = .keepOverdue
+
+        let configuration = settings.notificationConfiguration
+        XCTAssertEqual(configuration.morningHour, 6)
+        XCTAssertEqual(configuration.morningMinute, 30)
+        XCTAssertEqual(configuration.suspendedReminderIntensity, .standard)
+        XCTAssertEqual(configuration.suspendedAdvanceDays, 14)
+        XCTAssertFalse(configuration.suspendedReminderEnabled)
+        // The due-day reminder body depends on this, so it must be mirrored.
+        XCTAssertEqual(configuration.suspendedExpiryPolicy, .keepOverdue)
+    }
+
+    @MainActor
+    func test_userSettings_motionLanguageAndDataDefaults() {
+        let suiteName = "ModelTests.MotionLanguage.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        XCTAssertFalse(settings.reduceMotionEnabled)
+        XCTAssertTrue(settings.moduleTileRotationEnabled)
+        XCTAssertTrue(settings.startRitualEnabled)
+        XCTAssertEqual(settings.languageOverride, .system)
+        XCTAssertEqual(settings.recoveryPointRetentionCount, 8)
+        XCTAssertEqual(settings.effectiveRecoveryPointRetentionCount, 8)
+
+        settings.reduceMotionEnabled = true
+        settings.moduleTileRotationEnabled = false
+        settings.startRitualEnabled = false
+        settings.setLanguageOverride(.simplifiedChinese)
+
+        XCTAssertTrue(defaults.bool(forKey: "reduceMotionEnabled"))
+        XCTAssertFalse(defaults.bool(forKey: "moduleTileRotationEnabled"))
+        XCTAssertFalse(defaults.bool(forKey: "startRitualEnabled"))
+        XCTAssertEqual(defaults.string(forKey: "languageOverride"), LanguageOverride.simplifiedChinese.rawValue)
+        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), ["zh-Hans"])
+    }
+
+    @MainActor
+    func test_userSettings_projectDefaultsAreClampedAndPersisted() {
+        let suiteName = "ModelTests.ProjectBoardDefaults.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        XCTAssertEqual(settings.defaultProjectColorHex, "#C46A1A")
+        XCTAssertEqual(settings.defaultProjectIconName, "folder.fill")
+        XCTAssertEqual(settings.suspendedDefaultCountdownDays, 10)
+        XCTAssertEqual(settings.effectiveBoardColumnCount, 4)
+
+        settings.boardColumnCount = 99
+        XCTAssertEqual(settings.effectiveBoardColumnCount, 6)
+        settings.boardColumnCount = 1
+        XCTAssertEqual(settings.effectiveBoardColumnCount, 2)
+
+        settings.recoveryPointRetentionCount = 0
+        XCTAssertEqual(settings.effectiveRecoveryPointRetentionCount, 1)
+        settings.recoveryPointRetentionCount = 999
+        XCTAssertEqual(settings.effectiveRecoveryPointRetentionCount, 50)
+
+        settings.defaultProjectColorHex = "#3FA67A"
+        settings.defaultProjectIconName = "star.fill"
+        settings.suspendedDefaultCountdownDays = 21
+
+        XCTAssertEqual(defaults.string(forKey: "defaultProjectColor"), "#3FA67A")
+        XCTAssertEqual(defaults.string(forKey: "defaultProjectIcon"), "star.fill")
+        XCTAssertEqual(defaults.integer(forKey: "suspendedDefaultCountdownDays"), 21)
+        XCTAssertEqual(defaults.integer(forKey: "boardColumnCount"), 1)
+        XCTAssertEqual(defaults.integer(forKey: "recoveryPointRetentionCount"), 999)
+    }
+
+    @MainActor
+    func test_userSettings_suspendedExpiryPolicyDefaultsToAutoDeleteAndPersists() {
+        let suiteName = "ModelTests.SuspendedExpiry.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        // The historical behaviour must stay the default so existing installs
+        // do not silently start retaining tasks they used to lose.
+        XCTAssertEqual(settings.suspendedExpiryPolicy, .autoDelete)
+        XCTAssertNil(defaults.string(forKey: "suspendedExpiryPolicy"))
+
+        settings.suspendedExpiryPolicy = .keepOverdue
+
+        XCTAssertEqual(defaults.string(forKey: "suspendedExpiryPolicy"), SuspendedExpiryPolicy.keepOverdue.rawValue)
+        XCTAssertEqual(settings.suspendedExpiryPolicy, .keepOverdue)
+
+        // An unknown raw value degrades to the safe historical default.
+        defaults.set("something-else", forKey: "suspendedExpiryPolicy")
+        let reloaded = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(reloaded)
+        XCTAssertEqual(reloaded.suspendedExpiryPolicy, .autoDelete)
     }
 
     @MainActor
@@ -946,6 +1097,24 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(snapshot.totalCount, 6)
     }
 
+    func test_weekTopologySnapshot_hasContentOnlyWhenWeekContainsTasks() {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+
+        XCTAssertFalse(WeekTopologySnapshot(week: week).hasContent)
+
+        let day = DayModel(dayId: start.dayId, date: start, status: .draft)
+        day.tasks.append(TaskItem(title: "Plan the week", order: 1, zone: .draft))
+        week.days.append(day)
+
+        XCTAssertTrue(WeekTopologySnapshot(week: week).hasContent)
+    }
+
     func test_weekTopologySnapshot_ordersRemainingAndCompletedTasks() {
         let start = makeDate(2026, 6, 15)
         let week = WeekModel(
@@ -997,28 +1166,903 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(topologyDay.forgottenNodes.allSatisfy { $0.title == nil })
     }
 
-    func test_weekTopologySemanticLevel_usesStableScaleThresholds() {
-        XCTAssertEqual(WeekTopologySemanticLevel(scale: 1.0), .overview)
-        XCTAssertEqual(WeekTopologySemanticLevel(scale: 1.65), .groups)
-        XCTAssertEqual(WeekTopologySemanticLevel(scale: 2.45), .tasks)
+    func test_weekTopologySnapshot_hasContentProbeMatchesBuiltSnapshot() {
+        let start = makeDate(2026, 6, 15)
+
+        // 空周。
+        let empty = WeekCalculator().makeWeek(for: start, status: .present)
+        XCTAssertFalse(WeekTopologySnapshot.hasContent(in: empty))
+        XCTAssertEqual(
+            WeekTopologySnapshot.hasContent(in: empty),
+            WeekTopologySnapshot(week: empty).hasContent
+        )
+
+        // 只有草稿任务（remaining 侧）。
+        let withDraft = WeekCalculator().makeWeek(for: start, status: .present)
+        withDraft.days.first?.tasks.append(TaskItem(title: "Draft", order: 1, zone: .draft))
+        XCTAssertTrue(WeekTopologySnapshot.hasContent(in: withDraft))
+        XCTAssertEqual(
+            WeekTopologySnapshot.hasContent(in: withDraft),
+            WeekTopologySnapshot(week: withDraft).hasContent
+        )
+
+        // 只有已完成任务：remaining 为空，容易漏判。
+        let withCompleted = WeekCalculator().makeWeek(for: start, status: .present)
+        let done = TaskItem(title: "Done", order: 1, zone: .complete)
+        done.completedOrder = 1
+        withCompleted.days.first?.tasks.append(done)
+        XCTAssertTrue(WeekTopologySnapshot.hasContent(in: withCompleted))
+        XCTAssertEqual(
+            WeekTopologySnapshot.hasContent(in: withCompleted),
+            WeekTopologySnapshot(week: withCompleted).hasContent
+        )
+
+        // 只有遗忘计数，没有任何任务实体。
+        let withExpired = WeekCalculator().makeWeek(for: start, status: .present)
+        withExpired.days.first?.expiredCount = 2
+        XCTAssertTrue(WeekTopologySnapshot.hasContent(in: withExpired))
+        XCTAssertEqual(
+            WeekTopologySnapshot.hasContent(in: withExpired),
+            WeekTopologySnapshot(week: withExpired).hasContent
+        )
     }
 
-    func test_weekTopologyLayout_placesSevenDaysOnHorizontalSpine() {
+    func test_weekTopologySemanticLevel_derivesThresholdsFromNodeGeometry() {
+        // 阈值不再手写倍数，而是由「节点尺寸 + 间距」推导，卡片一变阈值就跟着变。
+        let groupScale = WeekTopologyMetrics.groupClearEffectiveScale
+        let taskScale = WeekTopologyMetrics.taskClearEffectiveScale
+
+        XCTAssertGreaterThan(taskScale, groupScale)
+
+        XCTAssertEqual(WeekTopologySemanticLevel(effectiveScale: groupScale * 0.99), .overview)
+        XCTAssertEqual(WeekTopologySemanticLevel(effectiveScale: groupScale), .groups)
+        XCTAssertEqual(WeekTopologySemanticLevel(effectiveScale: taskScale * 0.99), .groups)
+        XCTAssertEqual(WeekTopologySemanticLevel(effectiveScale: taskScale), .tasks)
+    }
+
+    func test_weekTopologyMetrics_taskClearScaleKeepsCardsApart() {
+        let scale = WeekTopologyMetrics.taskClearEffectiveScale
+        let slack: CGFloat = 0.001
+
+        // 同一天内：相邻两行任务卡不能压叠。
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.taskVerticalSpacing * scale,
+            WeekTopologyMetrics.taskCardHeight + WeekTopologyMetrics.minimumNodeGap - slack
+        )
+
+        // 相邻日期之间：同一行的两张任务卡不能压叠。
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.taskPitch * scale,
+            WeekTopologyMetrics.taskCardWidth + WeekTopologyMetrics.minimumNodeGap - slack
+        )
+    }
+
+    /// 每一层的门槛都必须让**纵向**堆叠的卡片也不压叠。
+    ///
+    /// 之前的门槛只检查了相邻日期之间的横向间距，于是组层（eff 0.5–0.86）
+    /// 里日期节点和它自己的组节点会重叠 12pt——同一列上下的卡片同样会撞。
+    func test_weekTopologyMetrics_tierGatesLeaveVerticalClearance() {
+        let slack: CGFloat = 0.001
+
+        let stacks: [(name: String, gate: CGFloat, distance: CGFloat, upper: CGFloat, lower: CGFloat)] = [
+            (
+                "日期→组",
+                WeekTopologyMetrics.groupClearEffectiveScale,
+                WeekTopologyMetrics.groupTopOffset,
+                WeekTopologyMetrics.dayNodeExpandedHeight,
+                WeekTopologyMetrics.groupCardHeight
+            ),
+            (
+                "组→任务",
+                WeekTopologyMetrics.taskClearEffectiveScale,
+                WeekTopologyMetrics.taskFirstRowOffset,
+                WeekTopologyMetrics.groupCardHeight,
+                WeekTopologyMetrics.taskCardHeight
+            ),
+            (
+                "任务→任务",
+                WeekTopologyMetrics.taskClearEffectiveScale,
+                WeekTopologyMetrics.taskVerticalSpacing,
+                WeekTopologyMetrics.taskCardHeight,
+                WeekTopologyMetrics.taskCardHeight
+            )
+        ]
+
+        for stack in stacks {
+            let gap = stack.distance * stack.gate - stack.upper / 2 - stack.lower / 2
+            XCTAssertGreaterThanOrEqual(
+                gap,
+                WeekTopologyMetrics.minimumNodeGap - slack,
+                "\(stack.name) 在门槛尺度下会压叠（净空 \(gap)pt）"
+            )
+        }
+    }
+
+    func test_weekTopologyMetrics_tiersStayDistinguishable() {
+        // 组层与任务层必须落在不同的尺度上，否则组层永远看不到。
+        XCTAssertLessThan(
+            WeekTopologyMetrics.groupClearEffectiveScale,
+            WeekTopologyMetrics.taskClearEffectiveScale
+        )
+    }
+
+    /// 连线端点必须落在两张卡片的边界之外。
+    ///
+    /// 这是「线条穿过框」那个 bug 的回归守卫：按中心到中心画线时，同一列的
+    /// 日期 / 组 / 任务全部共线，整棵子树会被一根签子串起来。
+    func test_weekTopologyEdgeSpan_stopsAtCardBorders() throws {
+        let gap = WeekTopologyMetrics.edgeGap
+
+        let pairs: [(name: String, gate: CGFloat, distance: CGFloat, upper: CGFloat, lower: CGFloat)] = [
+            (
+                "日期→组",
+                WeekTopologyMetrics.taskClearEffectiveScale,
+                WeekTopologyMetrics.groupTopOffset,
+                WeekTopologyMetrics.dayNodeExpandedHeight,
+                WeekTopologyMetrics.groupCardHeight
+            ),
+            (
+                "组→任务",
+                WeekTopologyMetrics.taskClearEffectiveScale,
+                WeekTopologyMetrics.taskFirstRowOffset,
+                WeekTopologyMetrics.groupCardHeight,
+                WeekTopologyMetrics.taskCardHeight
+            ),
+            (
+                "任务→任务",
+                WeekTopologyMetrics.taskClearEffectiveScale,
+                WeekTopologyMetrics.taskVerticalSpacing,
+                WeekTopologyMetrics.taskCardHeight,
+                WeekTopologyMetrics.taskCardHeight
+            )
+        ]
+
+        for pair in pairs {
+            // 上方卡片中心放在 0，下方卡片按渲染尺度摆位。
+            let bottomCenterY = pair.distance * pair.gate
+            let span = WeekTopologyEdgeSpan(
+                topCenterY: 0,
+                bottomCenterY: bottomCenterY,
+                topClearance: WeekTopologyEdgeSpan.clearance(cardHeight: pair.upper),
+                bottomClearance: WeekTopologyEdgeSpan.clearance(cardHeight: pair.lower)
+            )
+
+            let unwrapped = try XCTUnwrap(
+                span,
+                "\(pair.name)：两张卡片之间没有给连线留下任何空间"
+            )
+
+            XCTAssertGreaterThanOrEqual(
+                unwrapped.startY,
+                pair.upper / 2,
+                "\(pair.name) 的连线起点落进了上方卡片里"
+            )
+            XCTAssertLessThanOrEqual(
+                unwrapped.endY,
+                bottomCenterY - pair.lower / 2,
+                "\(pair.name) 的连线终点落进了下方卡片里"
+            )
+            XCTAssertGreaterThan(
+                unwrapped.startY,
+                0,
+                "\(pair.name) 的连线起点不该超过上方卡片的中心"
+            )
+            XCTAssertLessThan(
+                unwrapped.endY,
+                bottomCenterY,
+                "\(pair.name) 的连线终点不该超过下方卡片的中心"
+            )
+            XCTAssertEqual(unwrapped.startY, pair.upper / 2 + gap, accuracy: 0.001)
+            XCTAssertEqual(unwrapped.endY, bottomCenterY - pair.lower / 2 - gap, accuracy: 0.001)
+
+            // 只把两端各让出 edgeGap、中间一点不剩，等于把线裁没了。
+            // 「非 nil」还不够，剩下的那截必须真的看得见。
+            XCTAssertGreaterThanOrEqual(
+                unwrapped.endY - unwrapped.startY,
+                WeekTopologyMetrics.minimumConnectorLength - 0.001,
+                "\(pair.name) 在门槛尺度下连线被裁得看不见了"
+            )
+        }
+    }
+
+    func test_weekTopologyFocus_everyEdgeStaysDrawableAtTheFramedScale() throws {
+        // 端到端复核用户截图里的那个毛病：一条线从头穿到尾，把整棵子树串成糖葫芦。
+        //
+        // 这里不手算几何，直接拿真实布局在取景尺度上走一遍——如果「门槛」和
+        // 「取景上限」交叉，这条测试会先于截图发现：要么连线被判成没有空间，
+        // 要么子树已经超出画布。
         let start = makeDate(2026, 6, 15)
         let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let days = week.days.sorted { $0.date < $1.date }
+        let target = try XCTUnwrap(days.first)
+        for order in 1...2 {
+            target.tasks.append(TaskItem(title: "R\(order)", order: order, zone: .draft))
+        }
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let topologyDay = try XCTUnwrap(snapshot.days.first)
+        let box = try XCTUnwrap(layout.subtreeBounds(for: topologyDay))
+
+        let canvas = CGSize(width: 321, height: 220)
+        let scale = WeekTopologyViewportState.focusEffectiveScale(
+            subtreeSize: box.size,
+            canvasSize: canvas
+        )
+
+        // 门槛不能越过取景上限，否则「任务层可见」和「子树装得下」无法同时成立。
+        XCTAssertLessThanOrEqual(
+            box.height * scale,
+            canvas.height - WeekTopologyMetrics.focusPadding * 2 + 0.001,
+            "任务层门槛已经高过紧凑画布能取景的上限"
+        )
+        XCTAssertEqual(
+            WeekTopologySemanticLevel(effectiveScale: scale),
+            .tasks,
+            "取景尺度进不了任务层"
+        )
+
+        // 取景是等比缩放加平移，两点间距只受缩放影响，所以直接按 scale 摆位即可。
+        let dayPoint = try XCTUnwrap(layout.positions[topologyDay.id])
+        let groupPoint = try XCTUnwrap(
+            layout.positions[topologyDay.groupID(for: .remaining)]
+        )
+        let taskPoints = topologyDay.remainingTasks.compactMap { layout.positions[$0.id] }
+        XCTAssertEqual(taskPoints.count, 2, "这一天应该挂两个任务节点")
+
+        var edges: [(name: String, top: CGFloat, bottom: CGFloat, upper: CGFloat, lower: CGFloat)] = [
+            (
+                "日期→组",
+                dayPoint.y * scale,
+                groupPoint.y * scale,
+                WeekTopologyMetrics.dayNodeExpandedHeight,
+                WeekTopologyMetrics.groupCardHeight
+            )
+        ]
+        for (index, point) in taskPoints.enumerated() {
+            edges.append((
+                index == 0 ? "组→任务1" : "任务1→任务2",
+                (index == 0 ? groupPoint.y : taskPoints[index - 1].y) * scale,
+                point.y * scale,
+                index == 0
+                    ? WeekTopologyMetrics.groupCardHeight
+                    : WeekTopologyMetrics.taskCardHeight,
+                WeekTopologyMetrics.taskCardHeight
+            ))
+        }
+
+        for edge in edges {
+            let span = try XCTUnwrap(
+                WeekTopologyEdgeSpan(
+                    topCenterY: edge.top,
+                    bottomCenterY: edge.bottom,
+                    topClearance: WeekTopologyEdgeSpan.clearance(cardHeight: edge.upper),
+                    bottomClearance: WeekTopologyEdgeSpan.clearance(cardHeight: edge.lower)
+                ),
+                "\(edge.name)：取景尺度下两张卡片之间没有给连线留下空间"
+            )
+
+            XCTAssertGreaterThanOrEqual(
+                span.startY,
+                edge.top + edge.upper / 2 - 0.001,
+                "\(edge.name) 的连线起点落进了上方卡片里"
+            )
+            XCTAssertLessThanOrEqual(
+                span.endY,
+                edge.bottom - edge.lower / 2 + 0.001,
+                "\(edge.name) 的连线终点落进了下方卡片里"
+            )
+            XCTAssertGreaterThanOrEqual(
+                span.endY - span.startY,
+                WeekTopologyMetrics.minimumConnectorLength - 0.001,
+                "\(edge.name) 在取景尺度下被裁得看不见了"
+            )
+        }
+    }
+
+    func test_weekTopologyEdgeSpan_returnsNilWhenCardsAreTooClose() {
+        // 空间不足时宁可不画线，也不要画一条穿进卡片的线。
+        XCTAssertNil(
+            WeekTopologyEdgeSpan(
+                topCenterY: 0,
+                bottomCenterY: 10,
+                topClearance: 20,
+                bottomClearance: 20
+            )
+        )
+    }
+
+    func test_weekTopologyMetrics_verticalInsetClearsRootCard() {
+        // 根节点在两种形态下都不能被画布上边缘裁掉。
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.verticalInset,
+            WeekTopologyMetrics.rootNodeExpandedHeight / 2
+        )
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.verticalInset,
+            WeekTopologyMetrics.rootNodeCompactHeight / 2
+        )
+    }
+
+    func test_weekTopologyMetrics_taskRowStaysInsideDayPitch() {
+        // 一天的整行任务不能宽过日间距，否则相邻日期必然压叠。
+        // 三列网格的行宽是 276pt，而日间距只有 152pt——这就是 P2 无法靠调间距
+        // 修好的结构性原因，也是这里把列数收敛到 1 的原因。
+        let rowWidth = CGFloat(WeekTopologyMetrics.taskColumnCount - 1)
+            * WeekTopologyMetrics.taskColumnSpacing
+            + WeekTopologyMetrics.taskCardWidth
+
+        XCTAssertLessThanOrEqual(
+            rowWidth,
+            WeekTopologyMetrics.daySpacing,
+            "任务行比日间距还宽，相邻日期的任务卡必然互相压叠"
+        )
+    }
+
+    func test_weekTopologyLayout_buildsTreeLevelsAndStableDayOrder() throws {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let firstDay = try XCTUnwrap(week.days.sorted { $0.date < $1.date }.first)
+        firstDay.tasks.append(TaskItem(title: "Root task", order: 1, zone: .draft))
         let snapshot = WeekTopologySnapshot(week: week)
 
         let layout = WeekTopologyLayout(snapshot: snapshot)
         let dayPoints = snapshot.days.compactMap { layout.positions[$0.id] }
+        let rootPoint = try XCTUnwrap(layout.positions[snapshot.rootNodeID])
+        let groupPoint = try XCTUnwrap(layout.positions[snapshot.days[0].groupID(for: .remaining)])
+        let taskID = try XCTUnwrap(snapshot.days.first?.remainingTasks.first?.id)
+        let taskPoint = try XCTUnwrap(layout.positions[taskID])
 
         XCTAssertEqual(dayPoints.count, 7)
         XCTAssertEqual(Set(dayPoints.map(\.y)).count, 1)
         XCTAssertTrue(zip(dayPoints, dayPoints.dropFirst()).allSatisfy { $0.x < $1.x })
-        XCTAssertGreaterThan(layout.contentBounds.width, layout.contentBounds.height)
+        XCTAssertEqual(rootPoint.x, layout.contentBounds.midX, accuracy: 0.001)
+        XCTAssertGreaterThan(dayPoints[0].y - rootPoint.y, 160)
+        XCTAssertLessThan(dayPoints[0].y, groupPoint.y)
+        XCTAssertLessThan(groupPoint.y, taskPoint.y)
+        XCTAssertGreaterThan(layout.contentBounds.height, 300)
+    }
+
+    func test_weekTopologyLayout_rootRailSpansEveryDayColumn() throws {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let rail = try XCTUnwrap(layout.rootRail)
+
+        let dayPoints = try snapshot.days.map { try XCTUnwrap(layout.positions[$0.id]) }
+        let minDayX = try XCTUnwrap(dayPoints.map(\.x).min())
+        let maxDayX = try XCTUnwrap(dayPoints.map(\.x).max())
+        let minDayY = try XCTUnwrap(dayPoints.map(\.y).min())
+
+        XCTAssertEqual(rail.trunkX, layout.contentBounds.midX, accuracy: 0.001)
+        XCTAssertLessThanOrEqual(rail.railStartX, minDayX, "横杆没有覆盖到最左一天")
+        XCTAssertGreaterThanOrEqual(rail.railEndX, maxDayX, "横杆没有覆盖到最右一天")
+        XCTAssertGreaterThan(rail.railY, rail.trunkTopY)
+        XCTAssertLessThan(rail.railY, minDayY)
+    }
+
+    func test_weekTopologyLayout_taskRowsNeverCollideWithNextGroupBand() throws {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        let day = DayModel(dayId: start.dayId, date: start, status: .execute)
+        for order in 1...7 {
+            day.tasks.append(TaskItem(title: "Remaining \(order)", order: order, zone: .focus))
+        }
+        for order in 8...11 {
+            let done = TaskItem(title: "Done \(order)", order: order, zone: .complete)
+            done.completedOrder = order - 7
+            day.tasks.append(done)
+        }
+        day.expiredCount = 3
+        week.days.append(day)
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let topologyDay = try XCTUnwrap(snapshot.days.first)
+
+        // 三行剩余 + 两行完成，正好是旧实现里写死的 88pt 组带间距撑不住的情形。
+        XCTAssertEqual(topologyDay.remainingCount, 7)
+        XCTAssertEqual(topologyDay.completedCount, 4)
+        XCTAssertEqual(topologyDay.forgottenCount, 3)
+
+        try assertNoVerticalCollision(
+            in: layout,
+            taskIDs: topologyDay.remainingTasks.map(\.id),
+            above: topologyDay.groupID(for: .completed)
+        )
+        try assertNoVerticalCollision(
+            in: layout,
+            taskIDs: topologyDay.completedTasks.map(\.id),
+            above: topologyDay.groupID(for: .forgotten)
+        )
+    }
+
+    func test_weekTopologyLayout_taskCardsSeparateAtTaskTierZoom() throws {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        for offset in 0..<7 {
+            let date = start.addingDays(offset)
+            let day = DayModel(dayId: date.dayId, date: date, status: .execute)
+            for order in 1...3 {
+                day.tasks.append(TaskItem(title: "Task \(order)", order: order, zone: .frozen))
+            }
+            week.days.append(day)
+        }
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let points = try snapshot.days
+            .flatMap(\.remainingTasks)
+            .map { try XCTUnwrap(layout.positions[$0.id]) }
+
+        // 任务层只在有效缩放越过推导出的下限之后才出现，所以「不重叠」要在渲染
+        // 尺度下成立，而不是在内容坐标下成立——节点尺寸并不随缩放变化。
+        let tierScale = WeekTopologyMetrics.taskClearEffectiveScale
+        for (index, point) in points.enumerated() {
+            for other in points.dropFirst(index + 1) where abs(point.y - other.y) < 0.001 {
+                XCTAssertGreaterThanOrEqual(
+                    abs(point.x - other.x) * tierScale,
+                    WeekTopologyMetrics.taskCardWidth,
+                    "任务层刚出现时同一行的两个任务卡就已经重叠"
+                )
+            }
+        }
+    }
+
+    /// 卡片在渲染空间的矩形，尺寸按当前层级取——和画布读的是同一套 metrics。
+    private func topologyCardRects(
+        layout: WeekTopologyLayout,
+        snapshot: WeekTopologySnapshot,
+        semanticLevel: WeekTopologySemanticLevel,
+        scale: CGFloat
+    ) -> [(id: String, rect: CGRect)] {
+        let isOverview = semanticLevel == .overview
+        let rootSize = CGSize(
+            width: 58,
+            height: isOverview
+                ? WeekTopologyMetrics.rootNodeCompactHeight
+                : WeekTopologyMetrics.rootNodeExpandedHeight
+        )
+        let daySize = CGSize(
+            width: isOverview
+                ? WeekTopologyMetrics.dayNodeCompactWidth
+                : WeekTopologyMetrics.dayNodeExpandedWidth,
+            height: isOverview
+                ? WeekTopologyMetrics.dayNodeCompactHeight
+                : WeekTopologyMetrics.dayNodeExpandedHeight
+        )
+        let groupSize = CGSize(
+            width: WeekTopologyMetrics.groupCardWidth,
+            height: WeekTopologyMetrics.groupCardHeight
+        )
+        let taskSize = CGSize(
+            width: WeekTopologyMetrics.taskCardWidth,
+            height: WeekTopologyMetrics.taskCardHeight
+        )
+        let forgottenSize = CGSize(
+            width: WeekTopologyMetrics.forgottenCardWidth,
+            height: WeekTopologyMetrics.forgottenCardHeight
+        )
+
+        func rect(_ id: String, _ size: CGSize) -> (id: String, rect: CGRect)? {
+            guard let point = layout.positions[id] else { return nil }
+            let center = CGPoint(x: point.x * scale, y: point.y * scale)
+            return (id, CGRect(
+                x: center.x - size.width / 2,
+                y: center.y - size.height / 2,
+                width: size.width,
+                height: size.height
+            ))
+        }
+
+        var out: [(id: String, rect: CGRect)] = []
+        if let entry = rect(snapshot.rootNodeID, rootSize) { out.append(entry) }
+
+        for day in snapshot.days {
+            if let entry = rect(day.id, daySize) { out.append(entry) }
+            guard semanticLevel != .overview else { continue }
+
+            for kind in WeekTopologyResultKind.allCases where day.count(for: kind) > 0 {
+                if let entry = rect(day.groupID(for: kind), groupSize) { out.append(entry) }
+            }
+            guard semanticLevel == .tasks else { continue }
+
+            for kind in WeekTopologyResultKind.allCases where day.count(for: kind) > 0 {
+                let size = kind == .forgotten ? forgottenSize : taskSize
+                for nodeID in day.nodeIDs(for: kind) {
+                    if let entry = rect(nodeID, size) { out.append(entry) }
+                }
+            }
+        }
+        return out
+    }
+
+    /// 一天挂三个带、每个带多张卡，用来覆盖「跨带」与「带内跨任务」两种穿越。
+    private func makeThreeBandDay() throws -> (
+        snapshot: WeekTopologySnapshot,
+        layout: WeekTopologyLayout,
+        day: WeekTopologyDaySnapshot
+    ) {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekModel(
+            weekId: start.weekId,
+            startDate: start,
+            endDate: start.addingDays(6),
+            status: .present
+        )
+        let day = DayModel(dayId: start.dayId, date: start, status: .execute)
+        for order in 1...3 {
+            day.tasks.append(TaskItem(title: "Remaining \(order)", order: order, zone: .draft))
+        }
+        for order in 4...5 {
+            let done = TaskItem(title: "Done \(order)", order: order, zone: .complete)
+            done.completedOrder = order - 3
+            day.tasks.append(done)
+        }
+        day.expiredCount = 2
+        week.days.append(day)
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        return (
+            snapshot,
+            WeekTopologyLayout(snapshot: snapshot),
+            try XCTUnwrap(snapshot.days.first)
+        )
+    }
+
+    func test_weekTopologyGeometry_cardsNeverOverlapAndLinksNeverCrossACard() throws {
+        // 用户截图里的毛病是「线穿过框」。这条用例把两类关系一次钉死：
+        //   1. 任何两张卡片都不压叠；
+        //   2. 任何一条连线的线段，都不穿过它两端以外的任何卡片。
+        //
+        // 第 2 条是这次真正的收获：`WeekTopologyEdgeSpan` 只保证线段*两端*有余量，
+        // 中间夹着的卡片它管不了。「组 → 每个任务」的扇出画法正是这样把线画回
+        // 它上面的任务卡里的，而那条线两端的余量看起来完全正常——
+        // 所以只断言端点的用例抓不到它。
+        let fixture = try makeThreeBandDay()
+        let snapshot = fixture.snapshot
+        let layout = fixture.layout
+        let topologyDay = fixture.day
+
+        XCTAssertEqual(topologyDay.remainingCount, 3)
+        XCTAssertEqual(topologyDay.completedCount, 2)
+        XCTAssertEqual(topologyDay.forgottenCount, 2)
+
+        let levels: [(name: String, scale: CGFloat)] = [
+            ("overview", 0.5),
+            ("groups 门槛", WeekTopologyMetrics.groupClearEffectiveScale),
+            ("tasks 门槛", WeekTopologyMetrics.taskClearEffectiveScale),
+            ("放大上限", WeekTopologyViewportState.maximumEffectiveScale)
+        ]
+
+        for entry in levels {
+            let level = WeekTopologySemanticLevel(effectiveScale: entry.scale)
+            let cards = topologyCardRects(
+                layout: layout,
+                snapshot: snapshot,
+                semanticLevel: level,
+                scale: entry.scale
+            )
+            XCTAssertFalse(cards.isEmpty, "[\(entry.name)] 一张卡片都没画出来")
+
+            // 1. 卡片之间不能压叠。
+            for i in cards.indices {
+                for j in cards.indices where j > i {
+                    let overlap = cards[i].rect.intersection(cards[j].rect)
+                    XCTAssertTrue(
+                        overlap.isNull || overlap.height <= 0.001,
+                        "[\(entry.name)] \(cards[i].id) 与 \(cards[j].id) 压叠了 \(overlap.height)pt"
+                    )
+                }
+            }
+
+            guard level != .overview else { continue }
+
+            // 2. 连线不能穿过任何一张卡片。
+            for link in layout.subtreeLinks(for: topologyDay, semanticLevel: level) {
+                let parent = try XCTUnwrap(layout.positions[link.parentID])
+                let child = try XCTUnwrap(layout.positions[link.childID])
+                let span = try XCTUnwrap(
+                    WeekTopologyEdgeSpan(
+                        topCenterY: parent.y * entry.scale,
+                        bottomCenterY: child.y * entry.scale,
+                        topClearance: link.parentHeight / 2 + WeekTopologyMetrics.edgeGap,
+                        bottomClearance: link.childHeight / 2 + WeekTopologyMetrics.edgeGap
+                    ),
+                    "[\(entry.name)] \(link.parentID) → \(link.childID) 没有给连线留下空间"
+                )
+
+                let x = parent.x * entry.scale
+                let stroke = CGRect(
+                    x: x - 0.7,
+                    y: span.startY,
+                    width: 1.4,
+                    height: span.endY - span.startY
+                )
+
+                for card in cards where card.id != link.parentID && card.id != link.childID {
+                    let hit = card.rect.intersection(stroke)
+                    XCTAssertTrue(
+                        hit.isNull || hit.height <= 0.001,
+                        "[\(entry.name)] \(link.parentID) → \(link.childID) 的连线穿过了 \(card.id)（\(hit.height)pt）"
+                    )
+                }
+            }
+        }
+    }
+
+    func test_weekTopologyFanOutLinks_wouldRunThroughTheCardsBetweenThem() throws {
+        // 上面那条不变量的反面证据，说明它为什么必须有牙齿。
+        //
+        // 修复前的画法是「组 → 每一个任务」扇出，于是「组 → 第 3 个任务」这条边
+        // 会笔直穿过它上面的第 1、2 张任务卡，而这条边两端的余量完全正常。
+        // `test_weekTopologyEdgeSpan_stopsAtCardBorders` 只检查端点，抓不到它。
+        let fixture = try makeThreeBandDay()
+        let layout = fixture.layout
+        let topologyDay = fixture.day
+        let scale = WeekTopologyMetrics.taskClearEffectiveScale
+
+        let groupPoint = try XCTUnwrap(layout.positions[topologyDay.groupID(for: .remaining)])
+        let taskPoints = try topologyDay.remainingTasks.map { try XCTUnwrap(layout.positions[$0.id]) }
+        XCTAssertEqual(taskPoints.count, 3)
+
+        // 扇出到第 3 个任务（下标 2）。
+        let target = taskPoints[2]
+        let span = try XCTUnwrap(
+            WeekTopologyEdgeSpan(
+                topCenterY: groupPoint.y * scale,
+                bottomCenterY: target.y * scale,
+                topClearance: WeekTopologyMetrics.groupCardHeight / 2 + WeekTopologyMetrics.edgeGap,
+                bottomClearance: WeekTopologyMetrics.taskCardHeight / 2 + WeekTopologyMetrics.edgeGap
+            ),
+            "扇出的场景没构造对：这条边本身应当是有空间的"
+        )
+
+        // 两端余量确实正常——这正是它骗过端点断言的原因。
+        XCTAssertGreaterThanOrEqual(span.startY, groupPoint.y * scale, "起点应当已经在组卡下方")
+
+        // 但它穿过了中间那张卡（下标 1）。
+        let middle = taskPoints[1]
+        let middleRect = CGRect(
+            x: middle.x * scale - WeekTopologyMetrics.taskCardWidth / 2,
+            y: middle.y * scale - WeekTopologyMetrics.taskCardHeight / 2,
+            width: WeekTopologyMetrics.taskCardWidth,
+            height: WeekTopologyMetrics.taskCardHeight
+        )
+        let stroke = CGRect(
+            x: middle.x * scale - 0.7,
+            y: span.startY,
+            width: 1.4,
+            height: span.endY - span.startY
+        )
+        let hit = middleRect.intersection(stroke)
+
+        XCTAssertFalse(hit.isNull, "扇出画法应当穿过中间那张卡——场景没构造对")
+        XCTAssertGreaterThan(
+            hit.height,
+            0,
+            "扇出画法应当真的穿进中间那张卡，否则「改成链」就没有必要"
+        )
+    }
+
+    func test_weekTopologyLayout_subtreeBoundsCoversItsOwnDayOnly() throws {
+        let start = makeDate(2026, 6, 15)
+        let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let days = week.days.sorted { $0.date < $1.date }
+        let target = try XCTUnwrap(days.first)
+        for order in 1...4 {
+            target.tasks.append(TaskItem(title: "R\(order)", order: order, zone: .focus))
+        }
+        for order in 5...7 {
+            let done = TaskItem(title: "C\(order)", order: order, zone: .complete)
+            done.completedOrder = order - 4
+            target.tasks.append(done)
+        }
+        target.expiredCount = 2
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let topologyDay = try XCTUnwrap(snapshot.days.first)
+        let box = try XCTUnwrap(layout.subtreeBounds(for: topologyDay))
+
+        // 这一天自己的每个节点都必须落在盒子里。
+        var ownNodeIDs = [topologyDay.id]
+        for kind in WeekTopologyResultKind.allCases where topologyDay.count(for: kind) > 0 {
+            ownNodeIDs.append(topologyDay.groupID(for: kind))
+        }
+        ownNodeIDs.append(contentsOf: topologyDay.remainingTasks.map(\.id))
+        ownNodeIDs.append(contentsOf: topologyDay.completedTasks.map(\.id))
+        ownNodeIDs.append(contentsOf: topologyDay.forgottenNodes.map(\.id))
+
+        for nodeID in ownNodeIDs {
+            let point = try XCTUnwrap(layout.positions[nodeID])
+            XCTAssertTrue(box.contains(point), "\(nodeID) 落在子树包围盒之外")
+        }
+
+        // 而且不能把邻近日期也圈进来，否则取景会缩得没有意义。
+        for other in snapshot.days.dropFirst() {
+            let point = try XCTUnwrap(layout.positions[other.id])
+            XCTAssertFalse(box.contains(point), "子树包围盒圈进了别的日期")
+        }
+    }
+
+    func test_weekTopologyFocus_framesDaySubtreeInsideCompactCanvas() throws {
+        // 复刻紧凑卡片：7 天整周、画布 321x220。
+        let start = makeDate(2026, 6, 15)
+        let week = WeekCalculator().makeWeek(for: start, status: .present)
+        let days = week.days.sorted { $0.date < $1.date }
+        let target = try XCTUnwrap(days.first)
+        for order in 1...2 {
+            target.tasks.append(TaskItem(title: "R\(order)", order: order, zone: .draft))
+        }
+
+        let snapshot = WeekTopologySnapshot(week: week)
+        let layout = WeekTopologyLayout(snapshot: snapshot)
+        let topologyDay = try XCTUnwrap(snapshot.days.first)
+        let box = try XCTUnwrap(layout.subtreeBounds(for: topologyDay))
+
+        let canvas = CGSize(width: 321, height: 220)
+        let effectiveScale = WeekTopologyViewportState.focusEffectiveScale(
+            subtreeSize: box.size,
+            canvasSize: canvas
+        )
+
+        // 取景后的缩放必须已经进入任务层，否则轻点日期只能看到孤零零的日期节点。
+        XCTAssertEqual(
+            WeekTopologySemanticLevel(effectiveScale: effectiveScale),
+            .tasks,
+            "紧凑卡片里 focus 后的有效缩放进不了任务层"
+        )
+
+        // 而且整棵子树要真的装得进画布（含四周留白）。
+        let rendered = CGSize(
+            width: box.width * effectiveScale,
+            height: box.height * effectiveScale
+        )
+        XCTAssertLessThanOrEqual(
+            rendered.height,
+            canvas.height - WeekTopologyMetrics.focusPadding * 2 + 0.001,
+            "取景后子树的上下两端会超出紧凑画布"
+        )
+        XCTAssertLessThanOrEqual(
+            rendered.width,
+            canvas.width - WeekTopologyMetrics.focusPadding * 2 + 0.001,
+            "取景后子树的左右两端会超出紧凑画布"
+        )
+
+        // 任务卡在取景尺度下不能压叠。
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.taskVerticalSpacing * effectiveScale,
+            WeekTopologyMetrics.taskCardHeight,
+            "取景尺度下相邻两行任务卡会压叠"
+        )
+    }
+
+    func test_weekTopologyFocus_keepsTaskRowsReachableForLongDays() throws {
+        // 一天 7 个任务时子树装不进紧凑画布，取景必须退到「任务层下限」而不是
+        // 无限缩小——否则任务卡会挤成一团。
+        let canvas = CGSize(width: 321, height: 220)
+        let tallSubtree = CGSize(width: 88, height: 400)
+        let effectiveScale = WeekTopologyViewportState.focusEffectiveScale(
+            subtreeSize: tallSubtree,
+            canvasSize: canvas
+        )
+
+        XCTAssertEqual(effectiveScale, WeekTopologyMetrics.taskClearEffectiveScale, accuracy: 0.0001)
+        XCTAssertGreaterThanOrEqual(
+            WeekTopologyMetrics.taskVerticalSpacing * effectiveScale,
+            WeekTopologyMetrics.taskCardHeight,
+            "任务多的日子取景后任务卡会压叠"
+        )
+    }
+
+    func test_weekTopologyViewport_clampsZoomToRenderedCeiling() {
+        var viewport = WeekTopologyViewportState()
+        let fitScale: CGFloat = 0.282
+
+        // 上限按画布适配比例反算：紧凑卡片的 0.282 与全屏的 0.392 应该得到
+        // 不同的 scale 上限，但同一个「渲染尺度」上限。
+        viewport.applyScale(100, fitScale: fitScale)
+        XCTAssertEqual(
+            viewport.effectiveScale(fitScale: fitScale),
+            WeekTopologyViewportState.maximumEffectiveScale,
+            accuracy: 0.0001
+        )
+
+        viewport.applyScale(0.1, fitScale: fitScale)
+        XCTAssertEqual(viewport.scale, WeekTopologyViewportState.minimumScale)
+    }
+
+    func test_weekTopologyLayout_dayNodesSeparateAtOverviewZoom() {
+        let contentWidth = WeekTopologyMetrics.contentWidth(dayCount: 7)
+
+        // 屏宽 375 / 393 / 430，各自减去页面内边距 32 与卡片内边距 40。
+        for canvasWidth in [CGFloat(303), 321, 358] {
+            let fitScale = WeekTopologyMetrics.fitScale(
+                viewportWidth: canvasWidth,
+                contentWidth: contentWidth
+            )
+            XCTAssertGreaterThanOrEqual(
+                WeekTopologyMetrics.daySpacing * fitScale,
+                WeekTopologyMetrics.dayNodeCompactWidth,
+                "画布宽 \(canvasWidth) 时 overview 层的日期节点会首尾相贴"
+            )
+        }
+    }
+
+    func test_weekTopologyViewport_reachesTaskTierAtCompactCardFitScale() {
+        let contentWidth = WeekTopologyMetrics.contentWidth(dayCount: 7)
+        let fitScale = WeekTopologyMetrics.fitScale(viewportWidth: 321, contentWidth: contentWidth)
+
+        var viewport = WeekTopologyViewportState()
+        XCTAssertEqual(viewport.semanticLevel(fitScale: fitScale), .overview)
+
+        // 上限必须按画布适配比例反算，否则紧凑卡片永远进不了任务层。
+        viewport.applyScale(viewport.clampedScale(100, fitScale: fitScale), fitScale: fitScale)
+
+        XCTAssertEqual(viewport.semanticLevel(fitScale: fitScale), .tasks)
+        XCTAssertGreaterThanOrEqual(
+            viewport.effectiveScale(fitScale: fitScale),
+            WeekTopologyViewportState.tasksReachEffectiveScale
+        )
+    }
+
+    private func assertNoVerticalCollision(
+        in layout: WeekTopologyLayout,
+        taskIDs: [String],
+        above groupID: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let group = try XCTUnwrap(layout.positions[groupID], file: file, line: line)
+        let groupTop = group.y - WeekTopologyMetrics.groupCardHeight / 2
+
+        for id in taskIDs {
+            let point = try XCTUnwrap(layout.positions[id], file: file, line: line)
+            XCTAssertLessThan(
+                point.y + WeekTopologyMetrics.taskCardHeight / 2,
+                groupTop,
+                "任务 \(id) 的底边压到了 \(groupID) 的顶边",
+                file: file,
+                line: line
+            )
+        }
     }
 
     func test_suspendedCountdownPreset_defaults() {
         XCTAssertEqual(SuspendedCountdownPreset.defaultOptions, [1, 2, 3, 5, 7, 10, 30])
+    }
+
+    func test_suspendedCountdownPreset_includesCustomDefaultOnlyWhenMissing() {
+        // A preset value must not be duplicated.
+        XCTAssertEqual(SuspendedCountdownPreset.options(includingDefault: 7), SuspendedCountdownPreset.defaultOptions)
+
+        // A custom default outside the presets is appended and kept sorted.
+        XCTAssertEqual(SuspendedCountdownPreset.options(includingDefault: 21), [1, 2, 3, 5, 7, 10, 21, 30])
+        XCTAssertEqual(SuspendedCountdownPreset.options(includingDefault: 4), [1, 2, 3, 4, 5, 7, 10, 30])
+
+        // Non-positive values are normalized to the smallest usable preset.
+        XCTAssertEqual(SuspendedCountdownPreset.options(includingDefault: 0), SuspendedCountdownPreset.defaultOptions)
+        XCTAssertEqual(SuspendedCountdownPreset.options(includingDefault: -5), SuspendedCountdownPreset.defaultOptions)
+
+        // The configured default is always selectable.
+        for candidate in [1, 4, 21, 60] {
+            XCTAssertTrue(
+                SuspendedCountdownPreset.options(includingDefault: candidate).contains(candidate),
+                "Expected the configured default \(candidate) to be selectable"
+            )
+        }
     }
 
     func test_centeredSquareSizing_usesMinDimension() {
@@ -1039,6 +2083,128 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(SuspendedTaskMetaFormatter.deadlineText(remainingDays: 10), "10 天后到期")
         XCTAssertEqual(SuspendedTaskMetaFormatter.stepsText(count: 3), "3 步骤")
         XCTAssertEqual(SuspendedTaskMetaFormatter.attachmentsText(count: 2), "2 附件")
+    }
+
+    func test_suspendedTaskMetaFormatter_marksOverdueSeparatelyFromDueToday() {
+        let dueToday = SuspendedTaskMetaFormatter.deadlineText(remainingDays: 0)
+        let overdue = SuspendedTaskMetaFormatter.deadlineText(remainingDays: -3)
+
+        // Overdue tasks are reachable once the expiry policy keeps them, so they
+        // must not be mislabelled as due today.
+        XCTAssertNotEqual(overdue, dueToday)
+        XCTAssertTrue(overdue.contains("3"), "Expected the overdue text to carry the day count, got: \(overdue)")
+
+        // A single day overdue is still overdue, not due today.
+        XCTAssertNotEqual(SuspendedTaskMetaFormatter.deadlineText(remainingDays: -1), dueToday)
+    }
+
+    // MARK: - Theme system
+
+    func test_themeVisualStyle_originalThemesKeepTheClassicForm() {
+        // The ten original themes must render exactly as they always have.
+        // Any change here is a regression for existing users.
+        let originals: [WeekTheme] = [
+            .amber, .ocean, .forest, .rose, .lavender,
+            .graphite, .sunset, .mint, .midnight, .lotr
+        ]
+        for theme in originals {
+            XCTAssertEqual(theme.visualStyle, .classic, "\(theme.rawValue) must keep the classic form")
+            XCTAssertEqual(theme.visualStyle.symbolVariant, .none, "\(theme.rawValue) must keep outline icons")
+            XCTAssertNil(theme.visualStyle.borderColorHexLight, "\(theme.rawValue) must not set a custom border")
+        }
+    }
+
+    func test_themeVisualStyle_personalisedThemesOverrideTheForm() {
+        XCTAssertEqual(WeekTheme.brutal.visualStyle, .brutalist)
+        XCTAssertEqual(WeekTheme.neon.visualStyle, .neon)
+        XCTAssertEqual(WeekTheme.paper.visualStyle, .paper)
+        XCTAssertEqual(WeekTheme.terminal.visualStyle, .terminal)
+
+        // Brutalist is defined by a hard (unblurred) offset shadow.
+        XCTAssertEqual(WeekTheme.brutal.visualStyle.shadow?.radius, 0)
+        // Flat themes must not silently fall back to the classic diffuse shadow.
+        XCTAssertEqual(WeekTheme.paper.visualStyle.shadow, .flat)
+        XCTAssertEqual(WeekTheme.terminal.visualStyle.shadow, .flat)
+
+        XCTAssertEqual(WeekTheme.brutal.visualStyle.symbolVariant, .fill)
+        XCTAssertEqual(WeekTheme.neon.visualStyle.symbolVariant, .fill)
+        XCTAssertEqual(WeekTheme.paper.visualStyle.symbolVariant, .none)
+        XCTAssertEqual(WeekTheme.terminal.visualStyle.symbolVariant, .fill)
+
+        // Every personalised theme must differ from the classic form,
+        // otherwise it is just a recolour wearing a new name.
+        for theme in WeekTheme.allCases where theme.visualStyle != .classic {
+            XCTAssertTrue(
+                [.brutal, .neon, .paper, .terminal].contains(theme),
+                "\(theme.rawValue) changed the visual form without being a personalised theme"
+            )
+        }
+    }
+
+    /// `barScale` is a multiplier precisely so `.classic` stays untouched:
+    /// call sites pass 4, 8 and 12 points and all three must come back unchanged.
+    func test_themeVisualStyle_classicBarScalePreservesOriginalThickness() {
+        let style = ThemeVisualStyle.classic
+
+        XCTAssertEqual(style.barThickness(8), 8, accuracy: 0.001)
+        XCTAssertEqual(style.barThickness(12), 12, accuracy: 0.001)
+        XCTAssertEqual(style.barThickness(4), 4, accuracy: 0.001)
+        // nil corner radius keeps the original pill shape.
+        XCTAssertEqual(style.barCornerRadius(for: 8), 4, accuracy: 0.001)
+    }
+
+    /// The settings picker swatch is derived from the card form. The factors are
+    /// tuned so `.classic` reproduces the 7pt / 0.5pt swatch it has always had —
+    /// if someone retunes them, the originals change appearance in the picker.
+    func test_themeVisualStyle_classicSwatchKeepsOriginalMetrics() {
+        let style = ThemeVisualStyle.classic
+        XCTAssertEqual(style.swatchRadius, 7, accuracy: 0.001)
+        XCTAssertEqual(style.swatchBorderWidth, 0.5, accuracy: 0.001)
+    }
+
+    func test_themeVisualStyle_personalisedThemesReshapeBars() {
+        let brutal = WeekTheme.brutal.visualStyle
+        XCTAssertEqual(brutal.barThickness(8), 12, accuracy: 0.001)
+        XCTAssertEqual(brutal.barCornerRadius(for: 12), 0, accuracy: 0.001)
+
+        let paper = WeekTheme.paper.visualStyle
+        XCTAssertEqual(paper.barThickness(8), 4.8, accuracy: 0.001)
+        XCTAssertEqual(paper.barCornerRadius(for: 4.8), 0.5, accuracy: 0.001)
+
+        let terminal = WeekTheme.terminal.visualStyle
+        XCTAssertEqual(terminal.barThickness(8), 6.4, accuracy: 0.001)
+        XCTAssertEqual(terminal.barCornerRadius(for: 6.4), 0, accuracy: 0.001)
+    }
+
+    /// `.circle` and `.square` are not used by any shipped theme yet, but they
+    /// are part of the mechanism — pin the mapping so adding one is a one-liner.
+    func test_themeSymbolVariant_mapsToSwiftUISymbolVariants() {
+        XCTAssertEqual(ThemeSymbolVariant.none.symbolVariants, .none)
+        XCTAssertEqual(ThemeSymbolVariant.fill.symbolVariants, .fill)
+        XCTAssertEqual(ThemeSymbolVariant.circle.symbolVariants, .circle)
+        XCTAssertEqual(ThemeSymbolVariant.square.symbolVariants, .square)
+    }
+
+    func test_themePalette_everyThemeHasCompleteHexValuesInBothAppearances() {
+        // Adding a theme means hand-writing 40 hex values; this catches typos
+        // and missed fields across every theme, past and future.
+        for theme in WeekTheme.allCases {
+            for mode in AppearanceMode.allCases {
+                let palette = theme.palette(for: mode, systemIsDark: mode == .dark)
+                let values = Mirror(reflecting: palette).children.compactMap { $0.value as? String }
+
+                XCTAssertEqual(
+                    values.count, 20,
+                    "\(theme.rawValue)/\(mode.rawValue): expected 20 palette fields, got \(values.count)"
+                )
+                for value in values {
+                    XCTAssertTrue(
+                        value.hasPrefix("#") && value.count == 7,
+                        "\(theme.rawValue)/\(mode.rawValue): '\(value)' is not a #RRGGBB colour"
+                    )
+                }
+            }
+        }
     }
 
     func test_arrayMove_ignoresOutOfRangeInputs() {
@@ -2251,6 +3417,41 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
         XCTAssertEqual(deletedCount, 1)
         XCTAssertEqual(remaining.map(\.title), ["Active"])
         XCTAssertEqual(notifications.cancelledTaskIDs, [expired.id])
+    }
+
+    func test_sweepExpiredSuspendedTasksKeepsOverdueRecordsUnderKeepOverduePolicy() throws {
+        let context = container.mainContext
+        let notifications = TestNotificationService()
+        let service = SuspendedTaskLifecycleService(modelContext: context, notificationService: notifications)
+        let now = makeDate(2026, 3, 20, 12, 0)
+
+        let expired = SuspendedTaskItem(
+            title: "Expired",
+            decisionDeadline: makeDate(2026, 3, 19, 23, 59, 59),
+            preferredCountdownDays: 10
+        )
+        let active = SuspendedTaskItem(
+            title: "Active",
+            decisionDeadline: makeDate(2026, 3, 25, 23, 59, 59),
+            preferredCountdownDays: 10
+        )
+        context.insert(expired)
+        context.insert(active)
+        try context.save()
+
+        let deletedCount = try service.sweepExpiredTasks(now: now, policy: .keepOverdue)
+        let remaining = try context.fetch(FetchDescriptor<SuspendedTaskItem>())
+
+        // Nothing is deleted and nothing is cancelled, so the overdue record
+        // stays visible in the suspended box for the user to decide on.
+        XCTAssertEqual(deletedCount, 0)
+        XCTAssertEqual(Set(remaining.map(\.title)), ["Expired", "Active"])
+        XCTAssertTrue(notifications.cancelledTaskIDs.isEmpty)
+        XCTAssertEqual(expired.status, .active)
+
+        // Re-running is idempotent: the record is still there, still untouched.
+        XCTAssertEqual(try service.sweepExpiredTasks(now: now, policy: .keepOverdue), 0)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<SuspendedTaskItem>()).count, 2)
     }
 
     private func requireDay(in week: WeekModel, date: Date) -> DayModel {

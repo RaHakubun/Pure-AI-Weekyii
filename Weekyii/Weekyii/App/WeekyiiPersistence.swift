@@ -245,6 +245,14 @@ enum WeekyiiPersistence {
         try? encoded.write(to: manifestURL, options: .atomic)
     }
 
+    /// How many local recovery points are kept on disk.
+    /// Mirrors `UserSettings.recoveryPointRetentionCount` without creating a dependency
+    /// on the settings object inside the persistence layer.
+    private static var backupRetentionCount: Int {
+        let stored = UserDefaults.standard.object(forKey: "recoveryPointRetentionCount") as? Int ?? 8
+        return min(max(stored, 1), 50)
+    }
+
     private static func pruneBackups(in backupFolder: URL) {
         let fileManager = FileManager.default
         let snapshots = ((try? fileManager.contentsOfDirectory(
@@ -259,7 +267,7 @@ enum WeekyiiPersistence {
             return lhsDate > rhsDate
         }
 
-        let keep = Set<URL>(snapshots.prefix(8))
+        let keep = Set<URL>(snapshots.prefix(backupRetentionCount))
 
         for snapshot in snapshots where !keep.contains(snapshot) {
             try? fileManager.removeItem(at: snapshot)

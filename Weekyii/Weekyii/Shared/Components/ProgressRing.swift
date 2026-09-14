@@ -20,18 +20,25 @@ struct ProgressRing: View {
         self.showPercentage = showPercentage
     }
     
+    /// Bars and rings follow the active theme's visual language. The theme
+    /// returns a scale, not an absolute width, so the ten original themes keep
+    /// exactly the weight they have always had.
+    private var themedLineWidth: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barThickness(lineWidth)
+    }
+
     var body: some View {
         ZStack {
             // 背景环
             Circle()
-                .stroke(Color.backgroundTertiary, lineWidth: lineWidth)
-            
+                .stroke(Color.backgroundTertiary, lineWidth: themedLineWidth)
+
             // 进度环
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
                     Color.weekyiiGradient,
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    style: StrokeStyle(lineWidth: themedLineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
@@ -63,16 +70,20 @@ struct MiniProgressRing: View {
         self.size = size
     }
     
+    private var themedLineWidth: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barThickness(4)
+    }
+
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.backgroundTertiary, lineWidth: 4)
-            
+                .stroke(Color.backgroundTertiary, lineWidth: themedLineWidth)
+
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
                     Color.weekyiiGradient,
-                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    style: StrokeStyle(lineWidth: themedLineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
@@ -94,23 +105,35 @@ struct ProgressBar: View {
         self.showPercentage = showPercentage
     }
     
+    /// Themed thickness and corner shape. `barScale` keeps the original weight
+    /// under `.classic`; personalised themes can go thinner, thicker or square.
+    private var themedHeight: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barThickness(height)
+    }
+
+    private var themedCornerRadius: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedHeight)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.xs) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // 背景
-                    RoundedRectangle(cornerRadius: height / 2)
+                    RoundedRectangle(cornerRadius: themedCornerRadius)
                         .fill(Color.backgroundTertiary)
-                    
+
                     // 进度条
-                    RoundedRectangle(cornerRadius: height / 2)
+                    RoundedRectangle(cornerRadius: themedCornerRadius)
                         .fill(Color.weekyiiGradient)
                         .frame(width: geometry.size.width * progress)
                         .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
                 }
             }
-            .frame(height: height)
-            
+            // The frame has to follow the themed thickness or a scaled-up bar
+            // (Brutalist runs 1.5x) would be clipped by its own container.
+            .frame(height: themedHeight)
+
             if showPercentage {
                 Text("\(Int(progress * 100))%")
                     .font(.caption)

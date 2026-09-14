@@ -15,12 +15,13 @@ struct CreateProjectSheet: View {
     @State private var errorMessage: String?
     @State private var hasAppliedProjectDefaults = false
 
-    private let colorOptions = [
+    /// Shared with the project settings page so both surfaces offer the same palette.
+    static let colorOptions = [
         "#C46A1A", "#3FA67A", "#D05C3E", "#8C6AD9",
         "#2F7E79", "#F08A3C", "#D97A6C", "#6B5A4F"
     ]
 
-    private let iconOptions = [
+    static let iconOptions = [
         "folder.fill", "doc.text.fill", "star.fill", "bolt.fill",
         "flag.fill", "book.fill", "hammer.fill", "puzzlepiece.fill",
         "lightbulb.fill", "chart.bar.fill", "graduationcap.fill", "airplane"
@@ -81,7 +82,7 @@ struct CreateProjectSheet: View {
                                 .foregroundColor(.textSecondary)
 
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: WeekSpacing.sm) {
-                                ForEach(colorOptions, id: \.self) { hex in
+                                ForEach(Self.colorOptions, id: \.self) { hex in
                                     ZStack {
                                         Circle()
                                             .fill(Color(hex: hex))
@@ -116,7 +117,7 @@ struct CreateProjectSheet: View {
                                 .foregroundColor(.textSecondary)
 
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: WeekSpacing.sm) {
-                                ForEach(iconOptions, id: \.self) { icon in
+                                ForEach(Self.iconOptions, id: \.self) { icon in
                                     ZStack {
                                         RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous)
                                             .fill(selectedIcon == icon ? Color(hex: selectedColor).opacity(0.15) : Color.backgroundTertiary)
@@ -161,6 +162,14 @@ struct CreateProjectSheet: View {
                 guard projectToEdit == nil, !hasAppliedProjectDefaults else { return }
                 startDate = Date()
                 endDate = Date().addingDays(max(settings.defaultProjectDurationDays, 1))
+                // Only adopt a stored default that is actually part of the palette,
+                // otherwise nothing would render as selected.
+                if Self.colorOptions.contains(settings.defaultProjectColorHex) {
+                    selectedColor = settings.defaultProjectColorHex
+                }
+                if Self.iconOptions.contains(settings.defaultProjectIconName) {
+                    selectedIcon = settings.defaultProjectIconName
+                }
                 hasAppliedProjectDefaults = true
             }
             .toolbar {

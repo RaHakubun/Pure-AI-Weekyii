@@ -11,6 +11,7 @@ private enum MainTab: Hashable {
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
@@ -19,6 +20,12 @@ struct ContentView: View {
 
     private var visualIdentity: String {
         "\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)"
+    }
+
+    /// A single switch that silences every app-driven animation: the system setting
+    /// and Weekyii's own “减少动效” both funnel into one value.
+    private var reduceMotion: Bool {
+        systemReduceMotion || userSettings.reduceMotionEnabled
     }
 
     var body: some View {
@@ -30,7 +37,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.past)
             
-            TodayView(animationsActive: selectedTab == .today && scenePhase == .active)
+            TodayView(animationsActive: selectedTab == .today && scenePhase == .active && !reduceMotion)
                 .id(visualIdentity)
                 .tabItem {
                     tabLabel(String(localized: "tab.today"), systemImage: "sun.max")
@@ -44,7 +51,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.pending)
 
-            ExtensionsHubView(animationsActive: selectedTab == .extensions && scenePhase == .active)
+            ExtensionsHubView(animationsActive: selectedTab == .extensions && scenePhase == .active && !reduceMotion)
                 .id(visualIdentity)
                 .tabItem {
                     tabLabel(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
@@ -57,6 +64,7 @@ struct ContentView: View {
                 }
                 .tag(MainTab.settings)
         }
+        .environment(\.weekyiiReduceMotion, reduceMotion)
         // Theme and appearance changes already invalidate this view through UserSettings.
         // Keeping them in the identity destroys every tab's NavigationStack on selection.
         .id(appState.dataRevision)

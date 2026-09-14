@@ -4,10 +4,19 @@
     "" : {
 
     },
+    "—" : {
+
+    },
     "·" : {
 
     },
+    "·%lld" : {
+
+    },
     "“" : {
+
+    },
+    "// focus" : {
 
     },
     "%" : {
@@ -81,6 +90,9 @@
     "%lld 天" : {
 
     },
+    "%lld 项" : {
+
+    },
     "%lld/%lld" : {
       "localizations" : {
         "en" : {
@@ -114,6 +126,12 @@
 
     },
     "+%lld天" : {
+
+    },
+    "> weekyii" : {
+
+    },
+    ">_" : {
 
     },
     "~" : {
@@ -1303,6 +1321,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日任务流到期提醒"
+          }
+        }
+      }
+    },
+    "notification.suspended.d0e.auto_delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due tonight: if it is still unhandled, the task will be deleted automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今晚到期：若仍未处理，系统将自动删除该任务。"
+          }
+        }
+      }
+    },
+    "notification.suspended.d0e.keep_overdue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due tonight: if it is still unhandled, it stays in the suspended box marked as overdue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今晚到期：若仍未处理，任务会留在悬置箱并标记为已逾期。"
+          }
+        }
+      }
+    },
+    "notification.suspended.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspended box"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置箱提醒"
           }
         }
       }
@@ -3501,6 +3567,38 @@
         }
       }
     },
+    "settings.data.retention" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery points kept"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复点保留数量"
+          }
+        }
+      }
+    },
+    "settings.data.retention.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oldest recovery points are pruned once the limit is exceeded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超出后自动清理最旧的恢复点"
+          }
+        }
+      }
+    },
     "settings.debug.clear" : {
       "localizations" : {
         "en" : {
@@ -4079,6 +4177,7 @@
       }
     },
     "settings.icloud.coming_soon" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4145,23 +4244,6 @@
         }
       }
     },
-    "settings.icloud.status.disabled" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not Available"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不可用"
-          }
-        }
-      }
-    },
     "settings.icloud.status.available" : {
       "localizations" : {
         "en" : {
@@ -4190,6 +4272,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在检查 iCloud…"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.disabled" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不可用"
           }
         }
       }
@@ -4371,6 +4470,326 @@
         }
       }
     },
+    "settings.language.en" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        }
+      }
+    },
+    "settings.language.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit and reopen Weekyii for the change to take effect."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改后需要完全退出并重新打开 Weekyii 才会生效。"
+          }
+        }
+      }
+    },
+    "settings.language.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Language"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "界面语言"
+          }
+        }
+      }
+    },
+    "settings.language.system" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随系统"
+          }
+        }
+      }
+    },
+    "settings.language.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言"
+          }
+        }
+      }
+    },
+    "settings.language.zh_hans" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "简体中文"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "简体中文"
+          }
+        }
+      }
+    },
+    "settings.motion.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turning on “Reduce motion” also stops tile rotation. Changes apply immediately."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“减少动效”开启后，磁贴轮换也会一并停止。改动立即生效。"
+          }
+        }
+      }
+    },
+    "settings.motion.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "动效"
+          }
+        }
+      }
+    },
+    "settings.motion.reduce" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reduce motion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减少动效"
+          }
+        }
+      }
+    },
+    "settings.motion.reduce.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops theme backgrounds, transitions and tile flips"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止主题背景、转场与磁贴翻转等动画"
+          }
+        }
+      }
+    },
+    "settings.motion.tiles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-rotate module tiles"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模块磁贴自动轮换"
+          }
+        }
+      }
+    },
+    "settings.motion.tiles.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotates through suspended tasks and projects while the Extensions tab is open"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在扩展页停留时轮换展示不同的悬置任务与项目"
+          }
+        }
+      }
+    },
+    "settings.project.board.columns" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Columns per row"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行列数"
+          }
+        }
+      }
+    },
+    "settings.project.board.columns.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d columns"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 列"
+          }
+        }
+      }
+    },
+    "settings.project.board.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fewer columns make larger tiles; wide tiles narrow automatically to fit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列数越少磁贴越大；宽幅磁贴会自动收窄以适应当前列数。"
+          }
+        }
+      }
+    },
+    "settings.project.board.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project board"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目看板"
+          }
+        }
+      }
+    },
+    "settings.project.default_color" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default colour"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认颜色"
+          }
+        }
+      }
+    },
+    "settings.project.default_color.a11y" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default colour %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认颜色 %@"
+          }
+        }
+      }
+    },
+    "settings.project.default_icon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default icon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认图标"
+          }
+        }
+      }
+    },
+    "settings.project.default_icon.a11y" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default icon %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认图标 %@"
+          }
+        }
+      }
+    },
     "settings.reminder.15min" : {
       "localizations" : {
         "en" : {
@@ -4415,6 +4834,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前 1 小时"
+          }
+        }
+      }
+    },
+    "settings.reminder.auto.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekyii reminds you at the morning time and 5 minutes before the deadline; the fixed reminder is for your own rhythm."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统会在晨间时刻与截止前最后 5 分钟自动提醒，固定时刻提醒用于你的个人节奏。"
+          }
+        }
+      }
+    },
+    "settings.reminder.morning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morning reminder time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "晨间提醒时刻"
+          }
+        }
+      }
+    },
+    "settings.reminder.morning.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminds you about unfinished tasks at this time, also used for suspended task mornings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"
           }
         }
       }
@@ -4496,6 +4963,358 @@
         }
       }
     },
+    "settings.suspended.default_countdown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default countdown"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置箱默认倒计时"
+          }
+        }
+      }
+    },
+    "settings.suspended.default_countdown.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default countdown for new suspended tasks; still adjustable before saving."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"
+          }
+        }
+      }
+    },
+    "settings.suspended.default_countdown.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d days"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 天"
+          }
+        }
+      }
+    },
+    "settings.suspended.expiry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expiry policy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期处理方式"
+          }
+        }
+      }
+    },
+    "settings.suspended.expiry.auto_delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete automatically"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期自动删除"
+          }
+        }
+      }
+    },
+    "settings.suspended.expiry.auto_delete.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete the record once the deadline passes, leaving no trace."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期后直接删除，不留记录。"
+          }
+        }
+      }
+    },
+    "settings.suspended.expiry.keep_overdue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep as overdue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留为逾期待处理"
+          }
+        }
+      }
+    },
+    "settings.suspended.expiry.keep_overdue.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep it in the suspended box marked as overdue, so you decide whether to renew, assign or delete it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期后保留在悬置箱并标记为已逾期，由你决定续期、分配或删除。"
+          }
+        }
+      }
+    },
+    "settings.suspended.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspended Box"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置箱"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.advance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start reminding %d days ahead"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前 %d 天开始提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deadline reminder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.enabled.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, no suspended task deadline reminders are sent"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后不再发送任何悬置任务的到期提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.evening" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evening reminder time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期当晚提醒时刻"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminder intensity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒强度"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.full" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充分"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.full.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several days ahead, one day ahead and on the due day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前多天、提前一天与到期当天提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.minimal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minimal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精简"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.minimal.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due-day reminders only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只在到期当天提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.standard" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准"
+          }
+        }
+      }
+    },
+    "settings.suspended.reminder.intensity.standard.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One day ahead and on the due day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前一天与到期当天提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspended Box Reminders"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置箱提醒"
+          }
+        }
+      }
+    },
+    "settings.suspended.section.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspended tasks are reminded before their deadline using this rhythm. What happens once the deadline passes is configured under Task Management → Suspended Box."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置任务会按这里的节奏在到期前提醒你。到期后的处理方式在「任务管理 → 悬置箱」中设置。"
+          }
+        }
+      }
+    },
     "settings.theme.color" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4542,6 +5361,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "settings.usage_history.overview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "概览"
+          }
+        }
+      }
+    },
+    "settings.usage_history.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage history"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用历程"
           }
         }
       }
@@ -4969,6 +5820,22 @@
         }
       }
     },
+    "suspended.deadline.overdue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d days overdue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已逾期 %d 天"
+          }
+        }
+      }
+    },
     "tab.extensions" : {
       "localizations" : {
         "en" : {
@@ -5286,6 +6153,74 @@
         }
       }
     },
+    "theme.brutal.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brutalist"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粗野"
+          }
+        }
+      }
+    },
+    "theme.neon.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "霓虹"
+          }
+        }
+      }
+    },
+    "theme.paper.name" : {
+      "comment" : "",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纸感"
+          }
+        }
+      }
+    },
+    "theme.terminal.name" : {
+      "comment" : "",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "终端"
+          }
+        }
+      }
+    },
     "today.days_started" : {
       "localizations" : {
         "en" : {
@@ -5572,6 +6507,9 @@
     "主题" : {
 
     },
+    "也可拖动或双指缩放浏览" : {
+
+    },
     "交换" : {
 
     },
@@ -5593,6 +6531,9 @@
     "今日节奏" : {
 
     },
+    "从最近恢复点还原" : {
+
+    },
     "从归档恢复" : {
 
     },
@@ -5612,9 +6553,6 @@
 
     },
     "你可以选择同步今日，或只让新默认值从明日开始生效。" : {
-
-    },
-    "使用历程" : {
 
     },
     "使用方式" : {
@@ -5657,6 +6595,9 @@
 
     },
     "列出最近备份摘要" : {
+
+    },
+    "创建任务后，这里会按日期显示任务数量与完成状态。" : {
 
     },
     "创建并移动" : {
@@ -5743,9 +6684,6 @@
     "完成任务保留详情；过期任务仅保留数量。" : {
 
     },
-    "完成率 %lld%%" : {
-
-    },
     "完成编辑" : {
 
     },
@@ -5786,6 +6724,9 @@
 
     },
     "已选择" : {
+
+    },
+    "已遗忘" : {
 
     },
     "已遗忘任务，无详情" : {
@@ -5908,9 +6849,6 @@
     "数据库不可用" : {
 
     },
-    "整周概览" : {
-
-    },
     "新增" : {
 
     },
@@ -5968,10 +6906,19 @@
     "未选择" : {
 
     },
-    "本周拓扑" : {
+    "本周" : {
+
+    },
+    "本周，共 %lld 项" : {
+
+    },
+    "本周任务结构" : {
 
     },
     "本周详情" : {
+
+    },
+    "本周还没有任务" : {
 
     },
     "本地恢复点" : {
@@ -6046,6 +6993,9 @@
     "确认结项后，项目将进入只读状态。" : {
 
     },
+    "空" : {
+
+    },
     "立即重算状态" : {
 
     },
@@ -6059,9 +7009,6 @@
 
     },
     "类型管理" : {
-
-    },
-    "系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。" : {
 
     },
     "结束 %@" : {
@@ -6083,9 +7030,6 @@
 
     },
     "编辑项目信息" : {
-
-    },
-    "缩放后展开结果组和任务" : {
 
     },
     "草稿任务" : {
@@ -6115,7 +7059,19 @@
     "趋势与洞察" : {
 
     },
-    "轻点选择，轻点两次聚焦当天分支" : {
+    "轻点展开当天任务" : {
+
+    },
+    "轻点日期展开" : {
+
+    },
+    "轻点日期直接展开任务，也可双指缩放" : {
+
+    },
+    "轻点查看整周统计" : {
+
+    },
+    "轻点选择当天" : {
 
     },
     "输入任务名称" : {
@@ -6145,6 +7101,9 @@
     "重新打开项目" : {
 
     },
+    "重试打开数据库" : {
+
+    },
     "阶段 2/2 · 呆胶布" : {
 
     },
@@ -6152,6 +7111,9 @@
 
     },
     "附件 %lld" : {
+
+    },
+    "项" : {
 
     },
     "项目" : {

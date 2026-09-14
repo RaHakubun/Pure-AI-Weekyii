@@ -25,6 +25,8 @@ struct ThemeStatusArtwork: View {
                 LotrStatusIllustration(renderingMode: renderingMode)
             case .amber, .ocean, .forest, .rose, .lavender, .graphite, .mint, .midnight:
                 NarrativeThemeStatusIllustration(theme: theme, renderingMode: renderingMode)
+            case .brutal, .neon, .paper, .terminal:
+                GeometricStatusIllustration(theme: theme, renderingMode: renderingMode)
             }
         }
         .accessibilityHidden(true)
@@ -76,9 +78,935 @@ private struct NarrativeThemeStatusIllustration: View {
             MintGreenhouseScene(size: size, time: time)
         case .midnight:
             MidnightAuroraScene(size: size, time: time)
-        case .sunset, .lotr:
+        case .sunset, .lotr, .brutal, .neon, .paper, .terminal:
             Color.clear
         }
+    }
+}
+
+// MARK: - Personalised theme artwork
+
+/// Abstract artwork for the four personalised themes.
+///
+/// Each theme owns a different visual grammar rather than reusing one shape
+/// set with a different palette: brutalism is flat and overprinted, neon is a
+/// glowing signal field, paper is a layered print, and terminal is a compact
+/// phosphor interface.
+private struct ThemeArtworkPalette {
+    let backgroundPrimary: Color
+    let backgroundSecondary: Color
+    let backgroundTertiary: Color
+    let primary: Color
+    let primaryLight: Color
+    let accent: Color
+    let accentLight: Color
+    let textPrimary: Color
+    let textSecondary: Color
+
+    init(theme: WeekTheme, isDark: Bool) {
+        let palette = theme.palette(for: .system, systemIsDark: isDark)
+        backgroundPrimary = Color(hex: palette.backgroundPrimary)
+        backgroundSecondary = Color(hex: palette.backgroundSecondary)
+        backgroundTertiary = Color(hex: palette.backgroundTertiary)
+        primary = Color(hex: palette.primary)
+        primaryLight = Color(hex: palette.primaryLight)
+        accent = Color(hex: palette.accentOrange)
+        accentLight = Color(hex: palette.accentOrangeLight)
+        textPrimary = Color(hex: palette.textPrimary)
+        textSecondary = Color(hex: palette.textSecondary)
+    }
+}
+
+private struct GeometricStatusIllustration: View {
+    let theme: WeekTheme
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                scene(time: timeline.date.timeIntervalSinceReferenceDate)
+            }
+        } else {
+            scene(time: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func scene(time: TimeInterval) -> some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let palette = ThemeArtworkPalette(theme: theme, isDark: colorScheme == .dark)
+
+            switch theme {
+            case .brutal:
+                BrutalStatusScene(size: size, time: time, palette: palette)
+            case .neon:
+                NeonStatusScene(size: size, time: time, palette: palette)
+            case .paper:
+                PaperStatusScene(size: size, time: time, palette: palette)
+            case .terminal:
+                TerminalStatusScene(size: size, time: time, palette: palette)
+            default:
+                Color.clear
+            }
+        }
+        .clipped()
+        .allowsHitTesting(false)
+    }
+}
+
+private struct BrutalStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let registrationShift = CGFloat(sin(time * 0.72)) * 2.5
+
+        ZStack {
+            palette.backgroundSecondary
+
+            Rectangle()
+                .fill(palette.primary)
+                .frame(width: unit * 0.62, height: unit * 0.62)
+                .overlay(Rectangle().stroke(palette.textPrimary, lineWidth: max(2, unit * 0.025)))
+                .rotationEffect(.degrees(-7))
+                .offset(x: -unit * 0.17 + registrationShift, y: -unit * 0.05)
+
+            Rectangle()
+                .fill(palette.accent)
+                .frame(width: unit * 0.39, height: unit * 0.39)
+                .overlay(Rectangle().stroke(palette.textPrimary, lineWidth: max(2, unit * 0.02)))
+                .rotationEffect(.degrees(11))
+                .offset(x: unit * 0.22, y: unit * 0.10 - registrationShift)
+
+            Circle()
+                .fill(palette.backgroundPrimary)
+                .frame(width: unit * 0.25, height: unit * 0.25)
+                .overlay(Circle().stroke(palette.textPrimary, lineWidth: max(2, unit * 0.024)))
+                .offset(x: unit * 0.10, y: -unit * 0.20)
+
+            Rectangle()
+                .fill(palette.textPrimary)
+                .frame(width: unit * 0.72, height: max(3, unit * 0.045))
+                .offset(x: unit * 0.03, y: unit * 0.29)
+
+            Path { path in
+                path.move(to: CGPoint(x: size.width * 0.09, y: size.height * 0.22))
+                path.addLine(to: CGPoint(x: size.width * 0.31, y: size.height * 0.22))
+                path.addLine(to: CGPoint(x: size.width * 0.31, y: size.height * 0.30))
+            }
+            .stroke(palette.textPrimary, style: StrokeStyle(lineWidth: max(2, unit * 0.02), lineCap: .square, lineJoin: .miter))
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
+private struct NeonStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let isDark = colorScheme == .dark
+        let cyan = isDark ? palette.primary : Color(hex: "#00C9D8")
+        let cyanLight = isDark ? palette.primaryLight : Color(hex: "#B4FAFF")
+        let magenta = isDark ? palette.accent : Color(hex: "#F1008A")
+        let violet = Color(hex: isDark ? "#A78BFA" : "#7657E8")
+        let acid = Color(hex: isDark ? "#B7FF63" : "#8FBF2E")
+        let ground = Color(hex: isDark ? "#070B18" : "#E8EEF0")
+        let groundMid = Color(hex: isDark ? "#121B32" : "#C7D6DC")
+        let paper = Color(hex: isDark ? "#152039" : "#F8FBFA")
+        let paperShadow = Color(hex: isDark ? "#02040A" : "#738692")
+        let pulse = 0.86 + ((sin(time * 2.1) + 1) * 0.5) * 0.14
+        let exposureShift = CGFloat(sin(time * 0.34)) * unit * 0.025
+
+        ZStack {
+            LinearGradient(
+                colors: [ground, groundMid, ground],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(cyan.opacity(isDark ? 0.13 : 0.08))
+                .frame(width: unit * 1.18, height: unit * 1.18)
+                .blur(radius: unit * 0.28)
+                .offset(x: -size.width * 0.28, y: -size.height * 0.12)
+
+            Circle()
+                .fill(magenta.opacity(isDark ? 0.12 : 0.07))
+                .frame(width: unit * 0.96, height: unit * 0.96)
+                .blur(radius: unit * 0.23)
+                .offset(x: size.width * 0.28, y: size.height * 0.12)
+
+            // The plate is the light-sensitive surface. The artwork below
+            // behaves like several exposures laid on top of one another.
+            Rectangle()
+                .fill(paper.opacity(0.93))
+                .frame(width: size.width * 0.82, height: size.height * 0.82)
+                .rotationEffect(.degrees(-2.5))
+                .shadow(color: paperShadow.opacity(isDark ? 0.45 : 0.20), radius: unit * 0.08, y: unit * 0.04)
+
+            Rectangle()
+                .stroke(paperShadow.opacity(isDark ? 0.40 : 0.22), lineWidth: 1)
+                .frame(width: size.width * 0.82, height: size.height * 0.82)
+                .rotationEffect(.degrees(-2.5))
+
+            Canvas { context, canvas in
+                func point(_ x: CGFloat, _ y: CGFloat, offsetX: CGFloat = 0, offsetY: CGFloat = 0) -> CGPoint {
+                    CGPoint(
+                        x: canvas.width * x + offsetX,
+                        y: canvas.height * y + offsetY
+                    )
+                }
+
+                // A dark contact shadow: the object blocks the light, rather
+                // than depicting a recognisable building or device.
+                var shadow = Path()
+                shadow.move(to: point(0.25, 0.17, offsetX: unit * 0.035, offsetY: unit * 0.025))
+                shadow.addLine(to: point(0.60, 0.17, offsetX: unit * 0.035, offsetY: unit * 0.025))
+                shadow.addLine(to: point(0.68, 0.37, offsetX: unit * 0.035, offsetY: unit * 0.025))
+                shadow.addLine(to: point(0.55, 0.78, offsetX: unit * 0.035, offsetY: unit * 0.025))
+                shadow.addLine(to: point(0.25, 0.67, offsetX: unit * 0.035, offsetY: unit * 0.025))
+                shadow.closeSubpath()
+                context.fill(shadow, with: .color(paperShadow.opacity(isDark ? 0.46 : 0.24)))
+
+                // Cyan exposure: a hard-edged transparent sheet with one
+                // long vertical gesture and a cut-like diagonal ending.
+                var cyanExposure = Path()
+                cyanExposure.move(to: point(0.20, 0.72))
+                cyanExposure.addLine(to: point(0.25, 0.20))
+                cyanExposure.addLine(to: point(0.45, 0.20))
+                cyanExposure.addLine(to: point(0.39, 0.43))
+                cyanExposure.addLine(to: point(0.54, 0.68))
+                cyanExposure.addLine(to: point(0.43, 0.76))
+                cyanExposure.closeSubpath()
+                context.fill(cyanExposure, with: .color(cyan.opacity(isDark ? 0.28 : 0.18)))
+                context.stroke(
+                    cyanExposure,
+                    with: .color(cyan.opacity(0.92 * pulse)),
+                    style: StrokeStyle(lineWidth: max(1.5, unit * 0.018), lineJoin: .miter)
+                )
+
+                // Second exposure, offset just enough to create a ghost edge.
+                var cyanGhost = Path()
+                cyanGhost.move(to: point(0.23, 0.72, offsetX: exposureShift))
+                cyanGhost.addLine(to: point(0.28, 0.20, offsetX: exposureShift))
+                cyanGhost.addLine(to: point(0.48, 0.20, offsetX: exposureShift))
+                cyanGhost.addLine(to: point(0.42, 0.43, offsetX: exposureShift))
+                context.stroke(cyanGhost, with: .color(cyanLight.opacity(0.42)), lineWidth: max(1, unit * 0.010))
+
+                // Magenta exposure: a soft oval plus an angular plate crossing it.
+                let magentaOval = CGRect(
+                    x: canvas.width * 0.47,
+                    y: canvas.height * 0.20,
+                    width: canvas.width * 0.30,
+                    height: canvas.height * 0.42
+                )
+                context.fill(Path(ellipseIn: magentaOval), with: .color(magenta.opacity(isDark ? 0.25 : 0.16)))
+                context.stroke(
+                    Path(ellipseIn: magentaOval),
+                    with: .color(magenta.opacity(0.92 * pulse)),
+                    style: StrokeStyle(lineWidth: max(1.5, unit * 0.016))
+                )
+
+                var magentaPlate = Path()
+                magentaPlate.move(to: point(0.53, 0.26))
+                magentaPlate.addLine(to: point(0.76, 0.26))
+                magentaPlate.addLine(to: point(0.69, 0.51))
+                magentaPlate.addLine(to: point(0.49, 0.51))
+                magentaPlate.closeSubpath()
+                context.fill(magentaPlate, with: .color(magenta.opacity(isDark ? 0.18 : 0.12)))
+                context.stroke(magentaPlate, with: .color(magenta.opacity(0.82)), lineWidth: max(1, unit * 0.012))
+
+                // A violet ring and acid block read like transparent objects
+                // placed on the paper, not like windows on a facade.
+                let ringRect = CGRect(
+                    x: canvas.width * 0.55,
+                    y: canvas.height * 0.40,
+                    width: canvas.width * 0.25,
+                    height: canvas.height * 0.25
+                )
+                context.stroke(
+                    Path(ellipseIn: ringRect),
+                    with: .color(violet.opacity(0.78)),
+                    style: StrokeStyle(lineWidth: max(1.5, unit * 0.018))
+                )
+                context.stroke(
+                    Path(ellipseIn: ringRect.insetBy(dx: unit * 0.045, dy: unit * 0.025)),
+                    with: .color(violet.opacity(0.30)),
+                    lineWidth: max(1, unit * 0.010)
+                )
+
+                let acidRect = CGRect(
+                    x: canvas.width * 0.27,
+                    y: canvas.height * 0.54,
+                    width: canvas.width * 0.16,
+                    height: canvas.height * 0.12
+                )
+                context.fill(Path(acidRect), with: .color(acid.opacity(isDark ? 0.52 : 0.34)))
+                context.stroke(Path(acidRect), with: .color(acid.opacity(0.95)), lineWidth: max(1, unit * 0.012))
+
+                // Fine parallel lines are the analogue of multiple negatives:
+                // they supply rhythm without turning the image into scenery.
+                for index in 0..<6 {
+                    let x = canvas.width * (0.16 + CGFloat(index) * 0.115)
+                    var line = Path()
+                    line.move(to: CGPoint(x: x, y: canvas.height * 0.18))
+                    line.addLine(to: CGPoint(x: x + canvas.width * 0.08, y: canvas.height * 0.79))
+                    context.stroke(line, with: .color(cyan.opacity(0.20)), lineWidth: 0.7)
+                }
+
+                for index in 0..<5 {
+                    let y = canvas.height * (0.25 + CGFloat(index) * 0.105)
+                    var line = Path()
+                    line.move(to: CGPoint(x: canvas.width * 0.16, y: y))
+                    line.addLine(to: CGPoint(x: canvas.width * 0.82, y: y + canvas.height * 0.025))
+                    context.stroke(line, with: .color(magenta.opacity(0.18)), lineWidth: 0.7)
+                }
+            }
+
+            // Small light leaks keep the neon identity while staying abstract.
+            Rectangle()
+                .fill(cyanLight.opacity(0.80 * pulse))
+                .frame(width: max(2, unit * 0.018), height: unit * 0.16)
+                .rotationEffect(.degrees(-7))
+                .position(x: size.width * 0.26, y: size.height * 0.27)
+                .shadow(color: cyan.opacity(0.75), radius: unit * 0.04)
+
+            Rectangle()
+                .fill(magenta.opacity(0.86 * pulse))
+                .frame(width: max(2, unit * 0.018), height: unit * 0.20)
+                .rotationEffect(.degrees(12))
+                .position(x: size.width * 0.70, y: size.height * 0.30)
+                .shadow(color: magenta.opacity(0.80), radius: unit * 0.04)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
+private struct NeonArchitectureStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let isDark = colorScheme == .dark
+        let cyan = isDark ? palette.primary : Color(hex: "#00D7E6")
+        let cyanLight = isDark ? palette.primaryLight : Color(hex: "#75F6FF")
+        let magenta = isDark ? palette.accent : Color(hex: "#F6008D")
+        let violet = Color(hex: isDark ? "#A88CFF" : "#7C63F4")
+        let acid = Color(hex: isDark ? "#B8FF5A" : "#9BDD32")
+        let skyTop = Color(hex: isDark ? "#050811" : "#DCEAF0")
+        let skyMiddle = Color(hex: isDark ? "#101A31" : "#AFC7D2")
+        let skyBottom = Color(hex: isDark ? "#1B1230" : "#E8EEF0")
+        let concrete = Color(hex: isDark ? "#131A2A" : "#344052")
+        let metal = Color(hex: isDark ? "#20283A" : "#566477")
+        let streetTop = Color(hex: isDark ? "#0E1728" : "#788E9A")
+        let streetBottom = Color(hex: isDark ? "#080B14" : "#394752")
+        let flicker = 0.78 + ((sin(time * 2.7) + 1) * 0.5) * 0.22
+        let rainDrift = CGFloat(sin(time * 0.42)) * unit * 0.04
+        let skyline: [(CGFloat, CGFloat, Color)] = isDark
+            ? [
+                (0.03, 0.43, Color(hex: "#0E1422")),
+                (0.17, 0.31, Color(hex: "#10182A")),
+                (0.77, 0.37, Color(hex: "#11172A")),
+                (0.90, 0.48, Color(hex: "#0D1320"))
+            ]
+            : [
+                (0.03, 0.43, Color(hex: "#B3C2CC")),
+                (0.17, 0.31, Color(hex: "#A5B8C3")),
+                (0.77, 0.37, Color(hex: "#A9BBC5")),
+                (0.90, 0.48, Color(hex: "#94A9B5"))
+            ]
+
+        ZStack {
+            LinearGradient(
+                colors: [skyTop, skyMiddle, skyBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Circle()
+                .fill(magenta.opacity(isDark ? 0.15 : 0.10))
+                .frame(width: unit * 1.10, height: unit * 1.10)
+                .blur(radius: unit * 0.26)
+                .offset(x: size.width * 0.30, y: -size.height * 0.15)
+
+            Canvas { context, canvas in
+                for (x, height, fill) in skyline {
+                    let rect = CGRect(
+                        x: canvas.width * x,
+                        y: canvas.height * (0.72 - height * 0.48),
+                        width: canvas.width * 0.17,
+                        height: canvas.height * height
+                    )
+                    context.fill(Path(rect), with: .color(fill))
+                    context.stroke(
+                        Path(rect),
+                        with: .color(cyan.opacity(0.24)),
+                        style: StrokeStyle(lineWidth: 1)
+                    )
+                }
+
+                for index in 0..<20 {
+                    let x = CGFloat((index * 37) % 101) / 100 * canvas.width + rainDrift
+                    let y = CGFloat((index * 23) % 70) / 100 * canvas.height
+                    var rain = Path()
+                    rain.move(to: CGPoint(x: x, y: y))
+                    rain.addLine(to: CGPoint(x: x - 3, y: y + canvas.height * 0.11))
+                    context.stroke(rain, with: .color(cyan.opacity(0.16)), lineWidth: 0.7)
+                }
+            }
+
+            // Orthogonal masses give the scene a clear vertical axis and a
+            // stable horizontal street line at the bottom.
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.08, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.08, y: size.height * 0.46))
+                    path.addLine(to: CGPoint(x: size.width * 0.34, y: size.height * 0.46))
+                    path.addLine(to: CGPoint(x: size.width * 0.34, y: size.height * 0.41))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.41))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.79))
+                    path.closeSubpath()
+                }
+                .fill(metal)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.08, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.08, y: size.height * 0.46))
+                    path.addLine(to: CGPoint(x: size.width * 0.34, y: size.height * 0.46))
+                    path.addLine(to: CGPoint(x: size.width * 0.34, y: size.height * 0.41))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.41))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.79))
+                }
+                .stroke(cyan, style: StrokeStyle(lineWidth: max(2, unit * 0.020), lineCap: .square, lineJoin: .miter))
+                .shadow(color: cyan.opacity(0.82), radius: unit * 0.06)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.64, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.64, y: size.height * 0.35))
+                    path.addLine(to: CGPoint(x: size.width * 0.91, y: size.height * 0.35))
+                    path.addLine(to: CGPoint(x: size.width * 0.91, y: size.height * 0.79))
+                    path.closeSubpath()
+                }
+                .fill(concrete)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.64, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.64, y: size.height * 0.35))
+                    path.addLine(to: CGPoint(x: size.width * 0.91, y: size.height * 0.35))
+                    path.addLine(to: CGPoint(x: size.width * 0.91, y: size.height * 0.79))
+                }
+                .stroke(magenta, style: StrokeStyle(lineWidth: max(2, unit * 0.020), lineCap: .square, lineJoin: .miter))
+                .shadow(color: magenta.opacity(0.88), radius: unit * 0.06)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.39, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.19))
+                    path.addLine(to: CGPoint(x: size.width * 0.44, y: size.height * 0.19))
+                    path.addLine(to: CGPoint(x: size.width * 0.44, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.60, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.60, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.79))
+                    path.closeSubpath()
+                }
+                .fill(concrete)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.39, y: size.height * 0.79))
+                    path.addLine(to: CGPoint(x: size.width * 0.39, y: size.height * 0.19))
+                    path.addLine(to: CGPoint(x: size.width * 0.44, y: size.height * 0.19))
+                    path.addLine(to: CGPoint(x: size.width * 0.44, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.60, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.60, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.79))
+                }
+                .stroke(cyan, style: StrokeStyle(lineWidth: max(2, unit * 0.022), lineCap: .square, lineJoin: .miter))
+                .shadow(color: cyan.opacity(0.90), radius: unit * 0.07)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.60, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.17))
+                    path.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.79))
+                }
+                .stroke(magenta, style: StrokeStyle(lineWidth: max(2, unit * 0.022), lineCap: .square, lineJoin: .miter))
+                .shadow(color: magenta.opacity(0.9), radius: unit * 0.07)
+            }
+
+            // Bright floor bands and window grids reinforce the architecture.
+            ForEach(0..<6, id: \.self) { row in
+                Rectangle()
+                    .fill((row % 2 == 0 ? cyan : magenta).opacity(0.64 * flicker))
+                    .frame(width: size.width * 0.19, height: max(1, unit * 0.012))
+                    .position(x: size.width * 0.52, y: size.height * (0.23 + CGFloat(row) * 0.085))
+                    .shadow(color: (row % 2 == 0 ? cyan : magenta).opacity(0.65), radius: unit * 0.025)
+            }
+
+            ForEach(0..<4, id: \.self) { column in
+                ForEach(0..<5, id: \.self) { row in
+                    let pinkWindow = (column + row) % 5 == 0
+                    Rectangle()
+                        .fill((pinkWindow ? magenta : cyan).opacity(pinkWindow ? 0.84 : 0.70 * flicker))
+                        .frame(width: max(2, unit * 0.021), height: max(3, unit * 0.038))
+                        .shadow(color: (pinkWindow ? magenta : cyan).opacity(0.7), radius: unit * 0.025)
+                        .position(
+                            x: size.width * 0.44 + CGFloat(column) * size.width * 0.045,
+                            y: size.height * 0.25 + CGFloat(row) * unit * 0.082
+                        )
+                }
+            }
+
+            ForEach(0..<3, id: \.self) { row in
+                Rectangle()
+                    .fill(cyan.opacity(0.60 * flicker))
+                    .frame(width: size.width * 0.19, height: max(1, unit * 0.011))
+                    .position(x: size.width * 0.22, y: size.height * (0.51 + CGFloat(row) * 0.085))
+            }
+
+            ForEach(0..<3, id: \.self) { row in
+                Rectangle()
+                    .fill(magenta.opacity(0.64 * flicker))
+                    .frame(width: size.width * 0.18, height: max(1, unit * 0.011))
+                    .position(x: size.width * 0.78, y: size.height * (0.44 + CGFloat(row) * 0.085))
+            }
+
+            ForEach(0..<4, id: \.self) { index in
+                Rectangle()
+                    .fill(violet.opacity(0.72))
+                    .frame(width: max(2, unit * 0.020), height: unit * 0.10)
+                    .shadow(color: violet.opacity(0.72), radius: unit * 0.03)
+                    .position(
+                        x: size.width * 0.70 + CGFloat(index) * size.width * 0.045,
+                        y: size.height * 0.43 + CGFloat(index % 2) * unit * 0.10
+                    )
+            }
+
+            // The wet street is a single calm horizontal base for the three masses.
+            VStack(spacing: 0) {
+                Spacer()
+                LinearGradient(
+                    colors: [streetTop, streetBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: size.height * 0.25)
+            }
+
+            Canvas { context, canvas in
+                let streetY = canvas.height * 0.77
+                for index in 0..<11 {
+                    let progress = CGFloat(index) / 10
+                    let x = canvas.width * (0.16 + progress * 0.72)
+                    let width = canvas.width * (0.04 + (1 - progress) * 0.09)
+                    var reflection = Path()
+                    reflection.move(to: CGPoint(x: x, y: streetY))
+                    reflection.addLine(to: CGPoint(x: x - width * 0.35, y: canvas.height + 4))
+                    context.stroke(
+                        reflection,
+                        with: .color((index % 3 == 0 ? magenta : cyan).opacity(isDark ? 0.19 : 0.34)),
+                        style: StrokeStyle(lineWidth: max(1, width * 0.11), lineCap: .round)
+                    )
+                }
+
+                for index in 0..<7 {
+                    let y = streetY + CGFloat(index) * canvas.height * 0.025
+                    var puddle = Path()
+                    puddle.move(to: CGPoint(x: canvas.width * 0.05, y: y))
+                    puddle.addQuadCurve(
+                        to: CGPoint(x: canvas.width * 0.95, y: y + 1),
+                        control: CGPoint(x: canvas.width * 0.50, y: y - 2)
+                    )
+                    context.stroke(puddle, with: .color(cyan.opacity(isDark ? 0.13 : 0.22)), lineWidth: 0.7)
+                }
+            }
+
+            // Signs are horizontal and physically attached to a facade.
+            NeonBuildingSign(title: "NIGHT//08", tint: cyan, text: cyanLight, width: unit * 0.43, height: unit * 0.17)
+                .position(x: size.width * 0.52, y: size.height * 0.42)
+
+            NeonBuildingSign(title: "雨夜", tint: magenta, text: magenta, width: unit * 0.25, height: unit * 0.20)
+                .position(x: size.width * 0.79, y: size.height * 0.48)
+
+            NeonBuildingSign(title: "BYTE", tint: acid, text: acid, width: unit * 0.27, height: unit * 0.16)
+                .position(x: size.width * 0.22, y: size.height * 0.58)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
+private struct LegacyNeonStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let cyan = colorScheme == .dark ? palette.primary : Color(hex: "#00D7E6")
+        let cyanLight = colorScheme == .dark ? palette.primaryLight : Color(hex: "#75F6FF")
+        let magenta = colorScheme == .dark ? palette.accent : Color(hex: "#F6008D")
+        let violet = Color(hex: colorScheme == .dark ? "#A88CFF" : "#7C63F4")
+        let acid = Color(hex: colorScheme == .dark ? "#B8FF5A" : "#9BDD32")
+        let skyTop = Color(hex: colorScheme == .dark ? "#050811" : "#DCEAF0")
+        let skyMiddle = Color(hex: colorScheme == .dark ? "#101A31" : "#AFC7D2")
+        let skyBottom = Color(hex: colorScheme == .dark ? "#1B1230" : "#E8EEF0")
+        let concrete = Color(hex: colorScheme == .dark ? "#131A2A" : "#344052")
+        let metal = Color(hex: colorScheme == .dark ? "#20283A" : "#566477")
+        let streetTop = Color(hex: colorScheme == .dark ? "#0E1728" : "#788E9A")
+        let streetBottom = Color(hex: colorScheme == .dark ? "#080B14" : "#394752")
+        let flicker = 0.78 + ((sin(time * 2.7) + 1) * 0.5) * 0.22
+        let rainDrift = CGFloat(sin(time * 0.42)) * unit * 0.04
+        let skyline: [(CGFloat, CGFloat, Color)] = colorScheme == .dark
+            ? [
+                (0.04, 0.47, Color(hex: "#0E1422")),
+                (0.17, 0.34, Color(hex: "#10182A")),
+                (0.78, 0.40, Color(hex: "#11172A")),
+                (0.91, 0.52, Color(hex: "#0D1320"))
+            ]
+            : [
+                (0.04, 0.47, Color(hex: "#B3C2CC")),
+                (0.17, 0.34, Color(hex: "#A5B8C3")),
+                (0.78, 0.40, Color(hex: "#A9BBC5")),
+                (0.91, 0.52, Color(hex: "#94A9B5"))
+            ]
+
+        ZStack {
+            LinearGradient(
+                colors: [skyTop, skyMiddle, skyBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Distant high-rises and a hazy magenta city glow.
+            Circle()
+                .fill(magenta.opacity(colorScheme == .dark ? 0.15 : 0.10))
+                .frame(width: unit * 1.18, height: unit * 1.18)
+                .blur(radius: unit * 0.28)
+                .offset(x: size.width * 0.30, y: -size.height * 0.15)
+
+            Canvas { context, canvas in
+                for (x, height, fill) in skyline {
+                    let width = canvas.width * 0.18
+                    let rect = CGRect(
+                        x: canvas.width * x,
+                        y: canvas.height * (0.72 - height * 0.48),
+                        width: width,
+                        height: canvas.height * height
+                    )
+                    context.fill(Path(rect), with: .color(fill))
+                    context.stroke(
+                        Path(rect),
+                        with: .color(cyan.opacity(0.24)),
+                        style: StrokeStyle(lineWidth: 1)
+                    )
+                }
+
+                // Rain streaks establish the wet-night atmosphere without
+                // becoming noisy at the compact card size.
+                for index in 0..<22 {
+                    let x = CGFloat((index * 37) % 101) / 100 * canvas.width + rainDrift
+                    let y = CGFloat((index * 23) % 70) / 100 * canvas.height
+                    var rain = Path()
+                    rain.move(to: CGPoint(x: x, y: y))
+                    rain.addLine(to: CGPoint(x: x - 3, y: y + canvas.height * 0.12))
+                    context.stroke(rain, with: .color(cyan.opacity(0.18)), lineWidth: 0.7)
+                }
+            }
+
+            // Main tower: a dark concrete mass with an irregular cantilever.
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.25, y: size.height * 0.84))
+                    path.addLine(to: CGPoint(x: size.width * 0.30, y: size.height * 0.20))
+                    path.addLine(to: CGPoint(x: size.width * 0.56, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.66, y: size.height * 0.27))
+                    path.addLine(to: CGPoint(x: size.width * 0.61, y: size.height * 0.84))
+                    path.closeSubpath()
+                }
+                .fill(concrete)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.25, y: size.height * 0.84))
+                    path.addLine(to: CGPoint(x: size.width * 0.30, y: size.height * 0.20))
+                    path.addLine(to: CGPoint(x: size.width * 0.56, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.66, y: size.height * 0.27))
+                    path.addLine(to: CGPoint(x: size.width * 0.61, y: size.height * 0.84))
+                }
+                .stroke(cyan, style: StrokeStyle(lineWidth: max(2, unit * 0.028), lineCap: .square, lineJoin: .miter))
+                .shadow(color: cyan.opacity(0.85), radius: unit * 0.07)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.56, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.87, y: size.height * 0.22))
+                    path.addLine(to: CGPoint(x: size.width * 0.83, y: size.height * 0.58))
+                    path.addLine(to: CGPoint(x: size.width * 0.61, y: size.height * 0.50))
+                    path.closeSubpath()
+                }
+                .fill(metal)
+
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.56, y: size.height * 0.12))
+                    path.addLine(to: CGPoint(x: size.width * 0.87, y: size.height * 0.22))
+                    path.addLine(to: CGPoint(x: size.width * 0.83, y: size.height * 0.58))
+                    path.addLine(to: CGPoint(x: size.width * 0.61, y: size.height * 0.50))
+                }
+                .stroke(magenta, style: StrokeStyle(lineWidth: max(2, unit * 0.024), lineCap: .square, lineJoin: .miter))
+                .shadow(color: magenta.opacity(0.88), radius: unit * 0.065)
+            }
+
+            // Dense cyan window columns and a magenta LED curtain.
+            ForEach(0..<5, id: \.self) { column in
+                ForEach(0..<5, id: \.self) { row in
+                    let isPink = (column + row) % 4 == 0
+                    Rectangle()
+                        .fill((isPink ? magenta : cyan).opacity(isPink ? 0.82 : 0.70 * flicker))
+                        .frame(width: max(2, unit * 0.027), height: max(3, unit * 0.052))
+                        .shadow(color: (isPink ? magenta : cyan).opacity(0.7), radius: unit * 0.025)
+                        .position(
+                            x: size.width * 0.35 + CGFloat(column) * unit * 0.052,
+                            y: size.height * 0.29 + CGFloat(row) * unit * 0.085
+                        )
+                }
+            }
+
+            ForEach(0..<4, id: \.self) { index in
+                Rectangle()
+                    .fill(violet.opacity(0.78))
+                    .frame(width: max(2, unit * 0.022), height: unit * 0.13)
+                    .shadow(color: violet.opacity(0.72), radius: unit * 0.03)
+                    .rotationEffect(.degrees(-8))
+                    .position(
+                        x: size.width * 0.70 + CGFloat(index) * unit * 0.044,
+                        y: size.height * 0.34 + CGFloat(index % 2) * unit * 0.10
+                    )
+            }
+
+            // Layered signage is intentionally asymmetrical, like a dense
+            // street facade instead of a centred abstract logo.
+            NeonBuildingSign(title: "NIGHT//08", tint: cyan, text: cyanLight, width: unit * 0.48, height: unit * 0.18)
+                .rotationEffect(.degrees(-4))
+                .position(x: size.width * 0.35, y: size.height * 0.48)
+
+            NeonBuildingSign(title: "雨夜", tint: magenta, text: magenta, width: unit * 0.27, height: unit * 0.22)
+                .rotationEffect(.degrees(7))
+                .position(x: size.width * 0.70, y: size.height * 0.49)
+
+            NeonBuildingSign(title: "BYTE", tint: acid, text: acid, width: unit * 0.29, height: unit * 0.17)
+                .rotationEffect(.degrees(-7))
+                .position(x: size.width * 0.75, y: size.height * 0.68)
+
+            // Rain-slick street and compressed neon reflections.
+            VStack(spacing: 0) {
+                Spacer()
+                LinearGradient(
+                    colors: [streetTop, streetBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: size.height * 0.25)
+            }
+
+            Canvas { context, canvas in
+                let streetY = canvas.height * 0.77
+                for index in 0..<11 {
+                    let progress = CGFloat(index) / 10
+                    let x = canvas.width * (0.16 + progress * 0.72)
+                    let width = canvas.width * (0.04 + (1 - progress) * 0.09)
+                    var reflection = Path()
+                    reflection.move(to: CGPoint(x: x, y: streetY))
+                    reflection.addLine(to: CGPoint(x: x - width * 0.35, y: canvas.height + 4))
+                    context.stroke(
+                        reflection,
+                        with: .color((index % 3 == 0 ? magenta : cyan).opacity(colorScheme == .dark ? 0.19 : 0.34)),
+                        style: StrokeStyle(lineWidth: max(1, width * 0.11), lineCap: .round)
+                    )
+                }
+
+                for index in 0..<7 {
+                    let y = streetY + CGFloat(index) * canvas.height * 0.025
+                    var puddle = Path()
+                    puddle.move(to: CGPoint(x: canvas.width * 0.05, y: y))
+                    puddle.addQuadCurve(
+                        to: CGPoint(x: canvas.width * 0.95, y: y + 1),
+                        control: CGPoint(x: canvas.width * 0.50, y: y - 2)
+                    )
+                    context.stroke(puddle, with: .color(cyan.opacity(colorScheme == .dark ? 0.13 : 0.22)), lineWidth: 0.7)
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
+private struct NeonBuildingSign: View {
+    let title: String
+    let tint: Color
+    let text: Color
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Rectangle()
+                .fill(tint)
+                .frame(width: max(2, height * 0.10))
+
+            Text(title)
+                .font(.system(size: max(7, height * 0.34), weight: .bold, design: .monospaced))
+                .foregroundStyle(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .padding(.horizontal, max(4, height * 0.20))
+        .frame(width: width, height: height)
+        .background(Color(hex: "#070B16").opacity(0.90))
+        .overlay {
+            Rectangle()
+                .stroke(tint, lineWidth: max(1, height * 0.07))
+        }
+        .shadow(color: tint.opacity(0.88), radius: max(3, height * 0.35))
+    }
+}
+
+private struct PaperStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let paperDrift = CGFloat(sin(time * 0.40)) * 1.8
+
+        ZStack {
+            palette.backgroundSecondary
+
+            Rectangle()
+                .fill(palette.backgroundTertiary.opacity(0.72))
+                .frame(width: size.width * 0.71, height: size.height * 0.74)
+                .rotationEffect(.degrees(-5))
+                .offset(x: -size.width * 0.10, y: size.height * 0.03)
+
+            Rectangle()
+                .fill(palette.backgroundPrimary)
+                .frame(width: size.width * 0.67, height: size.height * 0.72)
+                .overlay(Rectangle().stroke(palette.textSecondary.opacity(0.48), lineWidth: 1))
+                .rotationEffect(.degrees(4 + Double(paperDrift)))
+                .offset(x: size.width * 0.06, y: -size.height * 0.02)
+
+            Rectangle()
+                .fill(palette.primary.opacity(0.92))
+                .frame(width: unit * 0.18, height: unit * 0.60)
+                .rotationEffect(.degrees(-3))
+                .offset(x: -unit * 0.22, y: -unit * 0.04)
+
+            Rectangle()
+                .fill(palette.accent.opacity(0.82))
+                .frame(width: unit * 0.14, height: unit * 0.43)
+                .rotationEffect(.degrees(5))
+                .offset(x: unit * 0.14, y: unit * 0.07)
+
+            Circle()
+                .stroke(palette.primary, lineWidth: max(1, unit * 0.016))
+                .frame(width: unit * 0.31, height: unit * 0.31)
+                .overlay {
+                    Circle()
+                        .stroke(palette.accent.opacity(0.64), lineWidth: max(1, unit * 0.01))
+                        .padding(unit * 0.045)
+                }
+                .offset(x: unit * 0.21, y: -unit * 0.19)
+
+            Path { path in
+                path.move(to: CGPoint(x: size.width * 0.20, y: size.height * 0.77))
+                path.addLine(to: CGPoint(x: size.width * 0.74, y: size.height * 0.77))
+            }
+            .stroke(palette.textSecondary.opacity(0.58), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
+private struct TerminalStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    var body: some View {
+        let unit = min(size.width, size.height)
+        let cursorOpacity = 0.35 + ((sin(time * 3.2) + 1) * 0.5) * 0.65
+
+        ZStack {
+            palette.backgroundPrimary
+
+            Canvas { context, canvas in
+                for index in 0..<12 {
+                    let y = CGFloat(index) / 11 * canvas.height
+                    var scanline = Path()
+                    scanline.move(to: CGPoint(x: 0, y: y))
+                    scanline.addLine(to: CGPoint(x: canvas.width, y: y))
+                    context.stroke(scanline, with: .color(palette.primary.opacity(0.08)), lineWidth: 1)
+                }
+            }
+
+            RoundedRectangle(cornerRadius: unit * 0.05, style: .continuous)
+                .fill(palette.backgroundSecondary)
+                .frame(width: size.width * 0.72, height: size.height * 0.70)
+                .overlay {
+                    RoundedRectangle(cornerRadius: unit * 0.05, style: .continuous)
+                        .stroke(palette.primary.opacity(0.78), lineWidth: max(1, unit * 0.016))
+                }
+                .overlay(alignment: .topLeading) {
+                    HStack(spacing: 4) {
+                        Circle().fill(palette.accent).frame(width: 5, height: 5)
+                        Circle().fill(palette.primary).frame(width: 5, height: 5)
+                        Circle().fill(palette.primaryLight).frame(width: 5, height: 5)
+                    }
+                    .padding(.leading, unit * 0.08)
+                    .padding(.top, unit * 0.07)
+                }
+
+            VStack(alignment: .leading, spacing: unit * 0.055) {
+                Text("> weekyii")
+                Text("// focus")
+                    .foregroundStyle(palette.accent)
+
+                HStack(spacing: unit * 0.035) {
+                    Rectangle().fill(palette.primary).frame(width: unit * 0.20, height: max(3, unit * 0.035))
+                    Rectangle().fill(palette.primaryLight.opacity(0.55)).frame(width: unit * 0.10, height: max(3, unit * 0.035))
+                }
+
+                HStack(spacing: unit * 0.02) {
+                    Text(">_")
+                    Rectangle()
+                        .fill(palette.primaryLight.opacity(cursorOpacity))
+                        .frame(width: max(3, unit * 0.04), height: unit * 0.14)
+                }
+            }
+            .font(.system(size: max(11, unit * 0.13), weight: .semibold, design: .monospaced))
+            .foregroundStyle(palette.primary)
+            .offset(x: -unit * 0.13, y: unit * 0.06)
+        }
+        .frame(width: size.width, height: size.height)
     }
 }
 

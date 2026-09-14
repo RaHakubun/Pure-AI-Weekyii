@@ -1025,6 +1025,19 @@ struct TodayView: View {
                         startFlowCoordinator.cancel()
                     },
                     onContinue: {
+                        // When the start-day ritual is switched off, confirming the
+                        // warning starts the day immediately instead of showing a stamp.
+                        guard userSettings.startRitualEnabled else {
+                            do {
+                                try viewModel.startDay()
+                                startFlowStamp = nil
+                                startFlowDetent = .fraction(0.5)
+                                startFlowCoordinator.cancel()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                            return
+                        }
                         startFlowStamp = viewModel.pickStartRitualStamp()
                         startFlowCoordinator.chooseDirectEnter()
                         withAnimation(.easeInOut(duration: 0.24)) {

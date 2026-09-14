@@ -6,6 +6,39 @@ enum SuspendedTaskStatus: String, Codable, CaseIterable {
     case assigned
 }
 
+/// What happens to a suspended task once its decision deadline has passed.
+///
+/// Stored as a raw string in `UserDefaults`, so adding cases does not touch the
+/// SwiftData schema.
+enum SuspendedExpiryPolicy: String, CaseIterable, Codable, Identifiable {
+    /// Delete the record silently. This is the historical behaviour and stays
+    /// the default so existing installs do not change.
+    case autoDelete
+    /// Keep the record in the suspended box as an overdue item, so the user
+    /// still gets to renew, assign or delete it themselves.
+    case keepOverdue
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .autoDelete:
+            String(localized: "settings.suspended.expiry.auto_delete", defaultValue: "到期自动删除")
+        case .keepOverdue:
+            String(localized: "settings.suspended.expiry.keep_overdue", defaultValue: "保留为逾期待处理")
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .autoDelete:
+            String(localized: "settings.suspended.expiry.auto_delete.summary", defaultValue: "到期后直接删除，不留记录。")
+        case .keepOverdue:
+            String(localized: "settings.suspended.expiry.keep_overdue.summary", defaultValue: "到期后保留在悬置箱并标记为已逾期，由你决定续期、分配或删除。")
+        }
+    }
+}
+
 @Model
 final class MindStampItem {
     var id: UUID = UUID()

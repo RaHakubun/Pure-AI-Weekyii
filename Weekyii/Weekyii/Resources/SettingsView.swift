@@ -47,17 +47,9 @@ struct SettingsView: View {
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
         }
-        .onChange(of: settings.killTimeReminderMinutes) { _, _ in
+        .onChange(of: reminderSignature) { _, _ in
             rescheduleTodayKillTimeReminderIfNeeded()
-        }
-        .onChange(of: settings.fixedReminderEnabled) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
-        }
-        .onChange(of: settings.fixedReminderHour) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
-        }
-        .onChange(of: settings.fixedReminderMinute) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
+            rescheduleSuspendedReminders()
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             seedAlertMessage != nil
@@ -203,6 +195,17 @@ struct SettingsView: View {
                         tint: .purple
                     )
                 }
+
+                NavigationLink {
+                    languageSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: String(localized: "settings.language.title", defaultValue: "语言"),
+                        value: settings.languageOverride.displayName,
+                        icon: "globe",
+                        tint: .cyan
+                    )
+                }
             }
 
             Section("使用方式") {
@@ -265,6 +268,16 @@ struct SettingsView: View {
 
             Section("应用") {
                 NavigationLink {
+                    usageHistorySettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: String(localized: "settings.usage_history.title", defaultValue: "使用历程"),
+                        icon: "clock.arrow.circlepath",
+                        tint: .teal
+                    )
+                }
+
+                NavigationLink {
                     aboutSettingsPage
                 } label: {
                     SettingsNavigationRow(
@@ -297,8 +310,39 @@ struct SettingsView: View {
             Section("提醒") {
                 reminderSettings
             }
+            Section {
+                suspendedReminderSettings
+            } header: {
+                Text(String(localized: "settings.suspended.section", defaultValue: "悬置箱提醒"))
+            } footer: {
+                Text(String(localized: "settings.suspended.section.footer", defaultValue: "悬置任务会按这里的节奏在到期前提醒你。到期后的处理方式在「任务管理 → 悬置箱」中设置。"))
+            }
         }
         .navigationTitle("今日节奏")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var languageSettingsPage: some View {
+        Form {
+            Section {
+                Picker(String(localized: "settings.language.title", defaultValue: "语言"), selection: Binding(
+                    get: { settings.languageOverrideRaw },
+                    set: { raw in
+                        guard let override = LanguageOverride(rawValue: raw) else { return }
+                        settings.setLanguageOverride(override)
+                    }
+                )) {
+                    ForEach(LanguageOverride.allCases) { override in
+                        Text(override.displayName).tag(override.rawValue)
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.language.header", defaultValue: "界面语言"))
+            } footer: {
+                Text(String(localized: "settings.language.footer", defaultValue: "更改后需要完全退出并重新打开 Weekyii 才会生效。"))
+            }
+        }
+        .navigationTitle(String(localized: "settings.language.title", defaultValue: "语言"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -306,6 +350,41 @@ struct SettingsView: View {
         Form {
             Section("默认类型") {
                 taskTypeSettings
+            }
+            Section {
+                Stepper(value: Binding(
+                    get: { settings.suspendedDefaultCountdownDays },
+                    set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
+                ), in: 1...120) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
+                        Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
+                        Spacer(minLength: 8)
+                        Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Picker(selection: Binding(
+                    get: { settings.suspendedExpiryPolicy },
+                    set: { settings.suspendedExpiryPolicy = $0 }
+                )) {
+                    ForEach(SuspendedExpiryPolicy.allCases) { policy in
+                        Text(policy.displayName).tag(policy)
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "trash.slash.fill", color: .red)
+                        Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
+                    Text(settings.suspendedExpiryPolicy.summary)
+                }
             }
             Section("类型管理") {
                 taskTypeManagementSettings
@@ -334,9 +413,16 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var aboutSettingsPage: some View {
+    private var usageHistorySettingsPage: some View {
         Form {
             pastSection
+        }
+        .navigationTitle(String(localized: "settings.usage_history.title", defaultValue: "使用历程"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var aboutSettingsPage: some View {
+        Form {
             aboutSection
         }
         .navigationTitle("关于 Weekyii")
@@ -411,6 +497,42 @@ struct SettingsView: View {
             } footer: {
                 Text("每套主题仍保留独立的色彩与印象画。")
             }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { settings.reduceMotionEnabled },
+                    set: { settings.reduceMotionEnabled = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "figure.walk.motion", color: .teal)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "settings.motion.reduce", defaultValue: "减少动效"))
+                            Text(String(localized: "settings.motion.reduce.subtitle", defaultValue: "停止主题背景、转场与磁贴翻转等动画"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.moduleTileRotationEnabled },
+                    set: { settings.moduleTileRotationEnabled = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "rectangle.3.group.fill", color: .blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "settings.motion.tiles", defaultValue: "模块磁贴自动轮换"))
+                            Text(String(localized: "settings.motion.tiles.subtitle", defaultValue: "在扩展页停留时轮换展示不同的悬置任务与项目"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.motion.header", defaultValue: "动效"))
+            } footer: {
+                Text(String(localized: "settings.motion.footer", defaultValue: "“减少动效”开启后，磁贴轮换也会一并停止。改动立即生效。"))
+            }
         }
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
@@ -439,7 +561,7 @@ struct SettingsView: View {
             }
 
         } header: {
-            Text("使用历程")
+            Text(String(localized: "settings.usage_history.overview", defaultValue: "概览"))
         }
     }
 
@@ -559,6 +681,24 @@ struct SettingsView: View {
                     Text("本地恢复点")
                 }
             }
+
+            Stepper(value: Binding(
+                get: { settings.recoveryPointRetentionCount },
+                set: { settings.recoveryPointRetentionCount = min(max($0, 1), 50) }
+            ), in: 1...50) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "externaldrive.fill.badge.timemachine", color: .indigo)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.data.retention", defaultValue: "恢复点保留数量"))
+                        Text(String(localized: "settings.data.retention.subtitle", defaultValue: "超出后自动清理最旧的恢复点"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Text("\(settings.effectiveRecoveryPointRetentionCount)")
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text(String(localized: "settings.section.data"))
         } footer: {
@@ -577,6 +717,24 @@ struct SettingsView: View {
 
     private var archiveDefaultFilename: String {
         "Weekyii-\(Self.archiveFilenameFormatter.string(from: Date()))"
+    }
+
+    /// Every setting that changes when a reminder should fire, collapsed into one
+    /// comparable value so a single `onChange` can drive rescheduling.
+    private var reminderSignature: String {
+        [
+            "\(settings.killTimeReminderMinutes)",
+            "\(settings.fixedReminderEnabled)",
+            "\(settings.fixedReminderHour)",
+            "\(settings.fixedReminderMinute)",
+            "\(settings.morningReminderHour)",
+            "\(settings.morningReminderMinute)",
+            "\(settings.suspendedReminderEnabled)",
+            settings.suspendedReminderIntensityRaw,
+            "\(settings.suspendedReminderAdvanceDays)",
+            "\(settings.suspendedReminderEveningHour)",
+            "\(settings.suspendedReminderEveningMinute)"
+        ].joined(separator: "|")
     }
 
     private func exportArchive() {
@@ -1101,13 +1259,94 @@ struct SettingsView: View {
             .datePickerStyle(.compact)
         }
 
+        DatePicker(selection: morningReminderDateBinding, displayedComponents: .hourAndMinute) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "sunrise.fill", color: .orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
+                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .datePickerStyle(.compact)
+
         HStack(spacing: 12) {
             Color.clear
                 .frame(width: 28, height: 28)
-            Text("系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。")
+            Text(String(localized: "settings.reminder.auto.footer", defaultValue: "系统会在晨间时刻与截止前最后 5 分钟自动提醒，固定时刻提醒用于你的个人节奏。"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
+        }
+    }
+
+    // MARK: - Suspended Task Reminder Settings
+    @ViewBuilder
+    private var suspendedReminderSettings: some View {
+        Toggle(isOn: Binding(
+            get: { settings.suspendedReminderEnabled },
+            set: { settings.suspendedReminderEnabled = $0 }
+        )) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
+                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        if settings.suspendedReminderEnabled {
+            Picker(selection: Binding(
+                get: { settings.suspendedReminderIntensityRaw },
+                set: { settings.suspendedReminderIntensityRaw = $0 }
+            )) {
+                ForEach(SuspendedReminderIntensity.allCases) { intensity in
+                    Text(intensity.displayName).tag(intensity.rawValue)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
+                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Color.clear
+                    .frame(width: 28, height: 28)
+                Text(settings.suspendedReminderIntensity.summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            if settings.suspendedReminderIntensity == .full {
+                Stepper(value: Binding(
+                    get: { settings.suspendedReminderAdvanceDays },
+                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
+                ), in: 1...14) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
+                        Text(String(
+                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
+                            settings.suspendedReminderAdvanceDays
+                        ))
+                    }
+                }
+            }
+
+            DatePicker(selection: suspendedEveningReminderDateBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
+                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
+                }
+            }
+            .datePickerStyle(.compact)
         }
     }
 
@@ -1262,6 +1501,40 @@ struct SettingsView: View {
         )
     }
 
+    private var morningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.morningReminderHour
+                components.minute = settings.morningReminderMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.morningReminderHour = min(max(components.hour ?? 0, 0), 23)
+                settings.morningReminderMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+
+    private var suspendedEveningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.suspendedReminderEveningHour
+                components.minute = settings.suspendedReminderEveningMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
+                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+
     private var hasPendingDefaultKillTimeChange: Bool {
         pendingDefaultKillTimeHour != settings.defaultKillTimeHour
             || pendingDefaultKillTimeMinute != settings.defaultKillTimeMinute
@@ -1329,6 +1602,16 @@ struct SettingsView: View {
         let dayId = Date().dayId
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
         return try? modelContext.fetch(descriptor).first
+    }
+
+    /// Rebuilds the pending notifications of every active suspended task so a rhythm
+    /// change takes effect immediately instead of waiting for the next edit.
+    private func rescheduleSuspendedReminders() {
+        let tasks = ((try? modelContext.fetch(FetchDescriptor<SuspendedTaskItem>())) ?? [])
+            .filter { $0.status == .active }
+        for task in tasks {
+            NotificationService.shared.scheduleSuspendedTaskNotifications(for: task)
+        }
     }
 
     private func shouldWarnImmediateExpiryForToday(hour: Int, minute: Int) -> Bool {
@@ -1763,16 +2046,190 @@ private struct SettingsNavigationRow: View {
 private struct ThemePaletteMark: View {
     let theme: WeekTheme
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// The mark mirrors the theme's *form*, not just its colours, so a squared-off
+    /// Brutalist swatch is instantly distinguishable from a rounded classic one.
+    /// Card metrics are scaled down to the 30pt mark, and both factors are picked
+    /// so `.classic` reproduces exactly the 7pt radius / 0.5pt rule it has today.
+    private var style: ThemeVisualStyle { theme.visualStyle }
+
+    private var markRadius: CGFloat { style.swatchRadius }
+    private var markBorderWidth: CGFloat { style.swatchBorderWidth }
+
+    /// Light and dark differ on purpose: an ink rule disappears on a dark row.
+    private var markBorderColor: Color {
+        if let light = style.borderColorHexLight, let dark = style.borderColorHexDark {
+            return Color.dynamic(lightHex: light, darkHex: dark)
+        }
+        return Color.primary.opacity(0.08)
+    }
+
+    private var paletteBackground: Color {
+        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).backgroundSecondary)
+    }
+
+    private var paletteBackgroundPrimary: Color {
+        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).backgroundPrimary)
+    }
+
+    private var palettePrimary: Color {
+        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).primary)
+    }
+
+    private var palettePrimaryLight: Color {
+        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).primaryLight)
+    }
+
+    private var paletteAccent: Color {
+        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).accentOrange)
+    }
+
     var body: some View {
+        markArtwork
+        .frame(width: 30, height: 30)
+        .clipShape(RoundedRectangle(cornerRadius: markRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: markRadius, style: .continuous)
+                .stroke(markBorderColor, lineWidth: markBorderWidth)
+        }
+    }
+
+    @ViewBuilder
+    private var markArtwork: some View {
+        switch theme {
+        case .lotr:
+            lotrMark
+        case .brutal:
+            brutalMark
+        case .neon:
+            neonMark
+        case .paper:
+            paperMark
+        case .terminal:
+            terminalMark
+        default:
+            classicMark
+        }
+    }
+
+    private var classicMark: some View {
         HStack(spacing: 0) {
             Rectangle().fill(theme.primaryColor)
             Rectangle().fill(theme.accentColor)
         }
-        .frame(width: 30, height: 30)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+    }
+
+    private var lotrMark: some View {
+        ZStack {
+            LinearGradient(
+                colors: [paletteBackgroundPrimary, paletteBackground],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .stroke(palettePrimary, lineWidth: 2.2)
+                .padding(4)
+
+            Circle()
+                .stroke(paletteAccent.opacity(0.76), lineWidth: 1)
+                .padding(8)
+
+            Capsule()
+                .fill(paletteAccent)
+                .frame(width: 13, height: 2.5)
+                .rotationEffect(.degrees(-24))
+
+            Circle()
+                .fill(palettePrimaryLight)
+                .frame(width: 3, height: 3)
+                .offset(x: 7, y: -7)
+        }
+    }
+
+    private var brutalMark: some View {
+        ZStack {
+            paletteBackground
+
+            Rectangle()
+                .fill(palettePrimary)
+                .frame(width: 19, height: 19)
+                .offset(x: -3, y: -3)
+
+            Rectangle()
+                .fill(paletteAccent)
+                .frame(width: 13, height: 13)
+                .offset(x: 6, y: 6)
+        }
+    }
+
+    private var neonMark: some View {
+        ZStack {
+            paletteBackgroundPrimary
+
+            Circle()
+                .fill(paletteAccent.opacity(0.38))
+                .frame(width: 12, height: 12)
+                .blur(radius: 3)
+                .offset(x: 7, y: -6)
+
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(palettePrimary, lineWidth: 1.8)
+                .padding(4)
+
+            Circle()
+                .stroke(paletteAccent, lineWidth: 1.4)
+                .frame(width: 9, height: 9)
+                .offset(x: 6, y: 5)
+
+            Capsule()
+                .fill(palettePrimaryLight)
+                .frame(width: 14, height: 2)
+                .rotationEffect(.degrees(-18))
+                .offset(x: -2, y: 6)
+        }
+    }
+
+    private var paperMark: some View {
+        ZStack {
+            paletteBackground
+
+            Rectangle()
+                .fill(palettePrimary.opacity(0.92))
+                .frame(width: 9, height: 21)
+                .offset(x: -6, y: -1)
+
+            Rectangle()
+                .fill(paletteAccent.opacity(0.82))
+                .frame(width: 8, height: 15)
+                .offset(x: 5, y: 3)
+
+            Circle()
+                .stroke(palettePrimary.opacity(0.62), lineWidth: 1)
+                .frame(width: 11, height: 11)
+                .offset(x: 2, y: -5)
+        }
+    }
+
+    private var terminalMark: some View {
+        ZStack {
+            paletteBackgroundPrimary
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(">_")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                Rectangle()
+                    .fill(palettePrimary)
+                    .frame(width: 9, height: 1.5)
+            }
+            .foregroundStyle(palettePrimary)
+            .offset(x: -2, y: -1)
+
+            Rectangle()
+                .fill(palettePrimaryLight.opacity(0.58))
+                .frame(height: 1)
+                .offset(y: 9)
         }
     }
 }
@@ -1818,10 +2275,92 @@ private struct ProjectSettingsView: View {
                         Text(tileSizeName(size)).tag(size.rawValue)
                     }
                 }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: "settings.project.default_color", defaultValue: "默认颜色"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 10)], spacing: 10) {
+                        ForEach(CreateProjectSheet.colorOptions, id: \.self) { hex in
+                            Button {
+                                settings.defaultProjectColorHex = hex
+                            } label: {
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 30, height: 30)
+                                    .overlay {
+                                        if settings.defaultProjectColorHex == hex {
+                                            Image(systemName: "checkmark")
+                                                .font(.caption.bold())
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(String(
+                                format: String(localized: "settings.project.default_color.a11y", defaultValue: "默认颜色 %@"),
+                                hex
+                            )))
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: "settings.project.default_icon", defaultValue: "默认图标"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+                        ForEach(CreateProjectSheet.iconOptions, id: \.self) { icon in
+                            let isSelected = settings.defaultProjectIconName == icon
+                            Button {
+                                settings.defaultProjectIconName = icon
+                            } label: {
+                                Image(systemName: icon)
+                                    .font(.body)
+                                    .foregroundStyle(isSelected ? .white : Color(hex: settings.defaultProjectColorHex))
+                                    .frame(width: 38, height: 38)
+                                    .background(
+                                        isSelected
+                                            ? Color(hex: settings.defaultProjectColorHex)
+                                            : Color(hex: settings.defaultProjectColorHex).opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(String(
+                                format: String(localized: "settings.project.default_icon.a11y", defaultValue: "默认图标 %@"),
+                                icon
+                            )))
+                        }
+                    }
+                }
             } header: {
                 Text("新建项目默认值")
             } footer: {
                 Text("仅影响以后新建的项目，不会修改现有项目。")
+            }
+
+            Section {
+                Stepper(value: Binding(
+                    get: { settings.boardColumnCount },
+                    set: { settings.boardColumnCount = min(max($0, 2), 6) }
+                ), in: 2...6) {
+                    HStack {
+                        Label(String(localized: "settings.project.board.columns", defaultValue: "每行列数"), systemImage: "square.grid.3x3")
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "settings.project.board.columns.value", defaultValue: "%d 列"),
+                            settings.effectiveBoardColumnCount
+                        ))
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.project.board.header", defaultValue: "项目看板"))
+            } footer: {
+                Text(String(localized: "settings.project.board.footer", defaultValue: "列数越少磁贴越大；宽幅磁贴会自动收窄以适应当前列数。"))
             }
 
             Section("项目概览") {

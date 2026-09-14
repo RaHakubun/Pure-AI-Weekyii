@@ -1,6 +1,51 @@
 import Foundation
 import UserNotifications
 
+/// How aggressively the suspended box reminds the user before a decision deadline.
+enum SuspendedReminderIntensity: String, CaseIterable, Codable, Identifiable {
+    /// Only the due-day morning and evening checkpoints.
+    case minimal
+    /// One day before, plus the due-day checkpoints.
+    case standard
+    /// `advanceDays` before, one day before, plus the due-day checkpoints.
+    case full
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .minimal: String(localized: "settings.suspended.reminder.intensity.minimal", defaultValue: "精简")
+        case .standard: String(localized: "settings.suspended.reminder.intensity.standard", defaultValue: "标准")
+        case .full: String(localized: "settings.suspended.reminder.intensity.full", defaultValue: "充分")
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .minimal: String(localized: "settings.suspended.reminder.intensity.minimal.summary", defaultValue: "只在到期当天提醒")
+        case .standard: String(localized: "settings.suspended.reminder.intensity.standard.summary", defaultValue: "提前一天与到期当天提醒")
+        case .full: String(localized: "settings.suspended.reminder.intensity.full.summary", defaultValue: "提前多天、提前一天与到期当天提醒")
+        }
+    }
+}
+
+/// User-configurable reminder rhythm. The default value reproduces the historical
+/// hardcoded behaviour so existing call sites and tests keep working unchanged.
+struct NotificationConfiguration: Equatable {
+    var morningHour: Int = 9
+    var morningMinute: Int = 0
+    var suspendedReminderEnabled: Bool = true
+    var suspendedReminderIntensity: SuspendedReminderIntensity = .full
+    var suspendedAdvanceDays: Int = 3
+    var suspendedEveningHour: Int = 19
+    var suspendedEveningMinute: Int = 30
+    /// Carried here so the due-day reminder can tell the truth about what
+    /// happens if the user does nothing.
+    var suspendedExpiryPolicy: SuspendedExpiryPolicy = .autoDelete
+
+    static let `default` = NotificationConfiguration()
+}
+
 protocol NotificationScheduling {
     func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?)
     func cancelKillTimeNotification(for day: DayModel)
@@ -32,6 +77,9 @@ final class NotificationService: NotificationScheduling {
     static let shared = NotificationService()
     private let calendar = Calendar(identifier: .iso8601)
     private let finalReminderLeadMinutes = 5
+
+    /// Reminder rhythm driven by `UserSettings`. Updated whenever settings are saved.
+    var configuration: NotificationConfiguration = .default
     
     private init() {}
 
@@ -97,7 +145,8 @@ final class NotificationService: NotificationScheduling {
             for: input,
             reminderMinutes: reminderMinutes,
             fixedReminder: fixedReminder,
-            now: now
+            now: now,
+            configuration: configuration
         )
     }
 
@@ -105,7 +154,8 @@ final class NotificationService: NotificationScheduling {
         for input: KillTimeInput,
         reminderMinutes: Int,
         fixedReminder: DateComponents?,
-        now: Date
+        now: Date,
+        configuration: NotificationConfiguration = .default
     ) -> [ReminderPlanItem] {
         guard let killDate = killDate(for: input), killDate > now else { return [] }
         guard input.unfinishedCount > 0 else { return [] }
@@ -122,7 +172,7 @@ final class NotificationService: NotificationScheduling {
             )
         ]
 
-        if let morningDate = morningReminderDate(for: input.dayDate), morningDate > now {
+        if let morningDate = morningReminderDate(for: input.dayDate, configuration: configuration), morningDate > now {
             candidates.append(
                 ReminderPlanItem(
                     identifier: morningReminderIdentifier(for: input.dayId),
@@ -177,19 +227,52 @@ final class NotificationService: NotificationScheduling {
             taskID: task.id,
             decisionDeadline: task.decisionDeadline
         )
-        return suspendedReminderPlan(for: input, now: now)
+        return suspendedReminderPlan(for: input, now: now, configuration: configuration)
     }
 
-    func suspendedReminderPlan(for input: SuspendedInput, now: Date) -> [ReminderPlanItem] {
-        let title = "悬置箱提醒"
+    func suspendedReminderPlan(
+        for input: SuspendedInput,
+        now: Date,
+        configuration: NotificationConfiguration = .default
+    ) -> [ReminderPlanItem] {
+        guard configuration.suspendedReminderEnabled else { return [] }
+
+        let title = String(localized: "notification.suspended.title", defaultValue: "悬置箱提醒")
         let dueDay = calendar.startOfDay(for: input.decisionDeadline)
 
-        let checkpoints: [(suffix: String, offset: Int, hour: Int, minute: Int, body: String)] = [
-            ("d3", -3, 9, 30, "还有 3 天到期：请续期、分配到具体某一天，或删除。"),
-            ("d1", -1, 10, 0, "明天到期：请尽快处理这个悬置任务。"),
-            ("d0m", 0, 9, 0, "今天到期：建议现在续期或分配到具体日期。"),
-            ("d0e", 0, 19, 30, "今晚到期：若仍未处理，系统将自动删除该任务。")
-        ]
+        let morningHour = configuration.morningHour
+        let morningMinute = configuration.morningMinute
+        let eveningHour = configuration.suspendedEveningHour
+        let eveningMinute = configuration.suspendedEveningMinute
+
+        var checkpoints: [(suffix: String, offset: Int, hour: Int, minute: Int, body: String)] = []
+
+        if configuration.suspendedReminderIntensity == .full {
+            let advanceDays = min(max(configuration.suspendedAdvanceDays, 1), 14)
+            checkpoints.append((
+                "d\(advanceDays)",
+                -advanceDays,
+                morningHour,
+                morningMinute,
+                "还有 \(advanceDays) 天到期：请续期、分配到具体某一天，或删除。"
+            ))
+        }
+
+        if configuration.suspendedReminderIntensity != .minimal {
+            checkpoints.append(("d1", -1, morningHour, morningMinute, "明天到期：请尽快处理这个悬置任务。"))
+        }
+
+        checkpoints.append(("d0m", 0, morningHour, morningMinute, "今天到期：建议现在续期或分配到具体日期。"))
+        let eveningBody = configuration.suspendedExpiryPolicy == .autoDelete
+            ? String(
+                localized: "notification.suspended.d0e.auto_delete",
+                defaultValue: "今晚到期：若仍未处理，系统将自动删除该任务。"
+            )
+            : String(
+                localized: "notification.suspended.d0e.keep_overdue",
+                defaultValue: "今晚到期：若仍未处理，任务会留在悬置箱并标记为已逾期。"
+            )
+        checkpoints.append(("d0e", 0, eveningHour, eveningMinute, eveningBody))
 
         var items: [ReminderPlanItem] = []
         for checkpoint in checkpoints {
@@ -276,10 +359,10 @@ final class NotificationService: NotificationScheduling {
         return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)-\(parts.hour ?? 0)-\(parts.minute ?? 0)"
     }
 
-    private func morningReminderDate(for dayDate: Date) -> Date? {
+    private func morningReminderDate(for dayDate: Date, configuration: NotificationConfiguration) -> Date? {
         var components = calendar.dateComponents([.year, .month, .day], from: dayDate)
-        components.hour = 9
-        components.minute = 0
+        components.hour = configuration.morningHour
+        components.minute = configuration.morningMinute
         components.second = 0
         return calendar.date(from: components)
     }
@@ -330,11 +413,15 @@ final class NotificationService: NotificationScheduling {
     }
 
     private func suspendedReminderIdentifiers(for task: SuspendedTaskItem) -> [String] {
-        let staged = ["d3", "d1", "d0m", "d0e"].map { suffix in
+        // The advance reminder suffix depends on the configured advance window, so the
+        // removal set covers the whole supported range.
+        let advance = (1...14).map { "d\($0)" }
+        let staged = advance + ["d1", "d0m", "d0e"]
+        let identifiers = staged.map { suffix in
             "suspended-\(task.id.uuidString)-\(suffix)"
         }
         // Backward compatibility: remove old checkpoint ids as well.
         let legacy = (0..<3).map { "suspended-\(task.id.uuidString)-\($0)" }
-        return staged + legacy
+        return Array(Set(identifiers + legacy))
     }
 }

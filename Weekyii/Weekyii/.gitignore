@@ -2,6 +2,7 @@
 .build/
 DerivedData/
 .derivedData*/
+.derived/
 *.xcuserstate
 
 # IDE

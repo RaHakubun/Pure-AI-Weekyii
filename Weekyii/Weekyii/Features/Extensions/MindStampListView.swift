@@ -93,9 +93,13 @@ struct MindStampListView: View {
                     Button {
                         imagePreviewItem = ImagePreviewItem(image: uiImage)
                     } label: {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
+                        ZStack {
+                            Color.accentPink.opacity(0.08)
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                                .padding(WeekSpacing.xs)
+                        }
                             .frame(width: 72, height: 72)
                             .clipShape(.rect(cornerRadius: WeekRadius.small))
                             .overlay {

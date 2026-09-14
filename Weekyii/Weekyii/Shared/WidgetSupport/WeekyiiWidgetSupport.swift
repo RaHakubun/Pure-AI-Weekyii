@@ -11,6 +11,23 @@ enum AppearanceMode: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 }
 
+/// In-app language override. `system` clears the override and follows the device language.
+enum LanguageOverride: String, CaseIterable, Codable, Identifiable {
+    case system
+    case simplifiedChinese = "zh-Hans"
+    case english = "en"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: String(localized: "settings.language.system", defaultValue: "跟随系统")
+        case .simplifiedChinese: String(localized: "settings.language.zh_hans", defaultValue: "简体中文")
+        case .english: String(localized: "settings.language.en", defaultValue: "English")
+        }
+    }
+}
+
 enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
     case doneFocus = "done-focus"
     case postponeFocus = "postpone-focus"

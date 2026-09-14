@@ -9,10 +9,16 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     @ViewBuilder let content: (Item) -> Content
     @ViewBuilder let emptyContent: () -> EmptyContent
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.weekyiiReduceMotion) private var appReduceMotion
     @State private var selectedIndex = 0
     @State private var rotation = 0.0
     @State private var rotationQueue: [Int] = []
+
+    /// System “reduce motion” and Weekyii's own switch both disable the 3D flip.
+    private var reduceMotion: Bool {
+        systemReduceMotion || appReduceMotion
+    }
 
     private var itemIDs: [Item.ID] { items.map(\.id) }
 

@@ -39,6 +39,16 @@ struct KillTimeSlider: View {
         return min(max(value, lb), upperBound)
     }
 
+    /// Track thickness follows the active theme. `.classic` scales by 1.0, so the
+    /// ten original themes keep the 4pt track they have always had.
+    private var themedTrackHeight: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barThickness(trackHeight)
+    }
+
+    private var themedTrackCornerRadius: CGFloat {
+        WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedTrackHeight)
+    }
+
     // MARK: Body
 
     var body: some View {
@@ -93,15 +103,15 @@ struct KillTimeSlider: View {
     private func trackRow(thumbCenterX: CGFloat, thumbRadius: CGFloat) -> some View {
         ZStack(alignment: .leading) {
             // 背景轨道
-            RoundedRectangle(cornerRadius: trackHeight / 2)
+            RoundedRectangle(cornerRadius: themedTrackCornerRadius)
                 .fill(Color.secondary.opacity(0.2))
-                .frame(height: trackHeight)
+                .frame(height: themedTrackHeight)
                 .padding(.horizontal, thumbRadius)
 
             // 进度填充（从轨道起点到 thumb 中心）
-            RoundedRectangle(cornerRadius: trackHeight / 2)
+            RoundedRectangle(cornerRadius: themedTrackCornerRadius)
                 .fill(Color.weekyiiPrimary)
-                .frame(width: max(0, thumbCenterX - thumbRadius), height: trackHeight)
+                .frame(width: max(0, thumbCenterX - thumbRadius), height: themedTrackHeight)
                 .offset(x: thumbRadius)
 
             // 滑块

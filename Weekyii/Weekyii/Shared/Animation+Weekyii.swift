@@ -1,5 +1,22 @@
 import SwiftUI
 
+// MARK: - In-App Motion Preference
+
+/// `EnvironmentValues.accessibilityReduceMotion` is read-only, so the in-app
+/// “减少动效” preference travels through its own key. `ContentView` combines it with
+/// the system setting and publishes the result down the view tree.
+private struct WeekyiiReduceMotionKey: EnvironmentKey {
+    nonisolated static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// True when the user enabled “减少动效” inside Weekyii (system setting excluded).
+    var weekyiiReduceMotion: Bool {
+        get { self[WeekyiiReduceMotionKey.self] }
+        set { self[WeekyiiReduceMotionKey.self] = newValue }
+    }
+}
+
 // MARK: - Animation Extensions
 
 extension Animation {

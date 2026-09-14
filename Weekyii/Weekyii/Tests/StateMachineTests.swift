@@ -1115,6 +1115,114 @@ final class StateMachineTests: XCTestCase {
         XCTAssertFalse(day.isDraftZoneUnlocked)
     }
 
+    // MARK: - Suspended-task expiry policy (end-to-end through reconcile)
+
+    /// `StateMachine` reads the policy straight from `UserDefaults.standard`, so the
+    /// key has to be swapped for the duration of the call and restored afterwards —
+    /// a leaked `keepOverdue` would silently disable sweeping everywhere else.
+    private func withExpiryPolicy<T>(_ policy: String?, _ body: () throws -> T) rethrows -> T {
+        let defaults = UserDefaults.standard
+        let key = "suspendedExpiryPolicy"
+        let original = defaults.object(forKey: key)
+        if let policy {
+            defaults.set(policy, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+        defer {
+            if let original {
+                defaults.set(original, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        return try body()
+    }
+
+    @MainActor
+    private func makeSuspendedFixture(now: Date) throws -> (expired: SuspendedTaskItem, active: SuspendedTaskItem) {
+        let calendar = Calendar(identifier: .iso8601)
+        let context = container.mainContext
+        let expired = SuspendedTaskItem(
+            title: "Expired",
+            decisionDeadline: calendar.date(byAdding: .day, value: -1, to: now)!,
+            preferredCountdownDays: 10
+        )
+        let active = SuspendedTaskItem(
+            title: "Active",
+            decisionDeadline: calendar.date(byAdding: .day, value: 5, to: now)!,
+            preferredCountdownDays: 10
+        )
+        context.insert(expired)
+        context.insert(active)
+        try context.save()
+        return (expired, active)
+    }
+
+    @MainActor
+    private func makeMachine(now: Date) -> StateMachine {
+        StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: makeAppState(),
+            userSettings: makeSettings()
+        )
+    }
+
+    /// No key written yet means "first install" — the default must stay `.autoDelete`
+    /// so upgrading users keep the behaviour they already had.
+    @MainActor
+    func test_reconcile_deletesExpiredSuspendedTasksWhenPolicyIsAbsent() throws {
+        let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
+        let (_, active) = try makeSuspendedFixture(now: now)
+        let machine = makeMachine(now: now)
+
+        let report = withExpiryPolicy(nil) { machine.reconcile(now: now, force: true) }
+
+        XCTAssertEqual(report.suspendedAutoDeletedCount, 1)
+        let remaining = try container.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>())
+        XCTAssertEqual(remaining.map(\.id), [active.id])
+    }
+
+    @MainActor
+    func test_reconcile_keepsOverdueSuspendedTasksUnderKeepOverduePolicy() throws {
+        let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
+        let (expired, active) = try makeSuspendedFixture(now: now)
+        let machine = makeMachine(now: now)
+
+        let report = withExpiryPolicy(SuspendedExpiryPolicy.keepOverdue.rawValue) {
+            machine.reconcile(now: now, force: true)
+        }
+
+        XCTAssertEqual(report.suspendedAutoDeletedCount, 0)
+        let remaining = try container.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>())
+        XCTAssertEqual(Set(remaining.map(\.id)), [expired.id, active.id])
+        XCTAssertEqual(expired.status, .active)
+
+        // A second reconcile must be a no-op, not a late deletion.
+        let second = withExpiryPolicy(SuspendedExpiryPolicy.keepOverdue.rawValue) {
+            machine.reconcile(now: now, force: true)
+        }
+        XCTAssertEqual(second.suspendedAutoDeletedCount, 0)
+        XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>()).count, 2)
+    }
+
+    /// An unreadable value (sync glitch, future enum case) must fall back to the
+    /// safe default rather than stranding records forever.
+    @MainActor
+    func test_reconcile_fallsBackToAutoDeleteWhenPolicyValueIsUnreadable() throws {
+        let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
+        let (_, active) = try makeSuspendedFixture(now: now)
+        let machine = makeMachine(now: now)
+
+        let report = withExpiryPolicy("something-else") { machine.reconcile(now: now, force: true) }
+
+        XCTAssertEqual(report.suspendedAutoDeletedCount, 1)
+        let remaining = try container.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>())
+        XCTAssertEqual(remaining.map(\.id), [active.id])
+    }
+
     @MainActor
     private func makeExecutingToday(
         mode: ExecutionMode,
