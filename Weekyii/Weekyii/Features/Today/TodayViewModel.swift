@@ -165,8 +165,8 @@ final class TodayViewModel {
             attachments: attachments
         )
         _ = try taskMutationService.createTask(in: day, payload: payload, zone: .draft)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -182,7 +182,6 @@ final class TodayViewModel {
             attachments: attachments
         )
         try taskMutationService.updateTask(task, payload: payload)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
@@ -191,8 +190,8 @@ final class TodayViewModel {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         _ = try taskMutationService.deleteDraftTasks(in: day, at: offsets)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -200,7 +199,6 @@ final class TodayViewModel {
         guard let day = resolveToday() else { throw WeekyiiError.dayNotFound(timeProvider.today.dayId) }
         guard day.status == .draft else { throw WeekyiiError.cannotEditStartedDay }
         try taskMutationService.moveDraftTasks(in: day, from: source, to: destination)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
@@ -228,9 +226,8 @@ final class TodayViewModel {
             }
         }
 
-        updateNotificationSchedule(for: day)
-
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -252,10 +249,10 @@ final class TodayViewModel {
             day.status = .completed
             day.closedAt = now
             day.isDraftZoneUnlocked = false
-            notificationService.cancelKillTimeNotification(for: day)
         }
 
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -285,8 +282,8 @@ final class TodayViewModel {
         )
         _ = try taskMutationService.createTask(in: day, payload: payload, zone: .frozen)
         taskMutationService.normalizeOrder(in: day, zone: .frozen)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -320,15 +317,14 @@ final class TodayViewModel {
     func deleteExecutionTasks(at offsets: IndexSet) throws {
         let day = try resolveUnlockedFlexibleExecutionDay()
         _ = try taskMutationService.deleteTasks(in: day, zone: .frozen, at: offsets)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
     func moveExecutionTasks(from source: IndexSet, to destination: Int) throws {
         let day = try resolveUnlockedFlexibleExecutionDay()
         try taskMutationService.moveTasks(in: day, zone: .frozen, from: source, to: destination)
-        updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
@@ -355,7 +351,6 @@ final class TodayViewModel {
             task.order = index + 3
         }
 
-        updateNotificationSchedule(for: day)
         try modelContext.save()
         syncToday()
     }
@@ -383,8 +378,13 @@ final class TodayViewModel {
             day.killTimeHour = hour
             day.killTimeMinute = minute
             day.followsDefaultKillTime = false
-            expire(day: day, expiredCount: expiredCountForImmediateExpire(day: day))
+            expire(
+                day: day,
+                expiredCount: expiredCountForImmediateExpire(day: day),
+                cancelNotifications: false
+            )
             try modelContext.save()
+            reconcileNotificationsAfterMutation(for: day)
             syncToday()
             return
         }
@@ -392,8 +392,8 @@ final class TodayViewModel {
         day.killTimeHour = hour
         day.killTimeMinute = minute
         day.followsDefaultKillTime = false
-        updateNotificationSchedule(for: day)
         try modelContext.save()
+        reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }
 
@@ -424,14 +424,13 @@ final class TodayViewModel {
             now: timeProvider.now
         )
 
+        try modelContext.save()
         if let sourceDay = fetchDay(by: execution.sourceDayId) {
-            updateNotificationSchedule(for: sourceDay)
+            reconcileNotificationsAfterMutation(for: sourceDay)
         }
         if let targetDay = fetchDay(by: execution.targetDayId) {
-            updateNotificationSchedule(for: targetDay)
+            reconcileNotificationsAfterMutation(for: targetDay)
         }
-
-        try modelContext.save()
         syncToday()
         return PostponeResult(targetDate: execution.targetDate, createdWeek: execution.createdWeek)
     }
@@ -462,12 +461,14 @@ final class TodayViewModel {
         day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
     }
 
-    private func expire(day: DayModel, expiredCount: Int) {
+    private func expire(day: DayModel, expiredCount: Int, cancelNotifications: Bool = true) {
         day.status = .expired
         day.expiredCount = expiredCount
         day.isDraftZoneUnlocked = false
         removeTasks(in: [.draft, .focus, .frozen], from: day)
-        notificationService.cancelKillTimeNotification(for: day)
+        if cancelNotifications {
+            notificationService.cancelKillTimeNotification(for: day)
+        }
     }
 
     private func removeTasks(in zones: [TaskZone], from day: DayModel) {
@@ -601,7 +602,19 @@ final class TodayViewModel {
         }
     }
 
-    private func updateNotificationSchedule(for day: DayModel) {
+    private func reconcileNotificationsAfterMutation(for day: DayModel, clearDelivered: Bool = true) {
+        updateNotificationSchedule(for: day, expireIfNeeded: false)
+        if clearDelivered {
+            notificationService.removeDeliveredKillTimeNotifications(for: day)
+        }
+    }
+
+    private func updateNotificationSchedule(for day: DayModel, expireIfNeeded: Bool = true) {
+        guard day.dayId == timeProvider.today.dayId else {
+            notificationService.cancelKillTimeNotification(for: day)
+            return
+        }
+
         guard day.status == .draft || day.status == .execute else {
             notificationService.cancelKillTimeNotification(for: day)
             return
@@ -609,8 +622,12 @@ final class TodayViewModel {
 
         guard let killDate = killDate(for: day) else { return }
         if timeProvider.now >= killDate {
-            let expiredCount = day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
-            expire(day: day, expiredCount: expiredCount)
+            if expireIfNeeded {
+                let expiredCount = day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
+                expire(day: day, expiredCount: expiredCount)
+            } else {
+                notificationService.cancelKillTimeNotification(for: day)
+            }
             return
         }
 

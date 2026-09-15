@@ -1465,6 +1465,7 @@ private struct ProjectsFullView: View {
 
     var body: some View {
         content
+            .accessibilityIdentifier("projectsFullView")
             .background(Color.backgroundPrimary.ignoresSafeArea())
             .navigationTitle(String(localized: "extensions.tab.projects"))
             .navigationBarTitleDisplayMode(.inline)
@@ -1793,6 +1794,8 @@ private struct ProjectsFullView: View {
             .frame(maxWidth: .infinity)
             .weekPaddingVertical(WeekSpacing.xl)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("projectsEmptyState")
     }
 }
 

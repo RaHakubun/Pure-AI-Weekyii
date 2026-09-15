@@ -36,9 +36,15 @@ final class ThemePickerScreenshotTests: XCTestCase {
         _ = app.staticTexts["主题"].waitForExistence(timeout: 5)
         sleep(1)
 
+        let screenshotDirectory = URL(fileURLWithPath: "/tmp/weekyii_shots", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: screenshotDirectory,
+            withIntermediateDirectories: true
+        )
+
         let screenshot = app.screenshot()
         try screenshot.pngRepresentation.write(
-            to: URL(fileURLWithPath: "/tmp/weekyii_shots/uitest_picker.png")
+            to: screenshotDirectory.appendingPathComponent("uitest_picker.png")
         )
 
         // Scroll the page so the personalised themes (粗野 / 霓虹 / 纸感 / 终端)
@@ -51,7 +57,7 @@ final class ThemePickerScreenshotTests: XCTestCase {
         sleep(1)
         let scrolled = app.screenshot()
         try scrolled.pngRepresentation.write(
-            to: URL(fileURLWithPath: "/tmp/weekyii_shots/uitest_picker_scrolled.png")
+            to: screenshotDirectory.appendingPathComponent("uitest_picker_scrolled.png")
         )
     }
 }
@@ -114,11 +120,20 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(moveDownButton.waitForExistence(timeout: 3))
         moveDownButton.tap()
 
-        let firstAfter = app.staticTexts["draftTaskTitle_0"].label
-        let secondAfter = app.staticTexts["draftTaskTitle_1"].label
+        let firstAfter = app.staticTexts["draftTaskTitle_0"]
+        let secondAfter = app.staticTexts["draftTaskTitle_1"]
+        let firstReordered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", secondBefore),
+            object: firstAfter
+        )
+        let secondReordered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", firstBefore),
+            object: secondAfter
+        )
+        wait(for: [firstReordered, secondReordered], timeout: 5)
 
-        XCTAssertEqual(firstAfter, secondBefore)
-        XCTAssertEqual(secondAfter, firstBefore)
+        XCTAssertEqual(firstAfter.label, secondBefore)
+        XCTAssertEqual(secondAfter.label, firstBefore)
     }
 
     func testDraftAddAndEditBothOpenTaskEditorSheet() {
@@ -142,8 +157,15 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(cancelButton.waitForExistence(timeout: 2))
         cancelButton.tap()
 
-        let firstDraftTask = app.staticTexts["draftTaskTitle_0"]
+        let editorDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: editorTitleField
+        )
+        wait(for: [editorDismissed], timeout: 5)
+
+        let firstDraftTask = app.buttons["draftTaskButton_0"]
         XCTAssertTrue(firstDraftTask.waitForExistence(timeout: 3))
+        XCTAssertTrue(firstDraftTask.isHittable)
         firstDraftTask.tap()
 
         XCTAssertTrue(editorTitleField.waitForExistence(timeout: 3))
@@ -171,7 +193,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertFalse(exchangeButton.isEnabled)
         XCTAssertFalse(addButton.isEnabled)
         XCTAssertFalse(editButton.isEnabled)
-        XCTAssertTrue(lockButton.isHittable)
+        XCTAssertTrue(waitForHittable(lockButton, in: app))
 
         lockButton.tap()
 
@@ -312,6 +334,10 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(projectsSeeAll.waitForExistence(timeout: 5))
         projectsSeeAll.tap()
 
+        let projectsFullView = app.descendants(matching: .any)["projectsFullView"]
+        XCTAssertTrue(projectsFullView.waitForExistence(timeout: 5))
+        let projectsEmptyState = app.descendants(matching: .any)["projectsEmptyState"]
+        XCTAssertTrue(projectsEmptyState.waitForExistence(timeout: 5))
         let projectsEmptyCreate = app.buttons["projectsEmptyCreateButton"]
         XCTAssertTrue(projectsEmptyCreate.waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["projectsFooterCreateButton"].exists)
@@ -327,6 +353,19 @@ final class DraftReorderUITests: XCTestCase {
         let mindStampsToolbarCreate = app.buttons["mindstampsToolbarCreateButton"]
         XCTAssertTrue(mindStampsToolbarCreate.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["mindstampsFooterCreateButton"].exists)
+    }
+
+    private func waitForHittable(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8
+    ) -> Bool {
+        guard element.waitForExistence(timeout: 5) else { return false }
+        for _ in 0..<maxSwipes {
+            if element.isHittable { return true }
+            app.swipeUp()
+        }
+        return element.isHittable
     }
 
     func testMindStampsPageShowsToolbarCreateAndDeleteConfirmation() {
@@ -625,8 +664,18 @@ final class DraftReorderUITests: XCTestCase {
         let topology = app.descendants(matching: .any)["weekTopologyView"]
         XCTAssertTrue(topology.waitForExistence(timeout: 3))
 
+        // The seed puts both tasks on the current day. Do not hard-code Monday
+        // here: the test must remain valid when the calendar advances to a
+        // different weekday.
+        let seededDay = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH 'weekTopologyDay_' AND label CONTAINS '共 2 项'"
+            )
+        ).firstMatch
+        XCTAssertTrue(seededDay.waitForExistence(timeout: 3))
+
         // Focusing a day is what brings the task layer into the compact canvas.
-        app.buttons["weekTopologyDay_0"].tap()
+        seededDay.tap()
 
         // Task cards carry a label (title + type) but no identifier.
         let taskCard = topology.buttons

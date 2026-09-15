@@ -3230,6 +3230,7 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
 
         func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
         func cancelKillTimeNotification(for day: DayModel) {}
+        func removeDeliveredKillTimeNotifications(for day: DayModel) {}
 
         func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {
             scheduledTaskIDs.append(task.id)

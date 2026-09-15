@@ -51,6 +51,21 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(uniqueMinuteKeys.count, plan.count)
     }
 
+    func test_killTimeIdentifierNamespace_coversEveryKillTimeReminder() {
+        let dayID = "2026-03-19"
+
+        XCTAssertEqual(
+            NotificationService.killTimeNotificationIdentifiers(for: dayID),
+            [
+                "killtime-\(dayID)",
+                "morning-reminder-\(dayID)",
+                "pre-killtime-\(dayID)",
+                "final-killtime-\(dayID)",
+                "fixed-reminder-\(dayID)"
+            ]
+        )
+    }
+
     func test_suspendedPlan_emitsFourStageReminders() {
         let service = NotificationService.shared
         let now = makeDate(year: 2026, month: 3, day: 10, hour: 8, minute: 0)

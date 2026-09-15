@@ -201,6 +201,7 @@ struct DraftEditorView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canEdit)
+            .accessibilityIdentifier("draftTaskButton_\(index)")
             .contextMenu {
                 if canEdit {
                     Button("后移任务", systemImage: "calendar.badge.clock") {

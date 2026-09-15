@@ -30,9 +30,35 @@ final class StateMachineTests: XCTestCase {
         }
     }
 
-    private struct TestNotificationService: NotificationScheduling {
-        func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
-        func cancelKillTimeNotification(for day: DayModel) {}
+    private final class TestNotificationService: NotificationScheduling {
+        struct KillTimeSnapshot {
+            let dayID: String
+            let status: DayStatus
+            let unfinishedCount: Int
+        }
+
+        var scheduledKillTimeSnapshots: [KillTimeSnapshot] = []
+        var cancelledKillTimeDayIDs: [String] = []
+        var removedDeliveredKillTimeDayIDs: [String] = []
+
+        func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {
+            scheduledKillTimeSnapshots.append(
+                KillTimeSnapshot(
+                    dayID: day.dayId,
+                    status: day.status,
+                    unfinishedCount: day.sortedDraftTasks.count + day.frozenTasks.count + (day.focusTask == nil ? 0 : 1)
+                )
+            )
+        }
+
+        func cancelKillTimeNotification(for day: DayModel) {
+            cancelledKillTimeDayIDs.append(day.dayId)
+        }
+
+        func removeDeliveredKillTimeNotifications(for day: DayModel) {
+            removedDeliveredKillTimeDayIDs.append(day.dayId)
+        }
+
         func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
         func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
     }
@@ -1115,6 +1141,159 @@ final class StateMachineTests: XCTestCase {
         XCTAssertFalse(day.isDraftZoneUnlocked)
     }
 
+    @MainActor
+    func test_doneFocus_reschedulesWithUpdatedUnfinishedCountAndClearsDeliveredNotifications() throws {
+        let (day, viewModel, notifications) = try makeRecordingExecutingToday(
+            mode: .strict,
+            frozenTitles: ["Second", "Third"]
+        )
+        let initialScheduleCount = notifications.scheduledKillTimeSnapshots.count
+
+        try viewModel.doneFocus()
+
+        XCTAssertEqual(day.completedTasks.map(\.title), ["First"])
+        XCTAssertEqual(day.focusTask?.title, "Second")
+        XCTAssertEqual(day.status, .execute)
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.count, initialScheduleCount + 1)
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.last?.unfinishedCount, 2)
+        XCTAssertEqual(notifications.removedDeliveredKillTimeDayIDs, [day.dayId])
+    }
+
+    @MainActor
+    func test_doneFocus_finalTaskCancelsAndClearsDeliveredWithoutRescheduling() throws {
+        let (day, viewModel, notifications) = try makeRecordingExecutingToday(
+            mode: .strict,
+            frozenTitles: []
+        )
+        let initialScheduleCount = notifications.scheduledKillTimeSnapshots.count
+
+        try viewModel.doneFocus()
+
+        XCTAssertEqual(day.status, .completed)
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.count, initialScheduleCount)
+        XCTAssertEqual(notifications.cancelledKillTimeDayIDs, [day.dayId])
+        XCTAssertEqual(notifications.removedDeliveredKillTimeDayIDs, [day.dayId])
+    }
+
+    @MainActor
+    func test_addTask_savesThenReschedulesWithUpdatedUnfinishedCount() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == now.dayId }))
+        day.status = .draft
+        day.tasks.append(TaskItem(title: "Existing", order: 1, zone: .draft))
+        try context.save()
+
+        let notifications = TestNotificationService()
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: notifications,
+            appState: makeAppState(),
+            userSettings: makeUserSettings(executionMode: .strict)
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+        let initialScheduleCount = notifications.scheduledKillTimeSnapshots.count
+
+        try viewModel.addTask(title: "Added", type: .regular)
+
+        XCTAssertEqual(day.sortedDraftTasks.map(\.title), ["Existing", "Added"])
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.count, initialScheduleCount + 1)
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.last?.unfinishedCount, 2)
+        XCTAssertEqual(notifications.removedDeliveredKillTimeDayIDs, [day.dayId])
+    }
+
+    @MainActor
+    func test_todayViewModel_moveDraftTasksReordersTasks() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == now.dayId }))
+        day.status = .draft
+        day.tasks.append(TaskItem(title: "Today A", order: 1, zone: .draft))
+        day.tasks.append(TaskItem(title: "Today B", order: 2, zone: .draft))
+        day.tasks.append(TaskItem(title: "Today C", order: 3, zone: .draft))
+        try context.save()
+
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: TestNotificationService(),
+            appState: makeAppState(),
+            userSettings: makeUserSettings(executionMode: .strict)
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+
+        try viewModel.moveDraftTasks(from: IndexSet(integer: 2), to: 0)
+
+        XCTAssertEqual(day.sortedDraftTasks.map(\.title), ["Today C", "Today A", "Today B"])
+        XCTAssertEqual(day.sortedDraftTasks.map(\.order), [1, 2, 3])
+    }
+
+    @MainActor
+    func test_addExecutionTask_savesThenReschedulesWithUpdatedUnfinishedCount() throws {
+        let (day, viewModel, notifications) = try makeRecordingExecutingToday(
+            mode: .flexible,
+            frozenTitles: ["Second"]
+        )
+        try viewModel.setDraftZoneUnlocked(true)
+        let initialScheduleCount = notifications.scheduledKillTimeSnapshots.count
+
+        try viewModel.addExecutionTask(title: "Third", type: .regular)
+
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Second", "Third"])
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.count, initialScheduleCount + 1)
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.last?.unfinishedCount, 3)
+        XCTAssertEqual(notifications.removedDeliveredKillTimeDayIDs, [day.dayId])
+    }
+
+    @MainActor
+    func test_commitPostpone_doesNotScheduleFutureDayNotifications() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let targetDate = now.addingDays(1)
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        let sourceDay = try XCTUnwrap(week.days.first(where: { $0.dayId == now.dayId }))
+        let targetDay = try XCTUnwrap(week.days.first(where: { $0.dayId == targetDate.dayId }))
+        sourceDay.status = .draft
+        let task = TaskItem(title: "Postpone me", order: 1, zone: .draft)
+        sourceDay.tasks.append(task)
+        try context.save()
+
+        let notifications = TestNotificationService()
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: notifications,
+            appState: makeAppState(),
+            userSettings: makeUserSettings(executionMode: .strict)
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+        let initialScheduleCount = notifications.scheduledKillTimeSnapshots.count
+
+        let preview = try viewModel.previewPostpone(
+            taskID: task.id,
+            taskTitle: task.title,
+            targetDate: targetDate
+        )
+        _ = try viewModel.commitPostpone(preview, allowWeekCreation: false)
+
+        XCTAssertEqual(sourceDay.status, .empty)
+        XCTAssertEqual(targetDay.status, .draft)
+        XCTAssertEqual(targetDay.sortedDraftTasks.map(\.title), ["Postpone me"])
+        XCTAssertEqual(notifications.scheduledKillTimeSnapshots.count, initialScheduleCount)
+        XCTAssertFalse(notifications.scheduledKillTimeSnapshots.contains { $0.dayID == targetDay.dayId })
+        XCTAssertEqual(notifications.cancelledKillTimeDayIDs, [sourceDay.dayId, targetDay.dayId])
+        XCTAssertEqual(notifications.removedDeliveredKillTimeDayIDs, [sourceDay.dayId, targetDay.dayId])
+    }
+
     // MARK: - Suspended-task expiry policy (end-to-end through reconcile)
 
     /// `StateMachine` reads the policy straight from `UserDefaults.standard`, so the
@@ -1256,6 +1435,39 @@ final class StateMachineTests: XCTestCase {
         Self.retainTodayViewModelForTestLifetime(viewModel)
         viewModel.refresh()
         return (day, viewModel)
+    }
+
+    @MainActor
+    private func makeRecordingExecutingToday(
+        mode: ExecutionMode,
+        frozenTitles: [String]
+    ) throws -> (DayModel, TodayViewModel, TestNotificationService) {
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let context = container.mainContext
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == now.dayId }))
+        day.status = .execute
+        day.executionMode = mode
+        let focus = TaskItem(title: "First", order: 1, zone: .focus)
+        focus.startedAt = now.addingTimeInterval(-300)
+        day.tasks.append(focus)
+        for (index, title) in frozenTitles.enumerated() {
+            day.tasks.append(TaskItem(title: title, order: index + 2, zone: .frozen))
+        }
+        try context.save()
+
+        let notifications = TestNotificationService()
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: notifications,
+            appState: makeAppState(),
+            userSettings: makeUserSettings(executionMode: mode)
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+        return (day, viewModel, notifications)
     }
 
 }

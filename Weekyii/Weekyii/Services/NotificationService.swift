@@ -49,6 +49,7 @@ struct NotificationConfiguration: Equatable {
 protocol NotificationScheduling {
     func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?)
     func cancelKillTimeNotification(for day: DayModel)
+    func removeDeliveredKillTimeNotifications(for day: DayModel)
     func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem)
     func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem)
 }
@@ -105,13 +106,13 @@ final class NotificationService: NotificationScheduling {
 
     func cancelKillTimeNotification(for day: DayModel) {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: [
-                killTimeIdentifier(for: day),
-                morningReminderIdentifier(for: day),
-                preKillTimeIdentifier(for: day),
-                finalKillTimeIdentifier(for: day),
-                fixedReminderIdentifier(for: day)
-            ]
+            withIdentifiers: killTimeIdentifiers(for: day)
+        )
+    }
+
+    func removeDeliveredKillTimeNotifications(for day: DayModel) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(
+            withIdentifiers: killTimeIdentifiers(for: day)
         )
     }
 
@@ -342,6 +343,20 @@ final class NotificationService: NotificationScheduling {
 
     private func fixedReminderIdentifier(for dayID: String) -> String {
         "fixed-reminder-\(dayID)"
+    }
+
+    private func killTimeIdentifiers(for day: DayModel) -> [String] {
+        Self.killTimeNotificationIdentifiers(for: day.dayId)
+    }
+
+    static func killTimeNotificationIdentifiers(for dayID: String) -> [String] {
+        [
+            "killtime-\(dayID)",
+            "morning-reminder-\(dayID)",
+            "pre-killtime-\(dayID)",
+            "final-killtime-\(dayID)",
+            "fixed-reminder-\(dayID)"
+        ]
     }
 
     private func fixedReminderDate(for dayDate: Date, fixedReminder: DateComponents?) -> Date? {
