@@ -698,4 +698,110 @@ final class DraftReorderUITests: XCTestCase {
             "轻点任务卡错误地显示成了「任务已遗忘」"
         )
     }
+
+    // MARK: - 周视图日期卡等高
+
+    /// 周视图两列网格里，七张日期卡必须等高。
+    ///
+    /// `LazyVGrid` 只把一行撑到最高 cell 的高度，**不会**拉伸同行的其他 cell。
+    /// 空日期曾经完全不渲染进度环，intrinsic height 比有任务的日期少
+    /// `36pt（环）+ 12pt（间距）`，所以「某天第一次加任务」之后，同一行立刻变得
+    /// 参差不齐。修复方式是在 `DayCard` 里让所有状态共用同一条布局路径。
+    func testWeekOverviewDayCardsShareOneHeight() {
+        // 种子数据把两个草稿任务放在今天，于是本周恰好是「一天有任务、六天空」，
+        // 也就是最容易暴露高度不一致的组合。
+        let heights = measureWeekDayCardHeights(seedDraft: true)
+
+        XCTAssertEqual(
+            heights.count, 7,
+            "七张日期卡都应该被量到高度，实际只量到 \(heights.count) 张：\(heights)"
+        )
+
+        // 半像素归并，避免浮点噪声（实测同一高度会有 ~6e-5 的抖动）。
+        let distinctHeights = Set(heights.values.map { ($0 * 2).rounded() / 2 })
+        XCTAssertEqual(
+            distinctHeights.count, 1,
+            "同一周内日期卡高度不一致（空日期与有任务的日期不等高）：\(heights)"
+        )
+    }
+
+    /// 加任务前后，日期卡的高度必须不变。
+    ///
+    /// 这是缺陷的原始触发路径：用户在空日期上放第一个任务，卡片立刻长高 48pt。
+    /// `-uiTesting` 走的是 in-memory 容器，两次启动之间除种子数据外没有任何残留，
+    /// 所以可以把「加任务」隔离成唯一变量。
+    func testWeekOverviewDayCardHeightIsStableWhenADayGetsItsFirstTask() {
+        let emptyWeek = measureWeekDayCardHeights(seedDraft: false)
+        let seededWeek = measureWeekDayCardHeights(seedDraft: true)
+
+        XCTAssertEqual(emptyWeek.count, 7, "空库这一周也应量到 7 张卡：\(emptyWeek)")
+        XCTAssertEqual(seededWeek.count, 7, "有任务这一周也应量到 7 张卡：\(seededWeek)")
+
+        // 比高度「档位」而不是逐张精确值：种子只影响今天，其余六天两轮都为空，
+        // 所以只要出现一个新的高度档位，就说明状态变化改变了卡片高度。
+        let emptyTiers = Set(emptyWeek.values.map { ($0 * 2).rounded() / 2 })
+        let seededTiers = Set(seededWeek.values.map { ($0 * 2).rounded() / 2 })
+
+        XCTAssertEqual(
+            seededTiers, emptyTiers,
+            "给日期加上第一个任务后卡片高度变了：空库档位 \(emptyTiers)，有任务档位 \(seededTiers)"
+        )
+    }
+
+    /// 启动 App、进入周视图、量出七张日期卡的高度。
+    private func measureWeekDayCardHeights(seedDraft: Bool) -> [Int: CGFloat] {
+        let app = XCUIApplication()
+        app.launchArguments = seedDraft
+            ? ["-uiTesting", "1", "-uiTestingSeedDraft"]
+            : ["-uiTesting", "1"]
+        app.launch()
+
+        let weekButton = app.buttons["todaySectionWeekButton"]
+        XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
+        weekButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["weekOverviewCardsGrid"].waitForExistence(timeout: 3)
+        )
+
+        // `weekDayCard_*` 的 identifier 会传播到子元素，所以用 firstMatch 取容器本身，
+        // 避免「multiple matching elements」。
+        func card(_ index: Int) -> XCUIElement {
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier == %@", "weekDayCard_\(index)"))
+                .firstMatch
+        }
+
+        // 每张卡只记第一次量到的值：高度不随滚动位置变化。
+        var heights: [Int: CGFloat] = [:]
+        func measureVisibleCards() {
+            for index in 0..<7 {
+                let element = card(index)
+                guard element.exists else { continue }
+                let height = element.frame.height
+                if height > 0, heights[index] == nil {
+                    heights[index] = height
+                }
+            }
+        }
+
+        measureVisibleCards()
+
+        // 网格位于拓扑卡下方，最后一行可能落在屏幕外；LazyVGrid 又是懒加载的，
+        // 所以要往下滚一遍把七张卡都量到。
+        //
+        // 拖拽必须锚定在卡片区域：非全屏的拓扑画布高 220pt 且自带拖拽手势，
+        // 用 `app.swipeUp()`（落点在屏幕中央）会被画布吃掉，页面根本不滚动。
+        var attempts = 0
+        while heights.count < 7, attempts < 6 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            measureVisibleCards()
+            attempts += 1
+        }
+
+        app.terminate()
+        return heights
+    }
 }
