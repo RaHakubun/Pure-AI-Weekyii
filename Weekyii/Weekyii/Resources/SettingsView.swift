@@ -1259,18 +1259,7 @@ struct SettingsView: View {
             .datePickerStyle(.compact)
         }
 
-        DatePicker(selection: morningReminderDateBinding, displayedComponents: .hourAndMinute) {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "sunrise.fill", color: .orange)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
-                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .datePickerStyle(.compact)
+        morningReminderSettingRow
 
         HStack(spacing: 12) {
             Color.clear
@@ -1280,6 +1269,38 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             Spacer()
         }
+    }
+
+    private var morningReminderSettingRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                SettingsIcon(icon: "sunrise.fill", color: .orange)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
+                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 12) {
+                Text("提醒时间")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                DatePicker(
+                    "晨间提醒时刻",
+                    selection: morningReminderDateBinding,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+            }
+            .padding(.leading, 40)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Suspended Task Reminder Settings
