@@ -6537,6 +6537,9 @@
     "从归档恢复" : {
 
     },
+    "以周为核心管理你的每一天" : {
+
+    },
     "任务已遗忘" : {
 
     },
@@ -7157,6 +7160,696 @@
     },
     "默认类型" : {
 
+    },
+    "task.habit.origin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habit · %@"
+          }
+        }
+      }
+    },
+    "extensions.module.habits.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits"
+          }
+        }
+      }
+    },
+    "extensions.hub.habits.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No habits yet. Tap to create one."
+          }
+        }
+      }
+    },
+    "extensions.hub.habits.progress" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today %lld/%lld"
+          }
+        }
+      }
+    },
+    "habit.action.archive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        }
+      }
+    },
+    "habit.action.restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        }
+      }
+    },
+    "habit.category.health" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Health"
+          }
+        }
+      }
+    },
+    "habit.category.fitness" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fitness"
+          }
+        }
+      }
+    },
+    "habit.category.learning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Learning"
+          }
+        }
+      }
+    },
+    "habit.category.mindfulness" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mindfulness"
+          }
+        }
+      }
+    },
+    "habit.category.creativity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creativity"
+          }
+        }
+      }
+    },
+    "habit.category.social" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Social"
+          }
+        }
+      }
+    },
+    "habit.category.productivity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productivity"
+          }
+        }
+      }
+    },
+    "habit.detail.add_today" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Today"
+          }
+        }
+      }
+    },
+    "habit.detail.add_today.result.exists" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already added today"
+          }
+        }
+      }
+    },
+    "habit.detail.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Habit"
+          }
+        }
+      }
+    },
+    "habit.detail.delete_confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasks in unstarted days are removed; started days only lose the link. All records and stats are deleted."
+          }
+        }
+      }
+    },
+    "habit.editor.category" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Category"
+          }
+        }
+      }
+    },
+    "habit.editor.color" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        }
+      }
+    },
+    "habit.editor.create_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Habit"
+          }
+        }
+      }
+    },
+    "habit.editor.edit_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Habit"
+          }
+        }
+      }
+    },
+    "habit.editor.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits join the draft zone on the first launch of a scheduled day. Started or past-cutoff days are never written."
+          }
+        }
+      }
+    },
+    "habit.editor.icon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon"
+          }
+        }
+      }
+    },
+    "habit.editor.monthly_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Months without the selected day are skipped."
+          }
+        }
+      }
+    },
+    "habit.editor.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        }
+      }
+    },
+    "habit.editor.name_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. Meditation, Running"
+          }
+        }
+      }
+    },
+    "habit.editor.plan_change_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's task is re-evaluated after you change the repeat plan."
+          }
+        }
+      }
+    },
+    "habit.editor.schedule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repeat"
+          }
+        }
+      }
+    },
+    "habit.editor.start_date" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Date"
+          }
+        }
+      }
+    },
+    "habit.error.day_locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date locked"
+          }
+        }
+      }
+    },
+    "habit.error.name_empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name required"
+          }
+        }
+      }
+    },
+    "habit.error.not_scheduled_today" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today is not in this habit's schedule"
+          }
+        }
+      }
+    },
+    "habit.error.past_kill_time" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past today's cutoff — it will return tomorrow"
+          }
+        }
+      }
+    },
+    "habit.error.save_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save failed"
+          }
+        }
+      }
+    },
+    "habit.error.schedule_empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a day"
+          }
+        }
+      }
+    },
+    "habit.record.completed_at %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed at %@"
+          }
+        }
+      }
+    },
+    "habit.record.status.completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        }
+      }
+    },
+    "habit.record.status.missed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupted"
+          }
+        }
+      }
+    },
+    "habit.record.status.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To do"
+          }
+        }
+      }
+    },
+    "habit.record.unrecorded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not recorded"
+          }
+        }
+      }
+    },
+    "habit.schedule.everyday" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every day"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By month"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.once" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.weekly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By weekday"
+          }
+        }
+      }
+    },
+    "habit.schedule.monthly %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly on %@"
+          }
+        }
+      }
+    },
+    "habit.schedule.once %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once on %@"
+          }
+        }
+      }
+    },
+    "habit.schedule.weekdays" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekdays"
+          }
+        }
+      }
+    },
+    "habit.schedule.weekend" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekends"
+          }
+        }
+      }
+    },
+    "habit.stats.completion_rate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completion rate"
+          }
+        }
+      }
+    },
+    "habit.stats.current_streak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current streak"
+          }
+        }
+      }
+    },
+    "habit.stats.days %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days"
+          }
+        }
+      }
+    },
+    "habit.stats.longest_streak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longest streak"
+          }
+        }
+      }
+    },
+    "habit.stats.placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "—"
+          }
+        }
+      }
+    },
+    "habit.stats.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistics"
+          }
+        }
+      }
+    },
+    "habit.stats.total_completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total completed"
+          }
+        }
+      }
+    },
+    "habit.timeline.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Interrupted\" = created that day but not finished; \"not recorded\" = never created (app not opened or past cutoff)."
+          }
+        }
+      }
+    },
+    "habit.timeline.starts_on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts %@"
+          }
+        }
+      }
+    },
+    "habit.timeline.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timeline"
+          }
+        }
+      }
+    },
+    "habit.today.completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done today"
+          }
+        }
+      }
+    },
+    "habit.today.not_generated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not generated"
+          }
+        }
+      }
+    },
+    "habit.today.not_scheduled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not scheduled"
+          }
+        }
+      }
+    },
+    "habit.today.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due today"
+          }
+        }
+      }
+    },
+    "habits.archived.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived"
+          }
+        }
+      }
+    },
+    "habits.empty.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Habit"
+          }
+        }
+      }
+    },
+    "habits.empty.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No habits yet"
+          }
+        }
+      }
+    },
+    "habits.section.active" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        }
+      }
+    },
+    "habits.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits join the draft zone on scheduled days"
+          }
+        }
+      }
+    },
+    "habits.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My Habits"
+          }
+        }
+      }
+    },
+    "habits.today.progress" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld of %lld done today"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
