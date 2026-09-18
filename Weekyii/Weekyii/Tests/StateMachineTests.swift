@@ -147,6 +147,8 @@ final class StateMachineTests: XCTestCase {
             ProjectModel.self,
             SuspendedTaskItem.self,
             TaskTypeDefinition.self,
+            HabitModel.self,
+            HabitDayRecord.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: config)

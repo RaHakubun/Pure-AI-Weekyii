@@ -1776,6 +1776,8 @@ enum WeekyiiSchemaV8: VersionedSchema {
             MindStampItem.self,
             SuspendedTaskItem.self,
             TaskTypeDefinition.self,
+            HabitModel.self,
+            HabitDayRecord.self,
         ]
     }
 }

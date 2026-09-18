@@ -37,3 +37,41 @@ extension Date {
         Calendar(identifier: .iso8601).date(byAdding: .day, value: days, to: self) ?? self
     }
 }
+
+extension Date {
+    /// ISO weekday：1 = 周一 ... 7 = 周日。
+    var isoWeekday: Int {
+        let weekday = Calendar(identifier: .iso8601).component(.weekday, from: self)
+        return weekday == 1 ? 7 : weekday - 1
+    }
+}
+
+/// YYYY-MM-DD ↔ Date 的稳定互转（与 `Date.dayId` 的格式/时区一致）。
+enum WeekyiiDayId {
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    static func date(from dayId: String) -> Date? {
+        guard !dayId.isEmpty else { return nil }
+        return formatter.date(from: dayId)
+    }
+}
+
+/// weekday 展示辅助（locale 驱动；`veryShortWeekdaySymbols` 为周日打头）。
+enum WeekyiiWeekday {
+    static var localizedShortSymbols: [String] {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.locale = .autoupdatingCurrent
+        return calendar.veryShortWeekdaySymbols
+    }
+
+    static func localizedSymbol(for isoWeekday: Int) -> String {
+        let symbols = localizedShortSymbols
+        guard !symbols.isEmpty else { return "\(isoWeekday)" }
+        return symbols[isoWeekday % 7]
+    }
+}

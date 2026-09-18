@@ -492,6 +492,60 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_habitRelationshipRoundTripsThroughContext() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = Date().startOfDay
+        let day = DayModel(dayId: today.dayId, date: today, status: .draft)
+        let habit = HabitModel(name: "冥想", category: .mindfulness, scheduleWeekdays: [1, 3, 5], startDayId: today.dayId)
+        let task = TaskItem(title: "冥想", order: 1)
+        task.day = day
+        task.habit = habit
+        day.tasks.append(task)
+        context.insert(day)
+        context.insert(habit)
+
+        let record = HabitDayRecord(dayId: today.dayId)
+        record.habit = habit
+        habit.records.append(record)
+        context.insert(record)
+        try context.save()
+
+        let habits = try context.fetch(FetchDescriptor<HabitModel>())
+        XCTAssertEqual(habits.count, 1)
+        XCTAssertEqual(habits.first?.tasks.map(\.title), ["冥想"])
+        XCTAssertEqual(habits.first?.records.map(\.dayId), [today.dayId])
+        XCTAssertEqual(habits.first?.scheduleWeekdays, [1, 3, 5])
+        XCTAssertEqual(habits.first?.category, .mindfulness)
+
+        let tasks = try context.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(tasks.first?.habit?.name, "冥想")
+
+        let records = try context.fetch(FetchDescriptor<HabitDayRecord>())
+        XCTAssertEqual(records.first?.habit?.name, "冥想")
+        XCTAssertEqual(records.first?.status, .pending)
+    }
+
+    func test_habitWeekdayBitmaskEncodesISOWeekdays() throws {
+        let habit = HabitModel(name: "Test", scheduleWeekdays: [7], startDayId: "2026-01-01")
+        XCTAssertEqual(habit.scheduleWeekdays, [7])          // 只选周日
+        habit.scheduleWeekdaysRaw = 0b0011111
+        XCTAssertEqual(habit.scheduleWeekdays, [1, 2, 3, 4, 5])  // 工作日
+        habit.scheduleWeekdaysRaw = 0
+        XCTAssertEqual(habit.scheduleWeekdays, [])
+        XCTAssertEqual(habit.scheduleSummary, "")
+
+        habit.scheduleKind = .monthly
+        habit.scheduleMonthDays = [1, 15, 31]
+        XCTAssertEqual(habit.scheduleMonthDays, [1, 15, 31])
+        XCTAssertEqual(habit.scheduleMonthDaysRaw, (1 << 0) | (1 << 14) | (1 << 30))
+        XCTAssertTrue(habit.hasSchedule)
+        habit.scheduleMonthDaysRaw = 0
+        XCTAssertEqual(habit.scheduleMonthDays, [])
+        XCTAssertFalse(habit.hasSchedule)
+    }
+
+    @MainActor
     func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
         let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -3319,6 +3373,8 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
             ProjectModel.self,
             MindStampItem.self,
             SuspendedTaskItem.self,
+            HabitModel.self,
+            HabitDayRecord.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: config)

@@ -24,6 +24,7 @@ final class TaskItem {
 
     var day: DayModel?
     var project: ProjectModel?
+    var habit: HabitModel?
 
     init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
         self.title = title
