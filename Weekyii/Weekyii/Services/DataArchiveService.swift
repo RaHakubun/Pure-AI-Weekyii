@@ -44,7 +44,7 @@ enum WeekyiiArchiveError: LocalizedError {
 enum WeekyiiDataArchiveService {
     static let formatIdentifier = "com.fluentdesign.weekyii.archive"
     static let currentFormatVersion = 1
-    static let currentSchemaVersion = 7
+    static let currentSchemaVersion = 8
 
     struct Inspection: Equatable {
         let exportedAt: Date
@@ -53,9 +53,10 @@ enum WeekyiiDataArchiveService {
         let taskCount: Int
         let projectCount: Int
         let taskTypeCount: Int
+        let habitCount: Int
 
         var conciseSummary: String {
-            "\(weekCount) 周 · \(dayCount) 天 · \(taskCount) 个任务 · \(projectCount) 个项目 · \(taskTypeCount) 个标签"
+            "\(weekCount) 周 · \(dayCount) 天 · \(taskCount) 个任务 · \(projectCount) 个项目 · \(taskTypeCount) 个标签 · \(habitCount) 个习惯"
         }
     }
 
@@ -77,6 +78,7 @@ enum WeekyiiDataArchiveService {
         let mindStamps: [MindStampRecord]
         let suspendedTasks: [SuspendedTaskRecord]
         let taskTypes: [TaskTypeRecord]
+        let habits: [HabitRecord]?
         let settings: SettingsRecord
         let appState: AppStateRecord
     }
@@ -97,7 +99,7 @@ enum WeekyiiDataArchiveService {
         let id: UUID; let dayId: String?; let projectId: UUID?; let title: String; let taskDescription: String
         let taskType: TaskType; let taskTypeIdRaw: String; let order: Int; let zone: TaskZone
         let startedAt: Date?; let endedAt: Date?; let completedOrder: Int
-        let steps: [StepRecord]; let attachments: [AttachmentRecord]
+        let steps: [StepRecord]; let attachments: [AttachmentRecord]; let habitId: UUID?
     }
     struct ProjectRecord: Codable {
         let id: UUID; let name: String; let projectDescription: String; let color: String; let icon: String
@@ -113,6 +115,18 @@ enum WeekyiiDataArchiveService {
     struct TaskTypeRecord: Codable {
         let idRaw: String; let name: String; let iconName: String; let colorHex: String
         let baseKindRaw: String; let sortOrder: Int; let isBuiltIn: Bool; let isArchived: Bool
+    }
+    struct HabitRecord: Codable {
+        let id: UUID; let name: String; let iconName: String; let colorHex: String
+        let categoryRaw: String
+        let scheduleKindRaw: String; let scheduleWeekdaysRaw: Int; let scheduleMonthDaysRaw: Int
+        let startDayId: String; let generatedThroughDayId: String
+        let isActive: Bool; let createdAt: Date; let sortOrder: Int
+        let dayLogs: [HabitDayLog]?
+    }
+    struct HabitDayLog: Codable {
+        let id: UUID; let dayId: String; let statusRaw: String
+        let createdAt: Date; let completedAt: Date?
     }
     struct SettingsRecord: Codable {
         let defaultKillTimeHour: Int; let defaultKillTimeMinute: Int; let defaultTaskTypeRaw: String
@@ -152,7 +166,8 @@ enum WeekyiiDataArchiveService {
             dayCount: payload.days.count,
             taskCount: payload.tasks.count + payload.suspendedTasks.count,
             projectCount: payload.projects.count,
-            taskTypeCount: payload.taskTypes.count
+            taskTypeCount: payload.taskTypes.count,
+            habitCount: (payload.habits ?? []).count
         )
     }
 
@@ -186,7 +201,8 @@ enum WeekyiiDataArchiveService {
             dayCount: payload.days.count,
             taskCount: payload.tasks.count + payload.suspendedTasks.count,
             projectCount: payload.projects.count,
-            taskTypeCount: payload.taskTypes.count
+            taskTypeCount: payload.taskTypes.count,
+            habitCount: (payload.habits ?? []).count
         )
     }
 
@@ -198,6 +214,7 @@ enum WeekyiiDataArchiveService {
         let stamps = try modelContext.fetch(FetchDescriptor<MindStampItem>())
         let suspended = try modelContext.fetch(FetchDescriptor<SuspendedTaskItem>())
         let taskTypes = try modelContext.fetch(FetchDescriptor<TaskTypeDefinition>())
+        let habits = try modelContext.fetch(FetchDescriptor<HabitModel>())
         return Payload(
             weeks: weeks.map { .init(weekId: $0.weekId, startDate: $0.startDate, endDate: $0.endDate, status: $0.status, completedTasksCount: $0.completedTasksCount, expiredTasksCount: $0.expiredTasksCount, totalStartedDays: $0.totalStartedDays) },
             days: days.map { .init(dayId: $0.dayId, weekId: $0.week?.weekId, date: $0.date, dayOfWeek: $0.dayOfWeek, status: $0.status, killTimeHour: $0.killTimeHour, killTimeMinute: $0.killTimeMinute, followsDefaultKillTime: $0.followsDefaultKillTime, initiatedAt: $0.initiatedAt, closedAt: $0.closedAt, executionModeRaw: $0.executionModeRaw, isDraftZoneUnlocked: $0.isDraftZoneUnlocked, expiredCount: $0.expiredCount) },
@@ -206,13 +223,17 @@ enum WeekyiiDataArchiveService {
             mindStamps: stamps.map { .init(id: $0.id, text: $0.text, imageBlob: $0.imageBlob, createdAt: $0.createdAt) },
             suspendedTasks: suspended.map { suspendedRecord($0) },
             taskTypes: taskTypes.map { .init(idRaw: $0.idRaw, name: $0.name, iconName: $0.iconName, colorHex: $0.colorHex, baseKindRaw: $0.baseKindRaw, sortOrder: $0.sortOrder, isBuiltIn: $0.isBuiltIn, isArchived: $0.isArchived) },
+            habits: habits.map { habitRecord($0) },
             settings: .init(defaultKillTimeHour: settings.defaultKillTimeHour, defaultKillTimeMinute: settings.defaultKillTimeMinute, defaultTaskTypeRaw: settings.defaultTaskType.rawValue, defaultTaskTypeIdRaw: settings.defaultTaskTypeIdRaw, defaultExecutionModeRaw: settings.defaultExecutionModeRaw, killTimeReminderMinutes: settings.killTimeReminderMinutes, fixedReminderEnabled: settings.fixedReminderEnabled, fixedReminderHour: settings.fixedReminderHour, fixedReminderMinute: settings.fixedReminderMinute, weekStartsOnMonday: settings.weekStartsOnMonday, defaultProjectDurationDays: settings.defaultProjectDurationDays, defaultProjectTileSizeRaw: settings.defaultProjectTileSizeRaw, pendingMonthShowRegular: settings.pendingMonthShowRegular, pendingMonthShowDDL: settings.pendingMonthShowDDL, pendingMonthShowLeisure: settings.pendingMonthShowLeisure, selectedThemeRaw: settings.selectedThemeRaw, appearanceModeRaw: settings.appearanceModeRaw, premiumThemeUnlocked: settings.premiumThemeUnlocked),
             appState: .init(daysStartedCount: appState.daysStartedCount, dataRevision: appState.dataRevision, stateTransitionRevision: appState.stateTransitionRevision, systemStartDate: appState.systemStartDate, lastProcessedDate: appState.lastProcessedDate, lastRolloverAt: appState.lastRolloverAt)
         )
     }
 
     private static func taskRecord(_ task: TaskItem) -> TaskRecord {
-        .init(id: task.id, dayId: task.day?.dayId, projectId: task.project?.id, title: task.title, taskDescription: task.taskDescription, taskType: task.taskType, taskTypeIdRaw: task.taskTypeIdRaw, order: task.order, zone: task.zone, startedAt: task.startedAt, endedAt: task.endedAt, completedOrder: task.completedOrder, steps: task.steps.map { stepRecord($0) }, attachments: task.attachments.map { attachmentRecord($0) })
+        .init(id: task.id, dayId: task.day?.dayId, projectId: task.project?.id, title: task.title, taskDescription: task.taskDescription, taskType: task.taskType, taskTypeIdRaw: task.taskTypeIdRaw, order: task.order, zone: task.zone, startedAt: task.startedAt, endedAt: task.endedAt, completedOrder: task.completedOrder, steps: task.steps.map { stepRecord($0) }, attachments: task.attachments.map { attachmentRecord($0) }, habitId: task.habit?.id)
+    }
+    private static func habitRecord(_ habit: HabitModel) -> HabitRecord {
+        .init(id: habit.id, name: habit.name, iconName: habit.iconName, colorHex: habit.colorHex, categoryRaw: habit.categoryRaw, scheduleKindRaw: habit.scheduleKindRaw, scheduleWeekdaysRaw: habit.scheduleWeekdaysRaw, scheduleMonthDaysRaw: habit.scheduleMonthDaysRaw, startDayId: habit.startDayId, generatedThroughDayId: habit.generatedThroughDayId, isActive: habit.isActive, createdAt: habit.createdAt, sortOrder: habit.sortOrder, dayLogs: habit.records.map { .init(id: $0.id, dayId: $0.dayId, statusRaw: $0.statusRaw, createdAt: $0.createdAt, completedAt: $0.completedAt) })
     }
     private static func suspendedRecord(_ task: SuspendedTaskItem) -> SuspendedTaskRecord {
         .init(id: task.id, title: task.title, taskDescription: task.taskDescription, taskType: task.taskType, taskTypeIdRaw: task.taskTypeIdRaw, createdAt: task.createdAt, decisionDeadline: task.decisionDeadline, preferredCountdownDays: task.preferredCountdownDays, snoozeCount: task.snoozeCount, statusRaw: task.statusRaw, steps: task.steps.map { stepRecord($0) }, attachments: task.attachments.map { attachmentRecord($0) })
@@ -238,10 +259,13 @@ enum WeekyiiDataArchiveService {
         try requireUnique(payload.tasks.map(\.id), name: "任务 ID")
         try requireUnique(payload.projects.map(\.id), name: "项目 ID")
         try requireUnique(payload.taskTypes.map(\.idRaw), name: "标签 ID")
+        try requireUnique((payload.habits ?? []).map(\.id), name: "习惯 ID")
         let weekIds = Set(payload.weeks.map(\.weekId)); let dayIds = Set(payload.days.map(\.dayId)); let projectIds = Set(payload.projects.map(\.id))
+        let habitIds = Set((payload.habits ?? []).map(\.id))
         guard payload.days.allSatisfy({ $0.weekId == nil || weekIds.contains($0.weekId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属周的日期。") }
         guard payload.tasks.allSatisfy({ $0.dayId == nil || dayIds.contains($0.dayId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属日期的任务。") }
         guard payload.tasks.allSatisfy({ $0.projectId == nil || projectIds.contains($0.projectId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属项目的任务。") }
+        guard payload.tasks.allSatisfy({ $0.habitId == nil || habitIds.contains($0.habitId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属习惯的任务。") }
         guard (0...23).contains(payload.settings.defaultKillTimeHour), (0...59).contains(payload.settings.defaultKillTimeMinute) else { throw WeekyiiArchiveError.invalidData("默认截止时间超出范围。") }
         guard payload.days.allSatisfy({ (0...23).contains($0.killTimeHour) && (0...59).contains($0.killTimeMinute) }) else { throw WeekyiiArchiveError.invalidData("日期截止时间超出范围。") }
         guard payload.suspendedTasks.allSatisfy({ SuspendedTaskStatus(rawValue: $0.statusRaw) != nil }) else { throw WeekyiiArchiveError.invalidData("暂存任务状态未知。") }
@@ -254,7 +278,7 @@ enum WeekyiiDataArchiveService {
     private static func deleteAllData(in context: ModelContext) throws {
         // Keep deletions registered in this context so rollback can still discard
         // the complete replacement, but enumerate in bounded batches instead of
-        // materializing every stored model in nine large arrays.
+        // materializing every stored model in eleven large arrays.
         try deleteAll(TaskAttachment.self, in: context)
         try deleteAll(TaskStep.self, in: context)
         try deleteAll(TaskItem.self, in: context)
@@ -264,6 +288,8 @@ enum WeekyiiDataArchiveService {
         try deleteAll(MindStampItem.self, in: context)
         try deleteAll(SuspendedTaskItem.self, in: context)
         try deleteAll(TaskTypeDefinition.self, in: context)
+        try deleteAll(HabitDayRecord.self, in: context)
+        try deleteAll(HabitModel.self, in: context)
     }
 
     private static func deleteAll<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
@@ -279,6 +305,20 @@ enum WeekyiiDataArchiveService {
     private static func insert(_ payload: Payload, into context: ModelContext) throws {
         for record in payload.taskTypes {
             context.insert(TaskTypeDefinition(idRaw: record.idRaw, name: record.name, iconName: record.iconName, colorHex: record.colorHex, baseKind: TaskType(rawValue: record.baseKindRaw) ?? .regular, sortOrder: record.sortOrder, isBuiltIn: record.isBuiltIn, isArchived: record.isArchived))
+        }
+        var habits: [UUID: HabitModel] = [:]
+        for record in payload.habits ?? [] {
+            let item = HabitModel(name: record.name, iconName: record.iconName, colorHex: record.colorHex, startDayId: record.startDayId)
+            item.id = record.id; item.categoryRaw = record.categoryRaw
+            item.scheduleKindRaw = record.scheduleKindRaw; item.scheduleWeekdaysRaw = record.scheduleWeekdaysRaw; item.scheduleMonthDaysRaw = record.scheduleMonthDaysRaw
+            item.generatedThroughDayId = record.generatedThroughDayId; item.isActive = record.isActive; item.createdAt = record.createdAt; item.sortOrder = record.sortOrder
+            context.insert(item); habits[record.id] = item
+            for log in record.dayLogs ?? [] {
+                let entry = HabitDayRecord(dayId: log.dayId, createdAt: log.createdAt)
+                entry.id = log.id; entry.statusRaw = log.statusRaw; entry.completedAt = log.completedAt
+                entry.habit = item
+                context.insert(entry)
+            }
         }
         var projects: [UUID: ProjectModel] = [:]
         for record in payload.projects {
@@ -307,6 +347,7 @@ enum WeekyiiDataArchiveService {
             item.steps = record.steps.map { makeStep($0) }; item.attachments = record.attachments.map { makeAttachment($0) }
             if let dayId = record.dayId { item.day = days[dayId] }
             if let projectId = record.projectId { item.project = projects[projectId] }
+            if let habitId = record.habitId { item.habit = habits[habitId] }
             context.insert(item)
         }
         for record in payload.mindStamps {

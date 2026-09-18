@@ -2,10 +2,15 @@ import XCTest
 import SwiftData
 import Photos
 import SwiftUI
+import CryptoKit
 @testable import Weekyii
 
 final class ModelTests: XCTestCase {
     private static var retainedUserSettings: [UserSettings] = []
+    // Deallocating an AppState inside a @MainActor test crashes the process on
+    // the iOS 26.2 simulator (isolated-deinit back-deploy shim double-free);
+    // archive tests therefore keep the instance alive for the whole run.
+    private static var retainedAppStates: [AppState] = []
 
     override func tearDown() {
         // `UserSettings.save()` pushes its reminder rhythm into the shared
@@ -990,6 +995,149 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(habits.isEmpty)
         let records = try context.fetch(FetchDescriptor<HabitDayRecord>())
         XCTAssertTrue(records.isEmpty)
+    }
+
+    @MainActor
+    func test_dataArchiveRoundTripsHabitsRecordsAndTaskLinks() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let suiteName = "ModelTests.ArchiveHabits.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        let appState = AppState()
+        Self.retainedAppStates.append(appState)
+
+        let targetDate = makeDate(2026, 9, 16)
+        let dayId = targetDate.dayId
+        let week = WeekModel(weekId: "habit-archive-week", startDate: makeDate(2026, 9, 14), endDate: makeDate(2026, 9, 20), status: .present)
+        let day = DayModel(dayId: dayId, date: targetDate, status: .draft)
+        day.week = week
+        let habit = HabitModel(name: "晨跑", iconName: "figure.run", colorHex: "#FF8800", category: .health, scheduleKind: .weekly, scheduleWeekdays: [1, 2, 3], startDayId: dayId)
+        habit.generatedThroughDayId = dayId
+        let completedLog = HabitDayRecord(dayId: dayId, createdAt: makeDate(2026, 9, 16, 8))
+        completedLog.status = .completed
+        completedLog.completedAt = makeDate(2026, 9, 16, 8, 30)
+        completedLog.habit = habit
+        let missedLog = HabitDayRecord(dayId: makeDate(2026, 9, 15).dayId, createdAt: makeDate(2026, 9, 15, 8))
+        missedLog.status = .missed
+        missedLog.habit = habit
+        habit.records = [completedLog, missedLog]
+        let task = TaskItem(title: "晨跑任务", taskType: .regular, order: 1)
+        task.day = day
+        task.habit = habit
+        context.insert(week)
+        context.insert(day)
+        context.insert(habit)
+        context.insert(task)
+        try context.save()
+
+        let archive = try WeekyiiDataArchiveService.export(modelContext: context, settings: settings, appState: appState)
+        let inspection = try WeekyiiDataArchiveService.inspect(archive)
+        XCTAssertEqual(inspection.habitCount, 1)
+        XCTAssertTrue(inspection.conciseSummary.contains("1 个习惯"))
+
+        let restoredContainer = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let restoredContext = restoredContainer.mainContext
+        _ = try WeekyiiDataArchiveService.importReplacing(
+            archive,
+            modelContext: restoredContext,
+            settings: settings,
+            appState: appState,
+            storeURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("store")
+        )
+
+        let restoredHabits = try restoredContext.fetch(FetchDescriptor<HabitModel>())
+        XCTAssertEqual(restoredHabits.count, 1)
+        let restoredHabit = try XCTUnwrap(restoredHabits.first)
+        XCTAssertEqual(restoredHabit.name, "晨跑")
+        XCTAssertEqual(restoredHabit.scheduleKind, .weekly)
+        XCTAssertEqual(restoredHabit.scheduleWeekdays, [1, 2, 3])
+        XCTAssertEqual(restoredHabit.scheduleWeekdaysRaw, habit.scheduleWeekdaysRaw)
+        XCTAssertEqual(restoredHabit.generatedThroughDayId, dayId)
+
+        XCTAssertEqual(restoredHabit.records.count, 2)
+        let restoredCompleted = try XCTUnwrap(restoredHabit.records.first { $0.dayId == dayId })
+        XCTAssertEqual(restoredCompleted.status, .completed)
+        XCTAssertEqual(restoredCompleted.completedAt, makeDate(2026, 9, 16, 8, 30))
+        let restoredMissed = try XCTUnwrap(restoredHabit.records.first { $0.dayId == makeDate(2026, 9, 15).dayId })
+        XCTAssertEqual(restoredMissed.status, .missed)
+        XCTAssertNil(restoredMissed.completedAt)
+
+        let restoredTasks = try restoredContext.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(restoredTasks.map(\.title), ["晨跑任务"])
+        XCTAssertEqual(restoredTasks.first?.habit?.id, restoredHabit.id)
+        XCTAssertEqual(restoredHabit.tasks.map(\.title), ["晨跑任务"])
+    }
+
+    @MainActor
+    func test_dataArchiveImportsLegacySchema7PayloadWithoutHabits() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let suiteName = "ModelTests.ArchiveLegacy.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        let appState = AppState()
+        Self.retainedAppStates.append(appState)
+
+        let targetDate = makeDate(2026, 9, 16)
+        let week = WeekModel(weekId: "legacy-week", startDate: makeDate(2026, 9, 14), endDate: makeDate(2026, 9, 20), status: .present)
+        let day = DayModel(dayId: targetDate.dayId, date: targetDate, status: .draft)
+        day.week = week
+        let habit = HabitModel(name: "阅读", startDayId: targetDate.dayId)
+        let task = TaskItem(title: "阅读任务", order: 1)
+        task.day = day
+        task.habit = habit
+        context.insert(week)
+        context.insert(day)
+        context.insert(habit)
+        context.insert(task)
+        try context.save()
+
+        let archive = try WeekyiiDataArchiveService.export(modelContext: context, settings: settings, appState: appState)
+        let legacy = try downgradeArchiveToSchema7(archive)
+
+        let inspection = try WeekyiiDataArchiveService.inspect(legacy)
+        XCTAssertEqual(inspection.habitCount, 0)
+        XCTAssertEqual(inspection.taskCount, 1)
+
+        let restoredContainer = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let restoredContext = restoredContainer.mainContext
+        _ = try WeekyiiDataArchiveService.importReplacing(
+            legacy,
+            modelContext: restoredContext,
+            settings: settings,
+            appState: appState,
+            storeURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("store")
+        )
+
+        XCTAssertEqual(try restoredContext.fetch(FetchDescriptor<HabitModel>()).count, 0)
+        XCTAssertEqual(try restoredContext.fetch(FetchDescriptor<HabitDayRecord>()).count, 0)
+        let restoredTasks = try restoredContext.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(restoredTasks.map(\.title), ["阅读任务"])
+        XCTAssertNil(restoredTasks.first?.habit)
+    }
+
+    private func downgradeArchiveToSchema7(_ data: Data) throws -> Data {
+        var envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let payloadString = try XCTUnwrap(envelope["payload"] as? String)
+        let payloadData = try XCTUnwrap(Data(base64Encoded: payloadString))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: payloadData) as? [String: Any])
+        payload.removeValue(forKey: "habits")
+        if var tasks = payload["tasks"] as? [[String: Any]] {
+            for index in tasks.indices {
+                tasks[index].removeValue(forKey: "habitId")
+            }
+            payload["tasks"] = tasks
+        }
+        let downgradedPayload = try JSONSerialization.data(withJSONObject: payload)
+        envelope["schemaVersion"] = 7
+        envelope["payload"] = downgradedPayload.base64EncodedString()
+        envelope["payloadSHA256"] = SHA256.hash(data: downgradedPayload).map { String(format: "%02x", $0) }.joined()
+        return try JSONSerialization.data(withJSONObject: envelope)
     }
 
     @MainActor
