@@ -20,7 +20,7 @@ final class ModelTests: XCTestCase {
     func test_cloudSyncSchema_isCloudKitCompatible() {
         let schema = WeekyiiPersistence.currentSchema
 
-        XCTAssertEqual(schema.version, Schema.Version(7, 0, 0))
+        XCTAssertEqual(schema.version, Schema.Version(8, 0, 0))
 
         let entitiesWithUniqueConstraints = schema.entities.compactMap { entity in
             entity.uniquenessConstraints.isEmpty ? nil : entity.name
@@ -210,7 +210,7 @@ final class ModelTests: XCTestCase {
         WeekyiiPersistence.backupPersistentStoreIfExists(storeURL: storeURL)
 
         let snapshots = BackupRecoveryService.listSnapshots(storeURL: storeURL)
-            .filter { $0.folderName.contains("preflight-v7") }
+            .filter { $0.folderName.contains("preflight-v8") }
         XCTAssertEqual(snapshots.count, 1)
     }
 
@@ -223,7 +223,7 @@ final class ModelTests: XCTestCase {
             isDirectory: true
         )
         let matching = backupFolder.appendingPathComponent(
-            "snapshot-2026-09-13T11-00-00Z-preflight-v7-BBBBBBBB",
+            "snapshot-2026-09-13T11-00-00Z-preflight-v8-BBBBBBBB",
             isDirectory: true
         )
         try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
@@ -232,7 +232,7 @@ final class ModelTests: XCTestCase {
         var verifiedFolders: [String] = []
         let found = BackupRecoveryService.hasValidSnapshot(
             storeURL: storeURL,
-            reason: "preflight-v7"
+            reason: "preflight-v8"
         ) { folder in
             verifiedFolders.append(folder.lastPathComponent)
             return true
@@ -421,6 +421,74 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(stamps.map(\.text), ["V6 stamp"])
         XCTAssertEqual(suspended.map(\.title), ["V6 suspended"])
         XCTAssertTrue(taskTypes.contains { $0.idRaw == "custom-v6" })
+    }
+
+    @MainActor
+    func test_publishedV7FixtureMigratesToV8() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        do {
+            let legacySchema = Schema(versionedSchema: WeekyiiSchemaV7.self)
+            let legacyConfiguration = ModelConfiguration(
+                "Weekyii",
+                schema: legacySchema,
+                url: storeURL,
+                allowsSave: true,
+                cloudKitDatabase: .none
+            )
+            let legacyContainer = try ModelContainer(for: legacySchema, configurations: legacyConfiguration)
+            let context = legacyContainer.mainContext
+            let week = WeekyiiSchemaV7.WeekModel(
+                weekId: "2026-W40",
+                startDate: Date(timeIntervalSince1970: 1_790_000_000),
+                endDate: Date(timeIntervalSince1970: 1_790_518_400),
+                status: .present
+            )
+            let day = WeekyiiSchemaV7.DayModel(
+                dayId: "2026-09-28",
+                date: Date(timeIntervalSince1970: 1_790_000_000),
+                status: .draft
+            )
+            let project = WeekyiiSchemaV7.ProjectModel(
+                name: "V7 project",
+                startDate: Date(timeIntervalSince1970: 1_790_000_000),
+                endDate: Date(timeIntervalSince1970: 1_790_518_400)
+            )
+            let task = WeekyiiSchemaV7.TaskItem(
+                title: "V7 task",
+                taskDescription: "carried over",
+                taskType: .ddl,
+                order: 1,
+                zone: .draft
+            )
+            task.steps.append(WeekyiiSchemaV7.TaskStep(title: "V7 step", isCompleted: true, sortOrder: 1))
+            task.attachments.append(WeekyiiSchemaV7.TaskAttachment(data: Data([7, 7, 7]), fileName: "v7.bin", fileType: "application/octet-stream"))
+            task.project = project
+            day.tasks.append(task)
+            week.days.append(day)
+            context.insert(week)
+            context.insert(project)
+            context.insert(WeekyiiSchemaV7.MindStampItem(text: "V7 stamp", imageBlob: Data([9, 9])))
+            context.insert(WeekyiiSchemaV7.SuspendedTaskItem(title: "V7 suspended", decisionDeadline: Date(timeIntervalSince1970: 1_790_600_000), preferredCountdownDays: 3))
+            context.insert(WeekyiiSchemaV7.TaskTypeDefinition(idRaw: "custom-v7", name: "V7 Type", iconName: "cloud", colorHex: "#445566", baseKindRaw: TaskType.regular.rawValue, sortOrder: 10))
+            try context.save()
+        }
+
+        let container = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let context = container.mainContext
+        let tasks = try context.fetch(FetchDescriptor<TaskItem>())
+        let projects = try context.fetch(FetchDescriptor<ProjectModel>())
+        let stamps = try context.fetch(FetchDescriptor<MindStampItem>())
+        let suspended = try context.fetch(FetchDescriptor<SuspendedTaskItem>())
+        let taskTypes = try context.fetch(FetchDescriptor<TaskTypeDefinition>())
+
+        XCTAssertEqual(tasks.map(\.title), ["V7 task"])
+        XCTAssertEqual(tasks.first?.steps.map(\.title), ["V7 step"])
+        XCTAssertEqual(tasks.first?.attachments.first?.data, Data([7, 7, 7]))
+        XCTAssertEqual(tasks.first?.project?.name, "V7 project")
+        XCTAssertEqual(projects.map(\.name), ["V7 project"])
+        XCTAssertEqual(stamps.map(\.text), ["V7 stamp"])
+        XCTAssertEqual(suspended.map(\.title), ["V7 suspended"])
+        XCTAssertTrue(taskTypes.contains { $0.idRaw == "custom-v7" })
     }
 
     @MainActor
