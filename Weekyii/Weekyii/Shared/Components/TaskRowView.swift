@@ -9,6 +9,7 @@ struct TaskRowView: View {
     let task: TaskItem
     let titleAccessibilityIdentifier: String?
     let showsProjectOrigin: Bool
+    let showsHabitOrigin: Bool
     let renderContext: RenderContext
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
@@ -20,11 +21,13 @@ struct TaskRowView: View {
         task: TaskItem,
         titleAccessibilityIdentifier: String? = nil,
         showsProjectOrigin: Bool = false,
+        showsHabitOrigin: Bool = false,
         renderContext: RenderContext = .normalCard
     ) {
         self.task = task
         self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
         self.showsProjectOrigin = showsProjectOrigin
+        self.showsHabitOrigin = showsHabitOrigin
         self.renderContext = renderContext
     }
 
@@ -49,6 +52,10 @@ struct TaskRowView: View {
                     if showsProjectOrigin, task.project != nil {
                         Spacer(minLength: WeekSpacing.sm)
                         TaskProjectOriginBadge(project: task.project)
+                    }
+                    if showsHabitOrigin, task.habit != nil {
+                        Spacer(minLength: WeekSpacing.sm)
+                        TaskHabitOriginBadge(habit: task.habit)
                     }
                 }
 
@@ -152,6 +159,33 @@ struct TaskProjectOriginBadge: View {
             .padding(.horizontal, 8)
             .background(isOnDarkBackground ? Color.white.opacity(0.16) : Color.backgroundTertiary, in: Capsule())
             .accessibilityIdentifier("taskProjectOriginBadge")
+        }
+    }
+}
+
+struct TaskHabitOriginBadge: View {
+    let habit: HabitModel?
+    var isOnDarkBackground: Bool = false
+
+    var body: some View {
+        if let habit {
+            HStack(spacing: WeekSpacing.xs) {
+                Image(systemName: habit.iconName)
+                    .font(.caption2)
+                Text(
+                    String(
+                        format: String(localized: "task.habit.origin", defaultValue: "习惯 · %@"),
+                        habit.name
+                    )
+                )
+                .lineLimit(1)
+            }
+            .font(.caption2)
+            .foregroundStyle(isOnDarkBackground ? Color.white.opacity(0.95) : Color.textSecondary)
+            .padding(.vertical, 3)
+            .padding(.horizontal, 8)
+            .background(isOnDarkBackground ? Color.white.opacity(0.16) : Color.backgroundTertiary, in: Capsule())
+            .accessibilityIdentifier("taskHabitOriginBadge")
         }
     }
 }

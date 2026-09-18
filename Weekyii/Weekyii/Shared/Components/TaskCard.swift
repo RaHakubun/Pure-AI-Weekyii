@@ -6,6 +6,7 @@ struct TaskCard: View {
     let task: TaskItem
     let showStatus: Bool
     let showsProjectOrigin: Bool
+    let showsHabitOrigin: Bool
     let onTap: (() -> Void)?
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
@@ -13,10 +14,17 @@ struct TaskCard: View {
         taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
     }
     
-    init(task: TaskItem, showStatus: Bool = true, showsProjectOrigin: Bool = false, onTap: (() -> Void)? = nil) {
+    init(
+        task: TaskItem,
+        showStatus: Bool = true,
+        showsProjectOrigin: Bool = false,
+        showsHabitOrigin: Bool = false,
+        onTap: (() -> Void)? = nil
+    ) {
         self.task = task
         self.showStatus = showStatus
         self.showsProjectOrigin = showsProjectOrigin
+        self.showsHabitOrigin = showsHabitOrigin
         self.onTap = onTap
     }
     
@@ -56,6 +64,10 @@ struct TaskCard: View {
 
                     if showsProjectOrigin {
                         TaskProjectOriginBadge(project: task.project)
+                    }
+
+                    if showsHabitOrigin {
+                        TaskHabitOriginBadge(habit: task.habit)
                     }
 
                     if showStatus {

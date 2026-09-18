@@ -503,6 +503,14 @@ struct TodayView: View {
                                 isOnDarkBackground: true
                             )
                         }
+
+                        if focusTask.habit != nil {
+                            Spacer(minLength: WeekSpacing.sm)
+                            TaskHabitOriginBadge(
+                                habit: focusTask.habit,
+                                isOnDarkBackground: true
+                            )
+                        }
                     }
                     
                     HStack {
@@ -625,6 +633,7 @@ struct TodayView: View {
                     FrozenZoneView(
                         tasks: day.frozenTasks,
                         showsProjectOrigin: true,
+                        showsHabitOrigin: true,
                         onTapTask: { task in
                             selectedTaskForDetail = task
                         },

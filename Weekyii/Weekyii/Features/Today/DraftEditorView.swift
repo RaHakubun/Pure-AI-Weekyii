@@ -196,6 +196,7 @@ struct DraftEditorView: View {
                     task: task,
                     titleAccessibilityIdentifier: "draftTaskTitle_\(index)",
                     showsProjectOrigin: true,
+                    showsHabitOrigin: true,
                     renderContext: .reorderList
                 )
             }

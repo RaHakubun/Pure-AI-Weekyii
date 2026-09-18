@@ -5,6 +5,7 @@ import SwiftUI
 struct FrozenZoneView: View {
     let tasks: [TaskItem]
     var showsProjectOrigin: Bool = false
+    var showsHabitOrigin: Bool = false
     var onTapTask: ((TaskItem) -> Void)? = nil
     var onPostponeTask: ((TaskItem) -> Void)? = nil
 
@@ -22,6 +23,7 @@ struct FrozenZoneView: View {
                         task: task,
                         showStatus: false,
                         showsProjectOrigin: showsProjectOrigin,
+                        showsHabitOrigin: showsHabitOrigin,
                         onTap: {
                             onTapTask?(task)
                         }
