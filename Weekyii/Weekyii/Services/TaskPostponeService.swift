@@ -339,6 +339,9 @@ struct TaskPostponeService {
         guard sourceDay.dayId == todayDayId else {
             throw WeekyiiError.postponeSourceTaskNotInToday
         }
+        guard task.habit == nil else {
+            throw WeekyiiError.cannotPostponeHabitTask
+        }
 
         switch task.zone {
         case .draft, .focus, .frozen:

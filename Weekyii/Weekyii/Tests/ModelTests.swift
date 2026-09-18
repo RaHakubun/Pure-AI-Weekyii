@@ -3852,6 +3852,89 @@ final class TaskPostponeServiceTests: XCTestCase {
         }
     }
 
+    func test_preview_habitTaskCannotBePostponed() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let service = TaskPostponeService(modelContext: context)
+        let today = makeDate(2026, 3, 5)
+
+        let todayWeek = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(todayWeek)
+        let todayDay = requireDay(in: todayWeek, date: today)
+        todayDay.status = .draft
+        let habit = HabitModel(name: "晨跑", startDayId: today.dayId)
+        context.insert(habit)
+        let habitTask = TaskItem(title: "晨跑", order: 1, zone: .draft)
+        habitTask.habit = habit
+        todayDay.tasks.append(habitTask)
+        try context.save()
+
+        XCTAssertThrowsError(
+            try service.preview(taskID: habitTask.id, targetDate: today.addingDays(1), today: today)
+        ) { error in
+            guard case WeekyiiError.cannotPostponeHabitTask = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+    }
+
+    func test_execute_habitTaskCannotBePostponed() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let service = TaskPostponeService(modelContext: context)
+        let today = makeDate(2026, 3, 5)
+        let now = makeDate(2026, 3, 5, 10, 0)
+
+        let todayWeek = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(todayWeek)
+        let todayDay = requireDay(in: todayWeek, date: today)
+        todayDay.status = .draft
+        let habit = HabitModel(name: "晨跑", startDayId: today.dayId)
+        context.insert(habit)
+        let habitTask = TaskItem(title: "晨跑", order: 1, zone: .draft)
+        habitTask.habit = habit
+        todayDay.tasks.append(habitTask)
+        let targetDate = today.addingDays(1)
+        let preview = TaskPostponeService.Preview(
+            taskID: habitTask.id,
+            targetDate: targetDate,
+            targetDayId: targetDate.dayId,
+            targetWeekId: targetDate.weekId,
+            requiresWeekCreation: false
+        )
+        try context.save()
+
+        XCTAssertThrowsError(
+            try service.execute(preview: preview, allowCreateWeek: false, today: today, now: now)
+        ) { error in
+            guard case WeekyiiError.cannotPostponeHabitTask = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+        XCTAssertEqual(todayDay.tasks.count, 1)
+        XCTAssertEqual(habitTask.zone, .draft)
+    }
+
+    func test_preview_normalTaskUnaffectedByHabitGuard() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let service = TaskPostponeService(modelContext: context)
+        let today = makeDate(2026, 3, 5)
+
+        let todayWeek = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(todayWeek)
+        let todayDay = requireDay(in: todayWeek, date: today)
+        todayDay.status = .draft
+        let normalTask = TaskItem(title: "Read", order: 1, zone: .draft)
+        todayDay.tasks.append(normalTask)
+        try context.save()
+
+        let preview = try service.preview(taskID: normalTask.id, targetDate: today.addingDays(1), today: today)
+        XCTAssertEqual(preview.targetDayId, today.addingDays(1).dayId)
+    }
+
     @MainActor
     func test_dataArchiveRoundTripsAndUsesReplacementSemantics() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)

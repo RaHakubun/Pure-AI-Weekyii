@@ -20,6 +20,7 @@ enum WeekyiiError: LocalizedError, Equatable {
     case projectHasOpenTasks
     case projectDateOutOfRange
     case projectTaskStateLocked
+    case cannotPostponeHabitTask
 
     var errorDescription: String? {
         switch self {
@@ -61,6 +62,8 @@ enum WeekyiiError: LocalizedError, Equatable {
             return "任务日期必须位于项目的开始与结束日期之间。"
         case .projectTaskStateLocked:
             return "该任务所属日期已启动或结束，不能从项目页面修改。"
+        case .cannotPostponeHabitTask:
+            return "习惯任务属于当天，不能后移。"
         }
     }
 }
