@@ -659,6 +659,85 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_habitMonthlyScheduleOccurrenceAndSkipsMissingDates() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let hitDay = makeDate(2026, 9, 15)
+        let monthEnd = makeDate(2026, 9, 30)
+        let hitDayModel = DayModel(dayId: hitDay.dayId, date: hitDay, status: .empty)
+        let monthEndModel = DayModel(dayId: monthEnd.dayId, date: monthEnd, status: .empty)
+        // 9/15 命中计划；9 月没有 31 日 → 31 号习惯整个 9 月不生成。
+        let onSchedule = HabitModel(name: "15 号记账", scheduleKind: .monthly, scheduleMonthDays: [15], startDayId: "2026-08-15")
+        let missingDate = HabitModel(name: "31 号复盘", scheduleKind: .monthly, scheduleMonthDays: [31], startDayId: "2026-08-31")
+        context.insert(hitDayModel)
+        context.insert(monthEndModel)
+        context.insert(onSchedule)
+        context.insert(missingDate)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let hitOutcome = materializer.sync(today: hitDay, now: makeDate(2026, 9, 15, 9))
+
+        XCTAssertEqual(hitOutcome.createdCount, 1)
+        XCTAssertEqual(hitDayModel.tasks.count, 1)
+        XCTAssertEqual(hitDayModel.tasks.first?.habit?.id, onSchedule.id)
+        XCTAssertEqual(onSchedule.records.count, 1)
+        XCTAssertEqual(onSchedule.records.first?.dayId, hitDay.dayId)
+        XCTAssertEqual(onSchedule.records.first?.status, .pending)
+        XCTAssertTrue(missingDate.records.isEmpty)
+        XCTAssertEqual(missingDate.generatedThroughDayId, hitDay.dayId)
+
+        let endOutcome = materializer.sync(today: monthEnd, now: makeDate(2026, 9, 30, 9))
+
+        XCTAssertEqual(endOutcome.createdCount, 0)
+        XCTAssertTrue(monthEndModel.tasks.isEmpty)
+        XCTAssertTrue(missingDate.records.isEmpty)
+        XCTAssertEqual(missingDate.generatedThroughDayId, monthEnd.dayId)
+
+        // 缺日月份不产生时间线节点；含 31 日的 8 月节点存在。
+        let nodes = HabitStatisticsCalculator.timeline(for: missingDate, today: monthEnd)
+        XCTAssertEqual(nodes.map(\.dayId), ["2026-08-31"])
+        XCTAssertFalse(nodes.contains { $0.dayId.hasPrefix("2026-09") })
+
+        let days = try context.fetch(FetchDescriptor<DayModel>())
+        XCTAssertFalse(days.contains { $0.dayId > monthEnd.dayId })
+    }
+
+    @MainActor
+    func test_habitOneOffScheduleMaterializesOnce() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let start = makeDate(2026, 9, 16)
+        let nextDay = makeDate(2026, 9, 17)
+        let startModel = DayModel(dayId: start.dayId, date: start, status: .empty)
+        let nextModel = DayModel(dayId: nextDay.dayId, date: nextDay, status: .empty)
+        let habit = HabitModel(name: "体检", scheduleKind: .once, startDayId: start.dayId)
+        context.insert(startModel)
+        context.insert(nextModel)
+        context.insert(habit)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let first = materializer.sync(today: start, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(first.createdCount, 1)
+        XCTAssertEqual(startModel.tasks.count, 1)
+        XCTAssertEqual(startModel.tasks.first?.habit?.id, habit.id)
+        XCTAssertEqual(habit.records.count, 1)
+
+        let repeated = materializer.sync(today: start, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(repeated.createdCount, 0)
+        XCTAssertEqual(startModel.tasks.count, 1)
+        XCTAssertEqual(habit.records.count, 1)
+
+        let next = materializer.sync(today: nextDay, now: makeDate(2026, 9, 17, 9))
+
+        XCTAssertEqual(next.createdCount, 0)
+        XCTAssertTrue(nextModel.tasks.isEmpty)
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.status, .missed)
+        XCTAssertEqual(habit.generatedThroughDayId, nextDay.dayId)
+    }
+
+    @MainActor
     func test_habitSyncSweepsPendingRecordsToMissed() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
@@ -817,6 +896,46 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(deduped.currentStreak, 5)
         XCTAssertEqual(deduped.longestStreak, 5)
         XCTAssertEqual(deduped.completionRatePercent, 100)
+    }
+
+    @MainActor
+    func test_habitTimelineAssemblesScheduledDaysWithStates() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-07")
+        context.insert(habit)
+
+        func addRecord(_ dayId: String, _ status: HabitDayRecordStatus, completedAt: Date? = nil) {
+            let record = HabitDayRecord(dayId: dayId)
+            record.status = status
+            record.completedAt = completedAt
+            record.habit = habit
+            habit.records.append(record)
+            context.insert(record)
+        }
+
+        let completedAt = makeDate(2026, 9, 14, 8, 12)
+        addRecord("2026-09-14", .completed, completedAt: completedAt)
+        addRecord("2026-09-15", .missed)
+        addRecord("2026-09-16", .pending)
+
+        let nodes = HabitStatisticsCalculator.timeline(for: habit, today: today)
+
+        XCTAssertEqual(nodes.map(\.dayId), [
+            "2026-09-16", "2026-09-15", "2026-09-14",
+            "2026-09-11", "2026-09-10", "2026-09-09",
+            "2026-09-08", "2026-09-07",
+        ])
+
+        let byDay = Dictionary(uniqueKeysWithValues: nodes.map { ($0.dayId, $0) })
+        XCTAssertEqual(byDay["2026-09-16"]?.state, .pending)
+        XCTAssertEqual(byDay["2026-09-15"]?.state, .missed)
+        XCTAssertEqual(byDay["2026-09-14"]?.state, .completed)
+        XCTAssertEqual(byDay["2026-09-14"]?.completedAt, completedAt)
+        XCTAssertEqual(byDay["2026-09-09"]?.state, .unrecorded)
+        XCTAssertNil(byDay["2026-09-09"]?.completedAt)
+        XCTAssertNotEqual(byDay["2026-09-15"]?.state, byDay["2026-09-09"]?.state)
     }
 
     // MARK: - Habit view model
