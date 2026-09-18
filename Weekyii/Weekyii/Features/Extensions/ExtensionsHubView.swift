@@ -23,6 +23,7 @@ struct ExtensionsHubView: View {
     @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: ExtensionsViewModel?
     @State private var mindStampViewModel: MindStampViewModel?
+    @State private var habitViewModel: HabitViewModel?
     @State private var errorMessage: String?
 
     /// Module tiles only rotate when the user left auto-rotation on.
@@ -34,7 +35,7 @@ struct ExtensionsHubView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: WeekSpacing.lg) {
-                    if let mindStampViewModel, let viewModel {
+                    if let mindStampViewModel, let viewModel, let habitViewModel {
                         LazyVGrid(
                             columns: [
                                 GridItem(.flexible(), spacing: WeekSpacing.md),
@@ -44,6 +45,7 @@ struct ExtensionsHubView: View {
                         ) {
                             MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: moduleTilesActive)
                             SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
+                            HabitsModulePreview(viewModel: habitViewModel, animationsActive: moduleTilesActive)
                         }
 
                         ProjectsModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
@@ -67,12 +69,17 @@ struct ExtensionsHubView: View {
             if mindStampViewModel == nil {
                 mindStampViewModel = MindStampViewModel(modelContext: modelContext)
             }
+            if habitViewModel == nil {
+                habitViewModel = HabitViewModel(modelContext: modelContext, appState: appState)
+            }
             viewModel?.refresh()
             mindStampViewModel?.refresh()
+            habitViewModel?.refresh()
         }
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
             mindStampViewModel?.refresh()
+            habitViewModel?.refresh()
         }
         .onChange(of: viewModel?.errorMessage) { _, newValue in
             if let newValue { errorMessage = newValue }
@@ -117,6 +124,105 @@ private struct SuspendedTasksModulePreview: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("extensionsSuspendedSeeAllButton")
+    }
+}
+
+// MARK: - Habits Module Preview
+
+private struct HabitsModulePreview: View {
+    let viewModel: HabitViewModel
+    let animationsActive: Bool
+
+    private var todayProgress: (completed: Int, scheduled: Int) {
+        var completed = 0
+        var scheduled = 0
+        for habit in viewModel.activeHabits {
+            let status = viewModel.statistics(for: habit).todayStatus
+            guard status != .notScheduled else { continue }
+            scheduled += 1
+            if status == .completed { completed += 1 }
+        }
+        return (completed, scheduled)
+    }
+
+    var body: some View {
+        let progress = todayProgress
+        NavigationLink {
+            HabitsFullView(viewModel: viewModel)
+        } label: {
+            LiveModuleTile(
+                items: viewModel.activeHabits,
+                initialDelay: .seconds(3.2),
+                isActive: animationsActive,
+                accessibilityIdentifier: "extensionsHabitsLiveTile"
+            ) { habit in
+                HabitLiveTile(
+                    habit: habit,
+                    habitCount: viewModel.activeHabits.count,
+                    completedToday: progress.completed,
+                    scheduledToday: progress.scheduled
+                )
+            } emptyContent: {
+                HubEmptyTile(
+                    title: String(localized: "extensions.module.habits.title", defaultValue: "习惯追踪"),
+                    message: String(localized: "extensions.hub.habits.empty", defaultValue: "还没有习惯，点击创建"),
+                    icon: "repeat.circle.fill",
+                    tint: .accentGreen
+                )
+                .accessibilityIdentifier("extensionsHabitsEmptyTile")
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("extensionsHabitsSeeAllButton")
+    }
+}
+
+private struct HabitLiveTile: View {
+    let habit: HabitModel
+    let habitCount: Int
+    let completedToday: Int
+    let scheduledToday: Int
+
+    var body: some View {
+        HubSquareSurface(tint: habit.habitColor) {
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HubTileHeader(
+                    title: String(localized: "extensions.module.habits.title", defaultValue: "习惯追踪"),
+                    icon: "repeat.circle.fill",
+                    tint: habit.habitColor,
+                    trailing: "\(habitCount)"
+                )
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: WeekSpacing.xs) {
+                    Image(systemName: habit.iconName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(habit.habitColor)
+                    Text(habit.name)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Text(habit.scheduleSummary)
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+
+                Text(
+                    String(
+                        format: String(localized: "extensions.hub.habits.progress", defaultValue: "今日 %lld/%lld"),
+                        locale: Locale.current,
+                        Int64(completedToday),
+                        Int64(scheduledToday)
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(habit.habitColor)
+            }
+        }
     }
 }
 
