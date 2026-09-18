@@ -402,6 +402,10 @@ final class AppHealthCoordinator: AppHealthCoordinating {
         defer { isReconciling = false }
 
         let report = stateMachine.reconcile(now: timeProvider.now, force: force || trigger == .manualResync)
+
+        HabitTaskMaterializer(modelContext: modelContainer.mainContext)
+            .sync(today: timeProvider.today, now: timeProvider.now)
+
         rescheduleNotificationsAfterReconcile()
         liveActivityService.reconcile(
             modelContext: modelContainer.mainContext,

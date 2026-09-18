@@ -7,6 +7,10 @@ final class StateMachineTests: XCTestCase {
     private static let sharedViewModelSettings = UserSettings()
     private static var retainedTodayViewModels: [TodayViewModel] = []
     private static var retainedWeekViewModels: [WeekViewModel] = []
+    // Deallocating an @MainActor class from a test crashes the process on the
+    // iOS 26.2 simulator (isolated-deinit back-deploy shim double-free);
+    // reconcile tests keep the coordinator alive for the whole run.
+    private static var retainedCoordinators: [AppHealthCoordinator] = []
 
     private final class TestAppState: AppStateStore {
         var systemStartDate: Date?
@@ -63,9 +67,16 @@ final class StateMachineTests: XCTestCase {
         func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
     }
 
-    private struct TestSettings: KillTimeSettings {
+    private struct TestSettings: KillTimeSettings, NotificationSettingsReadable, LiveActivityThemeReadable {
         var defaultKillTimeHour: Int = 23
         var defaultKillTimeMinute: Int = 45
+        var killTimeReminderMinutes: Int = 15
+        var fixedReminderEnabled: Bool = false
+        var fixedReminderHour: Int = 9
+        var fixedReminderMinute: Int = 0
+        var selectedThemeRaw: String = "system"
+        var appearanceModeRaw: String = "system"
+        var premiumThemeUnlocked: Bool = false
     }
 
     @MainActor
@@ -176,6 +187,10 @@ final class StateMachineTests: XCTestCase {
 
     private static func retainTodayViewModelForTestLifetime(_ viewModel: TodayViewModel) {
         retainedTodayViewModels.append(viewModel)
+    }
+
+    private static func retainCoordinatorForTestLifetime(_ coordinator: AppHealthCoordinator) {
+        retainedCoordinators.append(coordinator)
     }
 
     private static func retainWeekViewModelForTestLifetime(_ viewModel: WeekViewModel) {
@@ -1213,6 +1228,51 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(habit.records.count, 1)
         XCTAssertEqual(habit.records.first?.dayId, day.dayId)
         XCTAssertEqual(habit.records.first?.status, .completed)
+    }
+
+    @MainActor
+    func test_reconcileMaterializesHabitForToday() throws {
+        let context = container.mainContext
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        let today = now.startOfDay
+
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+
+        let habit = HabitModel(
+            name: "晨跑",
+            scheduleWeekdays: Set(1...7),
+            startDayId: today.dayId
+        )
+        context.insert(habit)
+        try context.save()
+
+        let coordinator = AppHealthCoordinator(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: makeAppState(),
+            userSettings: makeSettings(),
+            liveActivityService: NoopLiveActivityService()
+        )
+        Self.retainCoordinatorForTestLifetime(coordinator)
+
+        coordinator.reconcile(trigger: .launch, force: true)
+
+        let day = try XCTUnwrap(
+            context.fetch(FetchDescriptor<DayModel>()).first { $0.dayId == today.dayId }
+        )
+        XCTAssertEqual(day.status, .draft)
+        XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.dayId, today.dayId)
+        XCTAssertEqual(habit.records.first?.status, .pending)
+        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+
+        coordinator.reconcile(trigger: .launch, force: true)
+
+        XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertEqual(habit.records.count, 1)
     }
 
     @MainActor
