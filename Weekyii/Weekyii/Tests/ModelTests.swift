@@ -545,6 +545,229 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(habit.hasSchedule)
     }
 
+    // MARK: - Habit materializer
+
+    @MainActor
+    func test_habitSyncCreatesOnlyTodayAndIsIdempotent() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let day = DayModel(dayId: todayKey, date: today, status: .empty)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        context.insert(day)
+        context.insert(habit)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let first = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(first.createdCount, 1)
+        XCTAssertTrue(first.didChange)
+        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+
+        let second = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(second.createdCount, 0)
+        XCTAssertFalse(second.didChange)
+
+        XCTAssertEqual(day.tasks.count, 1)
+        XCTAssertEqual(day.tasks.first?.title, "晨跑")
+        XCTAssertEqual(day.tasks.first?.habit?.id, habit.id)
+        XCTAssertEqual(day.tasks.first?.day?.dayId, todayKey)
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.status, .pending)
+        XCTAssertEqual(habit.records.first?.dayId, todayKey)
+
+        let days = try context.fetch(FetchDescriptor<DayModel>())
+        XCTAssertFalse(days.contains { $0.dayId > todayKey })
+    }
+
+    @MainActor
+    func test_habitSyncSkipsLockedDayAndAdvancesWatermark() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let day = DayModel(dayId: todayKey, date: today, status: .execute)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        context.insert(day)
+        context.insert(habit)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let first = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(first.createdCount, 0)
+        XCTAssertEqual(first.blockedCount, 1)
+        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(habit.records.isEmpty)
+
+        let second = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(second.blockedCount, 0)
+        XCTAssertEqual(second.createdCount, 0)
+    }
+
+    @MainActor
+    func test_habitSyncSkipsWhenPastKillTime() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let day = DayModel(dayId: todayKey, date: today, status: .draft)
+        day.killTimeHour = 8
+        day.killTimeMinute = 0
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        context.insert(day)
+        context.insert(habit)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let outcome = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(outcome.createdCount, 0)
+        XCTAssertEqual(outcome.blockedCount, 1)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(habit.records.isEmpty)
+        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+    }
+
+    @MainActor
+    func test_habitSyncSkipsNotScheduledAndFutureStart() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let day = DayModel(dayId: todayKey, date: today, status: .empty)
+        let weekendOnly = HabitModel(name: "周日冥想", scheduleWeekdays: [7], startDayId: "2026-09-01")
+        let futureStart = HabitModel(name: "明天开始", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-17")
+        context.insert(day)
+        context.insert(weekendOnly)
+        context.insert(futureStart)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let outcome = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(outcome.createdCount, 0)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(weekendOnly.records.isEmpty)
+        XCTAssertTrue(futureStart.records.isEmpty)
+        XCTAssertEqual(weekendOnly.generatedThroughDayId, todayKey)
+        XCTAssertEqual(futureStart.generatedThroughDayId, "")
+    }
+
+    @MainActor
+    func test_habitSyncSweepsPendingRecordsToMissed() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let habit = HabitModel(name: "周日冥想", scheduleWeekdays: [7], startDayId: "2026-09-01")
+        let stale = HabitDayRecord(dayId: "2026-09-15")
+        stale.habit = habit
+        habit.records.append(stale)
+        let current = HabitDayRecord(dayId: todayKey)
+        current.habit = habit
+        habit.records.append(current)
+        context.insert(habit)
+        context.insert(stale)
+        context.insert(current)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        let outcome = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(outcome.missedRecordCount, 1)
+        XCTAssertTrue(outcome.didChange)
+        XCTAssertEqual(stale.status, .missed)
+        XCTAssertEqual(current.status, .pending)
+    }
+
+    @MainActor
+    func test_habitStageCompletionUpsertsCompletedRecord() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let completedAt = makeDate(2026, 9, 16, 21, 30)
+        let day = DayModel(dayId: todayKey, date: today, status: .execute)
+
+        let withRecord = HabitModel(name: "喝水", startDayId: "2026-09-01")
+        let pending = HabitDayRecord(dayId: todayKey)
+        pending.habit = withRecord
+        withRecord.records.append(pending)
+        let taskA = TaskItem(title: "喝水", order: 1, zone: .focus)
+        taskA.day = day
+        taskA.habit = withRecord
+        day.tasks.append(taskA)
+
+        let withoutRecord = HabitModel(name: "记账", startDayId: "2026-09-01")
+        let taskB = TaskItem(title: "记账", order: 2)
+        taskB.day = day
+        taskB.habit = withoutRecord
+        day.tasks.append(taskB)
+
+        context.insert(day)
+        context.insert(withRecord)
+        context.insert(withoutRecord)
+        context.insert(pending)
+        try context.save()
+
+        HabitRecordService.stageCompletion(for: taskA, at: completedAt)
+        XCTAssertEqual(withRecord.records.count, 1)
+        XCTAssertEqual(withRecord.records.first?.status, .completed)
+        XCTAssertEqual(withRecord.records.first?.completedAt, completedAt)
+
+        HabitRecordService.stageCompletion(for: taskB, at: completedAt)
+        XCTAssertEqual(withoutRecord.records.count, 1)
+        XCTAssertEqual(withoutRecord.records.first?.status, .completed)
+        XCTAssertEqual(withoutRecord.records.first?.dayId, todayKey)
+        XCTAssertEqual(withoutRecord.records.first?.completedAt, completedAt)
+
+        let records = try context.fetch(FetchDescriptor<HabitDayRecord>())
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records.filter { $0.status == .completed }.count, 2)
+    }
+
+    @MainActor
+    func test_habitAssignTodayBypassesWatermarkAndRejectsLocked() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let todayKey = today.dayId
+        let day = DayModel(dayId: todayKey, date: today, status: .empty)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        context.insert(day)
+        context.insert(habit)
+
+        let materializer = HabitTaskMaterializer(modelContext: context)
+        materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+
+        let generated = try XCTUnwrap(day.tasks.first { $0.habit?.id == habit.id })
+        let generatedId = generated.id
+        day.tasks = day.tasks.filter { $0.id != generatedId }
+        context.delete(generated)
+
+        let recreated = materializer.assignToday(habit: habit, today: today, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(recreated, .created)
+        XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+
+        let duplicate = materializer.assignToday(habit: habit, today: today, now: makeDate(2026, 9, 16, 11))
+        XCTAssertEqual(duplicate, .alreadyExists)
+
+        let recreatedTask = try XCTUnwrap(day.tasks.first { $0.habit?.id == habit.id })
+        let recreatedId = recreatedTask.id
+        day.tasks = day.tasks.filter { $0.id != recreatedId }
+        context.delete(recreatedTask)
+        day.status = .execute
+
+        let locked = materializer.assignToday(habit: habit, today: today, now: makeDate(2026, 9, 16, 12))
+        XCTAssertEqual(locked, .dayLocked)
+
+        let weekendOnly = HabitModel(name: "周日冥想", scheduleWeekdays: [7], startDayId: "2026-09-01")
+        context.insert(weekendOnly)
+        let notScheduled = materializer.assignToday(habit: weekendOnly, today: today, now: makeDate(2026, 9, 16, 13))
+        XCTAssertEqual(notScheduled, .notScheduledToday)
+    }
+
     @MainActor
     func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
         let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"
