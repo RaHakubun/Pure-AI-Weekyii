@@ -1178,6 +1178,44 @@ final class StateMachineTests: XCTestCase {
     }
 
     @MainActor
+    func test_doneFocus_recordsCompletedHabitForFocusTask() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .strict, frozenTitles: [])
+        let context = container.mainContext
+        let habit = HabitModel(name: "晨跑", startDayId: day.dayId)
+        context.insert(habit)
+        let focus = try XCTUnwrap(day.focusTask)
+        focus.habit = habit
+        try context.save()
+
+        try viewModel.doneFocus()
+
+        XCTAssertEqual(day.status, .completed)
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.dayId, day.dayId)
+        XCTAssertEqual(habit.records.first?.status, .completed)
+        XCTAssertNotNil(habit.records.first?.completedAt)
+    }
+
+    @MainActor
+    func test_doneFocus_recordsHabitOnlyWhenHabitTaskReachesFocus() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .strict, frozenTitles: ["Second"])
+        let context = container.mainContext
+        let habit = HabitModel(name: "晨跑", startDayId: day.dayId)
+        context.insert(habit)
+        let habitTask = try XCTUnwrap(day.frozenTasks.first)
+        habitTask.habit = habit
+        try context.save()
+
+        try viewModel.doneFocus()
+        XCTAssertTrue(habit.records.isEmpty)
+
+        try viewModel.doneFocus()
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.dayId, day.dayId)
+        XCTAssertEqual(habit.records.first?.status, .completed)
+    }
+
+    @MainActor
     func test_addTask_savesThenReschedulesWithUpdatedUnfinishedCount() throws {
         let context = container.mainContext
         let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)

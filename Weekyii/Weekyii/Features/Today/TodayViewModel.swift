@@ -241,6 +241,7 @@ final class TodayViewModel {
         focusTask.zone = .complete
         focusTask.endedAt = now
         focusTask.completedOrder = completedCount + 1
+        HabitRecordService.stageCompletion(for: focusTask, at: now)
 
         if let next = day.frozenTasks.first {
             next.zone = .focus
