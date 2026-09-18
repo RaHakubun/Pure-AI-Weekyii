@@ -43,11 +43,13 @@ struct TaskRowView: View {
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 4) {
-                // Title
-                titleView
-                
-                if showsProjectOrigin {
-                    TaskProjectOriginBadge(project: task.project)
+                HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+                    // Title
+                    titleView
+                    if showsProjectOrigin, task.project != nil {
+                        Spacer(minLength: WeekSpacing.sm)
+                        TaskProjectOriginBadge(project: task.project)
+                    }
                 }
 
                 // Description

@@ -54,13 +54,13 @@ struct TaskCard: View {
 
                     Spacer()
 
+                    if showsProjectOrigin {
+                        TaskProjectOriginBadge(project: task.project)
+                    }
+
                     if showStatus {
                         TaskZoneBadge(zone: task.zone)
                     }
-                }
-
-                if showsProjectOrigin {
-                    TaskProjectOriginBadge(project: task.project)
                 }
 
                 // 时间信息

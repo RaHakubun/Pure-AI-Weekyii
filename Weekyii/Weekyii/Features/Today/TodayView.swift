@@ -488,17 +488,22 @@ struct TodayView: View {
                             .foregroundColor(.white)
                     }
                     
-                    Text(focusTask.title)
-                        .font(.titleMedium)
-                        .foregroundColor(.white)
-                        .onTapGesture {
-                            selectedTaskForDetail = focusTask
-                        }
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(focusTask.title)
+                            .font(.titleMedium)
+                            .foregroundColor(.white)
+                            .onTapGesture {
+                                selectedTaskForDetail = focusTask
+                            }
 
-                    TaskProjectOriginBadge(
-                        project: focusTask.project,
-                        isOnDarkBackground: true
-                    )
+                        if focusTask.project != nil {
+                            Spacer(minLength: WeekSpacing.sm)
+                            TaskProjectOriginBadge(
+                                project: focusTask.project,
+                                isOnDarkBackground: true
+                            )
+                        }
+                    }
                     
                     HStack {
                         if let startedAt = focusTask.startedAt {
