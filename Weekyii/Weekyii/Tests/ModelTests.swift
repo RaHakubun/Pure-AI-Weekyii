@@ -814,6 +814,184 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(deduped.completionRatePercent, 100)
     }
 
+    // MARK: - Habit view model
+
+    private final class HabitTestAppState: AppStateStore {
+        var systemStartDate: Date?
+        var lastProcessedDate: Date?
+        var lastRolloverAt: Date?
+        var runtimeErrorMessage: String?
+        var stateTransitionRevision: Int = 0
+
+        func save() {}
+        func markProcessed(at date: Date) {}
+        func incrementDaysStarted() {}
+        func bumpStateTransitionRevision() { stateTransitionRevision += 1 }
+    }
+
+    private final class HabitTestTimeProvider: TimeProviding {
+        var mockDate: Date
+
+        init(mockDate: Date) {
+            self.mockDate = mockDate
+        }
+
+        var now: Date { mockDate }
+
+        var today: Date { Calendar(identifier: .iso8601).startOfDay(for: mockDate) }
+
+        var currentWeekId: String {
+            let calendar = Calendar(identifier: .iso8601)
+            let week = calendar.component(.weekOfYear, from: mockDate)
+            let year = calendar.component(.yearForWeekOfYear, from: mockDate)
+            return String(format: "%04d-W%02d", year, week)
+        }
+    }
+
+    @MainActor
+    func test_habitCreateMaterializesTodayWhenScheduled() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let day = DayModel(dayId: today.dayId, date: today, status: .empty)
+        context.insert(day)
+        let appState = HabitTestAppState()
+        let viewModel = HabitViewModel(
+            modelContext: context,
+            appState: appState,
+            timeProvider: HabitTestTimeProvider(mockDate: makeDate(2026, 9, 16, 9))
+        )
+
+        let habit = try viewModel.createHabit(name: "晨跑", startDate: today)
+
+        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+        XCTAssertEqual(day.tasks.map(\.title), ["晨跑"])
+        XCTAssertEqual(day.tasks.first?.habit?.id, habit.id)
+        XCTAssertEqual(habit.records.count, 1)
+        XCTAssertEqual(habit.records.first?.dayId, today.dayId)
+        XCTAssertEqual(viewModel.activeHabits.map(\.id), [habit.id])
+        XCTAssertTrue(viewModel.archivedHabits.isEmpty)
+        XCTAssertEqual(appState.stateTransitionRevision, 1)
+    }
+
+    @MainActor
+    func test_habitUpdateRewindsWatermarkWhenPlanChanges() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let day = DayModel(dayId: today.dayId, date: today, status: .empty)
+        context.insert(day)
+        let appState = HabitTestAppState()
+        let viewModel = HabitViewModel(
+            modelContext: context,
+            appState: appState,
+            timeProvider: HabitTestTimeProvider(mockDate: makeDate(2026, 9, 16, 9))
+        )
+
+        let habit = try viewModel.createHabit(
+            name: "周二跑",
+            scheduleWeekdays: [1, 2],
+            startDate: today
+        )
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+
+        try viewModel.updateHabit(
+            habit,
+            name: "晨跑",
+            iconName: habit.iconName,
+            colorHex: habit.colorHex,
+            category: habit.category,
+            scheduleKind: .weekly,
+            scheduleWeekdays: [1, 2, 3],
+            scheduleMonthDays: [],
+            startDate: today
+        )
+
+        XCTAssertEqual(habit.name, "晨跑")
+        XCTAssertEqual(habit.scheduleWeekdays, [1, 2, 3])
+        XCTAssertEqual(day.tasks.map(\.title), ["晨跑"])
+        XCTAssertEqual(day.tasks.first?.habit?.id, habit.id)
+        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+        XCTAssertEqual(appState.stateTransitionRevision, 2)
+    }
+
+    @MainActor
+    func test_habitArchiveStopsGenerationAndRestoreResumesToday() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let provider = HabitTestTimeProvider(mockDate: makeDate(2026, 9, 16, 9))
+        let today = provider.today
+        let tomorrow = makeDate(2026, 9, 17)
+        let day16 = DayModel(dayId: today.dayId, date: today, status: .empty)
+        let day17 = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .empty)
+        context.insert(day16)
+        context.insert(day17)
+        let appState = HabitTestAppState()
+        let viewModel = HabitViewModel(modelContext: context, appState: appState, timeProvider: provider)
+
+        let morning = try viewModel.createHabit(name: "晨跑", startDate: today)
+        XCTAssertEqual(day16.tasks.map(\.title), ["晨跑"])
+
+        try viewModel.setActive(morning, false)
+        XCTAssertTrue(viewModel.activeHabits.isEmpty)
+        XCTAssertEqual(viewModel.archivedHabits.map(\.id), [morning.id])
+
+        provider.mockDate = makeDate(2026, 9, 17, 9)
+        let stretch = try viewModel.createHabit(name: "拉伸", startDate: provider.today)
+        XCTAssertEqual(day17.tasks.map(\.title), ["拉伸"])
+        XCTAssertEqual(morning.generatedThroughDayId, today.dayId)
+        XCTAssertFalse(day17.tasks.contains { $0.habit?.id == morning.id })
+
+        try viewModel.setActive(morning, true)
+        XCTAssertEqual(viewModel.activeHabits.map(\.id), [morning.id, stretch.id])
+        XCTAssertEqual(Set(day17.tasks.map(\.title)), ["拉伸", "晨跑"])
+        XCTAssertEqual(morning.generatedThroughDayId, tomorrow.dayId)
+        XCTAssertEqual(stretch.generatedThroughDayId, tomorrow.dayId)
+    }
+
+    @MainActor
+    func test_habitDeleteRemovesDraftTasksAndKeepsStartedDayTasks() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let tomorrow = makeDate(2026, 9, 17)
+        let day16 = DayModel(dayId: today.dayId, date: today, status: .empty)
+        let day17 = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .execute)
+        context.insert(day16)
+        context.insert(day17)
+        let appState = HabitTestAppState()
+        let viewModel = HabitViewModel(
+            modelContext: context,
+            appState: appState,
+            timeProvider: HabitTestTimeProvider(mockDate: makeDate(2026, 9, 16, 9))
+        )
+
+        let habit = try viewModel.createHabit(name: "晨跑", startDate: today)
+
+        let draftExtra = TaskItem(title: "倒垃圾", order: 2, zone: .draft)
+        draftExtra.day = day16
+        day16.tasks.append(draftExtra)
+        let keptTask = TaskItem(title: "晨跑", order: 1, zone: .complete)
+        keptTask.day = day17
+        keptTask.habit = habit
+        day17.tasks.append(keptTask)
+        try context.save()
+
+        try viewModel.deleteHabit(habit)
+
+        XCTAssertEqual(day16.tasks.map(\.title), ["倒垃圾"])
+        XCTAssertEqual(day16.tasks.first?.order, 1)
+        XCTAssertEqual(day17.tasks.map(\.title), ["晨跑"])
+        XCTAssertNil(day17.tasks.first?.habit)
+        XCTAssertTrue(viewModel.activeHabits.isEmpty)
+        XCTAssertTrue(viewModel.archivedHabits.isEmpty)
+        let habits = try context.fetch(FetchDescriptor<HabitModel>())
+        XCTAssertTrue(habits.isEmpty)
+        let records = try context.fetch(FetchDescriptor<HabitDayRecord>())
+        XCTAssertTrue(records.isEmpty)
+    }
+
     @MainActor
     func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
         let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"
