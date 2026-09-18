@@ -769,6 +769,52 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_habitStatisticsStreakRateAndDedupe() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-09")
+        context.insert(habit)
+
+        func addRecord(_ dayId: String, _ status: HabitDayRecordStatus) {
+            let record = HabitDayRecord(dayId: dayId)
+            record.status = status
+            if status == .completed {
+                record.completedAt = WeekyiiDayId.date(from: dayId)
+            }
+            record.habit = habit
+            habit.records.append(record)
+            context.insert(record)
+        }
+
+        addRecord("2026-09-09", .completed)
+        addRecord("2026-09-10", .missed)
+        addRecord("2026-09-14", .completed)
+        addRecord("2026-09-15", .completed)
+        addRecord("2026-09-16", .completed)
+
+        let first = HabitStatisticsCalculator.statistics(for: habit, today: today)
+        XCTAssertEqual(first.currentStreak, 3)
+        XCTAssertEqual(first.longestStreak, 3)
+        XCTAssertEqual(first.completedCount, 4)
+        XCTAssertEqual(first.missedCount, 1)
+        XCTAssertEqual(first.totalRecordedCount, 5)
+        XCTAssertEqual(try XCTUnwrap(first.completionRate), 0.8, accuracy: 0.0001)
+        XCTAssertEqual(first.completionRatePercent, 80)
+        XCTAssertEqual(first.todayStatus, .completed)
+
+        addRecord("2026-09-10", .completed)
+
+        let deduped = HabitStatisticsCalculator.statistics(for: habit, today: today)
+        XCTAssertEqual(deduped.completedCount, 5)
+        XCTAssertEqual(deduped.missedCount, 0)
+        XCTAssertEqual(deduped.totalRecordedCount, 5)
+        XCTAssertEqual(deduped.currentStreak, 5)
+        XCTAssertEqual(deduped.longestStreak, 5)
+        XCTAssertEqual(deduped.completionRatePercent, 100)
+    }
+
+    @MainActor
     func test_userSettings_defaultsToStrictExecutionModeAndPersistsSelection() {
         let suiteName = "ModelTests.ExecutionMode.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

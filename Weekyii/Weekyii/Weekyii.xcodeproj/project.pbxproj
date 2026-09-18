@@ -108,6 +108,7 @@
 		C0D3A00730A0000100BEEF01 /* HabitModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00830A0000100BEEF01 /* HabitModel.swift */; };
 		C0D3A00930A0000100BEEF01 /* HabitDayRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00A30A0000100BEEF01 /* HabitDayRecord.swift */; };
 		C0D3A00B30A0000100BEEF01 /* HabitTaskMaterializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */; };
+		C0D3A00D30A0000100BEEF01 /* HabitStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */; };
 		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
 		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
@@ -272,6 +273,7 @@
 		C0D3A00830A0000100BEEF01 /* HabitModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitModel.swift; sourceTree = "<group>"; };
 		C0D3A00A30A0000100BEEF01 /* HabitDayRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitDayRecord.swift; sourceTree = "<group>"; };
 		C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitTaskMaterializer.swift; sourceTree = "<group>"; };
+		C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitStatistics.swift; sourceTree = "<group>"; };
 		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
 		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
 		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
@@ -476,6 +478,7 @@
 				C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
 				C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */,
+				C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */,
 				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
 				944E58322F2B593A00DB2DEE /* StateMachine.swift */,
 				A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */,
@@ -888,6 +891,7 @@
 				C0D3A00730A0000100BEEF01 /* HabitModel.swift in Sources */,
 				C0D3A00930A0000100BEEF01 /* HabitDayRecord.swift in Sources */,
 				C0D3A00B30A0000100BEEF01 /* HabitTaskMaterializer.swift in Sources */,
+				C0D3A00D30A0000100BEEF01 /* HabitStatistics.swift in Sources */,
 				944E587C2F2B593A00DB2DEE /* DayModel.swift in Sources */,
 				944E587D2F2B593A00DB2DEE /* TimeProvider.swift in Sources */,
 				944E587E2F2B593A00DB2DEE /* PastView.swift in Sources */,
