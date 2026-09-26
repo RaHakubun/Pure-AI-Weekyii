@@ -143,6 +143,14 @@ enum WeekyiiDataArchiveService {
 
     static func export(modelContext: ModelContext, settings: UserSettings, appState: AppState) throws -> Data {
         try modelContext.save()
+        return try exportReadOnly(modelContext: modelContext, settings: settings, appState: appState)
+    }
+
+    /// Exports the current graph without saving the context. This is required
+    /// when inspecting a read-only detached store during an explicit store
+    /// transfer; a transfer must never turn a read-only inspection into a
+    /// write attempt.
+    static func exportReadOnly(modelContext: ModelContext, settings: UserSettings, appState: AppState) throws -> Data {
         let payload = try makePayload(modelContext: modelContext, settings: settings, appState: appState)
         let payloadData = try encoder().encode(payload)
         let envelope = Envelope(

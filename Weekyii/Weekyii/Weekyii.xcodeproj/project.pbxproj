@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C3A0000130D0000100CAFE01 /* CloudSyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */; };
+		DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */; };
+		C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */; };
+		C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */; };
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
@@ -116,6 +118,28 @@
 		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
 		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
+		D4A100212F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */; };
+		D4A100312F7A100100AAA003 /* WeekyiiSnapshotRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */; };
+		D4A100412F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */; };
+		D4A100512F7A100100AAA005 /* LegacyStoreConsolidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */; };
+		D4A100612F7A100100AAA006 /* CloudRecordCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */; };
+		D4A100712F7A100100AAA007 /* CloudSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */; };
+		D4A100812F7A100100AAA008 /* CloudSyncMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */; };
+		D4A100912F7A100100AAA009 /* CloudSyncRetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */; };
+		DA2D00012F7A100100AAA001 /* CloudKitRecordAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */; };
+		DA2D00032F7A100100AAA001 /* CloudKitInfrastructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */; };
+		DA2D00052F7A100100AAA001 /* CKSyncEngineTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */; };
+		A90000092FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */; };
+		A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */; };
+		A90000072FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */; };
+		A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */; };
+		A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */; };
+		DA2D00072F7A100100AAA001 /* CloudSyncD2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */; };
+		ECA100012F7A100100AAA001 /* CloudSyncLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */; };
+		ECA100032F7A100100AAA001 /* CloudSyncReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */; };
+		ECA100052F7A100100AAA001 /* CloudSyncETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100062F7A100100AAA001 /* CloudSyncETests.swift */; };
+		EFA100012F7A100100AAA001 /* CloudSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */; };
+		EFA100032F7A100100AAA001 /* CloudSyncCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */; };
 		DF3C2419516E4D6FB1ABAE0F /* DraftReorderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */; };
 		E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7A6CE6657A22194F5108AB /* TaskStep.swift */; };
 		F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
@@ -125,6 +149,7 @@
 		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
 		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
 		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
+		F7A100212F70000100AAA001 /* LegacyStoreConsolidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -166,7 +191,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncMonitor.swift; sourceTree = "<group>"; };
+		DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncD1Tests.swift; sourceTree = "<group>"; };
+		C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEntitlementService.swift; sourceTree = "<group>"; };
+		C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncTypes.swift; sourceTree = "<group>"; };
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
 		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
@@ -285,10 +312,33 @@
 		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
 		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
 		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
+		D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiBusinessSnapshot.swift; sourceTree = "<group>"; };
+		D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiSnapshotRepository.swift; sourceTree = "<group>"; };
+		D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiSnapshotMergeService.swift; sourceTree = "<group>"; };
+		D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStoreConsolidator.swift; sourceTree = "<group>"; };
+		D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRecordCodec.swift; sourceTree = "<group>"; };
+		D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncTransport.swift; sourceTree = "<group>"; };
+		D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncMetadataStore.swift; sourceTree = "<group>"; };
+		D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncRetryPolicy.swift; sourceTree = "<group>"; };
+		DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordAdapter.swift; sourceTree = "<group>"; };
+		DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitInfrastructure.swift; sourceTree = "<group>"; };
+		DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKSyncEngineTransport.swift; sourceTree = "<group>"; };
+		DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncD2Tests.swift; sourceTree = "<group>"; };
+		ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncLocalStore.swift; sourceTree = "<group>"; };
+		ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncReconciler.swift; sourceTree = "<group>"; };
+		ECA100062F7A100100AAA001 /* CloudSyncETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncETests.swift; sourceTree = "<group>"; };
+		EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncCoordinator.swift; sourceTree = "<group>"; };
+		EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncCoordinatorTests.swift; sourceTree = "<group>"; };
 		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
 		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
 		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
+		F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStoreConsolidatorTests.swift; sourceTree = "<group>"; };
+		A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouterTests.swift; sourceTree = "<group>"; };
+		A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitor.swift; sourceTree = "<group>"; };
+		A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitorTests.swift; sourceTree = "<group>"; };
+		A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouter.swift; sourceTree = "<group>"; };
+		A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiAppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -354,6 +404,7 @@
 		944E580C2F2B593A00DB2DEE /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */,
 				944E58092F2B593A00DB2DEE /* AppState.swift */,
 				944E580A2F2B593A00DB2DEE /* ContentView.swift */,
 				944E580B2F2B593A00DB2DEE /* WeekyiiApp.swift */,
@@ -483,7 +534,8 @@
 		944E58352F2B593A00DB2DEE /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				C3A0000230D0000100CAFE01 /* CloudSyncMonitor.swift */,
+				C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */,
+				C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
 				C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */,
 				C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */,
@@ -492,6 +544,22 @@
 				A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */,
 				944E58332F2B593A00DB2DEE /* TimeProvider.swift */,
 				944E58342F2B593A00DB2DEE /* WeekCalculator.swift */,
+				D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */,
+				D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */,
+				D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */,
+				D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */,
+				D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */,
+				D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */,
+				D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */,
+				D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */,
+				DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */,
+				DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */,
+				DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */,
+				ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */,
+				ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */,
+				EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */,
+				A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */,
+				A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */,
 				B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */,
 			);
 			path = Services;
@@ -547,8 +615,15 @@
 		944E58452F2B593A00DB2DEE /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */,
+				A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */,
 				944E58422F2B593A00DB2DEE /* ModelTests.swift */,
+				DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */,
+				DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */,
+				ECA100062F7A100100AAA001 /* CloudSyncETests.swift */,
+				EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */,
 				F7A100102F70000100AAA001 /* NotificationServiceTests.swift */,
+				F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */,
 				944E58432F2B593A00DB2DEE /* StateMachineTests.swift */,
 				944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */,
 			);
@@ -814,7 +889,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C3A0000130D0000100CAFE01 /* CloudSyncMonitor.swift in Sources */,
+				A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */,
+				A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */,
+				A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */,
+				C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */,
+				C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */,
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
 				944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */,
@@ -881,6 +960,20 @@
 				944E58752F2B593A00DB2DEE /* WeekyiiApp.swift in Sources */,
 				F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */,
 				D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */,
+				D4A100212F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift in Sources */,
+				D4A100312F7A100100AAA003 /* WeekyiiSnapshotRepository.swift in Sources */,
+				D4A100412F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift in Sources */,
+				D4A100512F7A100100AAA005 /* LegacyStoreConsolidator.swift in Sources */,
+				D4A100612F7A100100AAA006 /* CloudRecordCodec.swift in Sources */,
+				D4A100712F7A100100AAA007 /* CloudSyncTransport.swift in Sources */,
+				D4A100812F7A100100AAA008 /* CloudSyncMetadataStore.swift in Sources */,
+				D4A100912F7A100100AAA009 /* CloudSyncRetryPolicy.swift in Sources */,
+				DA2D00012F7A100100AAA001 /* CloudKitRecordAdapter.swift in Sources */,
+				DA2D00032F7A100100AAA001 /* CloudKitInfrastructure.swift in Sources */,
+				DA2D00052F7A100100AAA001 /* CKSyncEngineTransport.swift in Sources */,
+				ECA100012F7A100100AAA001 /* CloudSyncLocalStore.swift in Sources */,
+				ECA100032F7A100100AAA001 /* CloudSyncReconciler.swift in Sources */,
+				EFA100012F7A100100AAA001 /* CloudSyncCoordinator.swift in Sources */,
 				94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */,
 				9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */,
 				9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */,
@@ -926,7 +1019,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */,
+				DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */,
+				DA2D00072F7A100100AAA001 /* CloudSyncD2Tests.swift in Sources */,
+				ECA100052F7A100100AAA001 /* CloudSyncETests.swift in Sources */,
+				EFA100032F7A100100AAA001 /* CloudSyncCoordinatorTests.swift in Sources */,
+				A90000092FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift in Sources */,
+				A90000072FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift in Sources */,
 				F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */,
+				F7A100212F70000100AAA001 /* LegacyStoreConsolidatorTests.swift in Sources */,
 				F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */,
 				F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */,
 			);
@@ -1098,7 +1198,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1137,7 +1237,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1254,7 +1354,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
@@ -1284,7 +1384,7 @@
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;

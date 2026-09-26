@@ -7,17 +7,9 @@ enum ProjectTileLivePanel: Hashable {
     case nextTask
 }
 
-enum ProjectTileLayoutStyle: Equatable {
-    case badge
-    case compactSummary
-    case dashboard
-    case timeline
-}
-
 enum ProjectTileSecondaryContent: Equatable {
     case none
     case microStatsStrip
-    case metricCards
     case compactPills
 }
 
@@ -29,7 +21,6 @@ struct ProjectTileContentInsets: Equatable {
 }
 
 struct ProjectTilePresentation: Equatable {
-    let layoutStyle: ProjectTileLayoutStyle
     let showsTitle: Bool
     let titleLineLimit: Int
     let showsStatusChip: Bool
@@ -37,13 +28,25 @@ struct ProjectTilePresentation: Equatable {
     let secondaryContent: ProjectTileSecondaryContent
     let contentInsets: ProjectTileContentInsets
     let livePanel: ProjectTileLivePanel
+    let showsProgressBar: Bool
+    let showsTrendChart: Bool
+    let trendChartMinHeight: CGFloat
+    let trendChartMaxHeight: CGFloat
+    let taskRowCount: Int
+    let primaryNumberFontSize: CGFloat
 
-    init(snapshot: ProjectTileSnapshot, size: ProjectTileSize, isEditing: Bool, liveTick _: Int) {
+    init(
+        snapshot: ProjectTileSnapshot,
+        size: ProjectTileSize,
+        isEditing: Bool,
+        liveTick _: Int,
+        isCompactBoard: Bool = false
+    ) {
         let hasNextTask = snapshot.hasUpcomingTask
+        let hasTasks = snapshot.totalCount > 0
 
         switch size {
         case .mini:
-            layoutStyle = .badge
             showsTitle = !isEditing
             titleLineLimit = 1
             showsStatusChip = false
@@ -55,45 +58,67 @@ struct ProjectTilePresentation: Equatable {
                 bottom: isEditing ? 14 : 6,
                 trailing: isEditing ? 16 : 6
             )
+            showsProgressBar = false
+            showsTrendChart = false
+            trendChartMinHeight = 0
+            trendChartMaxHeight = 0
+            taskRowCount = 0
+            primaryNumberFontSize = 22
         case .small:
-            layoutStyle = .compactSummary
             showsTitle = true
             titleLineLimit = 1
             showsStatusChip = false
             showsNextTaskDate = false
-            secondaryContent = isEditing ? .none : .microStatsStrip
+            secondaryContent = (isEditing || isCompactBoard) ? .none : .microStatsStrip
             contentInsets = ProjectTileContentInsets(
                 top: 6,
                 leading: 8,
                 bottom: isEditing ? 14 : 6,
                 trailing: isEditing ? 20 : 8
             )
+            showsProgressBar = hasTasks
+            showsTrendChart = false
+            trendChartMinHeight = 0
+            trendChartMaxHeight = 0
+            taskRowCount = 0
+            primaryNumberFontSize = 22
         case .medium:
-            layoutStyle = .dashboard
             showsTitle = true
             titleLineLimit = isEditing ? 1 : 2
             showsStatusChip = true
             showsNextTaskDate = !isEditing
-            secondaryContent = isEditing ? .compactPills : .metricCards
+            secondaryContent = isCompactBoard ? .none : .compactPills
             contentInsets = ProjectTileContentInsets(
                 top: 12,
                 leading: 12,
                 bottom: isEditing ? 22 : 14,
                 trailing: isEditing ? 30 : 14
             )
+            showsProgressBar = hasTasks
+            showsTrendChart = false
+            trendChartMinHeight = 0
+            trendChartMaxHeight = 0
+            taskRowCount = 0
+            primaryNumberFontSize = isCompactBoard ? 32 : 48
         case .wide:
-            layoutStyle = .timeline
             showsTitle = true
             titleLineLimit = 1
             showsStatusChip = true
             showsNextTaskDate = !isEditing
-            secondaryContent = .compactPills
+            // 窄板(≥5 列)下 wide 只放得下图表，次级行整体让位。
+            secondaryContent = isCompactBoard ? .none : .compactPills
             contentInsets = ProjectTileContentInsets(
                 top: 10,
                 leading: 10,
                 bottom: isEditing ? 18 : 12,
                 trailing: isEditing ? 28 : 10
             )
+            showsProgressBar = false
+            showsTrendChart = hasTasks && !snapshot.trend.isEmpty
+            trendChartMinHeight = isCompactBoard ? 20 : 26
+            trendChartMaxHeight = isCompactBoard ? 30 : 44
+            taskRowCount = (isEditing || isCompactBoard) ? 0 : 3
+            primaryNumberFontSize = 34
         }
 
         livePanel = Self.preferredPanel(

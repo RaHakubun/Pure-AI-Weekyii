@@ -9,13 +9,18 @@ final class ExtensionsViewModel {
     @ObservationIgnored private let notificationService: any NotificationScheduling
     @ObservationIgnored private let taskMutationService: TaskMutationService
     @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
+    @ObservationIgnored private let trendWindowDays = 14
+    @ObservationIgnored private let tileTaskRowLimit = 3
 
     var projects: [ProjectModel] = []
     var suspendedTasks: [SuspendedTaskItem] = []
     var tileSnapshotsByProjectID: [UUID: ProjectTileSnapshot] = [:]
     var errorMessage: String?
 
-    init(modelContext: ModelContext, notificationService: (any NotificationScheduling)? = nil) {
+    init(
+        modelContext: ModelContext,
+        notificationService: (any NotificationScheduling)? = nil
+    ) {
         self.modelContext = modelContext
         self.notificationService = notificationService ?? NotificationService.shared
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
@@ -640,6 +645,47 @@ final class ExtensionsViewModel {
                 return calendar.startOfDay(for: date) >= today
             }) ?? sortedPending.first
 
+            // 坐标轴与待办列表共用一个时间域：窗口右端跟着最晚的待办日延伸，
+            // 但最多到 today+13，避免远期任务把整段历史挤出窗口。
+            let latestPendingDay = project.tasks.compactMap { task -> Date? in
+                guard task.zone != .complete, let date = task.day?.date else { return nil }
+                return self.calendar.startOfDay(for: date)
+            }.max()
+            let horizonEnd = calendar.date(byAdding: .day, value: trendWindowDays - 1, to: today) ?? today
+            let windowEnd = min(latestPendingDay.map { max(today, $0) } ?? today, horizonEnd)
+            let windowStart = calendar.date(byAdding: .day, value: -(trendWindowDays - 1), to: windowEnd) ?? today
+
+            var completionsByDay: [Date: Int] = [:]
+            for task in project.tasks where task.zone == .complete {
+                guard let stamp = task.endedAt ?? task.day?.date else { continue }
+                let day = calendar.startOfDay(for: stamp)
+                guard day >= windowStart, day <= today else { continue }
+                completionsByDay[day, default: 0] += 1
+            }
+            var plannedByDay: [Date: Int] = [:]
+            for task in project.tasks where task.zone != .complete {
+                guard let date = task.day?.date else { continue }
+                let day = calendar.startOfDay(for: date)
+                guard day >= windowStart, day <= windowEnd else { continue }
+                plannedByDay[day, default: 0] += 1
+            }
+            let trend = (0..<trendWindowDays).compactMap { offset -> ProjectTileTrendPoint? in
+                guard let day = calendar.date(byAdding: .day, value: offset, to: windowStart) else { return nil }
+                return ProjectTileTrendPoint(
+                    day: day,
+                    completed: completionsByDay[day] ?? 0,
+                    planned: plannedByDay[day] ?? 0
+                )
+            }
+            let upcomingTasks = sortedPending.prefix(tileTaskRowLimit).map { task in
+                let taskDate = task.day?.date
+                return ProjectTileTaskEntry(
+                    title: task.title,
+                    date: taskDate,
+                    isOverdue: taskDate.map { calendar.startOfDay(for: $0) < today } ?? false
+                )
+            }
+
             next[project.id] = ProjectTileSnapshot(
                 projectID: project.id,
                 name: project.name,
@@ -651,11 +697,25 @@ final class ExtensionsViewModel {
                 remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
                 expiredCount: project.expiredTaskCount,
                 nextTaskTitle: preferredTask?.title,
-                nextTaskDate: preferredTask?.day?.date
+                nextTaskDate: preferredTask?.day?.date,
+                trend: trend,
+                upcomingTasks: upcomingTasks
             )
         }
         tileSnapshotsByProjectID = next
     }
+}
+
+struct ProjectTileTrendPoint: Equatable {
+    let day: Date
+    let completed: Int
+    var planned: Int = 0
+}
+
+struct ProjectTileTaskEntry: Equatable {
+    let title: String
+    let date: Date?
+    let isOverdue: Bool
 }
 
 struct ProjectTileSnapshot: Equatable {
@@ -670,6 +730,8 @@ struct ProjectTileSnapshot: Equatable {
     let expiredCount: Int
     let nextTaskTitle: String?
     let nextTaskDate: Date?
+    var trend: [ProjectTileTrendPoint] = []
+    var upcomingTasks: [ProjectTileTaskEntry] = []
 }
 
 struct ProjectTaskLedgerSection: Identifiable {
@@ -890,8 +952,19 @@ struct SuspendedTaskLifecycleService {
             zone: .draft
         )
         taskItem.taskTypeIdRaw = task.taskTypeIdRaw
-        replaceSteps(for: taskItem, with: task.steps)
-        replaceAttachments(for: taskItem, with: task.attachments)
+
+        // The resources **move** with the task instead of being re-created, so the
+        // attachment business identities survive the owner change. The suspended
+        // task's collections are emptied first: both relationships are `.cascade`,
+        // and a row still hanging off it would be deleted along with it.
+        let movedSteps = task.steps
+        let movedAttachments = task.attachments
+        task.steps = []
+        task.attachments = []
+        taskItem.steps = movedSteps
+        taskItem.attachments = movedAttachments
+        TaskResourceIdentity.renumberSteps(taskItem.steps)
+
         targetDay.tasks.append(taskItem)
         if targetDay.status == .empty {
             targetDay.status = .draft
@@ -969,20 +1042,24 @@ struct SuspendedTaskLifecycleService {
         return endOfDay(for: targetDay)
     }
 
+    // Editing one resource kind must not rebuild the other, so each wrapper
+    // touches only its own kind. Passing the untouched kind through is what used
+    // to re-create it — and re-mint its identity — on every save.
+
     private func replaceSteps(for task: SuspendedTaskItem, with steps: [TaskStep]) {
-        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
+        taskMutationService.replaceTaskSteps(for: task, steps: steps)
     }
 
     private func replaceAttachments(for task: SuspendedTaskItem, with attachments: [TaskAttachment]) {
-        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
+        taskMutationService.replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
+        taskMutationService.replaceTaskSteps(for: task, steps: steps)
     }
 
     private func replaceAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
-        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
+        taskMutationService.replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     private func endOfDay(for date: Date) -> Date {

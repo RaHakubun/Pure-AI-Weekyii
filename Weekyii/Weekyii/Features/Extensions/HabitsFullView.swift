@@ -97,40 +97,52 @@ struct HabitsFullView: View {
 
     private var progressCard: some View {
         let progress = todayProgress
+        let fraction: Double = progress.scheduled == 0 ? 0 : Double(progress.completed) / Double(progress.scheduled)
         return WeekCard(accentColor: .accentGreen) {
-            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: WeekSpacing.md) {
+                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                     Text(String(localized: "habits.title", defaultValue: "我的习惯"))
                         .font(.titleSmall)
                         .foregroundColor(.textPrimary)
 
-                    Spacer(minLength: WeekSpacing.sm)
+                    ProgressView(value: fraction)
+                        .tint(.accentGreen)
 
-                    Text(
-                        String(
-                            format: String(localized: "habits.today.progress", defaultValue: "今日完成 %lld/%lld"),
-                            locale: Locale.current,
-                            Int64(progress.completed),
-                            Int64(progress.scheduled)
-                        )
-                    )
-                    .font(.captionBold)
-                    .foregroundColor(.accentGreen)
+                    Text(String(localized: "habits.subtitle", defaultValue: "习惯按重复计划在当天自动加入草稿区"))
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
                 }
 
-                ProgressView(
-                    value: progress.scheduled == 0
-                        ? 0
-                        : Double(progress.completed) / Double(progress.scheduled)
-                )
-                .tint(.accentGreen)
-
-                Text(String(localized: "habits.subtitle", defaultValue: "习惯按重复计划在当天自动加入草稿区"))
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
+                // Right: compact ring
+                ZStack {
+                    Circle()
+                        .stroke(Color.accentGreen.opacity(0.15), lineWidth: 4)
+                    Circle()
+                        .trim(from: 0, to: min(max(fraction, 0), 1))
+                        .stroke(Color.accentGreen, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 0) {
+                        Text(
+                            String(
+                                format: String(localized: "habits.today.progress", defaultValue: "今日完成 %lld/%lld"),
+                                locale: Locale.current,
+                                Int64(progress.completed),
+                                Int64(progress.scheduled)
+                            )
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.accentGreen)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    }
+                    .frame(width: 44)
+                }
+                .frame(width: 56, height: 56)
             }
         }
     }
+
 
     // MARK: - Sections
 
@@ -163,14 +175,14 @@ struct HabitsFullView: View {
         return NavigationLink {
             HabitDetailView(habit: habit, viewModel: viewModel)
         } label: {
-            HStack(spacing: WeekSpacing.sm) {
+            HStack(spacing: WeekSpacing.md) {
                 Image(systemName: habit.iconName)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(habit.habitColor)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 36, height: 36)
                     .background(habit.habitColor.opacity(0.12), in: Circle())
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(habit.name)
                         .font(.bodyMedium)
                         .foregroundColor(habit.isActive ? .textPrimary : .textSecondary)
@@ -192,12 +204,13 @@ struct HabitsFullView: View {
                     .foregroundStyle(Color.textTertiary)
             }
             .padding(.horizontal, WeekSpacing.md)
-            .padding(.vertical, WeekSpacing.sm + 2)
+            .padding(.vertical, WeekSpacing.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("habitRow_\(habit.id.uuidString)")
     }
+
 
     @ViewBuilder
     private func streakChip(_ streak: Int) -> some View {

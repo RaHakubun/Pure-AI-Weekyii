@@ -304,6 +304,622 @@
         }
       }
     },
+    "cloud.accountSwitch.cloudCount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld records in the new iCloud account"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新 iCloud 账户中有 %lld 项记录"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.disable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off iCloud sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭 iCloud 同步"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.emptyCloudWarning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The new iCloud account is empty. Using its data will clear local business data after a recovery point is created."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新 iCloud 账户中没有 Weekyii 数据。使用该数据会在创建恢复点后清空本地业务数据。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.accountChanged" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iCloud account changed again. Review the newly signed-in account."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账户再次更改，请检查新登录的账户。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.accountUnavailable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iCloud account could not be confirmed. Your local data is unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法确认 iCloud 账户，本地数据未更改。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.cloudOperationFailed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account change could not be completed. Choose an action to retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "账户切换未完成，请选择操作后重试。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.invalidCloudData" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The new iCloud data could not be validated. Your local data is unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新 iCloud 数据未通过校验，本地数据未更改。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.journalUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A saved account recovery decision could not be read or saved. Sync is paused to protect your data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取或保存账户恢复状态。为保护数据，同步已暂停。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.localDataUnavailable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Weekyii data could not be safely read. It was not changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安全读取本地 Weekyii 数据，数据未更改。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.recoveryPointFailed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A local recovery point could not be created. Your local data is unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建本地恢复点，本地数据未更改。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.error.targetAccountRequired" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to the account shown for this pending decision before choosing how to resolve it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先登录待处理决定对应的账户，再选择处理方式。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.inspecting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inspecting the new iCloud account…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查新的 iCloud 账户…"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.later" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Later"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后处理"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.localCount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld local records"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 项本地记录"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.merge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并数据"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud account changed. Your local Weekyii data is safe. Choose how to handle data in the new iCloud account."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账户已更改。本地 Weekyii 数据是安全的。请选择如何处理新 iCloud 账户中的数据。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.reopen" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolve iCloud account change"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "处理 iCloud 账户变更"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.resolving" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applying your choice…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在按所选方式处理…"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud account changed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账户已更改"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.useCloud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use new iCloud data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用新 iCloud 数据"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.useLocal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use this device's data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用此设备的数据"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.available" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.no_account" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No iCloud account"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未登录 iCloud 账户"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.restricted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restricted"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "访问受限"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.temporarily_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temporarily unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时不可用"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.unable_to_check" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to check"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法检查"
+          }
+        }
+      }
+    },
+    "cloud.sync.account.unchecked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not checked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未检查"
+          }
+        }
+      }
+    },
+    "cloud.sync.entitlement.available" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available to everyone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有用户均可使用"
+          }
+        }
+      }
+    },
+    "cloud.sync.entitlement.checking" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking availability"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查可用性"
+          }
+        }
+      }
+    },
+    "cloud.sync.entitlement.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currently unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前不可用"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.authentication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the iCloud account on this device; sync is paused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查此设备的 iCloud 账户，同步已暂停。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.configuration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is temporarily unavailable on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的 iCloud 同步目前不可用。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.entitlement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is currently unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步目前不可用。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.network" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network unavailable. Your data is saved on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络暂不可用。本机数据仍正常保存。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.other" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync is paused. Your data remains saved on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已暂停。本机数据仍正常保存。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.permission" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This iCloud account cannot access Weekyii sync. Your data remains saved on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 iCloud 账户无法访问 Weekyii 同步区域。本机数据仍正常保存。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.quota" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud storage is full. Your data is saved on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 空间不足。本机数据仍正常保存。"
+          }
+        }
+      }
+    },
+    "cloud.sync.failure.temporary_service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud is temporarily busy; sync is paused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 服务暂时繁忙，同步已暂停。"
+          }
+        }
+      }
+    },
     "complete.title" : {
       "localizations" : {
         "en" : {
@@ -615,6 +1231,38 @@
         }
       }
     },
+    "extensions.hub.habits.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No habits yet. Tap to create one."
+          }
+        }
+      }
+    },
+    "extensions.hub.habits.more" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "还有 %lld 个习惯"
+          }
+        }
+      }
+    },
+    "extensions.hub.habits.progress" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today %lld/%lld"
+          }
+        }
+      }
+    },
     "extensions.hub.mindstamps.empty" : {
       "localizations" : {
         "en" : {
@@ -659,6 +1307,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 个进行中"
+          }
+        }
+      }
+    },
+    "extensions.hub.projects.deadline_label" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "截止"
           }
         }
       }
@@ -711,7 +1370,19 @@
         }
       }
     },
+    "extensions.hub.projects.progress_label" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "完成"
+          }
+        }
+      }
+    },
     "extensions.hub.projects.remaining" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -835,6 +1506,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无未决事项"
+          }
+        }
+      }
+    },
+    "extensions.module.habits.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits"
           }
         }
       }
@@ -997,6 +1678,656 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "冻结任务"
+          }
+        }
+      }
+    },
+    "habit.action.archive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        }
+      }
+    },
+    "habit.action.restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        }
+      }
+    },
+    "habit.category.creativity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creativity"
+          }
+        }
+      }
+    },
+    "habit.category.fitness" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fitness"
+          }
+        }
+      }
+    },
+    "habit.category.health" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Health"
+          }
+        }
+      }
+    },
+    "habit.category.learning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Learning"
+          }
+        }
+      }
+    },
+    "habit.category.mindfulness" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mindfulness"
+          }
+        }
+      }
+    },
+    "habit.category.productivity" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productivity"
+          }
+        }
+      }
+    },
+    "habit.category.social" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Social"
+          }
+        }
+      }
+    },
+    "habit.detail.add_today" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Today"
+          }
+        }
+      }
+    },
+    "habit.detail.add_today.result.exists" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already added today"
+          }
+        }
+      }
+    },
+    "habit.detail.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Habit"
+          }
+        }
+      }
+    },
+    "habit.detail.delete_confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasks in unstarted days are removed; started days only lose the link. All records and stats are deleted."
+          }
+        }
+      }
+    },
+    "habit.editor.category" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Category"
+          }
+        }
+      }
+    },
+    "habit.editor.color" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        }
+      }
+    },
+    "habit.editor.create_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Habit"
+          }
+        }
+      }
+    },
+    "habit.editor.edit_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Habit"
+          }
+        }
+      }
+    },
+    "habit.editor.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits join the draft zone on the first launch of a scheduled day. Started or past-cutoff days are never written."
+          }
+        }
+      }
+    },
+    "habit.editor.icon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon"
+          }
+        }
+      }
+    },
+    "habit.editor.monthly_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Months without the selected day are skipped."
+          }
+        }
+      }
+    },
+    "habit.editor.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        }
+      }
+    },
+    "habit.editor.name_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. Meditation, Running"
+          }
+        }
+      }
+    },
+    "habit.editor.plan_change_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's task is re-evaluated after you change the repeat plan."
+          }
+        }
+      }
+    },
+    "habit.editor.schedule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repeat"
+          }
+        }
+      }
+    },
+    "habit.editor.start_date" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Date"
+          }
+        }
+      }
+    },
+    "habit.error.day_locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date locked"
+          }
+        }
+      }
+    },
+    "habit.error.name_empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name required"
+          }
+        }
+      }
+    },
+    "habit.error.not_scheduled_today" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today is not in this habit's schedule"
+          }
+        }
+      }
+    },
+    "habit.error.past_kill_time" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past today's cutoff — it will return tomorrow"
+          }
+        }
+      }
+    },
+    "habit.error.save_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save failed"
+          }
+        }
+      }
+    },
+    "habit.error.schedule_empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a day"
+          }
+        }
+      }
+    },
+    "habit.record.completed_at %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed at %@"
+          }
+        }
+      }
+    },
+    "habit.record.status.completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        }
+      }
+    },
+    "habit.record.status.missed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupted"
+          }
+        }
+      }
+    },
+    "habit.record.status.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To do"
+          }
+        }
+      }
+    },
+    "habit.record.unrecorded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not recorded"
+          }
+        }
+      }
+    },
+    "habit.schedule.everyday" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every day"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By month"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.once" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once"
+          }
+        }
+      }
+    },
+    "habit.schedule.kind.weekly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By weekday"
+          }
+        }
+      }
+    },
+    "habit.schedule.monthly %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly on %@"
+          }
+        }
+      }
+    },
+    "habit.schedule.once %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once on %@"
+          }
+        }
+      }
+    },
+    "habit.schedule.weekdays" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekdays"
+          }
+        }
+      }
+    },
+    "habit.schedule.weekend" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekends"
+          }
+        }
+      }
+    },
+    "habit.stats.completion_rate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completion rate"
+          }
+        }
+      }
+    },
+    "habit.stats.current_streak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current streak"
+          }
+        }
+      }
+    },
+    "habit.stats.days %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days"
+          }
+        }
+      }
+    },
+    "habit.stats.longest_streak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longest streak"
+          }
+        }
+      }
+    },
+    "habit.stats.placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "—"
+          }
+        }
+      }
+    },
+    "habit.stats.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistics"
+          }
+        }
+      }
+    },
+    "habit.stats.total_completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total completed"
+          }
+        }
+      }
+    },
+    "habit.timeline.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Interrupted\" = created that day but not finished; \"not recorded\" = never created (app not opened or past cutoff)."
+          }
+        }
+      }
+    },
+    "habit.timeline.starts_on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts %@"
+          }
+        }
+      }
+    },
+    "habit.timeline.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timeline"
+          }
+        }
+      }
+    },
+    "habit.today.completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done today"
+          }
+        }
+      }
+    },
+    "habit.today.not_generated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not generated"
+          }
+        }
+      }
+    },
+    "habit.today.not_scheduled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not scheduled"
+          }
+        }
+      }
+    },
+    "habit.today.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due today"
+          }
+        }
+      }
+    },
+    "habits.archived.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived"
+          }
+        }
+      }
+    },
+    "habits.empty.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Habit"
+          }
+        }
+      }
+    },
+    "habits.empty.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No habits yet"
+          }
+        }
+      }
+    },
+    "habits.section.active" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        }
+      }
+    },
+    "habits.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habits join the draft zone on scheduled days"
+          }
+        }
+      }
+    },
+    "habits.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My Habits"
+          }
+        }
+      }
+    },
+    "habits.today.progress" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld of %lld done today"
           }
         }
       }
@@ -3388,6 +4719,54 @@
         }
       }
     },
+    "project.tile.empty.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to add your first task"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按进入项目添加任务"
+          }
+        }
+      }
+    },
+    "project.tile.legend.completed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
+    "project.tile.legend.planned" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planned"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划"
+          }
+        }
+      }
+    },
     "project.tiles.edit_hint" : {
       "localizations" : {
         "en" : {
@@ -4176,19 +5555,339 @@
         }
       }
     },
+    "settings.icloud.account" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud account"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账户"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.account_decision" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose how to continue with the changed iCloud account."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择如何继续使用已变化的 iCloud 账户。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.account_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iCloud account is unavailable; sync is paused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账户暂不可用，同步已暂停。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.account.open" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is currently unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步目前不可用。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your data is saved on this device; iCloud sync is temporarily unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机数据正常保存；iCloud 同步暂时不可用。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.quota" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud storage is full. Your data remains saved on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 空间不足。本机数据仍正常保存。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.syncing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing with iCloud…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在与 iCloud 同步…"
+          }
+        }
+      }
+    },
     "settings.icloud.coming_soon" : {
       "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Coming soon"
+            "value" : "Available"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "即将推出"
+            "value" : "现已开放"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.cancel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel and turn sync off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消并关闭同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.empty_message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Weekyii iCloud area is empty. Your local data stays on this device unless you confirm the upload."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekyii 的 iCloud 同步区域目前为空。只有确认后，才会上传此设备的本地数据。"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.empty_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload this device's data?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传此设备的数据吗？"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.merge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge, preferring local edits"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并并优先保留本地修改"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.nonempty_message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekyii found data in iCloud. Choose local data, iCloud data, or a local-first merge. Using iCloud creates a local recovery point first."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 中已有 Weekyii 数据。请选择本地数据、iCloud 数据或本地优先合并；使用 iCloud 数据前会先创建本地恢复点。"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.nonempty_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose which data to keep"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要保留的数据"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.open" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择处理方式"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose how to start iCloud sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 iCloud 同步的启动方式"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.upload_local" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload local data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传本地数据"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.use_cloud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use iCloud data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 iCloud 数据"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.use_local" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep this device's data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留此设备的数据"
+          }
+        }
+      }
+    },
+    "settings.icloud.entitlement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync access"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步权限"
           }
         }
       }
@@ -4199,19 +5898,18 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud sync is currently under development and will be available in a future update."
+            "value" : "iCloud sync is available to everyone. Turn it on when you are ready to choose how this device's data should be initialized."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 同步功能正在开发中,将在未来版本中推出。"
+            "value" : "所有用户均可使用 iCloud 同步。准备好后开启，并选择如何初始化此设备的数据。"
           }
         }
       }
     },
     "settings.icloud.header" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4223,6 +5921,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.last_failure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last issue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近一次问题"
+          }
+        }
+      }
+    },
+    "settings.icloud.last_success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last successful sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次成功同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.retry" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        }
+      }
+    },
+    "settings.icloud.retry_paused" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic retry is paused"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动重试已暂停"
           }
         }
       }
@@ -4244,18 +6007,51 @@
         }
       }
     },
-    "settings.icloud.status.available" : {
+    "settings.icloud.status.account_decision" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On — Weekyii syncs automatically with iCloud"
+            "value" : "The iCloud account changed; sync is paused"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已开启，将通过 iCloud 自动同步"
+            "value" : "iCloud 账户已变化，同步已暂停"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.account_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the iCloud account on this device"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查此设备的 iCloud 账户状态"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.available" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On — sync is enabled on this device"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已开启此设备的同步"
           }
         }
       }
@@ -4277,23 +6073,23 @@
       }
     },
     "settings.icloud.status.disabled" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not Available"
+            "value" : "Sync is off on this device"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不可用"
+            "value" : "此设备已关闭同步"
           }
         }
       }
     },
     "settings.icloud.status.failed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4309,7 +6105,56 @@
         }
       }
     },
+    "settings.icloud.status.first_choice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose how to combine this device and iCloud data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择此设备与 iCloud 数据的处理方式"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.first_upload" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose whether to upload this device's data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择是否上传此设备的数据"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is unavailable right now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前无法使用 iCloud 同步"
+          }
+        }
+      }
+    },
     "settings.icloud.status.no_account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4325,7 +6170,72 @@
         }
       }
     },
+    "settings.icloud.status.offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network unavailable; sync is paused"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络暂不可用，同步已暂停"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.paused" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync is paused; try again manually"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已暂停，请手动重试"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.quota" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud storage is full; sync is paused"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 空间不足，同步已暂停"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.ready" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready to sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已准备好同步"
+          }
+        }
+      }
+    },
     "settings.icloud.status.restricted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4374,22 +6284,24 @@
       }
     },
     "settings.icloud.status.temporarily_unavailable" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud is temporarily unavailable; retrying automatically"
+            "value" : "iCloud is temporarily unavailable; sync is paused"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 暂时不可用，将自动重试"
+            "value" : "iCloud 暂时不可用，同步已暂停"
           }
         }
       }
     },
     "settings.icloud.status.unknown" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4406,6 +6318,7 @@
       }
     },
     "settings.icloud.status.unknown_error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4421,7 +6334,56 @@
         }
       }
     },
+    "settings.icloud.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is available to everyone. Choose how this device's data should be initialized."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有用户均可使用 iCloud 同步。开启时，请选择如何初始化此设备的数据。"
+          }
+        }
+      }
+    },
     "settings.icloud.sync" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable iCloud Sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 iCloud 同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.sync_now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.toggle" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5996,6 +7958,16 @@
         }
       }
     },
+    "task.habit.origin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habit · %@"
+          }
+        }
+      }
+    },
     "task.project.origin" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -6933,6 +8905,9 @@
     "本地恢复点" : {
 
     },
+    "本地数据准备完成后即可继续使用 Weekyii" : {
+
+    },
     "本月回顾" : {
 
     },
@@ -6943,6 +8918,9 @@
 
     },
     "校验完成后完整替换当前数据" : {
+
+    },
+    "正在打开本地数据…" : {
 
     },
     "步骤" : {
@@ -7160,696 +9138,6 @@
     },
     "默认类型" : {
 
-    },
-    "task.habit.origin" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habit · %@"
-          }
-        }
-      }
-    },
-    "extensions.module.habits.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habits"
-          }
-        }
-      }
-    },
-    "extensions.hub.habits.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No habits yet. Tap to create one."
-          }
-        }
-      }
-    },
-    "extensions.hub.habits.progress" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Today %lld/%lld"
-          }
-        }
-      }
-    },
-    "habit.action.archive" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archive"
-          }
-        }
-      }
-    },
-    "habit.action.restore" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore"
-          }
-        }
-      }
-    },
-    "habit.category.health" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Health"
-          }
-        }
-      }
-    },
-    "habit.category.fitness" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fitness"
-          }
-        }
-      }
-    },
-    "habit.category.learning" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Learning"
-          }
-        }
-      }
-    },
-    "habit.category.mindfulness" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mindfulness"
-          }
-        }
-      }
-    },
-    "habit.category.creativity" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creativity"
-          }
-        }
-      }
-    },
-    "habit.category.social" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Social"
-          }
-        }
-      }
-    },
-    "habit.category.productivity" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Productivity"
-          }
-        }
-      }
-    },
-    "habit.detail.add_today" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add to Today"
-          }
-        }
-      }
-    },
-    "habit.detail.add_today.result.exists" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Already added today"
-          }
-        }
-      }
-    },
-    "habit.detail.delete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Habit"
-          }
-        }
-      }
-    },
-    "habit.detail.delete_confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tasks in unstarted days are removed; started days only lose the link. All records and stats are deleted."
-          }
-        }
-      }
-    },
-    "habit.editor.category" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Category"
-          }
-        }
-      }
-    },
-    "habit.editor.color" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color"
-          }
-        }
-      }
-    },
-    "habit.editor.create_title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New Habit"
-          }
-        }
-      }
-    },
-    "habit.editor.edit_title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Edit Habit"
-          }
-        }
-      }
-    },
-    "habit.editor.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habits join the draft zone on the first launch of a scheduled day. Started or past-cutoff days are never written."
-          }
-        }
-      }
-    },
-    "habit.editor.icon" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Icon"
-          }
-        }
-      }
-    },
-    "habit.editor.monthly_footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Months without the selected day are skipped."
-          }
-        }
-      }
-    },
-    "habit.editor.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Name"
-          }
-        }
-      }
-    },
-    "habit.editor.name_placeholder" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "e.g. Meditation, Running"
-          }
-        }
-      }
-    },
-    "habit.editor.plan_change_hint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Today's task is re-evaluated after you change the repeat plan."
-          }
-        }
-      }
-    },
-    "habit.editor.schedule" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Repeat"
-          }
-        }
-      }
-    },
-    "habit.editor.start_date" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Date"
-          }
-        }
-      }
-    },
-    "habit.error.day_locked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Date locked"
-          }
-        }
-      }
-    },
-    "habit.error.name_empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Name required"
-          }
-        }
-      }
-    },
-    "habit.error.not_scheduled_today" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Today is not in this habit's schedule"
-          }
-        }
-      }
-    },
-    "habit.error.past_kill_time" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Past today's cutoff — it will return tomorrow"
-          }
-        }
-      }
-    },
-    "habit.error.save_failed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save failed"
-          }
-        }
-      }
-    },
-    "habit.error.schedule_empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick a day"
-          }
-        }
-      }
-    },
-    "habit.record.completed_at %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completed at %@"
-          }
-        }
-      }
-    },
-    "habit.record.status.completed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completed"
-          }
-        }
-      }
-    },
-    "habit.record.status.missed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrupted"
-          }
-        }
-      }
-    },
-    "habit.record.status.pending" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "To do"
-          }
-        }
-      }
-    },
-    "habit.record.unrecorded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not recorded"
-          }
-        }
-      }
-    },
-    "habit.schedule.everyday" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Every day"
-          }
-        }
-      }
-    },
-    "habit.schedule.kind.monthly" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "By month"
-          }
-        }
-      }
-    },
-    "habit.schedule.kind.once" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Once"
-          }
-        }
-      }
-    },
-    "habit.schedule.kind.weekly" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "By weekday"
-          }
-        }
-      }
-    },
-    "habit.schedule.monthly %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Monthly on %@"
-          }
-        }
-      }
-    },
-    "habit.schedule.once %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Once on %@"
-          }
-        }
-      }
-    },
-    "habit.schedule.weekdays" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weekdays"
-          }
-        }
-      }
-    },
-    "habit.schedule.weekend" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weekends"
-          }
-        }
-      }
-    },
-    "habit.stats.completion_rate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completion rate"
-          }
-        }
-      }
-    },
-    "habit.stats.current_streak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Current streak"
-          }
-        }
-      }
-    },
-    "habit.stats.days %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld days"
-          }
-        }
-      }
-    },
-    "habit.stats.longest_streak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Longest streak"
-          }
-        }
-      }
-    },
-    "habit.stats.placeholder" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "—"
-          }
-        }
-      }
-    },
-    "habit.stats.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Statistics"
-          }
-        }
-      }
-    },
-    "habit.stats.total_completed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total completed"
-          }
-        }
-      }
-    },
-    "habit.timeline.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "\"Interrupted\" = created that day but not finished; \"not recorded\" = never created (app not opened or past cutoff)."
-          }
-        }
-      }
-    },
-    "habit.timeline.starts_on %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Starts %@"
-          }
-        }
-      }
-    },
-    "habit.timeline.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Timeline"
-          }
-        }
-      }
-    },
-    "habit.today.completed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done today"
-          }
-        }
-      }
-    },
-    "habit.today.not_generated" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not generated"
-          }
-        }
-      }
-    },
-    "habit.today.not_scheduled" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not scheduled"
-          }
-        }
-      }
-    },
-    "habit.today.pending" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Due today"
-          }
-        }
-      }
-    },
-    "habits.archived.section" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archived"
-          }
-        }
-      }
-    },
-    "habits.empty.action" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New Habit"
-          }
-        }
-      }
-    },
-    "habits.empty.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No habits yet"
-          }
-        }
-      }
-    },
-    "habits.section.active" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Active"
-          }
-        }
-      }
-    },
-    "habits.subtitle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habits join the draft zone on scheduled days"
-          }
-        }
-      }
-    },
-    "habits.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My Habits"
-          }
-        }
-      }
-    },
-    "habits.today.progress" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld of %lld done today"
-          }
-        }
-      }
     }
   },
   "version" : "1.0"

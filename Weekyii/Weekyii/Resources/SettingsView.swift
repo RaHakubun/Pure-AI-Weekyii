@@ -15,7 +15,7 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: UserSettings
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
-    @Environment(CloudSyncMonitor.self) private var cloudSyncMonitor
+    @Environment(CloudSyncCoordinator.self) private var cloudSyncCoordinator
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -34,6 +34,7 @@ struct SettingsView: View {
     @State private var pendingImportData: Data?
     @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
     @State private var showingImportConfirm = false
+    @State private var showingInitialCloudSyncDecision = false
     
     var body: some View {
         NavigationStack {
@@ -46,6 +47,10 @@ struct SettingsView: View {
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
+            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
+        }
+        .onChange(of: cloudSyncCoordinator.status) { _, _ in
+            if isInitialCloudSyncDecisionRequired { showingInitialCloudSyncDecision = true }
         }
         .onChange(of: reminderSignature) { _, _ in
             rescheduleTodayKillTimeReminderIfNeeded()
@@ -155,6 +160,26 @@ struct SettingsView: View {
             allowsMultipleSelection: false
         ) { result in
             handleArchiveSelection(result)
+        }
+        .confirmationDialog(
+            initialCloudSyncDecisionTitle,
+            isPresented: $showingInitialCloudSyncDecision,
+            titleVisibility: .visible
+        ) {
+            switch cloudSyncCoordinator.status {
+            case .initialEnableDecisionRequired(.remoteEmpty):
+                Button(String(localized: "settings.icloud.decision.upload_local")) { resolveInitialCloudSync(.uploadLocal) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteNonempty):
+                Button(String(localized: "settings.icloud.decision.use_local")) { resolveInitialCloudSync(.useLocal) }
+                Button(String(localized: "settings.icloud.decision.use_cloud"), role: .destructive) { resolveInitialCloudSync(.useCloud) }
+                Button(String(localized: "settings.icloud.decision.merge")) { resolveInitialCloudSync(.merge) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            default:
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            }
+        } message: {
+            Text(initialCloudSyncDecisionMessage)
         }
         .sheet(isPresented: $showingCreateTaskType) {
             TaskTypeDefinitionEditorSheet(
@@ -630,20 +655,88 @@ struct SettingsView: View {
     private var dataPrivacySection: some View {
         Section {
             HStack(spacing: 12) {
-                SettingsIcon(icon: cloudSyncMonitor.state.symbolName, color: cloudSyncStatusColor)
+                SettingsIcon(icon: cloudSyncStatusSymbol, color: cloudSyncStatusColor)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.icloud.sync", defaultValue: "iCloud 同步"))
-                    Text(cloudSyncMonitor.state.detail)
+                    Text(String(localized: "settings.icloud.header"))
+                    Text(cloudSyncStatusMessage)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                if cloudSyncMonitor.state.isWorking {
+                if cloudSyncCoordinator.diagnosticsSnapshot.accountResolutionRequired {
+                    Button(String(localized: "settings.icloud.banner.account.open")) {
+                        cloudSyncCoordinator.requestAccountResolutionPresentation()
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("settings.icloud.accountResolution")
+                } else if isInitialCloudSyncDecisionRequired {
+                    Button(String(localized: "settings.icloud.decision.open")) {
+                        showingInitialCloudSyncDecision = true
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("settings.icloud.initialDecision")
+                } else if cloudSyncCoordinator.diagnosticsSnapshot.manualSyncAllowed {
+                    Button {
+                        Task { await cloudSyncCoordinator.syncNow() }
+                    } label: {
+                        Label(String(localized: "settings.icloud.sync_now"), systemImage: "arrow.triangle.2.circlepath.icloud")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("settings.icloud.syncNow")
+                }
+                if cloudSyncCoordinator.status == .checkingAccount || cloudSyncCoordinator.status == .syncing {
                     ProgressView()
                         .controlSize(.small)
+                        .accessibilityLabel(String(localized: "settings.icloud.status.checking"))
                 }
             }
-            .accessibilityElement(children: .combine)
+
+            LabeledContent(String(localized: "settings.icloud.account")) {
+                Text(cloudSyncCoordinator.diagnosticsSnapshot.account.localizedDescription)
+                    .foregroundStyle(.secondary)
+            }
+
+            LabeledContent(String(localized: "settings.icloud.entitlement")) {
+                Text(entitlementStatusDescription)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let lastSuccessfulSync = cloudSyncCoordinator.diagnosticsSnapshot.lastSuccessfulSync {
+                LabeledContent(String(localized: "settings.icloud.last_success")) {
+                    Text(lastSuccessfulSync.formatted(date: .abbreviated, time: .shortened))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let lastFailure = cloudSyncCoordinator.diagnosticsSnapshot.lastFailure {
+                LabeledContent(String(localized: "settings.icloud.last_failure")) {
+                    Text(lastFailure.localizedDescription)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if cloudSyncCoordinator.diagnosticsSnapshot.automaticRetrySuppressed {
+                Label(String(localized: "settings.icloud.retry_paused"), systemImage: "pause.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(isOn: Binding(
+                get: { settings.cloudSyncRequested },
+                set: { requested in Task { await cloudSyncCoordinator.setRequested(requested) } }
+            )) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "arrow.triangle.2.circlepath.icloud", color: .blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.icloud.toggle"))
+                        Text(String(localized: "settings.icloud.subtitle"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             Button {
                 exportArchive()
@@ -707,12 +800,75 @@ struct SettingsView: View {
     }
 
     private var cloudSyncStatusColor: Color {
-        switch cloudSyncMonitor.state {
-        case .unavailable, .failed:
+        switch cloudSyncCoordinator.status {
+        case .offline, .quotaExceeded, .accountUnavailable, .locked, .pausedAfterFailure:
             return .orange
         default:
             return .blue
         }
+    }
+
+    private var cloudSyncStatusSymbol: String {
+        switch cloudSyncCoordinator.status {
+        case .disabled: "icloud.slash"
+        case .checkingAccount, .syncing: "arrow.triangle.2.circlepath.icloud"
+        case .quotaExceeded, .offline, .accountUnavailable, .locked, .pausedAfterFailure: "exclamationmark.icloud"
+        case .initialEnableDecisionRequired, .accountDecisionRequired: "questionmark.icloud"
+        case .ready, .synced: "checkmark.icloud"
+        }
+    }
+
+    private var cloudSyncStatusMessage: String {
+        switch cloudSyncCoordinator.status {
+        case .disabled: String(localized: "settings.icloud.status.disabled")
+        case .locked: String(localized: "settings.icloud.status.locked")
+        case .checkingAccount: String(localized: "settings.icloud.status.checking")
+        case .ready: String(localized: "settings.icloud.status.ready")
+        case .syncing: String(localized: "settings.icloud.status.syncing")
+        case .synced: String(localized: "settings.icloud.status.synced")
+        case .offline: String(localized: "settings.icloud.status.offline")
+        case .quotaExceeded: String(localized: "settings.icloud.status.quota")
+        case .accountUnavailable: String(localized: "settings.icloud.status.account_unavailable")
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.status.first_upload")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.status.first_choice")
+        case .accountDecisionRequired: String(localized: "settings.icloud.status.account_decision")
+        case .pausedAfterFailure: String(localized: "settings.icloud.status.paused")
+        }
+    }
+
+    private var entitlementStatusDescription: String {
+        switch cloudSyncCoordinator.diagnosticsSnapshot.entitlement {
+        case .checking: String(localized: "cloud.sync.entitlement.checking")
+        case .entitled: String(localized: "cloud.sync.entitlement.available")
+        case .notPurchased, .expired, .notConfigured, .verificationFailed:
+            String(localized: "cloud.sync.entitlement.unavailable")
+        }
+    }
+
+    private var isInitialCloudSyncDecisionRequired: Bool {
+        if case .initialEnableDecisionRequired = cloudSyncCoordinator.status { return true }
+        return false
+    }
+
+    private var initialCloudSyncDecisionTitle: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_title")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_title")
+        default: String(localized: "settings.icloud.decision.title")
+        }
+    }
+
+    private var initialCloudSyncDecisionMessage: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_message")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_message")
+        default: ""
+        }
+    }
+
+    private func resolveInitialCloudSync(_ choice: CloudSyncInitialEnableChoice) {
+        showingInitialCloudSyncDecision = false
+        Task { await cloudSyncCoordinator.resolveInitialEnable(choice) }
     }
 
     private var archiveDefaultFilename: String {
@@ -1660,9 +1816,7 @@ struct SettingsView: View {
             let expiredCount = today.status == .draft ? 0 : ((today.focusTask == nil ? 0 : 1) + today.frozenTasks.count)
             today.status = .expired
             today.expiredCount = expiredCount
-            let toRemove = today.tasks.filter { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
-            today.tasks.removeAll { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
-            toRemove.forEach { modelContext.delete($0) }
+            today.isDraftZoneUnlocked = false
             NotificationService.shared.cancelKillTimeNotification(for: today)
         }
 
@@ -2273,6 +2427,74 @@ private struct ProjectSettingsView: View {
         projects.filter { $0.status == .archived }
     }
 
+    /// 默认色的两种画法。提成计算属性是为了给 Form 的类型检查留出预算。
+    private var defaultColorSwatch: Color { Color(hex: settings.defaultProjectColorHex) }
+    private var defaultColorAccent: Color { Color.weekyiiEmphasis(hex: settings.defaultProjectColorHex) }
+
+    // 两个选项网格各自成属性：Form 的 body 表达式已接近类型检查预算上限。
+    private var defaultColorPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(String(localized: "settings.project.default_color", defaultValue: "默认颜色"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 10)], spacing: 10) {
+                ForEach(CreateProjectSheet.colorOptions, id: \.self) { hex in
+                    Button {
+                        settings.defaultProjectColorHex = hex
+                    } label: {
+                        Circle()
+                            .fill(Color(hex: hex))
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                if settings.defaultProjectColorHex == hex {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(Color.weekyiiTileInk)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(String(
+                        format: String(localized: "settings.project.default_color.a11y", defaultValue: "默认颜色 %@"),
+                        hex
+                    )))
+                }
+            }
+        }
+    }
+
+    private var defaultIconPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(String(localized: "settings.project.default_icon", defaultValue: "默认图标"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+                ForEach(CreateProjectSheet.iconOptions, id: \.self) { icon in
+                    let isSelected = settings.defaultProjectIconName == icon
+                    Button {
+                        settings.defaultProjectIconName = icon
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.body)
+                            .foregroundStyle(isSelected ? Color.weekyiiTileInk : defaultColorAccent)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                isSelected ? defaultColorSwatch : defaultColorAccent.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(String(
+                        format: String(localized: "settings.project.default_icon.a11y", defaultValue: "默认图标 %@"),
+                        icon
+                    )))
+                }
+            }
+        }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -2297,66 +2519,9 @@ private struct ProjectSettingsView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: "settings.project.default_color", defaultValue: "默认颜色"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                defaultColorPicker
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 10)], spacing: 10) {
-                        ForEach(CreateProjectSheet.colorOptions, id: \.self) { hex in
-                            Button {
-                                settings.defaultProjectColorHex = hex
-                            } label: {
-                                Circle()
-                                    .fill(Color(hex: hex))
-                                    .frame(width: 30, height: 30)
-                                    .overlay {
-                                        if settings.defaultProjectColorHex == hex {
-                                            Image(systemName: "checkmark")
-                                                .font(.caption.bold())
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(String(
-                                format: String(localized: "settings.project.default_color.a11y", defaultValue: "默认颜色 %@"),
-                                hex
-                            )))
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: "settings.project.default_icon", defaultValue: "默认图标"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
-                        ForEach(CreateProjectSheet.iconOptions, id: \.self) { icon in
-                            let isSelected = settings.defaultProjectIconName == icon
-                            Button {
-                                settings.defaultProjectIconName = icon
-                            } label: {
-                                Image(systemName: icon)
-                                    .font(.body)
-                                    .foregroundStyle(isSelected ? .white : Color(hex: settings.defaultProjectColorHex))
-                                    .frame(width: 38, height: 38)
-                                    .background(
-                                        isSelected
-                                            ? Color(hex: settings.defaultProjectColorHex)
-                                            : Color(hex: settings.defaultProjectColorHex).opacity(0.12),
-                                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(String(
-                                format: String(localized: "settings.project.default_icon.a11y", defaultValue: "默认图标 %@"),
-                                icon
-                            )))
-                        }
-                    }
-                }
+                defaultIconPicker
             } header: {
                 Text("新建项目默认值")
             } footer: {
@@ -2453,7 +2618,7 @@ private struct ProjectSettingsView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: project.icon)
-                .foregroundStyle(Color(hex: project.color))
+                .foregroundStyle(Color.weekyiiEmphasis(hex: project.color))
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)

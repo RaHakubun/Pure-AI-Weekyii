@@ -16,7 +16,8 @@ struct ProjectDetailView: View {
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
-    private var projectColor: Color { Color(hex: project.color) }
+    /// 详情页为浅色底，项目色全部走前景/描边用途，亮色系压暗后才可读。
+    private var projectColor: Color { Color.weekyiiEmphasis(hex: project.color) }
     private var snapshot: ProjectDetailSnapshot { viewModel.projectDetailSnapshot(for: project) }
     private var isProjectWritable: Bool { project.status == .planning || project.status == .active }
 
@@ -292,12 +293,17 @@ struct ProjectDetailView: View {
                 HStack(spacing: WeekSpacing.lg) {
                     progressRing
 
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: WeekSpacing.sm) {
-                        metricChip(title: String(localized: "project.stat.total"), value: "\(snapshot.totalCount)", tint: .textPrimary)
-                        metricChip(title: String(localized: "project.stat.completed"), value: "\(snapshot.completedCount)", tint: .accentGreen)
-                        metricChip(title: String(localized: "project.stat.remaining"), value: "\(snapshot.remainingCount)", tint: projectColor)
-                        metricChip(title: String(localized: "project.stat.expired"), value: "\(snapshot.expiredCount)", tint: .taskDDL)
+                    VStack(spacing: WeekSpacing.sm) {
+                        HStack(spacing: WeekSpacing.sm) {
+                            metricChip(title: String(localized: "project.stat.total"), value: "\(snapshot.totalCount)", tint: .textPrimary)
+                            metricChip(title: String(localized: "project.stat.completed"), value: "\(snapshot.completedCount)", tint: .accentGreen)
+                        }
+                        HStack(spacing: WeekSpacing.sm) {
+                            metricChip(title: String(localized: "project.stat.remaining"), value: "\(snapshot.remainingCount)", tint: projectColor)
+                            metricChip(title: String(localized: "project.stat.expired"), value: "\(snapshot.expiredCount)", tint: .taskDDL)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
 
                 Divider()

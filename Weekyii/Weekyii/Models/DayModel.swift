@@ -41,15 +41,18 @@ final class DayModel {
     }
 
     var sortedDraftTasks: [TaskItem] {
-        tasks.filter { $0.zone == .draft }.sorted { $0.order < $1.order }
+        guard !isTerminal else { return [] }
+        return tasks.filter { $0.zone == .draft }.sorted { $0.order < $1.order }
     }
 
     var focusTask: TaskItem? {
-        tasks.filter { $0.zone == .focus }.min { $0.order < $1.order }
+        guard !isTerminal else { return nil }
+        return tasks.filter { $0.zone == .focus }.min { $0.order < $1.order }
     }
 
     var frozenTasks: [TaskItem] {
-        tasks.filter { $0.zone == .frozen }.sorted { $0.order < $1.order }
+        guard !isTerminal else { return [] }
+        return tasks.filter { $0.zone == .frozen }.sorted { $0.order < $1.order }
     }
 
     var completedTasks: [TaskItem] {
@@ -57,7 +60,15 @@ final class DayModel {
     }
 
     var hasSingleFocus: Bool {
-        tasks.filter { $0.zone == .focus }.count <= 1
+        guard !isTerminal else { return true }
+        return tasks.filter { $0.zone == .focus }.count <= 1
+    }
+
+    /// A terminal day hides late-arriving open-zone tasks from user-facing getters
+    /// without deleting the raw synchronized records. `closedAt` is the only hard
+    /// completion evidence; status alone may still be a soft derived value.
+    var isTerminal: Bool {
+        status == .expired || status == .completed
     }
 
     var executionMode: ExecutionMode {

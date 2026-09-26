@@ -1229,6 +1229,111 @@ extension Color {
         return Color(hex: lightHex)
         #endif
     }
+
+    // MARK: - Helper: 项目色亮度适配
+
+    /// 磁贴上唯一的文字/图形颜色：暖调近黑，与外观模式无关。
+    /// 底色会被抬到 `weekyiiTileLuminanceFloor` 之上，因此不需要逐块判断深浅配两种墨色。
+    static var weekyiiTileInk: Color { Color(hex: "#1F1712") }
+
+    /// 磁贴底色的相对亮度下限，低于它的项目色在渲染时向白色提亮（存储值不变）。
+    static var weekyiiTileLuminanceFloor: Double { 0.28 }
+
+    /// 浅色卡片上文字/描边的相对亮度上限，高于它的项目色向黑色压暗。
+    /// 取 0.22 是因为现成深色系本来就落在此值附近，新色系被拉到同一可读档位。
+    static var weekyiiEmphasisLuminanceCeiling: Double { 0.22 }
+
+    /// 磁贴底色：仅亮度不足时提亮，已达标的色值保持原样。
+    static func weekyiiTileSurface(hex: String) -> Color {
+        guard let source = WeekyiiSRGB(hex: hex) else { return Color(hex: hex) }
+        let target = weekyiiTileLuminanceFloor
+        guard source.luminance < target else { return source.color }
+        return weekyiiBlendToThreshold(source, toward: WeekyiiSRGB(r: 1, g: 1, b: 1)) {
+            $0.luminance >= target
+        }.color
+    }
+
+    /// 浅色背景上的项目色前景：仅过亮时压暗，深色系列表项逐字节不变。
+    static func weekyiiEmphasis(hex: String) -> Color {
+        guard let source = WeekyiiSRGB(hex: hex) else { return Color(hex: hex) }
+        let ceiling = weekyiiEmphasisLuminanceCeiling
+        guard source.luminance > ceiling else { return source.color }
+        return weekyiiBlendToThreshold(source, toward: WeekyiiSRGB(r: 0, g: 0, b: 0)) {
+            $0.luminance <= ceiling
+        }.color
+    }
+}
+
+/// sRGB 分量，用于按 WCAG 相对亮度做阈值判断；与 `init(hex:)` 同为 .sRGB 空间。
+private struct WeekyiiSRGB {
+    var r: Double
+    var g: Double
+    var b: Double
+
+    init(r: Double, g: Double, b: Double) {
+        self.r = r
+        self.g = g
+        self.b = b
+    }
+
+    init?(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var raw: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&raw) else { return nil }
+        switch cleaned.count {
+        case 3:
+            (r, g, b) = (
+                Double((raw >> 8) & 0xF) * 17 / 255,
+                Double((raw >> 4) & 0xF) * 17 / 255,
+                Double(raw & 0xF) * 17 / 255
+            )
+        case 6:
+            (r, g, b) = (
+                Double((raw >> 16) & 0xFF) / 255,
+                Double((raw >> 8) & 0xFF) / 255,
+                Double(raw & 0xFF) / 255
+            )
+        default:
+            return nil
+        }
+    }
+
+    var luminance: Double {
+        0.2126 * Self.linearize(r) + 0.7152 * Self.linearize(g) + 0.0722 * Self.linearize(b)
+    }
+
+    var color: Color { Color(.sRGB, red: r, green: g, blue: b) }
+
+    func blending(to anchor: WeekyiiSRGB, by amount: Double) -> WeekyiiSRGB {
+        WeekyiiSRGB(
+            r: r + (anchor.r - r) * amount,
+            g: g + (anchor.g - g) * amount,
+            b: b + (anchor.b - b) * amount
+        )
+    }
+
+    private static func linearize(_ channel: Double) -> Double {
+        channel <= 0.03928 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+    }
+}
+
+/// 二分出满足阈值的最小插值量，保证同一 hex 每次得到同一个颜色。
+private func weekyiiBlendToThreshold(
+    _ source: WeekyiiSRGB,
+    toward anchor: WeekyiiSRGB,
+    satisfying isEnough: (WeekyiiSRGB) -> Bool
+) -> WeekyiiSRGB {
+    var low = 0.0
+    var high = 1.0
+    for _ in 0..<20 {
+        let middle = (low + high) / 2
+        if isEnough(source.blending(to: anchor, by: middle)) {
+            high = middle
+        } else {
+            low = middle
+        }
+    }
+    return source.blending(to: anchor, by: high)
 }
 
 #if canImport(UIKit)

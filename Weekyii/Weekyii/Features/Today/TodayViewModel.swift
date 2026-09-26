@@ -247,9 +247,9 @@ final class TodayViewModel {
             next.zone = .focus
             next.startedAt = now
         } else {
+            day.isDraftZoneUnlocked = false
             day.status = .completed
             day.closedAt = now
-            day.isDraftZoneUnlocked = false
         }
 
         try modelContext.save()
@@ -466,17 +466,8 @@ final class TodayViewModel {
         day.status = .expired
         day.expiredCount = expiredCount
         day.isDraftZoneUnlocked = false
-        removeTasks(in: [.draft, .focus, .frozen], from: day)
         if cancelNotifications {
             notificationService.cancelKillTimeNotification(for: day)
-        }
-    }
-
-    private func removeTasks(in zones: [TaskZone], from day: DayModel) {
-        let toRemove = day.tasks.filter { zones.contains($0.zone) }
-        day.tasks.removeAll { zones.contains($0.zone) }
-        for task in toRemove {
-            modelContext.delete(task)
         }
     }
 
@@ -487,25 +478,10 @@ final class TodayViewModel {
         }
     }
 
+    // Currently unreferenced — kept delegating to `TaskResourceIdentity` rather
+    // than deleted so wiring it up later cannot reintroduce identity churn.
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps = normalizedStepCopies(from: steps)
-    }
-
-    private func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
-        steps
-            .sorted {
-                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
-                return $0.createdAt < $1.createdAt
-            }
-            .enumerated()
-            .map { index, step in
-                TaskStep(
-                    title: step.title,
-                    isCompleted: step.isCompleted,
-                    sortOrder: index
-                )
-            }
+        TaskResourceIdentity.reconcileSteps(on: task, with: steps, in: modelContext)
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {
@@ -663,6 +639,7 @@ final class TodayViewModel {
             premiumThemeUnlocked: userSettings.premiumThemeUnlocked
         )
     }
+
 }
 
 private extension DayModel {

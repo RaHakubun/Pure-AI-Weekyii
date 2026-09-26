@@ -322,8 +322,8 @@ struct DayDetailView: View {
             zone: .draft
         )
         task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
-        task.steps = normalizedStepCopies(from: steps)
-        task.attachments = attachments
+        task.steps = TaskResourceIdentity.stepCopies(from: steps)
+        TaskResourceIdentity.reconcileAttachments(on: task, with: attachments, in: modelContext)
         day.tasks.append(task)
         try modelContext.save()
     }
@@ -335,7 +335,7 @@ struct DayDetailView: View {
         task.taskType = type
         task.taskTypeIdRaw = taskTypeIdRaw ?? type.rawValue
         replaceSteps(for: task, with: steps)
-        task.attachments = attachments
+        TaskResourceIdentity.reconcileAttachments(on: task, with: attachments, in: modelContext)
         try modelContext.save()
     }
 
@@ -373,23 +373,6 @@ struct DayDetailView: View {
     }
 
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps = normalizedStepCopies(from: steps)
-    }
-
-    private func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
-        steps
-            .sorted {
-                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
-                return $0.createdAt < $1.createdAt
-            }
-            .enumerated()
-            .map { index, step in
-                TaskStep(
-                    title: step.title,
-                    isCompleted: step.isCompleted,
-                    sortOrder: index
-                )
-            }
+        TaskResourceIdentity.reconcileSteps(on: task, with: steps, in: modelContext)
     }
 }

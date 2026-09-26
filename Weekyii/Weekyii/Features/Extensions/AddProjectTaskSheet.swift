@@ -121,7 +121,7 @@ struct AddProjectTaskSheet: View {
                                 if !selectedDates.isEmpty {
                                     Text(String(format: String(localized: "project.task.dates.count"), selectedDates.count))
                                         .font(.caption)
-                                        .foregroundColor(Color(hex: project.color))
+                                        .foregroundColor(Color.weekyiiEmphasis(hex: project.color))
                                 }
                             }
 
@@ -142,10 +142,10 @@ struct AddProjectTaskSheet: View {
                                         if let date = calendar.date(from: dc) {
                                             Text(date, format: .dateTime.month().day())
                                                 .font(.caption)
-                                                .foregroundColor(Color(hex: project.color))
+                                                .foregroundColor(Color.weekyiiEmphasis(hex: project.color))
                                                 .padding(.horizontal, WeekSpacing.sm)
                                                 .padding(.vertical, WeekSpacing.xs)
-                                                .background(Color(hex: project.color).opacity(0.1))
+                                                .background(Color.weekyiiEmphasis(hex: project.color).opacity(0.1))
                                                 .clipShape(Capsule())
                                                 .onTapGesture {
                                                     selectedDates.remove(dc)
@@ -371,11 +371,11 @@ struct AddProjectTaskSheet: View {
                         ZStack {
                             if isSelected && day.isCurrent && isWithinProject {
                                 Circle()
-                                    .fill(Color(hex: project.color))
+                                    .fill(Color.weekyiiEmphasis(hex: project.color))
                                     .frame(width: 34, height: 34)
                             } else if isToday && day.isCurrent {
                                 Circle()
-                                    .stroke(Color(hex: project.color), lineWidth: 1.5)
+                                    .stroke(Color.weekyiiEmphasis(hex: project.color), lineWidth: 1.5)
                                     .frame(width: 34, height: 34)
                             }
 
@@ -384,7 +384,7 @@ struct AddProjectTaskSheet: View {
                                 .foregroundColor(
                                     (!isSelectable) ? .textTertiary.opacity(0.3) :
                                     isSelected ? .white :
-                                    isToday ? Color(hex: project.color) :
+                                    isToday ? Color.weekyiiEmphasis(hex: project.color) :
                                     .textPrimary
                                 )
                         }

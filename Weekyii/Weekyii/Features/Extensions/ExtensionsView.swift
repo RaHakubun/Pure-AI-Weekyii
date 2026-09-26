@@ -281,7 +281,8 @@ private struct ProjectInlineCard: View {
     @State private var appeared = false
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
-    private var projectColor: Color { Color(hex: project.color) }
+    /// 卡片在浅色背景上，项目色只作前景/描边，亮色系需压暗到可读档位。
+    private var projectColor: Color { Color.weekyiiEmphasis(hex: project.color) }
     private var isFinished: Bool { project.status == .completed || project.status == .archived }
 
     var body: some View {

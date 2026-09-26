@@ -6,6 +6,14 @@ import CryptoKit
 @testable import Weekyii
 
 final class ModelTests: XCTestCase {
+    private struct FixedCloudSyncEntitlementProvider: CloudSyncEntitlementProviding {
+        let state: CloudSyncEntitlementState
+
+        func currentState() async -> CloudSyncEntitlementState {
+            state
+        }
+    }
+
     private static var retainedUserSettings: [UserSettings] = []
     // Deallocating an AppState inside a @MainActor test crashes the process on
     // the iOS 26.2 simulator (isolated-deinit back-deploy shim double-free);
@@ -22,112 +30,259 @@ final class ModelTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_cloudSyncSchema_isCloudKitCompatible() {
-        let schema = WeekyiiPersistence.currentSchema
+    func test_persistentConfigurationIsCanonicalLocalAndWritable() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("weekyii-persistent-configuration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let storeURL = folder.appendingPathComponent("Weekyii.store")
 
-        XCTAssertEqual(schema.version, Schema.Version(8, 0, 0))
-
-        let entitiesWithUniqueConstraints = schema.entities.compactMap { entity in
-            entity.uniquenessConstraints.isEmpty ? nil : entity.name
-        }
-        XCTAssertTrue(
-            entitiesWithUniqueConstraints.isEmpty,
-            "CloudKit does not support unique constraints: \(entitiesWithUniqueConstraints)"
+        let configuration = WeekyiiPersistence.persistentModelConfiguration(storeURL: storeURL)
+        let expectedConfiguration = ModelConfiguration(
+            "Weekyii",
+            schema: WeekyiiPersistence.currentSchema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
         )
 
-        let requiredRelationships = schema.entities.flatMap { entity in
-            entity.relationships.compactMap { relationship in
-                relationship.isOptional ? nil : "\(entity.name).\(relationship.name)"
-            }
-        }
-        XCTAssertTrue(
-            requiredRelationships.isEmpty,
-            "CloudKit requires optional relationships: \(requiredRelationships)"
-        )
-
-        let relationshipsWithoutInverse = schema.entities.flatMap { entity in
-            entity.relationships.compactMap { relationship in
-                relationship.inverseName == nil ? "\(entity.name).\(relationship.name)" : nil
-            }
-        }
-        XCTAssertTrue(
-            relationshipsWithoutInverse.isEmpty,
-            "CloudKit requires relationship inverses: \(relationshipsWithoutInverse)"
-        )
-
-        let deniedRelationships = schema.entities.flatMap { entity in
-            entity.relationships.compactMap { relationship in
-                relationship.deleteRule == .deny ? "\(entity.name).\(relationship.name)" : nil
-            }
-        }
-        XCTAssertTrue(
-            deniedRelationships.isEmpty,
-            "CloudKit does not support deny delete rules: \(deniedRelationships)"
-        )
+        XCTAssertEqual(configuration, expectedConfiguration)
+        XCTAssertEqual(configuration.url, storeURL)
+        XCTAssertNil(configuration.cloudKitContainerIdentifier)
+        XCTAssertTrue(configuration.allowsSave)
+        XCTAssertFalse(configuration.isStoredInMemoryOnly)
     }
 
-    func test_persistenceMode_usesPrivateCloudForProductionOnly() {
-        XCTAssertEqual(
-            WeekyiiPersistence.StoreMode.production.cloudKitContainerIdentifier,
-            "iCloud.com.fluentdesign.Weekyii"
-        )
-        XCTAssertNil(WeekyiiPersistence.StoreMode.localOnly.cloudKitContainerIdentifier)
-        XCTAssertNil(WeekyiiPersistence.StoreMode.inMemory.cloudKitContainerIdentifier)
-        XCTAssertEqual(
-            WeekyiiPersistence.launchStoreMode(environment: [:]),
-            .production
-        )
-        XCTAssertEqual(
-            WeekyiiPersistence.launchStoreMode(environment: ["XCTestConfigurationFilePath": "/tmp/tests.xctestconfiguration"]),
-            .localOnly
-        )
+    func test_persistentURLUsesCanonicalStoreFilename() {
+        let canonicalURL = WeekyiiPersistence.persistentStoreURL()
+        XCTAssertEqual(canonicalURL.lastPathComponent, "Weekyii.store")
     }
 
-    func test_cloudKitSchemaInitialization_requiresExplicitDevelopmentLaunchFlag() {
-        XCTAssertFalse(WeekyiiPersistence.shouldInitializeCloudKitSchema(arguments: []))
-        XCTAssertFalse(WeekyiiPersistence.shouldInitializeCloudKitSchema(arguments: ["-uiTesting"]))
-        XCTAssertTrue(
-            WeekyiiPersistence.shouldInitializeCloudKitSchema(
-                arguments: ["-initializeCloudKitSchema"]
+    @MainActor
+    func test_cloudSyncPreferenceDefaultsOffAndMigratesLegacyValuesToOff() throws {
+        let freshDefaults = makeSuiteDefaults()
+        let freshSettings = UserSettings(defaults: freshDefaults)
+        Self.retainedUserSettings.append(freshSettings)
+
+        XCTAssertFalse(freshSettings.cloudSyncRequested)
+        XCTAssertEqual(freshDefaults.object(forKey: "cloudSyncRequested") as? Bool, false)
+        XCTAssertEqual(freshDefaults.object(forKey: "weekyii.cloudSyncPreferenceMigratedV2") as? Bool, true)
+
+        for legacyValue in [false, true] {
+            let defaults = makeSuiteDefaults()
+            defaults.set(legacyValue, forKey: "cloudSyncEnabled")
+
+            let settings = UserSettings(defaults: defaults)
+            Self.retainedUserSettings.append(settings)
+
+            XCTAssertFalse(settings.cloudSyncRequested, "legacy value \(legacyValue) must not opt into explicit sync")
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
+            XCTAssertEqual(defaults.object(forKey: "weekyii.cloudSyncPreferenceMigratedV2") as? Bool, true)
+            XCTAssertEqual(
+                defaults.object(forKey: "cloudSyncEnabled") as? Bool,
+                legacyValue,
+                "migration must preserve the old preference as historical information"
             )
-        )
-    }
-
-    func test_cloudSyncState_explainsAutomaticSyncAndAccountProblems() {
-        XCTAssertFalse(CloudSyncState.available.detail.isEmpty)
-        XCTAssertFalse(CloudSyncState.syncing.detail.isEmpty)
-        XCTAssertTrue(CloudSyncState.unavailable(.noAccount).detail.contains("iCloud"))
-        XCTAssertTrue(CloudSyncState.failed("网络不可用").detail.contains("网络不可用"))
+        }
     }
 
     @MainActor
-    func test_cloudSyncDisplayStatePrioritizesCurrentAccountAvailability() {
-        XCTAssertEqual(
-            CloudSyncState.resolve(
-                account: .unavailable(.noAccount),
-                event: .synced(Date())
-            ),
-            .unavailable(.noAccount)
-        )
-        XCTAssertEqual(
-            CloudSyncState.resolve(
-                account: .available,
-                event: .syncing
-            ),
-            .syncing
-        )
+    func test_cloudSyncPreferenceMigrationIsIdempotentAcrossUserSettingsInstances() throws {
+        for legacyValue in [false, true] {
+            let suite = "WeekyiiCloudSyncMigration.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(legacyValue, forKey: "cloudSyncEnabled")
+
+            let firstSettings = UserSettings(defaults: defaults)
+            // Keep MainActor-isolated settings alive for the simulator test run;
+            // constructing another instance over the same suite still exercises reload.
+            Self.retainedUserSettings.append(firstSettings)
+
+            XCTAssertFalse(firstSettings.cloudSyncRequested)
+            XCTAssertEqual(defaults.object(forKey: "weekyii.cloudSyncPreferenceMigratedV2") as? Bool, true)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncEnabled") as? Bool, legacyValue)
+
+            firstSettings.cloudSyncRequested = true
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, true)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncEnabled") as? Bool, legacyValue)
+
+            let secondSettings = UserSettings(defaults: defaults)
+            Self.retainedUserSettings.append(secondSettings)
+
+            XCTAssertTrue(secondSettings.cloudSyncRequested)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, true)
+            XCTAssertEqual(defaults.object(forKey: "weekyii.cloudSyncPreferenceMigratedV2") as? Bool, true)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncEnabled") as? Bool, legacyValue)
+        }
     }
 
     @MainActor
-    func test_cloudSyncMonitorDebouncesBurstImports() async throws {
-        let monitor = CloudSyncMonitor(importDebounceDuration: .milliseconds(20))
+    func test_cloudSyncPreferenceSaveDoesNotRewriteLegacyValue() {
+        for legacyValue in [false, true] {
+            let defaults = makeSuiteDefaults()
+            defaults.set(legacyValue, forKey: "cloudSyncEnabled")
 
-        monitor.scheduleImportedChanges()
-        monitor.scheduleImportedChanges()
-        monitor.scheduleImportedChanges()
-        try await Task.sleep(for: .milliseconds(80))
+            let settings = UserSettings(defaults: defaults)
+            Self.retainedUserSettings.append(settings)
+            settings.defaultKillTimeHour = 8
+            settings.cloudSyncRequested = true
 
-        XCTAssertEqual(monitor.importRevision, 1)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncEnabled") as? Bool, legacyValue)
+        }
+    }
+
+    @MainActor
+    func test_cloudSyncPreferencePreservesValidV2ValueDuringMigration() {
+        for requestedValue in [false, true] {
+            let defaults = makeSuiteDefaults()
+            defaults.set(requestedValue, forKey: "cloudSyncRequested")
+            defaults.set(!requestedValue, forKey: "cloudSyncEnabled")
+
+            let settings = UserSettings(defaults: defaults)
+            Self.retainedUserSettings.append(settings)
+
+            XCTAssertEqual(settings.cloudSyncRequested, requestedValue)
+            XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, requestedValue)
+            XCTAssertEqual(defaults.object(forKey: "weekyii.cloudSyncPreferenceMigratedV2") as? Bool, true)
+        }
+    }
+
+    @MainActor
+    func test_cloudSyncPreferenceChangeDoesNotTouchStoreFiles() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("weekyii-cloud-preference-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let canonicalURL = folder.appendingPathComponent("Weekyii.store")
+        let secondaryStoreURL = folder.appendingPathComponent("secondary-store.fixture")
+        let legacyBytes = Data("legacy store stays untouched".utf8)
+        try legacyBytes.write(to: secondaryStoreURL)
+
+        let suite = "WeekyiiCloudPreference.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        settings.setCloudSyncRequested(false)
+
+        XCTAssertFalse(settings.cloudSyncRequested)
+        XCTAssertEqual(try Data(contentsOf: secondaryStoreURL), legacyBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: canonicalURL.path))
+    }
+
+    @MainActor
+    func test_openAccessEntitlementAndPreferenceControllerAreIndependentOfThemeUnlock() async {
+        let lockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
+        lockedThemeSettings.premiumThemeUnlocked = false
+        let unlockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
+        unlockedThemeSettings.premiumThemeUnlocked = true
+        Self.retainedUserSettings.append(contentsOf: [lockedThemeSettings, unlockedThemeSettings])
+
+        let openAccessProvider = OpenAccessCloudSyncEntitlementProvider()
+        let lockedThemeState = await openAccessProvider.currentState()
+        let unlockedThemeState = await openAccessProvider.currentState()
+        XCTAssertEqual(lockedThemeState, .entitled)
+        XCTAssertEqual(unlockedThemeState, .entitled)
+
+        let defaults = makeSuiteDefaults()
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        let controller = CloudSyncPreferenceController(entitlementProvider: openAccessProvider)
+
+        let didEnable = await controller.setRequested(true, for: settings)
+        XCTAssertTrue(didEnable)
+        XCTAssertTrue(settings.cloudSyncRequested)
+        XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, true)
+
+        let didDisable = await controller.setRequested(false, for: settings)
+        XCTAssertTrue(didDisable)
+        XCTAssertFalse(settings.cloudSyncRequested)
+        XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
+    }
+
+    @MainActor
+    func test_cloudSyncEntitlementProviderCanBeInjectedWithoutPaywallBehavior() async {
+        let defaults = makeSuiteDefaults()
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        let controller = CloudSyncPreferenceController(
+            entitlementProvider: FixedCloudSyncEntitlementProvider(state: .notPurchased)
+        )
+
+        let saved = await controller.setRequested(true, for: settings)
+
+        XCTAssertFalse(saved)
+        XCTAssertFalse(settings.cloudSyncRequested)
+        XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
+    }
+
+    @MainActor
+    func test_persistentStoreRemainsWritableAcrossReopen() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("weekyii-persistent-reopen-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let storeURL = folder.appendingPathComponent("Weekyii.store")
+        do {
+            let writable = try WeekyiiPersistence.makeModelContainer(
+                storeURL: storeURL,
+                storeMode: .persistent
+            )
+            let week = WeekModel(
+                weekId: "2026-W38",
+                startDate: Date(timeIntervalSince1970: 1_000),
+                endDate: Date(timeIntervalSince1970: 2_000),
+                status: .present
+            )
+            writable.mainContext.insert(week)
+            try writable.mainContext.save()
+        }
+
+        do {
+            let canonical = try WeekyiiPersistence.makeModelContainer(
+                storeURL: storeURL,
+                storeMode: .persistent
+            )
+            canonical.mainContext.insert(WeekModel(
+                weekId: "canonical-write",
+                startDate: Date(timeIntervalSince1970: 3_000),
+                endDate: Date(timeIntervalSince1970: 4_000)
+            ))
+            XCTAssertNoThrow(try canonical.mainContext.save())
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storeURL.path))
+        let reopened = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+        let reopenedWeekIds = Set(try reopened.mainContext.fetch(FetchDescriptor<WeekModel>()).map(\.weekId))
+        XCTAssertEqual(reopenedWeekIds, ["2026-W38", "canonical-write"])
+    }
+
+    @MainActor
+    func test_bootstrapIgnoresLegacyCloudPreference() throws {
+        for cloudSyncEnabled in [false, true] {
+            let folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("weekyii-local-bootstrap-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let storeURL = folder.appendingPathComponent("Weekyii.store")
+            let suite = "WeekyiiPersistenceBootstrap.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(cloudSyncEnabled, forKey: "cloudSyncEnabled")
+
+            let state = WeekyiiPersistence.bootstrapPersistentContainer(
+                storeURL: storeURL,
+                defaults: defaults
+            )
+
+            guard case .ready = state else {
+                XCTFail("The legacy cloud preference must not block local launch")
+                continue
+            }
+            XCTAssertTrue(FileManager.default.fileExists(atPath: storeURL.path))
+        }
     }
 
     @MainActor
@@ -152,10 +307,105 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(days.count, 1)
     }
 
-    func test_cloudSyncMonitor_startsOnlyForNormalAppLaunches() {
-        XCTAssertTrue(CloudSyncMonitor.shouldStart(isRunningTests: false, isUITesting: false))
-        XCTAssertFalse(CloudSyncMonitor.shouldStart(isRunningTests: true, isUITesting: false))
-        XCTAssertFalse(CloudSyncMonitor.shouldStart(isRunningTests: false, isUITesting: true))
+    private func makeSuiteDefaults(name: String = UUID().uuidString) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
+    @MainActor
+    func test_terminalDay_hidesOpenZonesWithoutDeletingRawTasks() {
+        let day = DayModel(dayId: "2026-09-19", date: makeDate(2026, 9, 19), status: .completed)
+        let draft = TaskItem(title: "迟到的草稿", order: 1, zone: .draft)
+        let focus = TaskItem(title: "迟到的专注", order: 2, zone: .focus)
+        let frozen = TaskItem(title: "迟到的冻结", order: 3, zone: .frozen)
+        let complete = TaskItem(title: "已完成", order: 4, zone: .complete)
+        complete.completedOrder = 1
+        day.tasks = [draft, focus, frozen, complete]
+
+        XCTAssertTrue(day.isTerminal)
+        XCTAssertEqual(day.tasks.count, 4)
+        XCTAssertTrue(day.sortedDraftTasks.isEmpty)
+        XCTAssertNil(day.focusTask)
+        XCTAssertTrue(day.frozenTasks.isEmpty)
+        XCTAssertEqual(day.completedTasks.map(\.title), ["已完成"])
+    }
+
+    @MainActor
+    func test_taskGarbageCollectorDeletesOnlyOldOpenZoneTasks() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let oldDate = makeDate(2026, 1, 1)
+        let oldDay = DayModel(dayId: oldDate.dayId, date: oldDate, status: .expired)
+        let draft = TaskItem(title: "旧草稿", order: 1, zone: .draft)
+        let focus = TaskItem(title: "旧专注", order: 2, zone: .focus)
+        let frozen = TaskItem(title: "旧冻结", order: 3, zone: .frozen)
+        let complete = TaskItem(title: "完成历史", order: 4, zone: .complete)
+        oldDay.tasks = [draft, focus, frozen, complete]
+        context.insert(oldDay)
+        context.insert(draft)
+        context.insert(focus)
+        context.insert(frozen)
+        context.insert(complete)
+        try context.save()
+
+        let deleted = TaskGarbageCollector(modelContext: context, retentionWeeks: 8)
+            .collect(referenceDate: makeDate(2026, 9, 19))
+        try context.save()
+
+        let remaining = try context.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(deleted, 3)
+        XCTAssertEqual(remaining.map(\.title), ["完成历史"])
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<DayModel>()).first)
+    }
+
+    @MainActor
+    func test_dataInvariantRepair_doesNotInventClosedAtForSoftCompletion() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let day = DayModel(dayId: "2026-09-19", date: makeDate(2026, 9, 19), status: .completed)
+        day.tasks.append(TaskItem(title: "已完成区任务", order: 1, zone: .complete))
+        context.insert(day)
+        try context.save()
+
+        _ = DataInvariantRepairService(modelContainer: container)
+            .repair(referenceDate: makeDate(2026, 9, 19, 12))
+
+        XCTAssertEqual(day.status, .completed)
+        XCTAssertNil(day.closedAt)
+    }
+
+    @MainActor
+    func test_dataInvariantRepair_preservesExpiredDayAndLateTaskZone() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let day = DayModel(dayId: "2026-09-19", date: makeDate(2026, 9, 19), status: .expired)
+        let lateFrozenTask = TaskItem(title: "迟到的冻结任务", order: 1, zone: .frozen)
+        day.tasks.append(lateFrozenTask)
+        context.insert(day)
+        try context.save()
+
+        _ = DataInvariantRepairService(modelContainer: container)
+            .repair(referenceDate: makeDate(2026, 9, 19, 12))
+
+        XCTAssertEqual(day.status, .expired)
+        XCTAssertEqual(day.tasks.first?.zone, .frozen)
+        XCTAssertTrue(day.frozenTasks.isEmpty)
+    }
+
+    @MainActor
+    func test_dataInvariantRepair_promotesClosedExpiredDayToCompleted() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let day = DayModel(dayId: "2026-09-19", date: makeDate(2026, 9, 19), status: .expired)
+        day.closedAt = makeDate(2026, 9, 19, 10)
+        context.insert(day)
+        try context.save()
+
+        _ = DataInvariantRepairService(modelContainer: container)
+            .repair(referenceDate: makeDate(2026, 9, 19, 12))
+
+        XCTAssertEqual(day.status, .completed)
     }
 
     func test_backupSnapshotPreservesAndRestoresExternalStorageFiles() throws {
@@ -278,14 +528,14 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_bootstrapRepairsDuplicateCloudWeeksBeforeConsistencyValidation() throws {
+    func test_bootstrapRepairsDuplicateWeeksAndReportsConsistency() throws {
         let storeURL = try makeTemporaryStoreURL()
         let today = makeDate(2026, 9, 13)
 
         do {
             let container = try WeekyiiPersistence.makeModelContainer(
                 storeURL: storeURL,
-                storeMode: .localOnly
+                storeMode: .persistent
             )
             let context = container.mainContext
             let firstWeek = WeekCalculator().makeWeek(for: today, status: .present)
@@ -302,14 +552,13 @@ final class ModelTests: XCTestCase {
         }
 
         let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
-            environment: [:],
             storeURL: storeURL,
-            storeMode: .localOnly,
+            storeMode: .persistent,
             referenceDate: today
         )
 
-        guard case .ready(let container) = launchState else {
-            XCTFail("A recoverable CloudKit merge must not block app launch")
+        guard case .ready(let container, let diagnostics) = launchState else {
+            XCTFail("A recoverable local merge must not block app launch")
             return
         }
         let weeks = try container.mainContext.fetch(FetchDescriptor<WeekModel>())
@@ -319,6 +568,8 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(weeks.count, 1)
         XCTAssertEqual(days.count, 1)
         XCTAssertEqual(Set(days[0].tasks.map(\.title)), ["来自 iPhone", "来自 iPad"])
+        XCTAssertGreaterThan(diagnostics.invariantRepair.repairedDuplicateCount, 0)
+        XCTAssertTrue(diagnostics.consistency.isConsistent)
     }
 
     @MainActor
@@ -334,7 +585,7 @@ final class ModelTests: XCTestCase {
         do {
             let container = try WeekyiiPersistence.makeModelContainer(
                 storeURL: storeURL,
-                storeMode: .localOnly
+                storeMode: .persistent
             )
             let context = container.mainContext
             context.insert(WeekCalculator().makeWeek(for: previousWeekDate, status: .present))
@@ -343,13 +594,12 @@ final class ModelTests: XCTestCase {
         }
 
         let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
-            environment: [:],
             storeURL: storeURL,
-            storeMode: .localOnly,
+            storeMode: .persistent,
             referenceDate: today
         )
 
-        guard case .ready(let container) = launchState else {
+        guard case .ready(let container, let diagnostics) = launchState else {
             XCTFail("Competing present-week updates must be repaired during launch")
             return
         }
@@ -357,6 +607,82 @@ final class ModelTests: XCTestCase {
         let presentWeeks = weeks.filter { $0.status == .present }
         XCTAssertEqual(presentWeeks.map(\.weekId), [today.weekId])
         XCTAssertEqual(weeks.first { $0.weekId == previousWeekDate.weekId }?.status, .past)
+        XCTAssertTrue(diagnostics.consistency.isConsistent)
+    }
+
+    @MainActor
+    func test_remainingBusinessConsistencyDiagnosticIsNonfatalAndStoreRemainsWritable() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let today = makeDate(2026, 9, 13)
+        let previousWeekDate = Calendar(identifier: .iso8601).date(byAdding: .day, value: -7, to: today)!
+
+        do {
+            let container = try WeekyiiPersistence.makeModelContainer(storeURL: storeURL)
+            container.mainContext.insert(WeekCalculator().makeWeek(for: previousWeekDate, status: .present))
+            container.mainContext.insert(WeekCalculator().makeWeek(for: today, status: .present))
+            try container.mainContext.save()
+        }
+
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            storeURL: storeURL,
+            referenceDate: today,
+            invariantRepair: { _, _ in DataInvariantRepairReport() }
+        )
+
+        guard case .ready(let container, let diagnostics) = launchState else {
+            XCTFail("A remaining business diagnostic must not fail local launch")
+            return
+        }
+        XCTAssertEqual(
+            diagnostics.consistency.diagnostics,
+            [.multiplePresentWeeks(count: 2)]
+        )
+        XCTAssertEqual(
+            try container.mainContext.fetch(FetchDescriptor<WeekModel>()).filter { $0.status == .present }.count,
+            2,
+            "diagnostics must not discard business records"
+        )
+
+        let localTask = TaskItem(title: "Local CRUD remains available", order: 1)
+        container.mainContext.insert(localTask)
+        try container.mainContext.save()
+        XCTAssertTrue(
+            try container.mainContext.fetch(FetchDescriptor<TaskItem>()).contains { $0.title == localTask.title }
+        )
+    }
+
+    @MainActor
+    func test_unreadablePersistentStoreStillFailsBootstrap() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        try Data("not a readable SwiftData store".utf8).write(to: storeURL)
+
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            storeURL: storeURL,
+            legacyStoreURL: storeURL.deletingLastPathComponent().appendingPathComponent("MissingLegacy.store")
+        )
+
+        guard case .failed = launchState else {
+            XCTFail("A genuine persistent-store open failure must remain fatal")
+            return
+        }
+    }
+
+    @MainActor
+    func test_bootstrapFailsWhenRequiredInvariantRepairFails() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            storeURL: storeURL,
+            legacyStoreURL: storeURL.deletingLastPathComponent()
+                .appendingPathComponent("MissingLegacy.store"),
+            invariantRepair: { _, _ in
+                throw WeekyiiPersistenceError.inconsistentState("injected repair transaction failure")
+            }
+        )
+
+        guard case .failed = launchState else {
+            XCTFail("A required repair transaction failure must remain fatal")
+            return
+        }
     }
 
     @MainActor
@@ -497,6 +823,69 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_publishedV7CurrentDayDraftSurvivesFullBootstrap() throws {
+        let storeURL = try makeTemporaryStoreURL()
+        let today = makeDate(2026, 9, 26)
+        let endOfWeek = Calendar(identifier: .iso8601).date(byAdding: .day, value: 1, to: today)!
+
+        do {
+            let schema = Schema(versionedSchema: WeekyiiSchemaV7.self)
+            let configuration = ModelConfiguration(
+                "Weekyii",
+                schema: schema,
+                url: storeURL,
+                allowsSave: true,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(for: schema, configurations: configuration)
+            let context = container.mainContext
+            let week = WeekyiiSchemaV7.WeekModel(
+                weekId: today.weekId,
+                startDate: today,
+                endDate: endOfWeek,
+                status: .present
+            )
+            let day = WeekyiiSchemaV7.DayModel(dayId: today.dayId, date: today, status: .draft)
+            let project = WeekyiiSchemaV7.ProjectModel(
+                name: "Upgrade project",
+                startDate: today,
+                endDate: endOfWeek
+            )
+            let task = WeekyiiSchemaV7.TaskItem(title: "Keep this draft", order: 1, zone: .draft)
+            task.steps.append(WeekyiiSchemaV7.TaskStep(title: "Keep this step"))
+            task.attachments.append(WeekyiiSchemaV7.TaskAttachment(
+                data: Data([1, 2, 3, 4]),
+                fileName: "upgrade.bin",
+                fileType: "application/octet-stream"
+            ))
+            task.project = project
+            day.tasks.append(task)
+            week.days.append(day)
+            context.insert(week)
+            context.insert(project)
+            try context.save()
+        }
+
+        let launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            storeURL: storeURL,
+            referenceDate: today,
+            legacyStoreURL: storeURL.deletingLastPathComponent().appendingPathComponent("MissingLegacy.store")
+        )
+        guard case .ready(let container, _) = launchState else {
+            XCTFail("An existing V7 user store must open after an in-place upgrade")
+            return
+        }
+
+        let context = container.mainContext
+        let tasks = try context.fetch(FetchDescriptor<TaskItem>())
+        XCTAssertEqual(tasks.map(\.title), ["Keep this draft"])
+        XCTAssertEqual(tasks.first?.steps.map(\.title), ["Keep this step"])
+        XCTAssertEqual(tasks.first?.attachments.first?.data, Data([1, 2, 3, 4]))
+        XCTAssertEqual(tasks.first?.project?.name, "Upgrade project")
+        XCTAssertEqual(tasks.first?.day?.dayId, today.dayId)
+    }
+
+    @MainActor
     func test_habitRelationshipRoundTripsThroughContext() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
@@ -568,7 +957,7 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(first.createdCount, 1)
         XCTAssertTrue(first.didChange)
-        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+        XCTAssertTrue(habit.records.contains { $0.dayId == todayKey })
 
         let second = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
         XCTAssertEqual(second.createdCount, 0)
@@ -587,7 +976,85 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_habitSyncSkipsLockedDayAndAdvancesWatermark() throws {
+    func test_habitSyncUsesTodayRecordEvenWhenLegacyWatermarkIsEmpty() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let day = DayModel(dayId: today.dayId, date: today, status: .empty)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        let record = HabitDayRecord(dayId: today.dayId)
+        record.habit = habit
+        habit.records.append(record)
+        habit.generatedThroughDayId = ""
+        context.insert(day)
+        context.insert(habit)
+        context.insert(record)
+
+        let outcome = HabitTaskMaterializer(modelContext: context)
+            .sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(outcome.createdCount, 0)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(habit.records.contains { $0.dayId == today.dayId })
+    }
+
+    @MainActor
+    func test_habitSyncIgnoresFutureLegacyWatermarkWhenTodayHasNoRecord() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let day = DayModel(dayId: today.dayId, date: today, status: .empty)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: [1, 2, 3, 4, 5], startDayId: "2026-09-01")
+        habit.generatedThroughDayId = "2099-12-31"
+        context.insert(day)
+        context.insert(habit)
+
+        let outcome = HabitTaskMaterializer(modelContext: context)
+            .sync(today: today, now: makeDate(2026, 9, 16, 9))
+
+        XCTAssertEqual(outcome.createdCount, 1)
+        XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertTrue(habit.records.contains { $0.dayId == today.dayId })
+    }
+
+    @MainActor
+    func test_habitSyncDoesNotResurrectDeletedTaskWhileDayRecordRemains() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let today = makeDate(2026, 9, 16)
+        let tomorrow = makeDate(2026, 9, 17)
+        let todayModel = DayModel(dayId: today.dayId, date: today, status: .empty)
+        let tomorrowModel = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .empty)
+        let habit = HabitModel(name: "晨跑", scheduleWeekdays: Set(1...7), startDayId: today.dayId)
+        context.insert(todayModel)
+        context.insert(tomorrowModel)
+        context.insert(habit)
+        let materializer = HabitTaskMaterializer(modelContext: context)
+
+        let first = materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
+        XCTAssertEqual(first.createdCount, 1)
+        XCTAssertEqual(todayModel.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertEqual(habit.records.filter { $0.dayId == today.dayId }.count, 1)
+
+        let generatedTask = try XCTUnwrap(todayModel.tasks.first { $0.habit?.id == habit.id })
+        todayModel.tasks.removeAll { $0.id == generatedTask.id }
+        context.delete(generatedTask)
+        habit.generatedThroughDayId = ""
+
+        let sameDay = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(sameDay.createdCount, 0)
+        XCTAssertTrue(todayModel.tasks.allSatisfy { $0.habit?.id != habit.id })
+        XCTAssertTrue(habit.records.contains { $0.dayId == today.dayId })
+
+        let nextDay = materializer.sync(today: tomorrow, now: makeDate(2026, 9, 17, 9))
+        XCTAssertEqual(nextDay.createdCount, 1)
+        XCTAssertEqual(tomorrowModel.tasks.filter { $0.habit?.id == habit.id }.count, 1)
+        XCTAssertEqual(habit.records.filter { $0.dayId == tomorrow.dayId }.count, 1)
+        XCTAssertEqual(habit.records.first { $0.dayId == today.dayId }?.status, .missed)
+    }
+
+    @MainActor
+    func test_habitSyncReevaluatesLockedDayWithoutCreatingProcessedEvidence() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
         let today = makeDate(2026, 9, 16)
@@ -602,13 +1069,14 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(first.createdCount, 0)
         XCTAssertEqual(first.blockedCount, 1)
-        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
         XCTAssertTrue(day.tasks.isEmpty)
         XCTAssertTrue(habit.records.isEmpty)
 
         let second = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
-        XCTAssertEqual(second.blockedCount, 0)
+        XCTAssertEqual(second.blockedCount, 1)
         XCTAssertEqual(second.createdCount, 0)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(habit.records.isEmpty)
     }
 
     @MainActor
@@ -631,7 +1099,11 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(outcome.blockedCount, 1)
         XCTAssertTrue(day.tasks.isEmpty)
         XCTAssertTrue(habit.records.isEmpty)
-        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+
+        let repeated = materializer.sync(today: today, now: makeDate(2026, 9, 16, 10))
+        XCTAssertEqual(repeated.blockedCount, 1)
+        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertTrue(habit.records.isEmpty)
     }
 
     @MainActor
@@ -654,8 +1126,6 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(day.tasks.isEmpty)
         XCTAssertTrue(weekendOnly.records.isEmpty)
         XCTAssertTrue(futureStart.records.isEmpty)
-        XCTAssertEqual(weekendOnly.generatedThroughDayId, todayKey)
-        XCTAssertEqual(futureStart.generatedThroughDayId, "")
     }
 
     @MainActor
@@ -684,14 +1154,12 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(onSchedule.records.first?.dayId, hitDay.dayId)
         XCTAssertEqual(onSchedule.records.first?.status, .pending)
         XCTAssertTrue(missingDate.records.isEmpty)
-        XCTAssertEqual(missingDate.generatedThroughDayId, hitDay.dayId)
 
         let endOutcome = materializer.sync(today: monthEnd, now: makeDate(2026, 9, 30, 9))
 
         XCTAssertEqual(endOutcome.createdCount, 0)
         XCTAssertTrue(monthEndModel.tasks.isEmpty)
         XCTAssertTrue(missingDate.records.isEmpty)
-        XCTAssertEqual(missingDate.generatedThroughDayId, monthEnd.dayId)
 
         // 缺日月份不产生时间线节点；含 31 日的 8 月节点存在。
         let nodes = HabitStatisticsCalculator.timeline(for: missingDate, today: monthEnd)
@@ -734,7 +1202,6 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(nextModel.tasks.isEmpty)
         XCTAssertEqual(habit.records.count, 1)
         XCTAssertEqual(habit.records.first?.status, .missed)
-        XCTAssertEqual(habit.generatedThroughDayId, nextDay.dayId)
     }
 
     @MainActor
@@ -810,7 +1277,7 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_habitAssignTodayBypassesWatermarkAndRejectsLocked() throws {
+    func test_habitAssignTodayCanRecreateTaskDespiteExistingDayRecordAndRejectsLocked() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
         let today = makeDate(2026, 9, 16)
@@ -822,17 +1289,27 @@ final class ModelTests: XCTestCase {
 
         let materializer = HabitTaskMaterializer(modelContext: context)
         materializer.sync(today: today, now: makeDate(2026, 9, 16, 9))
-        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+
+        var stats = HabitStatisticsCalculator.statistics(for: habit, today: today)
+        XCTAssertTrue(stats.hasTodayTask)
+        XCTAssertEqual(stats.todayStatus, .pending)
 
         let generated = try XCTUnwrap(day.tasks.first { $0.habit?.id == habit.id })
         let generatedId = generated.id
         day.tasks = day.tasks.filter { $0.id != generatedId }
         context.delete(generated)
+        habit.generatedThroughDayId = ""
+
+        // 任务删除后记录仍为 pending，故「加入今日」可见性必须基于 hasTodayTask 而非 todayStatus。
+        stats = HabitStatisticsCalculator.statistics(for: habit, today: today)
+        XCTAssertFalse(stats.hasTodayTask)
+        XCTAssertEqual(stats.todayStatus, .pending)
 
         let recreated = materializer.assignToday(habit: habit, today: today, now: makeDate(2026, 9, 16, 10))
         XCTAssertEqual(recreated, .created)
         XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
-        XCTAssertEqual(habit.generatedThroughDayId, todayKey)
+        XCTAssertTrue(habit.records.contains { $0.dayId == todayKey })
+        XCTAssertTrue(HabitStatisticsCalculator.statistics(for: habit, today: today).hasTodayTask)
 
         let duplicate = materializer.assignToday(habit: habit, today: today, now: makeDate(2026, 9, 16, 11))
         XCTAssertEqual(duplicate, .alreadyExists)
@@ -850,6 +1327,10 @@ final class ModelTests: XCTestCase {
         context.insert(weekendOnly)
         let notScheduled = materializer.assignToday(habit: weekendOnly, today: today, now: makeDate(2026, 9, 16, 13))
         XCTAssertEqual(notScheduled, .notScheduledToday)
+
+        let weekendStats = HabitStatisticsCalculator.statistics(for: weekendOnly, today: today)
+        XCTAssertEqual(weekendStats.todayStatus, .notScheduled)
+        XCTAssertFalse(weekendStats.hasTodayTask)
     }
 
     @MainActor
@@ -949,6 +1430,7 @@ final class ModelTests: XCTestCase {
 
         func save() {}
         func markProcessed(at date: Date) {}
+        func markRollover(at date: Date) { lastRolloverAt = date }
         func incrementDaysStarted() {}
         func bumpStateTransitionRevision() { stateTransitionRevision += 1 }
     }
@@ -988,7 +1470,6 @@ final class ModelTests: XCTestCase {
 
         let habit = try viewModel.createHabit(name: "晨跑", startDate: today)
 
-        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
         XCTAssertEqual(day.tasks.map(\.title), ["晨跑"])
         XCTAssertEqual(day.tasks.first?.habit?.id, habit.id)
         XCTAssertEqual(habit.records.count, 1)
@@ -999,7 +1480,7 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_habitUpdateRewindsWatermarkWhenPlanChanges() throws {
+    func test_habitUpdateMaterializesNewlyScheduledTodayWithoutARecord() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
         let today = makeDate(2026, 9, 16)
@@ -1018,7 +1499,8 @@ final class ModelTests: XCTestCase {
             startDate: today
         )
         XCTAssertTrue(day.tasks.isEmpty)
-        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+        XCTAssertTrue(habit.records.isEmpty)
+        habit.generatedThroughDayId = "2099-12-31"
 
         try viewModel.updateHabit(
             habit,
@@ -1036,7 +1518,8 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(habit.scheduleWeekdays, [1, 2, 3])
         XCTAssertEqual(day.tasks.map(\.title), ["晨跑"])
         XCTAssertEqual(day.tasks.first?.habit?.id, habit.id)
-        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
+        XCTAssertEqual(habit.generatedThroughDayId, "2099-12-31", "schedule edits must not rewrite the V8 compatibility watermark")
+        XCTAssertTrue(habit.records.contains { $0.dayId == today.dayId })
         XCTAssertEqual(appState.stateTransitionRevision, 2)
     }
 
@@ -1064,14 +1547,13 @@ final class ModelTests: XCTestCase {
         provider.mockDate = makeDate(2026, 9, 17, 9)
         let stretch = try viewModel.createHabit(name: "拉伸", startDate: provider.today)
         XCTAssertEqual(day17.tasks.map(\.title), ["拉伸"])
-        XCTAssertEqual(morning.generatedThroughDayId, today.dayId)
         XCTAssertFalse(day17.tasks.contains { $0.habit?.id == morning.id })
 
         try viewModel.setActive(morning, true)
         XCTAssertEqual(viewModel.activeHabits.map(\.id), [morning.id, stretch.id])
         XCTAssertEqual(Set(day17.tasks.map(\.title)), ["拉伸", "晨跑"])
-        XCTAssertEqual(morning.generatedThroughDayId, tomorrow.dayId)
-        XCTAssertEqual(stretch.generatedThroughDayId, tomorrow.dayId)
+        XCTAssertTrue(morning.records.contains { $0.dayId == tomorrow.dayId })
+        XCTAssertTrue(stretch.records.contains { $0.dayId == tomorrow.dayId })
     }
 
     @MainActor
@@ -1274,6 +1756,71 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_userSettings_defaultKillTimeReadsInjectedLocalDefaults() {
+        let suiteName = "ModelTests.KillTimeLocalRead.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(18, forKey: "defaultKillTimeHour")
+        defaults.set(25, forKey: "defaultKillTimeMinute")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+
+        XCTAssertEqual(settings.defaultKillTimeHour, 18)
+        XCTAssertEqual(settings.defaultKillTimeMinute, 25)
+    }
+
+    @MainActor
+    func test_userSettings_defaultKillTimeChangesPersistAndRestoreFromSameSuite() {
+        let suiteName = "ModelTests.KillTimeRestore.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        settings.defaultKillTimeHour = 20
+        settings.defaultKillTimeMinute = 10
+
+        XCTAssertEqual(defaults.object(forKey: "defaultKillTimeHour") as? Int, 20)
+        XCTAssertEqual(defaults.object(forKey: "defaultKillTimeMinute") as? Int, 10)
+
+        let restored = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(restored)
+        XCTAssertEqual(restored.defaultKillTimeHour, 20)
+        XCTAssertEqual(restored.defaultKillTimeMinute, 10)
+    }
+
+    @MainActor
+    func test_userSettings_defaultKillTimeIsIndependentAcrossDefaultsSuites() {
+        let firstSuite = "ModelTests.KillTimeFirstSuite.\(UUID().uuidString)"
+        let secondSuite = "ModelTests.KillTimeSecondSuite.\(UUID().uuidString)"
+        let firstDefaults = UserDefaults(suiteName: firstSuite)!
+        let secondDefaults = UserDefaults(suiteName: secondSuite)!
+        firstDefaults.removePersistentDomain(forName: firstSuite)
+        secondDefaults.removePersistentDomain(forName: secondSuite)
+        defer {
+            firstDefaults.removePersistentDomain(forName: firstSuite)
+            secondDefaults.removePersistentDomain(forName: secondSuite)
+        }
+        firstDefaults.set(16, forKey: "defaultKillTimeHour")
+        firstDefaults.set(5, forKey: "defaultKillTimeMinute")
+        secondDefaults.set(21, forKey: "defaultKillTimeHour")
+        secondDefaults.set(40, forKey: "defaultKillTimeMinute")
+
+        let firstSettings = UserSettings(defaults: firstDefaults)
+        Self.retainedUserSettings.append(firstSettings)
+        firstSettings.defaultKillTimeHour = 17
+
+        let secondSettings = UserSettings(defaults: secondDefaults)
+        Self.retainedUserSettings.append(secondSettings)
+
+        XCTAssertEqual(secondSettings.defaultKillTimeHour, 21)
+        XCTAssertEqual(secondSettings.defaultKillTimeMinute, 40)
+    }
+
+    @MainActor
     func test_userSettings_defaultTaskTypeIdPersistsSelection() {
         let suiteName = "ModelTests.TaskTypeId.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1394,7 +1941,7 @@ final class ModelTests: XCTestCase {
         let settings = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(settings)
 
-        XCTAssertEqual(settings.defaultProjectColorHex, "#C46A1A")
+        XCTAssertEqual(settings.defaultProjectColorHex, "#E39A3F")
         XCTAssertEqual(settings.defaultProjectIconName, "folder.fill")
         XCTAssertEqual(settings.suspendedDefaultCountdownDays, 10)
         XCTAssertEqual(settings.effectiveBoardColumnCount, 4)
@@ -1799,7 +2346,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(presentation.secondaryContent, .compactPills)
     }
 
-    func test_projectTilePresentation_mediumBrowseUsesMetricCards() {
+    func test_projectTilePresentation_mediumBrowseUsesCompactPills() {
         let snapshot = makeTileSnapshot(
             projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000024")!,
             nextTaskTitle: "整理材料"
@@ -1814,7 +2361,7 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(presentation.titleLineLimit, 2)
         XCTAssertTrue(presentation.showsNextTaskDate)
-        XCTAssertEqual(presentation.secondaryContent, .metricCards)
+        XCTAssertEqual(presentation.secondaryContent, .compactPills)
     }
 
     func test_projectTilePresentation_wideEditingKeepsTimelineStoryButUsesCompactStrip() {
@@ -1833,6 +2380,98 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(presentation.livePanel, .nextTask)
         XCTAssertFalse(presentation.showsNextTaskDate)
         XCTAssertEqual(presentation.secondaryContent, .compactPills)
+    }
+
+    func test_projectTilePresentation_smallAddsProgressBarAndKeepsStrip() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000030")!,
+            nextTaskTitle: "下一步"
+        )
+
+        let small = ProjectTilePresentation(snapshot: snapshot, size: .small, isEditing: false, liveTick: 0)
+        let mini = ProjectTilePresentation(snapshot: snapshot, size: .mini, isEditing: false, liveTick: 0)
+
+        XCTAssertTrue(small.showsProgressBar)
+        XCTAssertEqual(small.secondaryContent, .microStatsStrip)
+        XCTAssertEqual(small.taskRowCount, 0)
+        XCTAssertFalse(mini.showsProgressBar)
+    }
+
+    func test_projectTilePresentation_mediumAddsProgressBarUnderBigNumber() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000031")!,
+            nextTaskTitle: "整理材料"
+        )
+
+        let presentation = ProjectTilePresentation(snapshot: snapshot, size: .medium, isEditing: false, liveTick: 0)
+
+        XCTAssertTrue(presentation.showsProgressBar)
+        XCTAssertFalse(presentation.showsTrendChart)
+        XCTAssertEqual(presentation.primaryNumberFontSize, 48)
+        XCTAssertEqual(presentation.secondaryContent, .compactPills)
+    }
+
+    func test_projectTilePresentation_wideCarriesTrendChartAndTaskRows() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000032")!,
+            nextTaskTitle: "明天交付",
+            trend: makeTileTrendSeries()
+        )
+
+        let browse = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: false, liveTick: 0)
+        let edit = ProjectTilePresentation(snapshot: snapshot, size: .wide, isEditing: true, liveTick: 0)
+
+        XCTAssertTrue(browse.showsTrendChart)
+        XCTAssertFalse(browse.showsProgressBar)
+        XCTAssertEqual(browse.taskRowCount, 3)
+        XCTAssertEqual(edit.taskRowCount, 0)
+        XCTAssertEqual(edit.secondaryContent, .compactPills)
+
+        let emptyTrend = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000034")!,
+            nextTaskTitle: "明天交付"
+        )
+        XCTAssertFalse(
+            ProjectTilePresentation(snapshot: emptyTrend, size: .wide, isEditing: false, liveTick: 0).showsTrendChart
+        )
+    }
+
+    func test_projectTilePresentation_compactBoardTrimsSecondaryRows() {
+        let snapshot = makeTileSnapshot(
+            projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000033")!,
+            nextTaskTitle: "明天交付"
+        )
+
+        let medium = ProjectTilePresentation(
+            snapshot: snapshot,
+            size: .medium,
+            isEditing: false,
+            liveTick: 0,
+            isCompactBoard: true
+        )
+        let small = ProjectTilePresentation(
+            snapshot: snapshot,
+            size: .small,
+            isEditing: false,
+            liveTick: 0,
+            isCompactBoard: true
+        )
+        let wide = ProjectTilePresentation(
+            snapshot: snapshot,
+            size: .wide,
+            isEditing: false,
+            liveTick: 0,
+            isCompactBoard: true
+        )
+
+        XCTAssertEqual(medium.primaryNumberFontSize, 32)
+        XCTAssertEqual(medium.secondaryContent, .none)
+        XCTAssertTrue(medium.showsProgressBar)
+        XCTAssertEqual(small.secondaryContent, .none)
+        XCTAssertTrue(small.showsProgressBar)
+        XCTAssertEqual(wide.taskRowCount, 0)
+        XCTAssertEqual(wide.secondaryContent, .none)
+        XCTAssertEqual(wide.trendChartMaxHeight, 30)
     }
 
     func test_taskNumberFormatting() {
@@ -3521,7 +4160,11 @@ final class ModelTests: XCTestCase {
         return week
     }
 
-    private func makeTileSnapshot(projectID: UUID, nextTaskTitle: String?) -> ProjectTileSnapshot {
+    private func makeTileSnapshot(
+        projectID: UUID,
+        nextTaskTitle: String?,
+        trend: [ProjectTileTrendPoint] = []
+    ) -> ProjectTileSnapshot {
         ProjectTileSnapshot(
             projectID: projectID,
             name: "Project",
@@ -3533,26 +4176,69 @@ final class ModelTests: XCTestCase {
             remainingCount: 3,
             expiredCount: 1,
             nextTaskTitle: nextTaskTitle,
-            nextTaskDate: nextTaskTitle == nil ? nil : Date(timeIntervalSince1970: 1_762_444_800)
+            nextTaskDate: nextTaskTitle == nil ? nil : Date(timeIntervalSince1970: 1_762_444_800),
+            trend: trend
         )
+    }
+
+    /// 14 天窗口，索引 0...10 落在今天及以前（历史段），11...13 是未来段。
+    private func makeTileTrendSeries() -> [ProjectTileTrendPoint] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return (0..<14).map { offset in
+            ProjectTileTrendPoint(
+                day: calendar.date(byAdding: .day, value: offset - 10, to: today) ?? today,
+                completed: offset == 4 ? 2 : 0,
+                planned: offset >= 11 ? 1 : 0
+            )
+        }
     }
 }
 
 @MainActor
 final class TaskPostponeServiceTests: XCTestCase {
     private static var retainedUserSettings: [UserSettings] = []
+    // Swift 6 在 iOS 26.2 上通过 back-deploy 路径析构 @MainActor 类时会
+    // double-free task-local 存储：swift_task_deinitOnExecutorMainActorBackDeploy
+    // -> TaskLocal::StopLookupScope::~StopLookupScope
+    // -> ___BUG_IN_CLIENT_OF_LIBMALLOC_POINTER_BEING_FREED_WAS_NOT_ALLOCATED。
+    // 保留实例即可绕过（与 retainedUserSettings 同因）。
+    private static var retainedViewModels: [PendingViewModel] = []
+    private static var retainedAppStates: [AppState] = []
+    private static var retainedContainers: [ModelContainer] = []
+
+    /// PendingViewModel 默认使用真实系统时间；这些用例固定在 2026-03 中旬，
+    /// 日期漂移后（真实时间越过测试日期）canEdit 会抛 cannotEditStartedDay。
+    /// 注入固定时间让测试与时钟解耦。
+    private final class FixedMarchTimeProvider: TimeProviding {
+        private let iso8601 = Calendar(identifier: .iso8601)
+        var now: Date { makeDate(2026, 3, 19, 12) }
+        var today: Date { iso8601.startOfDay(for: now) }
+        var currentWeekId: String {
+            let week = iso8601.component(.weekOfYear, from: now)
+            let year = iso8601.component(.yearForWeekOfYear, from: now)
+            return String(format: "%04d-W%02d", year, week)
+        }
+        private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int) -> Date {
+            var components = DateComponents()
+            components.calendar = iso8601
+            components.timeZone = TimeZone(secondsFromGMT: 0)
+            components.year = year; components.month = month; components.day = day; components.hour = hour
+            return components.date!
+        }
+    }
     private var container: ModelContainer!
 
     private static func makeContainer() throws -> ModelContainer {
-        let schema = Schema(versionedSchema: WeekyiiSchemaV4.self)
-        let config = ModelConfiguration(
-            "TaskPostponeServiceTests",
-            schema: schema,
-            isStoredInMemoryOnly: true,
-            allowsSave: true,
-            cloudKitDatabase: .none
-        )
-        return try ModelContainer(for: schema, configurations: config)
+        // 必须用当前 schema：这些用例插入的是当前类型的模型
+        // （WeekCalculator().makeWeek(...) 等）。早先这里用 V4 schema，
+        // 触发 SwiftData "Failed to cast model ... to ..." 致命错误
+        // （ModelContext.swift:712），表现为测试进程反复崩溃被误判为
+        // 模拟器宿主 malloc 问题。
+        // 用与项目其它测试一致的构造路径（含 migrationPlan 与统一配置）。
+        // 裸 ModelContainer(for:configurations:) 在 iOS 26.2 上会触发
+        // SwiftData 的 double-free（malloc: pointer being freed was not allocated）。
+        return try WeekyiiPersistence.makeModelContainer(inMemory: true)
     }
 
     override func setUpWithError() throws {
@@ -3765,8 +4451,34 @@ final class TaskPostponeServiceTests: XCTestCase {
 
         XCTAssertEqual(todayDay.status, .completed)
         XCTAssertEqual(todayDay.closedAt, now)
-        XCTAssertNil(todayDay.focusTask)
-        XCTAssertTrue(todayDay.frozenTasks.isEmpty)
+        XCTAssertFalse(todayDay.tasks.contains { $0.zone == .focus })
+        XCTAssertFalse(todayDay.tasks.contains { $0.zone == .frozen })
+    }
+
+    func test_execute_fromFocusWithoutFrozenCompletesSourceDay() throws {
+        let context = container.mainContext
+        let service = TaskPostponeService(modelContext: context)
+        let today = makeDate(2026, 3, 5)
+        let now = makeDate(2026, 3, 5, 16, 30)
+
+        let todayWeek = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(todayWeek)
+        let todayDay = requireDay(in: todayWeek, date: today)
+        todayDay.status = .execute
+        let focus = TaskItem(title: "SoloFocus", order: 1, zone: .focus)
+        todayDay.tasks.append(focus)
+
+        let targetDate = today.addingDays(1)
+        let targetDay = requireDay(in: todayWeek, date: targetDate)
+        targetDay.status = .draft
+        try context.save()
+
+        let preview = try service.preview(taskID: focus.id, targetDate: targetDate, today: today)
+        _ = try service.execute(preview: preview, allowCreateWeek: false, today: today, now: now)
+
+        XCTAssertEqual(todayDay.status, .completed)
+        XCTAssertEqual(todayDay.closedAt, now)
+        XCTAssertFalse(todayDay.tasks.contains { $0.zone == .focus || $0.zone == .frozen })
     }
 
     func test_execute_implicitlyCreatesTargetDayWhenWeekExistsWithoutDay() throws {
@@ -3851,9 +4563,12 @@ final class TaskPostponeServiceTests: XCTestCase {
 
     @MainActor
     func test_pendingViewModel_addDraftTaskTurnsEmptyDayIntoDraft() throws {
-        throw XCTSkip("Temporarily skipped: SwiftData crashes on iOS 26.2 simulator in this unit path; behavior is covered by pending-week UI tests.")
         let context = container.mainContext
-        let viewModel = PendingViewModel(modelContext: context)
+        let viewModel = PendingViewModel(
+            modelContext: context,
+            timeProvider: FixedMarchTimeProvider()
+        )
+        Self.retainedViewModels.append(viewModel)
         let futureDate = makeDate(2026, 3, 20)
         let week = WeekCalculator().makeWeek(for: futureDate, status: .pending)
         context.insert(week)
@@ -3877,9 +4592,12 @@ final class TaskPostponeServiceTests: XCTestCase {
 
     @MainActor
     func test_pendingViewModel_updateDraftTaskRewritesFields() throws {
-        throw XCTSkip("Temporarily skipped: SwiftData crashes on iOS 26.2 simulator in this unit path; behavior is covered by pending-week UI tests.")
         let context = container.mainContext
-        let viewModel = PendingViewModel(modelContext: context)
+        let viewModel = PendingViewModel(
+            modelContext: context,
+            timeProvider: FixedMarchTimeProvider()
+        )
+        Self.retainedViewModels.append(viewModel)
         let futureDate = makeDate(2026, 3, 21)
         let week = WeekCalculator().makeWeek(for: futureDate, status: .pending)
         context.insert(week)
@@ -3887,6 +4605,7 @@ final class TaskPostponeServiceTests: XCTestCase {
         day.status = .draft
         let task = TaskItem(title: "Old", taskDescription: "Before", taskType: .regular, order: 1, zone: .draft)
         day.tasks.append(task)
+        context.insert(task)
         try context.save()
 
         try viewModel.updateDraftTask(
@@ -3906,17 +4625,26 @@ final class TaskPostponeServiceTests: XCTestCase {
 
     @MainActor
     func test_pendingViewModel_deleteDraftTasksRemovesAndRenumbers() throws {
-        throw XCTSkip("Temporarily skipped: SwiftData crashes on iOS 26.2 simulator in this unit path; behavior is covered by pending-week UI tests.")
         let context = container.mainContext
-        let viewModel = PendingViewModel(modelContext: context)
+        let viewModel = PendingViewModel(
+            modelContext: context,
+            timeProvider: FixedMarchTimeProvider()
+        )
+        Self.retainedViewModels.append(viewModel)
         let futureDate = makeDate(2026, 3, 22)
         let week = WeekCalculator().makeWeek(for: futureDate, status: .pending)
         context.insert(week)
         let day = requireDay(in: week, date: futureDate)
         day.status = .draft
-        day.tasks.append(TaskItem(title: "A", order: 1, zone: .draft))
-        day.tasks.append(TaskItem(title: "B", order: 2, zone: .draft))
-        day.tasks.append(TaskItem(title: "C", order: 3, zone: .draft))
+        let a = TaskItem(title: "A", order: 1, zone: .draft)
+        let b = TaskItem(title: "B", order: 2, zone: .draft)
+        let c = TaskItem(title: "C", order: 3, zone: .draft)
+        day.tasks.append(a)
+        day.tasks.append(b)
+        day.tasks.append(c)
+        context.insert(a)
+        context.insert(b)
+        context.insert(c)
         try context.save()
 
         try viewModel.deleteDraftTasks(in: day, at: IndexSet(integer: 1))
@@ -3928,19 +4656,27 @@ final class TaskPostponeServiceTests: XCTestCase {
 
     @MainActor
     func test_pendingViewModel_moveDraftTasksReordersDay() throws {
-        throw XCTSkip("Temporarily skipped: SwiftData crashes on iOS 26.2 simulator in this unit path; behavior is covered by pending-week UI tests.")
         let context = container.mainContext
-        let viewModel = PendingViewModel(modelContext: context)
+        let viewModel = PendingViewModel(
+            modelContext: context,
+            timeProvider: FixedMarchTimeProvider()
+        )
+        Self.retainedViewModels.append(viewModel)
         let futureDate = makeDate(2026, 3, 23)
         let week = WeekCalculator().makeWeek(for: futureDate, status: .pending)
         context.insert(week)
         let day = requireDay(in: week, date: futureDate)
         day.status = .draft
-        day.tasks.append(TaskItem(title: "A", order: 1, zone: .draft))
-        day.tasks.append(TaskItem(title: "B", order: 2, zone: .draft))
-        day.tasks.append(TaskItem(title: "C", order: 3, zone: .draft))
+        let a = TaskItem(title: "A", order: 1, zone: .draft)
+        let b = TaskItem(title: "B", order: 2, zone: .draft)
+        let c = TaskItem(title: "C", order: 3, zone: .draft)
+        day.tasks.append(a)
+        day.tasks.append(b)
+        day.tasks.append(c)
+        context.insert(a)
+        context.insert(b)
+        context.insert(c)
         try context.save()
-
         try viewModel.moveDraftTasks(in: day, from: IndexSet(integer: 2), to: 0)
 
         let draftTasks = day.sortedDraftTasks
@@ -4064,6 +4800,8 @@ final class TaskPostponeServiceTests: XCTestCase {
         let settings = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(settings)
         let appState = AppState()
+        Self.retainedAppStates.append(appState)
+        Self.retainedContainers.append(container)
 
         let customType = TaskTypeDefinition(idRaw: "custom-writing", name: "写作", iconName: "pencil", colorHex: "#123456", baseKind: .ddl, sortOrder: 10)
         let project = ProjectModel(name: "归档测试", startDate: Date(), endDate: Date().addingTimeInterval(86_400))
@@ -4110,7 +4848,10 @@ final class TaskPostponeServiceTests: XCTestCase {
         let suiteName = "ModelTests.ArchiveCorruption.\(UUID().uuidString)"
         let settings = UserSettings(defaults: UserDefaults(suiteName: suiteName)!)
         Self.retainedUserSettings.append(settings)
-        var data = try WeekyiiDataArchiveService.export(modelContext: container.mainContext, settings: settings, appState: AppState())
+        let appState = AppState()
+        Self.retainedAppStates.append(appState)
+        Self.retainedContainers.append(container)
+        var data = try WeekyiiDataArchiveService.export(modelContext: container.mainContext, settings: settings, appState: appState)
         data[data.count / 2] ^= 0x01
         XCTAssertThrowsError(try WeekyiiDataArchiveService.inspect(data))
     }
@@ -4410,5 +5151,1913 @@ final class SuspendedTaskLifecycleServiceTests: XCTestCase {
         XCTAssertEqual(components.hour, 23)
         XCTAssertEqual(components.minute, 59)
         XCTAssertEqual(components.second, 59)
+    }
+}
+
+// MARK: - Phase A0: resource identity stabilization
+
+/// Regression coverage for Phase A0 — "资源身份稳定化".
+///
+/// The invariants come from the execution plan's §W / §AH:
+///
+/// * `TaskAttachment.id` is the attachment's **business identity** — the key the
+///   sync layer will address it by. It must survive edits and owner changes, and
+///   may only be minted for a genuine duplication.
+/// * `TaskStep.createdAt` must survive a copy, so a no-op save does not look like
+///   a content change.
+/// * Editing one resource kind must not rebuild the other.
+///
+/// **Every case here fails against the pre-A0 implementation**, which rebuilt both
+/// kinds from scratch on every save — `delete all`, then
+/// `TaskAttachment(data:fileName:fileType:)` with no `id`, and
+/// `TaskStep(title:isCompleted:sortOrder:)` with no `createdAt`.
+@MainActor
+final class TaskResourceIdentityTests: XCTestCase {
+    private var container: ModelContainer!
+
+    private final class NoopNotificationService: NotificationScheduling {
+        func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
+        func cancelKillTimeNotification(for day: DayModel) {}
+        func removeDeliveredKillTimeNotifications(for day: DayModel) {}
+        func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
+        func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
+    }
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        let schema = Schema([
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self,
+            SuspendedTaskItem.self,
+            HabitModel.self,
+            HabitDayRecord.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        container = try ModelContainer(for: schema, configurations: config)
+    }
+
+    override func tearDownWithError() throws {
+        container = nil
+        try super.tearDownWithError()
+    }
+
+    // MARK: - Attachment identity (§AH, 8+ cases)
+
+    /// 1. A save that does not touch attachments must not change their identity.
+    func test_reconcileAttachments_preservesIdentityOnUnrelatedEdit() throws {
+        let context = container.mainContext
+        let service = TaskMutationService(modelContext: context)
+        let originalID = UUID()
+        let original = TaskAttachment(
+            id: originalID,
+            data: Data([0x01, 0x02, 0x03]),
+            fileName: "proof.png",
+            fileType: "image/png",
+            createdAt: makeDate(2026, 3, 1)
+        )
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.attachments = [original]
+        try context.save()
+
+        // Only the title changes; the caller hands the existing attachments back in.
+        try service.updateTask(
+            task,
+            payload: TaskDraftPayload(
+                title: "T2",
+                description: "",
+                type: .regular,
+                taskTypeIdRaw: "custom",
+                steps: [],
+                attachments: task.attachments
+            )
+        )
+        try context.save()
+
+        XCTAssertEqual(task.attachments.count, 1)
+        XCTAssertEqual(task.attachments.first?.id, originalID)
+        XCTAssertEqual(task.attachments.first?.createdAt, makeDate(2026, 3, 1))
+    }
+
+    /// 2. The *persisted row* is reused, not deleted and re-inserted.
+    func test_reconcileAttachments_reusesThePersistedRowAndKeepsCreatedAt() throws {
+        let context = container.mainContext
+        let original = TaskAttachment(
+            id: UUID(),
+            data: Data([0x01]),
+            fileName: "proof.png",
+            fileType: "image/png",
+            createdAt: makeDate(2026, 3, 1)
+        )
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.attachments = [original]
+        try context.save()
+
+        let before = task.attachments.first
+        // A detached copy carrying the same business identity but edited bytes
+        // and a bogus createdAt.
+        let edited = TaskAttachment(
+            id: original.id,
+            data: Data([0x09, 0x09]),
+            fileName: "proof.png",
+            fileType: "image/png",
+            createdAt: makeDate(2030, 1, 1)
+        )
+        TaskResourceIdentity.reconcileAttachments(on: task, with: [edited], in: context)
+
+        XCTAssertTrue(task.attachments.first === before, "the persisted row must be updated in place")
+        XCTAssertEqual(task.attachments.first?.data, Data([0x09, 0x09]))
+        XCTAssertEqual(task.attachments.first?.id, original.id)
+        XCTAssertEqual(
+            task.attachments.first?.createdAt,
+            makeDate(2026, 3, 1),
+            "createdAt belongs to the resource, not to the edit"
+        )
+        XCTAssertEqual(try context.fetch(FetchDescriptor<TaskAttachment>()).count, 1)
+    }
+
+    /// 3. Attachments dropped from the incoming list are deleted, not orphaned.
+    func test_reconcileAttachments_deletesRemovedAttachments() throws {
+        let context = container.mainContext
+        let kept = TaskAttachment(data: Data([0x01]), fileName: "kept.bin", fileType: "application/octet-stream")
+        let dropped = TaskAttachment(data: Data([0x02]), fileName: "dropped.bin", fileType: "application/octet-stream")
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.attachments = [kept, dropped]
+        try context.save()
+
+        TaskResourceIdentity.reconcileAttachments(on: task, with: [kept], in: context)
+        try context.save()
+
+        XCTAssertEqual(task.attachments.map(\.id), [kept.id])
+        let persisted = try context.fetch(FetchDescriptor<TaskAttachment>())
+        XCTAssertEqual(persisted.map(\.id), [kept.id])
+    }
+
+    /// 4. A genuinely new attachment is inserted carrying the caller's identity.
+    func test_reconcileAttachments_insertsNewAttachmentsWithCallerIdentity() throws {
+        let context = container.mainContext
+        let newID = UUID()
+        let incoming = TaskAttachment(
+            id: newID,
+            data: Data([0x07]),
+            fileName: "new.bin",
+            fileType: "application/octet-stream",
+            createdAt: makeDate(2026, 2, 2)
+        )
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+
+        TaskResourceIdentity.reconcileAttachments(on: task, with: [incoming], in: context)
+
+        XCTAssertEqual(task.attachments.count, 1)
+        XCTAssertEqual(task.attachments.first?.id, newID)
+        XCTAssertEqual(task.attachments.first?.createdAt, makeDate(2026, 2, 2))
+    }
+
+    /// 5. One business identity must not end up on two rows.
+    func test_reconcileAttachments_deduplicatesRepeatedBusinessIdentity() throws {
+        let context = container.mainContext
+        let sharedID = UUID()
+        let first = TaskAttachment(id: sharedID, data: Data([0x01]), fileName: "a.bin", fileType: "application/octet-stream")
+        let second = TaskAttachment(id: sharedID, data: Data([0x02]), fileName: "b.bin", fileType: "application/octet-stream")
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+
+        TaskResourceIdentity.reconcileAttachments(on: task, with: [first, second], in: context)
+
+        XCTAssertEqual(task.attachments.count, 1)
+        XCTAssertEqual(task.attachments.first?.data, Data([0x01]))
+    }
+
+    /// 6. Duplication is the only operation that mints a new attachment identity.
+    ///
+    /// There is deliberately **no** "copy preserving the same UUID" helper: that
+    /// would let a caller leave the original row alive and end up with two
+    /// SwiftData rows sharing one business id. A real move re-parents the existing
+    /// row instead — see `test_assignSuspendedTask_movesResourcesPreservingAttachmentIdentity`.
+    func test_duplicatedAttachmentCopies_mintFreshIdentity() throws {
+        let original = TaskAttachment(
+            id: UUID(),
+            data: Data([0x01]),
+            fileName: "a.bin",
+            fileType: "application/octet-stream",
+            createdAt: makeDate(2026, 3, 1)
+        )
+
+        let duplicated = TaskResourceIdentity.duplicatedAttachmentCopies(from: [original])
+        XCTAssertNotEqual(duplicated.first?.id, original.id)
+        XCTAssertNotEqual(duplicated.first?.createdAt, original.createdAt)
+        XCTAssertEqual(duplicated.first?.data, original.data)
+    }
+
+    /// 7. Editing attachments must not rebuild steps.
+    func test_replaceTaskAttachments_leavesStepsUntouched() throws {
+        let context = container.mainContext
+        let service = TaskMutationService(modelContext: context)
+        let stepDate = makeDate(2026, 3, 1)
+        let step = TaskStep(title: "S", sortOrder: 0, createdAt: stepDate)
+        let attachment = TaskAttachment(data: Data([0x01]), fileName: "a.bin", fileType: "application/octet-stream")
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.steps = [step]
+        task.attachments = [attachment]
+        try context.save()
+
+        let stepRow = task.steps.first
+        service.replaceTaskAttachments(for: task, attachments: [])
+
+        XCTAssertTrue(task.attachments.isEmpty)
+        XCTAssertEqual(task.steps.count, 1)
+        XCTAssertTrue(task.steps.first === stepRow, "steps must not be rebuilt when only attachments change")
+        XCTAssertEqual(task.steps.first?.createdAt, stepDate)
+    }
+
+    /// 8. Editing steps must not rebuild attachments.
+    func test_replaceTaskSteps_leavesAttachmentsUntouched() throws {
+        let context = container.mainContext
+        let service = TaskMutationService(modelContext: context)
+        let attachmentID = UUID()
+        let attachment = TaskAttachment(
+            id: attachmentID,
+            data: Data([0x01]),
+            fileName: "a.bin",
+            fileType: "application/octet-stream",
+            createdAt: makeDate(2026, 3, 1)
+        )
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.steps = [TaskStep(title: "S", sortOrder: 0)]
+        task.attachments = [attachment]
+        try context.save()
+
+        let attachmentRow = task.attachments.first
+        service.replaceTaskSteps(for: task, steps: [TaskStep(title: "S2", sortOrder: 0)])
+
+        XCTAssertEqual(task.steps.map(\.title), ["S2"])
+        XCTAssertEqual(task.attachments.count, 1)
+        XCTAssertTrue(
+            task.attachments.first === attachmentRow,
+            "attachments must not be rebuilt when only steps change"
+        )
+        XCTAssertEqual(task.attachments.first?.id, attachmentID)
+    }
+
+    /// 9. Assigning a suspended task to a day **moves** its resources.
+    func test_assignSuspendedTask_movesResourcesPreservingAttachmentIdentity() throws {
+        let context = container.mainContext
+        let service = SuspendedTaskLifecycleService(
+            modelContext: context,
+            notificationService: NoopNotificationService()
+        )
+        let today = makeDate(2026, 3, 12)
+        let targetDate = makeDate(2026, 3, 14)
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let targetDay = week.days.first(where: { $0.dayId == targetDate.dayId }) else {
+            return XCTFail("Missing target day \(targetDate.dayId)")
+        }
+        targetDay.status = .draft
+
+        let attachmentID = UUID()
+        let created = makeDate(2026, 3, 1)
+        let task = try service.createTask(
+            title: "Hold for later",
+            description: "",
+            type: .regular,
+            countdownDays: 10,
+            steps: [TaskStep(title: "Step A", sortOrder: 0, createdAt: created)],
+            attachments: [
+                TaskAttachment(
+                    id: attachmentID,
+                    data: Data([0x0A]),
+                    fileName: "proof.jpg",
+                    fileType: "image/jpeg",
+                    createdAt: created
+                )
+            ],
+            now: today
+        )
+
+        try service.assignTask(task, to: targetDate, today: today)
+
+        let assigned = targetDay.sortedDraftTasks.last
+        XCTAssertEqual(assigned?.attachments.map(\.id), [attachmentID])
+        XCTAssertEqual(assigned?.attachments.first?.createdAt, created)
+        XCTAssertEqual(assigned?.steps.map(\.createdAt), [created])
+        XCTAssertTrue(try context.fetch(FetchDescriptor<SuspendedTaskItem>()).isEmpty)
+    }
+
+    /// 10. Editing a suspended task preserves step identity end to end — the
+    /// editor sheet carries `createdAt` through its drafts, so a save must not
+    /// drift it.
+    func test_updateSuspendedTask_preservesStepCreatedAtAcrossTheEditor() throws {
+        let context = container.mainContext
+        let service = SuspendedTaskLifecycleService(
+            modelContext: context,
+            notificationService: NoopNotificationService()
+        )
+        let now = makeDate(2026, 3, 12)
+        let created = makeDate(2026, 3, 1)
+        let task = try service.createTask(
+            title: "Waiting",
+            description: "",
+            type: .regular,
+            countdownDays: 10,
+            steps: [TaskStep(title: "S", sortOrder: 0, createdAt: created)],
+            now: now
+        )
+
+        // What `SuspendedTaskEditorSheet` now produces: same createdAt, new title.
+        let edited = task.steps.map {
+            TaskStep(title: $0.title + "!", isCompleted: $0.isCompleted, sortOrder: $0.sortOrder, createdAt: $0.createdAt)
+        }
+        try service.updateTask(
+            task,
+            title: "Waiting",
+            description: "",
+            type: .regular,
+            countdownDays: 10,
+            steps: edited,
+            attachments: [],
+            now: now
+        )
+
+        XCTAssertEqual(task.steps.map(\.title), ["S!"])
+        XCTAssertEqual(task.steps.map(\.createdAt), [created])
+    }
+
+    // MARK: - Step stability (§AH, 4 cases)
+
+    /// 1. A copy carries `createdAt` across.
+    func test_stepCopies_preserveCreatedAt() throws {
+        let created = makeDate(2026, 3, 1)
+        let copies = TaskResourceIdentity.stepCopies(from: [TaskStep(title: "S", sortOrder: 0, createdAt: created)])
+        XCTAssertEqual(copies.count, 1)
+        XCTAssertEqual(copies.first?.createdAt, created)
+    }
+
+    /// 2. Ordering is deterministic and `sortOrder` is renumbered densely.
+    func test_stepCopies_renumberSortOrderDeterministically() throws {
+        let earlier = makeDate(2026, 3, 1)
+        let later = makeDate(2026, 3, 2)
+        let input = [
+            TaskStep(title: "C", sortOrder: 5, createdAt: later),
+            TaskStep(title: "A", sortOrder: 5, createdAt: earlier),
+            TaskStep(title: "B", sortOrder: 9, createdAt: later),
+        ]
+
+        let copies = TaskResourceIdentity.stepCopies(from: input)
+
+        XCTAssertEqual(copies.map(\.title), ["A", "C", "B"])
+        XCTAssertEqual(copies.map(\.sortOrder), [0, 1, 2])
+        XCTAssertEqual(copies.map(\.createdAt), [earlier, later, later])
+    }
+
+    /// 3. Re-saving the same steps must not drift their `createdAt`.
+    func test_reconcileSteps_doesNotDriftCreatedAtAcrossRepeatedSaves() throws {
+        let context = container.mainContext
+        let service = TaskMutationService(modelContext: context)
+        let created = makeDate(2026, 3, 1)
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+
+        let payload = { (steps: [TaskStep]) in
+            TaskDraftPayload(
+                title: "T",
+                description: "",
+                type: .regular,
+                taskTypeIdRaw: "custom",
+                steps: steps,
+                attachments: []
+            )
+        }
+
+        try service.updateTask(task, payload: payload([TaskStep(title: "S", sortOrder: 0, createdAt: created)]))
+        XCTAssertEqual(task.steps.map(\.createdAt), [created])
+
+        // Second save hands back a *copy* carrying the original createdAt.
+        try service.updateTask(task, payload: payload(TaskResourceIdentity.stepCopies(from: task.steps)))
+        XCTAssertEqual(task.steps.map(\.title), ["S"])
+        XCTAssertEqual(task.steps.map(\.createdAt), [created])
+
+        // Third save hands the owner's own rows straight back.
+        try service.updateTask(task, payload: payload(task.steps))
+        XCTAssertEqual(task.steps.map(\.title), ["S"])
+        XCTAssertEqual(task.steps.map(\.createdAt), [created])
+    }
+
+    /// 4. Handing the owner its own rows back reorders in place instead of
+    /// minting replacements.
+    func test_reconcileSteps_reordersOwnRowsInPlace() throws {
+        let context = container.mainContext
+        let first = TaskStep(title: "A", sortOrder: 1, createdAt: makeDate(2026, 3, 1))
+        let second = TaskStep(title: "B", sortOrder: 0, createdAt: makeDate(2026, 3, 2))
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.steps = [first, second]
+        try context.save()
+
+        TaskResourceIdentity.reconcileSteps(on: task, with: [first, second], in: context)
+
+        XCTAssertEqual(task.steps.count, 2)
+        XCTAssertTrue(task.steps.contains { $0 === first })
+        XCTAssertTrue(task.steps.contains { $0 === second })
+        XCTAssertEqual(TaskResourceIdentity.sortedSteps(task.steps).map(\.title), ["B", "A"])
+        XCTAssertEqual(TaskResourceIdentity.sortedSteps(task.steps).map(\.sortOrder), [0, 1])
+        XCTAssertEqual(try context.fetch(FetchDescriptor<TaskStep>()).count, 2)
+    }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 9, _ minute: Int = 0, _ second: Int = 0) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .iso8601)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        guard let date = components.date else {
+            fatalError("Invalid date components")
+        }
+        return date
+    }
+}
+
+// MARK: - Phase A1: normalized business snapshot
+
+/// Regression coverage for Phase A1 — the normalized `WeekyiiBusinessSnapshot`,
+/// the frozen `SyncEntityKey`, and the repository's refusal to silently collapse
+/// two records onto one identity.
+@MainActor
+final class WeekyiiSnapshotRepositoryTests: XCTestCase {
+    private var container: ModelContainer!
+    private static var retainedContainers: [ModelContainer] = []
+
+    private final class NoopNotificationService: NotificationScheduling {
+        func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {}
+        func cancelKillTimeNotification(for day: DayModel) {}
+        func removeDeliveredKillTimeNotifications(for day: DayModel) {}
+        func scheduleSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
+        func cancelSuspendedTaskNotifications(for task: SuspendedTaskItem) {}
+    }
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        container = try Self.makeContainer()
+    }
+
+    override func tearDownWithError() throws {
+        container = nil
+        try super.tearDownWithError()
+    }
+
+    private static func makeContainer() throws -> ModelContainer {
+        let schema = Schema([
+            WeekModel.self,
+            DayModel.self,
+            TaskItem.self,
+            TaskStep.self,
+            TaskAttachment.self,
+            ProjectModel.self,
+            MindStampItem.self,
+            SuspendedTaskItem.self,
+            HabitModel.self,
+            HabitDayRecord.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        let container = try ModelContainer(for: schema, configurations: config)
+        // SwiftData containers can be deallocated out from under an in-flight test
+        // on the iOS 26 simulator; keep them alive for the whole run.
+        retainedContainers.append(container)
+        return container
+    }
+
+    private func load() throws -> WeekyiiSnapshotLoadResult {
+        try WeekyiiSnapshotRepository.load(from: container.mainContext)
+    }
+
+    // MARK: - SyncEntityKey
+
+    /// The wire form is the sync contract. Renaming a kind, or changing how a
+    /// business id is rendered, silently re-keys every record a remote device has
+    /// already stored — so it is pinned here.
+    func test_syncEntityKey_wireFormIsPinned() throws {
+        let uuid = try XCTUnwrap(UUID(uuidString: "0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9"))
+
+        XCTAssertEqual(SyncEntityKey(kind: .week, businessId: "2026-W38").description, "week:2026-W38")
+        XCTAssertEqual(SyncEntityKey(kind: .day, businessId: "2026-09-21").description, "day:2026-09-21")
+        XCTAssertEqual(SyncEntityKey(kind: .taskType, businessId: "custom-writing").description, "taskType:custom-writing")
+        XCTAssertEqual(
+            SyncEntityKey(kind: .task, id: uuid).description,
+            "task:0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F9"
+        )
+        XCTAssertEqual(SyncEntityKey(kind: .suspendedTask, id: uuid).description.hasPrefix("suspendedTask:"), true)
+        XCTAssertEqual(SyncEntityKey(kind: .attachment, id: uuid).description.hasPrefix("attachment:"), true)
+        XCTAssertEqual(SyncEntityKey(kind: .project, id: uuid).description.hasPrefix("project:"), true)
+        XCTAssertEqual(SyncEntityKey(kind: .mindStamp, id: uuid).description.hasPrefix("mindStamp:"), true)
+        XCTAssertEqual(SyncEntityKey(kind: .habit, id: uuid).description.hasPrefix("habit:"), true)
+        XCTAssertEqual(SyncEntityKey(kind: .habitDayRecord, id: uuid).description.hasPrefix("habitDayRecord:"), true)
+
+        // UUIDs are rendered uppercase. Lowercasing would give one record two keys.
+        XCTAssertTrue(SyncEntityKey(kind: .task, id: uuid).businessId.contains("A"))
+
+        // Adding a kind is fine; renaming one is not. This fails on purpose if a
+        // kind is renamed or removed.
+        XCTAssertEqual(
+            SyncEntityKind.allCases.map(\.rawValue),
+            ["week", "day", "task", "suspendedTask", "attachment", "project", "mindStamp", "taskType", "habit", "habitDayRecord"]
+        )
+    }
+
+    func test_syncEntityKey_roundTripsAndToleratesColonInBusinessId() throws {
+        let keys = [
+            SyncEntityKey(kind: .task, id: UUID()),
+            SyncEntityKey(kind: .day, businessId: "2026-09-21"),
+            // A user-authored task-type slug may itself contain a colon; the split
+            // is on the first one, so it still round-trips.
+            SyncEntityKey(kind: .taskType, businessId: "custom:writing"),
+        ]
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        for key in keys {
+            let data = try encoder.encode(key)
+            XCTAssertEqual(try decoder.decode(SyncEntityKey.self, from: data), key)
+        }
+        XCTAssertEqual(SyncEntityKey(kind: .taskType, businessId: "custom:writing").businessId, "custom:writing")
+        XCTAssertThrowsError(try decoder.decode(SyncEntityKey.self, from: Data("\"nonsense\"".utf8)))
+        XCTAssertThrowsError(try decoder.decode(SyncEntityKey.self, from: Data("\"notAKind:x\"".utf8)))
+    }
+
+    // MARK: - Normalization
+
+    /// The point of hoisting attachments out of the task (§D of the plan): editing
+    /// an attachment must not change the task's own content, or the task aggregate
+    /// would be re-uploaded every time an unrelated attachment changes.
+    func test_snapshot_taskEncodingIsIndependentOfAttachmentBytes() throws {
+        let taskID = try XCTUnwrap(UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000001"))
+        let attachmentID = try XCTUnwrap(UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000001"))
+        let createdAt = makeDate(2026, 3, 1)
+
+        func build(bytes: Data) throws -> WeekyiiBusinessSnapshot {
+            let container = try Self.makeContainer()
+            let context = container.mainContext
+            let task = TaskItem(title: "T", order: 1)
+            task.id = taskID
+            context.insert(task)
+            task.attachments = [
+                TaskAttachment(id: attachmentID, data: bytes, fileName: "proof.bin", fileType: "application/octet-stream", createdAt: createdAt)
+            ]
+            try context.save()
+            return try WeekyiiSnapshotRepository.requireCleanSnapshot(from: context)
+        }
+
+        let before = try build(bytes: Data([0x01, 0x02]))
+        let after = try build(bytes: Data([0xFF, 0xFE, 0xFD]))
+
+        XCTAssertEqual(before.tasks, after.tasks, "the task's own content must not depend on attachment bytes")
+        XCTAssertNotEqual(before.attachments, after.attachments)
+    }
+
+    func test_snapshotAndHabitHashIgnoreLegacyWatermarkDifferences() throws {
+        let habitID = try XCTUnwrap(UUID(uuidString: "CCCCCCCC-0000-0000-0000-000000000001"))
+
+        func build(legacyWatermark: String) throws -> WeekyiiBusinessSnapshot {
+            let isolatedContainer = try Self.makeContainer()
+            let context = isolatedContainer.mainContext
+            let habit = HabitModel(
+                name: "晨跑",
+                scheduleWeekdays: [1, 2, 3, 4, 5],
+                startDayId: "2026-03-01"
+            )
+            habit.id = habitID
+            habit.createdAt = makeDate(2026, 3, 1)
+            habit.generatedThroughDayId = legacyWatermark
+            context.insert(habit)
+            try context.save()
+            return try WeekyiiSnapshotRepository.requireCleanSnapshot(from: context)
+        }
+
+        let emptyWatermark = try build(legacyWatermark: "")
+        let corruptWatermark = try build(legacyWatermark: "2099-12-31")
+        let habitKey = SyncEntityKey(kind: .habit, id: habitID)
+
+        XCTAssertEqual(emptyWatermark.habits, corruptWatermark.habits)
+        XCTAssertEqual(
+            try WeekyiiSnapshotCodec.entityHashes(emptyWatermark)[habitKey],
+            try WeekyiiSnapshotCodec.entityHashes(corruptWatermark)[habitKey]
+        )
+        XCTAssertEqual(
+            try WeekyiiSnapshotCodec.snapshotHash(emptyWatermark),
+            try WeekyiiSnapshotCodec.snapshotHash(corruptWatermark)
+        )
+    }
+
+    func test_snapshot_hoistsAttachmentsAndKeepsOnlyIdsOnTheTask() throws {
+        let context = container.mainContext
+        let attachmentID = UUID()
+        let bytes = Data([0xDE, 0xAD, 0xBE, 0xEF])
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.attachments = [
+            TaskAttachment(
+                id: attachmentID,
+                data: bytes,
+                fileName: "proof.bin",
+                fileType: "application/octet-stream",
+                createdAt: makeDate(2026, 3, 1)
+            )
+        ]
+        try context.save()
+
+        let result = try load()
+        XCTAssertTrue(result.isClean, "\(result.diagnostics)")
+
+        let taskSnapshot = try XCTUnwrap(result.snapshot.tasks.first)
+        XCTAssertEqual(taskSnapshot.attachmentIds, [attachmentID])
+
+        let attachment = try XCTUnwrap(result.snapshot.attachments.first)
+        XCTAssertEqual(result.snapshot.attachments.count, 1)
+        XCTAssertEqual(attachment.id, attachmentID)
+        XCTAssertEqual(attachment.data, bytes)
+        XCTAssertEqual(attachment.owner, .task(task.id))
+        XCTAssertEqual(attachment.entityKey, SyncEntityKey(kind: .attachment, id: attachmentID))
+    }
+
+    /// Identity is the UUID, never the content: two attachments holding identical
+    /// bytes are two entities. (§AH also asks for equal `blobSHA256` here — that
+    /// hash is Phase A2's content-identity layer; this test pins the entity layer.)
+    func test_snapshot_equalContentAttachmentsKeepDistinctKeysAndBothSurvive() throws {
+        let context = container.mainContext
+        let bytes = Data([0x01, 0x02, 0x03])
+        let firstID = UUID()
+        let secondID = UUID()
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        task.attachments = [
+            TaskAttachment(id: firstID, data: bytes, fileName: "a.bin", fileType: "application/octet-stream"),
+            TaskAttachment(id: secondID, data: bytes, fileName: "b.bin", fileType: "application/octet-stream"),
+        ]
+        try context.save()
+
+        let result = try load()
+        XCTAssertTrue(result.isClean, "\(result.diagnostics)")
+        XCTAssertEqual(result.snapshot.attachments.count, 2)
+        XCTAssertEqual(Set(result.snapshot.attachments.map(\.entityKey)).count, 2)
+        XCTAssertEqual(
+            Set(result.snapshot.tasks.first?.attachmentIds ?? []),
+            Set([firstID, secondID])
+        )
+    }
+
+    func test_snapshot_embedsStepsWithATotalOrder() throws {
+        let context = container.mainContext
+        let createdAt = makeDate(2026, 3, 1)
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        // Two steps tie on (sortOrder, createdAt) — the snapshot still needs a
+        // total order, or two runs could encode different bytes.
+        task.steps = [
+            TaskStep(title: "Zebra", sortOrder: 0, createdAt: createdAt),
+            TaskStep(title: "Alpha", sortOrder: 0, createdAt: createdAt),
+            TaskStep(title: "First", sortOrder: 0, createdAt: makeDate(2026, 2, 1)),
+        ]
+        try context.save()
+
+        let result = try load()
+        XCTAssertEqual(result.snapshot.tasks.first?.steps.map(\.title), ["First", "Alpha", "Zebra"])
+        // Steps are embedded: there is no step entity kind to address them by.
+        XCTAssertFalse(SyncEntityKind.allCases.contains { $0.rawValue == "step" })
+    }
+
+    /// The A2 canonical encoding (and therefore its hashes) depends on this: the
+    /// same graph must encode identically regardless of fetch order.
+    func test_snapshot_orderIsCanonicalRegardlessOfInsertionOrder() throws {
+        let ids = try [
+            XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111")),
+            XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222")),
+            XCTUnwrap(UUID(uuidString: "33333333-3333-3333-3333-333333333333")),
+        ]
+
+        func build(order: [UUID]) throws -> WeekyiiBusinessSnapshot {
+            let container = try Self.makeContainer()
+            let context = container.mainContext
+            // Only the *insert order* may differ between the two runs, so every
+            // property is derived from the id — otherwise the two graphs differ
+            // by construction and the comparison proves nothing.
+            for id in order {
+                let index = try XCTUnwrap(ids.firstIndex(of: id))
+                let task = TaskItem(title: "T\(index)", order: index + 1)
+                task.id = id
+                context.insert(task)
+            }
+            try context.save()
+            return try WeekyiiSnapshotRepository.requireCleanSnapshot(from: context)
+        }
+
+        let forward = try build(order: ids)
+        let shuffled = try build(order: [ids[2], ids[0], ids[1]])
+
+        XCTAssertEqual(forward.tasks.map(\.id), ids)
+        XCTAssertEqual(shuffled.tasks.map(\.id), ids)
+        XCTAssertEqual(forward, shuffled)
+        XCTAssertEqual(forward.entityKeys(), forward.entityKeys().sorted())
+    }
+
+    // MARK: - Duplicate identity
+
+    func test_load_reportsDuplicateBusinessIdInsteadOfDroppingIt() throws {
+        let context = container.mainContext
+        let sharedID = UUID()
+        let first = TaskItem(title: "First", order: 1)
+        first.id = sharedID
+        let second = TaskItem(title: "Second", order: 2)
+        second.id = sharedID
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let firstLoad = try load()
+        let secondLoad = try load()
+
+        XCTAssertEqual(firstLoad.snapshot.tasks.count, 1, "one business identity must yield one entity")
+        let duplicates = firstLoad.diagnostics(of: .duplicateBusinessId)
+        XCTAssertEqual(duplicates.count, 1)
+        XCTAssertEqual(duplicates.first?.entityKey, SyncEntityKey(kind: .task, id: sharedID))
+        XCTAssertTrue(
+            duplicates.first?.detail.contains("2 rows") ?? false,
+            "the diagnostic must say how many rows collided: \(duplicates.first?.detail ?? "nil")"
+        )
+        // The survivor is chosen by a documented rule, so two runs agree.
+        XCTAssertEqual(firstLoad.snapshot, secondLoad.snapshot)
+    }
+
+    /// The whole point of `requireCleanSnapshot`: an ambiguous store must not be
+    /// able to produce a clean-looking snapshot that sync would then treat as
+    /// authoritative. `load` still hands back the best-effort snapshot — that is
+    /// what a repair tool needs — but the syncable route has to refuse.
+    func test_requireCleanSnapshot_refusesAnAmbiguousStore() throws {
+        let context = container.mainContext
+        let sharedID = UUID()
+        let first = TaskItem(title: "First", order: 1)
+        first.id = sharedID
+        let second = TaskItem(title: "Second", order: 2)
+        second.id = sharedID
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        // `load` is the diagnostic view: it reports the collision and still returns
+        // a snapshot, so a repair tool can show the user what happened.
+        let result = try load()
+        XCTAssertEqual(result.diagnostics(of: .duplicateBusinessId).count, 1)
+        XCTAssertFalse(result.isClean)
+
+        // The syncable view must not.
+        XCTAssertThrowsError(try WeekyiiSnapshotRepository.requireCleanSnapshot(from: context)) { error in
+            guard case .ambiguousStore(let diagnostics)? = error as? WeekyiiSnapshotRepositoryError else {
+                return XCTFail("expected ambiguousStore, got \(error)")
+            }
+            XCTAssertEqual(diagnostics.map(\.kind), [.duplicateBusinessId])
+        }
+    }
+
+    /// And the clean case must still pass through, or the guard would be useless.
+    func test_requireCleanSnapshot_returnsACleanStore() throws {
+        let context = container.mainContext
+        let task = TaskItem(title: "T", order: 1)
+        context.insert(task)
+        try context.save()
+
+        let snapshot = try WeekyiiSnapshotRepository.requireCleanSnapshot(from: context)
+
+        XCTAssertEqual(snapshot.tasks.map(\.id), [task.id])
+    }
+
+    func test_validate_reportsDuplicateBusinessIdInsideASnapshot() throws {
+        let sharedID = UUID()
+        let snapshot = makeSnapshot(tasks: [
+            makeTaskSnapshot(id: sharedID),
+            makeTaskSnapshot(id: sharedID),
+        ])
+
+        let diagnostics = WeekyiiSnapshotRepository.validate(snapshot)
+
+        XCTAssertEqual(diagnostics.count, 1)
+        XCTAssertEqual(diagnostics.first?.kind, .duplicateBusinessId)
+        XCTAssertEqual(diagnostics.first?.entityKey, SyncEntityKey(kind: .task, id: sharedID))
+    }
+
+    // MARK: - Referential diagnostics
+
+    func test_validate_reportsOrphanAttachment() throws {
+        let attachmentID = UUID()
+        let snapshot = makeSnapshot(attachments: [
+            makeAttachmentSnapshot(id: attachmentID, owner: .task(UUID()))
+        ])
+
+        let diagnostics = WeekyiiSnapshotRepository.validate(snapshot)
+
+        XCTAssertEqual(diagnostics.map(\.kind), [.orphanAttachment])
+        XCTAssertEqual(diagnostics.first?.entityKey, SyncEntityKey(kind: .attachment, id: attachmentID))
+    }
+
+    func test_validate_reportsOwnerThatDoesNotListTheAttachment() throws {
+        let taskID = UUID()
+        let attachmentID = UUID()
+        let snapshot = makeSnapshot(
+            tasks: [makeTaskSnapshot(id: taskID)],
+            attachments: [makeAttachmentSnapshot(id: attachmentID, owner: .task(taskID))]
+        )
+
+        let diagnostics = WeekyiiSnapshotRepository.validate(snapshot)
+
+        XCTAssertEqual(diagnostics.map(\.kind), [.attachmentOwnerMismatch])
+        XCTAssertEqual(diagnostics.first?.entityKey, SyncEntityKey(kind: .attachment, id: attachmentID))
+    }
+
+    func test_validate_reportsDanglingAttachmentReference() throws {
+        let taskID = UUID()
+        let missingID = UUID()
+        let snapshot = makeSnapshot(tasks: [makeTaskSnapshot(id: taskID, attachmentIds: [missingID])])
+
+        let diagnostics = WeekyiiSnapshotRepository.validate(snapshot)
+
+        XCTAssertEqual(diagnostics.map(\.kind), [.danglingAttachmentReference])
+        XCTAssertEqual(diagnostics.first?.entityKey, SyncEntityKey(kind: .task, id: taskID))
+        XCTAssertTrue(diagnostics.first?.detail.contains(missingID.uuidString) ?? false)
+    }
+
+    func test_validate_reportsMissingParents() throws {
+        let taskID = UUID()
+        let habitRecordID = UUID()
+        let snapshot = makeSnapshot(
+            days: [makeDaySnapshot(dayId: "2026-03-12", weekId: "2026-W11")],
+            tasks: [makeTaskSnapshot(id: taskID, dayId: "2026-03-99", projectId: UUID(), habitId: UUID())],
+            habitDayRecords: [makeHabitDayRecordSnapshot(id: habitRecordID, habitId: UUID(), dayId: "2026-03-12")]
+        )
+
+        let diagnostics = WeekyiiSnapshotRepository.validate(snapshot)
+
+        // Diagnostics sort by `kind.rawValue`, so `missingDay` precedes `missingHabit`.
+        XCTAssertEqual(
+            diagnostics.map(\.kind),
+            [.missingDay, .missingHabit, .missingHabit, .missingProject, .missingWeek]
+        )
+    }
+
+    func test_validate_cleanSnapshotHasNoDiagnostics() throws {
+        let weekId = "2026-W11"
+        let dayId = "2026-03-12"
+        let taskID = UUID()
+        let projectID = UUID()
+        let habitID = UUID()
+        let attachmentID = UUID()
+
+        let snapshot = makeSnapshot(
+            weeks: [makeWeekSnapshot(weekId: weekId)],
+            days: [makeDaySnapshot(dayId: dayId, weekId: weekId)],
+            tasks: [makeTaskSnapshot(id: taskID, dayId: dayId, projectId: projectID, habitId: habitID, attachmentIds: [attachmentID])],
+            attachments: [makeAttachmentSnapshot(id: attachmentID, owner: .task(taskID))],
+            projects: [makeProjectSnapshot(id: projectID)],
+            habits: [makeHabitSnapshot(id: habitID)],
+            habitDayRecords: [makeHabitDayRecordSnapshot(id: UUID(), habitId: habitID, dayId: dayId)]
+        )
+
+        XCTAssertTrue(WeekyiiSnapshotRepository.validate(snapshot).isEmpty)
+        XCTAssertFalse(snapshot.isEmpty)
+        XCTAssertEqual(snapshot.entityCount, 7)
+    }
+
+    /// `TaskAttachment.task` and `.suspendedTask` are independent relationships, so
+    /// one row can hang off two owners. The snapshot must say so rather than pick
+    /// one silently.
+    func test_load_reportsOneAttachmentListedByTwoOwners() throws {
+        let context = container.mainContext
+        let task = TaskItem(title: "T", order: 1)
+        let suspended = SuspendedTaskItem(
+            title: "S",
+            decisionDeadline: makeDate(2026, 3, 22),
+            preferredCountdownDays: 10
+        )
+        let attachment = TaskAttachment(data: Data([0x01]), fileName: "shared.bin", fileType: "application/octet-stream")
+        context.insert(task)
+        context.insert(suspended)
+        context.insert(attachment)
+        task.attachments = [attachment]
+        suspended.attachments = [attachment]
+        try context.save()
+
+        let result = try load()
+
+        XCTAssertEqual(result.snapshot.attachments.count, 1)
+        let collisions = result.diagnostics(of: .attachmentMultipleOwners)
+        XCTAssertEqual(collisions.count, 1, "\(result.diagnostics)")
+        XCTAssertEqual(collisions.first?.entityKey, SyncEntityKey(kind: .attachment, id: attachment.id))
+    }
+
+    func test_load_orphanAttachmentIsReported() throws {
+        let context = container.mainContext
+        let attachment = TaskAttachment(data: Data([0x01]), fileName: "orphan.bin", fileType: "application/octet-stream")
+        context.insert(attachment)
+        try context.save()
+
+        let result = try load()
+
+        XCTAssertEqual(result.snapshot.attachments.count, 1)
+        let orphans = result.diagnostics(of: .orphanAttachment)
+        XCTAssertEqual(orphans.count, 1)
+        XCTAssertEqual(orphans.first?.entityKey, SyncEntityKey(kind: .attachment, id: attachment.id))
+    }
+
+    func test_diagnostics_areDeterministicallyOrdered() throws {
+        let taskID = UUID()
+        let snapshot = makeSnapshot(
+            days: [makeDaySnapshot(dayId: "2026-03-12", weekId: "2026-W11")],
+            tasks: [makeTaskSnapshot(id: taskID, dayId: "2026-03-99", attachmentIds: [UUID()])]
+        )
+
+        let first = WeekyiiSnapshotRepository.validate(snapshot)
+        let second = WeekyiiSnapshotRepository.validate(snapshot)
+
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(first, first.sorted { $0.kind.rawValue < $1.kind.rawValue })
+        XCTAssertFalse(first.isEmpty)
+    }
+
+    // MARK: - A0 ↔ A1
+
+    /// The payoff of Phase A0: assigning a suspended task to a day **moves** its
+    /// resources, so the attachment's `SyncEntityKey` is the same before and after.
+    /// Pre-A0 the resource was re-created and the key changed, which an incremental
+    /// sync would read as "delete + insert".
+    func test_assignSuspendedTask_keepsAttachmentEntityKeyStable() throws {
+        let context = container.mainContext
+        let service = SuspendedTaskLifecycleService(
+            modelContext: context,
+            notificationService: NoopNotificationService()
+        )
+        let today = makeDate(2026, 3, 12)
+        let targetDate = makeDate(2026, 3, 14)
+        let week = WeekCalculator().makeWeek(for: today, status: .present)
+        context.insert(week)
+        guard let targetDay = week.days.first(where: { $0.dayId == targetDate.dayId }) else {
+            return XCTFail("Missing target day \(targetDate.dayId)")
+        }
+        targetDay.status = .draft
+
+        let attachmentID = UUID()
+        let task = try service.createTask(
+            title: "Hold for later",
+            description: "",
+            type: .regular,
+            countdownDays: 10,
+            attachments: [
+                TaskAttachment(
+                    id: attachmentID,
+                    data: Data([0x0A]),
+                    fileName: "proof.jpg",
+                    fileType: "image/jpeg",
+                    createdAt: makeDate(2026, 3, 1)
+                )
+            ],
+            now: today
+        )
+
+        let key = SyncEntityKey(kind: .attachment, id: attachmentID)
+        let before = try load()
+        XCTAssertEqual(before.snapshot.attachments.map(\.entityKey), [key])
+        XCTAssertEqual(before.snapshot.attachments.first?.owner, .suspendedTask(task.id))
+
+        try service.assignTask(task, to: targetDate, today: today)
+
+        let after = try load()
+        XCTAssertTrue(after.isClean, "\(after.diagnostics)")
+        XCTAssertEqual(after.snapshot.attachments.map(\.entityKey), [key], "the attachment must keep its identity")
+        guard case .task = after.snapshot.attachments.first?.owner else {
+            return XCTFail("expected the attachment to be owned by the new task")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func makeSnapshot(
+        weeks: [WeekSnapshot] = [],
+        days: [DaySnapshot] = [],
+        tasks: [TaskSnapshot] = [],
+        suspendedTasks: [SuspendedTaskSnapshot] = [],
+        attachments: [AttachmentSnapshot] = [],
+        projects: [ProjectSnapshot] = [],
+        habits: [HabitSnapshot] = [],
+        habitDayRecords: [HabitDayRecordSnapshot] = []
+    ) -> WeekyiiBusinessSnapshot {
+        WeekyiiBusinessSnapshot(
+            weeks: weeks,
+            days: days,
+            tasks: tasks,
+            suspendedTasks: suspendedTasks,
+            attachments: attachments,
+            projects: projects,
+            mindStamps: [],
+            taskTypes: [],
+            habits: habits,
+            habitDayRecords: habitDayRecords
+        )
+    }
+
+    private func makeWeekSnapshot(weekId: String) -> WeekSnapshot {
+        WeekSnapshot(
+            weekId: weekId,
+            startDate: makeDate(2026, 3, 9),
+            endDate: makeDate(2026, 3, 15),
+            status: .present,
+            completedTasksCount: 0,
+            expiredTasksCount: 0,
+            totalStartedDays: 0
+        )
+    }
+
+    private func makeDaySnapshot(dayId: String, weekId: String? = nil) -> DaySnapshot {
+        DaySnapshot(
+            dayId: dayId,
+            weekId: weekId,
+            date: makeDate(2026, 3, 12),
+            dayOfWeek: "Thu",
+            status: .draft,
+            killTimeHour: 23,
+            killTimeMinute: 45,
+            followsDefaultKillTime: true,
+            initiatedAt: nil,
+            closedAt: nil,
+            executionModeRaw: ExecutionMode.strict.rawValue,
+            isDraftZoneUnlocked: false,
+            expiredCount: 0
+        )
+    }
+
+    private func makeTaskSnapshot(
+        id: UUID,
+        dayId: String? = nil,
+        projectId: UUID? = nil,
+        habitId: UUID? = nil,
+        attachmentIds: [UUID] = []
+    ) -> TaskSnapshot {
+        TaskSnapshot(
+            id: id,
+            dayId: dayId,
+            projectId: projectId,
+            habitId: habitId,
+            title: "T",
+            taskDescription: "",
+            taskType: .regular,
+            taskTypeIdRaw: TaskType.regular.rawValue,
+            order: 1,
+            zone: .draft,
+            startedAt: nil,
+            endedAt: nil,
+            completedOrder: 0,
+            steps: [],
+            attachmentIds: attachmentIds
+        )
+    }
+
+    private func makeAttachmentSnapshot(id: UUID, owner: AttachmentOwner, data: Data? = Data([0x01])) -> AttachmentSnapshot {
+        AttachmentSnapshot(
+            id: id,
+            owner: owner,
+            data: data,
+            fileName: "a.bin",
+            fileType: "application/octet-stream",
+            createdAt: makeDate(2026, 3, 1)
+        )
+    }
+
+    private func makeProjectSnapshot(id: UUID) -> ProjectSnapshot {
+        ProjectSnapshot(
+            id: id,
+            name: "P",
+            projectDescription: "",
+            color: "#C46A1A",
+            icon: "folder.fill",
+            status: .active,
+            startDate: makeDate(2026, 3, 1),
+            endDate: makeDate(2026, 3, 31),
+            createdAt: makeDate(2026, 3, 1),
+            tileSizeRaw: ProjectTileSize.medium.rawValue,
+            tileOrder: 0
+        )
+    }
+
+    private func makeHabitSnapshot(id: UUID) -> HabitSnapshot {
+        HabitSnapshot(
+            id: id,
+            name: "H",
+            iconName: "repeat.circle.fill",
+            colorHex: "#34C759",
+            categoryRaw: HabitCategory.health.rawValue,
+            scheduleKindRaw: HabitScheduleKind.weekly.rawValue,
+            scheduleWeekdaysRaw: 0b0011111,
+            scheduleMonthDaysRaw: 0,
+            startDayId: "2026-03-01",
+            isActive: true,
+            createdAt: makeDate(2026, 3, 1),
+            sortOrder: 0
+        )
+    }
+
+    private func makeHabitDayRecordSnapshot(id: UUID, habitId: UUID?, dayId: String) -> HabitDayRecordSnapshot {
+        HabitDayRecordSnapshot(
+            id: id,
+            habitId: habitId,
+            dayId: dayId,
+            statusRaw: HabitDayRecordStatus.pending.rawValue,
+            createdAt: makeDate(2026, 3, 12),
+            completedAt: nil
+        )
+    }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 9, _ minute: Int = 0, _ second: Int = 0) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .iso8601)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        guard let date = components.date else {
+            fatalError("Invalid date components")
+        }
+        return date
+    }
+}
+
+// MARK: - Phase A2: merge, canonical encoding, archive adapter
+
+/// Regression coverage for Phase A2 — the deterministic local-wins merge, the
+/// entity-hash / blob-hash layering, and the archive ↔ snapshot adapter.
+@MainActor
+final class WeekyiiSnapshotMergeServiceTests: XCTestCase {
+
+    // MARK: - Codec
+
+    func test_codec_canonicalEncodingIsStableAndRoundTrips() throws {
+        let graph = makeGraph()
+
+        let first = try WeekyiiSnapshotCodec.encode(graph)
+        let second = try WeekyiiSnapshotCodec.encode(graph)
+
+        XCTAssertEqual(first, second, "the same graph must encode to the same bytes")
+        XCTAssertEqual(try WeekyiiSnapshotCodec.decode(first), graph)
+    }
+
+    func test_codec_encodingIgnoresArrayInsertionOrder() throws {
+        let graph = makeGraph()
+        let shuffled = WeekyiiBusinessSnapshot(
+            weeks: Array(graph.weeks.reversed()),
+            days: Array(graph.days.reversed()),
+            tasks: Array(graph.tasks.reversed()),
+            suspendedTasks: Array(graph.suspendedTasks.reversed()),
+            attachments: Array(graph.attachments.reversed()),
+            projects: Array(graph.projects.reversed()),
+            mindStamps: Array(graph.mindStamps.reversed()),
+            taskTypes: Array(graph.taskTypes.reversed()),
+            habits: Array(graph.habits.reversed()),
+            habitDayRecords: Array(graph.habitDayRecords.reversed())
+        )
+
+        XCTAssertEqual(graph, shuffled)
+        XCTAssertEqual(try WeekyiiSnapshotCodec.encode(graph), try WeekyiiSnapshotCodec.encode(shuffled))
+        XCTAssertEqual(try WeekyiiSnapshotCodec.snapshotHash(graph), try WeekyiiSnapshotCodec.snapshotHash(shuffled))
+    }
+
+    /// The whole point of hoisting attachments out of the task (§D): changing an
+    /// attachment's bytes must move the attachment's own hash and leave the task's
+    /// alone, or every unrelated attachment edit would re-upload the task.
+    func test_codec_entityHashLayersPayloadBytesUnderTheAttachment() throws {
+        let taskID = UUID()
+        let attachmentID = UUID()
+
+        func graph(bytes: Data) -> WeekyiiBusinessSnapshot {
+            makeSnapshot(
+                tasks: [makeTask(id: taskID, attachmentIds: [attachmentID])],
+                attachments: [makeAttachment(id: attachmentID, owner: .task(taskID), bytes: bytes)]
+            )
+        }
+
+        let taskKey = SyncEntityKey(kind: .task, id: taskID)
+        let attachmentKey = SyncEntityKey(kind: .attachment, id: attachmentID)
+
+        // Same length on purpose. With different lengths the byte count alone would
+        // tell the two apart and a regression that dropped `blobSHA256` would slip
+        // through — which is exactly what a first version of this test did.
+        let before = try WeekyiiSnapshotCodec.entityHashes(graph(bytes: Data([0x01, 0x02])))
+        let after = try WeekyiiSnapshotCodec.entityHashes(graph(bytes: Data([0xFF, 0xFE])))
+
+        XCTAssertEqual(before[taskKey], after[taskKey], "the task's hash must not move with the attachment's bytes")
+        XCTAssertNotEqual(before[attachmentKey], after[attachmentKey], "the attachment's own hash must track its bytes")
+        XCTAssertNotEqual(
+            try WeekyiiSnapshotCodec.snapshotHash(graph(bytes: Data([0x01, 0x02]))),
+            try WeekyiiSnapshotCodec.snapshotHash(graph(bytes: Data([0xFF, 0xFE])))
+        )
+    }
+
+    /// The same metadata/blob separation, for the other blob-carrying entity.
+    /// Equal-length payloads on purpose, so only the blob hash can discriminate —
+    /// see the attachment test above for why that matters.
+    func test_codec_entityHashLayersImageBytesUnderTheMindStamp() throws {
+        let stampID = UUID()
+        let key = SyncEntityKey(kind: .mindStamp, id: stampID)
+
+        func hashes(text: String, image: Data?) throws -> [SyncEntityKey: String] {
+            try WeekyiiSnapshotCodec.entityHashes(
+                makeSnapshot(
+                    mindStamps: [
+                        MindStampSnapshot(id: stampID, text: text, imageBlob: image, createdAt: makeDate(2026, 3, 1))
+                    ]
+                )
+            )
+        }
+
+        let base = try hashes(text: "hello", image: Data([0x01, 0x02]))
+        let newText = try hashes(text: "hello!", image: Data([0x01, 0x02]))
+        let newBytes = try hashes(text: "hello", image: Data([0xFF, 0xFE]))
+
+        XCTAssertEqual(base[key]?.count, 64, "a SHA-256 hex digest")
+        XCTAssertNotEqual(base[key], newText[key], "changing the text must change the entity hash")
+        XCTAssertNotEqual(base[key], newBytes[key], "changing the image bytes must change the entity hash")
+    }
+
+    func test_codec_equalImageBytesShareABlobHashButStayDistinctEntities() throws {
+        let bytes = Data([0x0A, 0x0B])
+        let first = MindStampSnapshot(id: UUID(), text: "a", imageBlob: bytes, createdAt: makeDate(2026, 3, 1))
+        let second = MindStampSnapshot(id: UUID(), text: "b", imageBlob: bytes, createdAt: makeDate(2026, 3, 1))
+
+        XCTAssertEqual(
+            WeekyiiSnapshotCodec.blobHash(first.imageBlob),
+            WeekyiiSnapshotCodec.blobHash(second.imageBlob)
+        )
+        XCTAssertNotEqual(first.entityKey, second.entityKey)
+        XCTAssertNotEqual(
+            try WeekyiiSnapshotCodec.entityHash(first),
+            try WeekyiiSnapshotCodec.entityHash(second),
+            "equal bytes are not equal entities — these two differ in text"
+        )
+    }
+
+    /// The image is a blob, not an entity: it has no `SyncEntityKey` of its own, and
+    /// the mind stamp's key comes from its `id`.
+    func test_mindStampImageIsABlobNotAnEntity() throws {
+        let stampID = UUID()
+        let stamp = MindStampSnapshot(id: stampID, text: "t", imageBlob: Data([0x01]), createdAt: makeDate(2026, 3, 1))
+
+        XCTAssertEqual(stamp.entityKey, SyncEntityKey(kind: .mindStamp, id: stampID))
+        XCTAssertEqual(SyncEntityKind.allCases.filter { $0.rawValue.contains("mindStamp") }, [.mindStamp])
+        for kind in SyncEntityKind.allCases {
+            let name = kind.rawValue.lowercased()
+            XCTAssertFalse(name.contains("blob"), "a blob must not be addressable: \(kind.rawValue)")
+            XCTAssertFalse(name.contains("image"), "an image must not be addressable: \(kind.rawValue)")
+        }
+    }
+
+    /// "No image" and "a zero-byte image" are different states and must not hash alike.
+    func test_codec_mindStampDistinguishesNoImageFromAnEmptyImage() throws {
+        let stampID = UUID()
+
+        func hash(image: Data?) throws -> String {
+            let snapshot = makeSnapshot(
+                mindStamps: [
+                    MindStampSnapshot(id: stampID, text: "t", imageBlob: image, createdAt: makeDate(2026, 3, 1))
+                ]
+            )
+            return try XCTUnwrap(WeekyiiSnapshotCodec.entityHashes(snapshot)[SyncEntityKey(kind: .mindStamp, id: stampID)])
+        }
+
+        XCTAssertNotEqual(try hash(image: nil), try hash(image: Data()))
+    }
+
+    func test_codec_blobHashDistinguishesNoBytesFromZeroBytes() throws {
+        XCTAssertNil(WeekyiiSnapshotCodec.blobHash(nil))
+        XCTAssertNotNil(WeekyiiSnapshotCodec.blobHash(Data()))
+        XCTAssertNotEqual(WeekyiiSnapshotCodec.blobHash(Data()), WeekyiiSnapshotCodec.blobHash(Data([0x00])))
+        XCTAssertEqual(
+            WeekyiiSnapshotCodec.blobHash(Data([0x01, 0x02])),
+            WeekyiiSnapshotCodec.blobHash(Data([0x01, 0x02]))
+        )
+    }
+
+    func test_codec_entityHashesRejectsTwoRecordsClaimingOneIdentity() throws {
+        let sharedID = UUID()
+        let snapshot = makeSnapshot(tasks: [makeTask(id: sharedID), makeTask(id: sharedID)])
+
+        XCTAssertThrowsError(try WeekyiiSnapshotCodec.entityHashes(snapshot)) { error in
+            XCTAssertEqual(
+                error as? WeekyiiSnapshotCodecError,
+                .duplicateEntityKey(SyncEntityKey(kind: .task, id: sharedID))
+            )
+        }
+    }
+
+    func test_codec_snapshotHashDependsOnContentNotOnOrder() throws {
+        let graph = makeGraph()
+        let other = makeSnapshot(tasks: [makeTask(id: UUID())])
+
+        XCTAssertEqual(try WeekyiiSnapshotCodec.snapshotHash(graph), try WeekyiiSnapshotCodec.snapshotHash(graph))
+        XCTAssertNotEqual(try WeekyiiSnapshotCodec.snapshotHash(graph), try WeekyiiSnapshotCodec.snapshotHash(other))
+        XCTAssertNotEqual(
+            try WeekyiiSnapshotCodec.snapshotHash(graph),
+            try WeekyiiSnapshotCodec.snapshotHash(.empty)
+        )
+    }
+
+    /// §AH, stated as a test: two attachments holding identical bytes are still two
+    /// entities. They share a blob hash, keep distinct `SyncEntityKey`s, and both
+    /// survive a merge.
+    func test_codec_equalContentAttachmentsShareABlobHashButKeepDistinctEntityKeys() throws {
+        let bytes = Data([0x0A, 0x0B])
+        let firstID = UUID()
+        let secondID = UUID()
+        let taskID = UUID()
+
+        let local = makeSnapshot(tasks: [makeTask(id: taskID)])
+        let remote = makeSnapshot(
+            tasks: [makeTask(id: taskID, attachmentIds: [firstID, secondID])],
+            attachments: [
+                makeAttachment(id: firstID, owner: .task(taskID), bytes: bytes),
+                makeAttachment(id: secondID, owner: .task(taskID), bytes: bytes),
+            ]
+        )
+
+        let merged = try WeekyiiSnapshotMergeService.mergePreferringLocal(local: local, remote: remote).snapshot
+
+        XCTAssertEqual(merged.attachments.count, 2, "both attachments must survive the merge")
+        XCTAssertEqual(
+            Set(merged.attachments.compactMap { WeekyiiSnapshotCodec.blobHash($0.data) }).count,
+            1,
+            "identical bytes must share one blob hash"
+        )
+        XCTAssertEqual(Set(merged.attachments.map(\.entityKey)).count, 2, "and still be two entities")
+        XCTAssertEqual(Set(merged.tasks.first?.attachmentIds ?? []), Set([firstID, secondID]))
+        XCTAssertTrue(WeekyiiSnapshotRepository.validate(merged).isEmpty)
+    }
+
+    // MARK: - Merge
+
+    func test_merge_addsEntitiesThatExistOnlyRemotely() throws {
+        let taskID = UUID()
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(),
+            remote: makeSnapshot(tasks: [makeTask(id: taskID)])
+        )
+
+        XCTAssertEqual(result.snapshot.tasks.map(\.id), [taskID])
+        XCTAssertEqual(result.report.addedFromRemote, [SyncEntityKey(kind: .task, id: taskID)])
+        XCTAssertTrue(result.report.keptLocal.isEmpty)
+        XCTAssertTrue(result.report.conflicting.isEmpty)
+        XCTAssertTrue(result.report.isClean, "\(result.report.diagnostics)")
+    }
+
+    func test_merge_keepsLocalWhenBothSidesHoldTheSameKey() throws {
+        let taskID = UUID()
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(tasks: [makeTask(id: taskID, title: "local")]),
+            remote: makeSnapshot(tasks: [makeTask(id: taskID, title: "remote")])
+        )
+
+        XCTAssertEqual(result.snapshot.tasks.map(\.title), ["local"])
+        XCTAssertEqual(result.report.keptLocal, [SyncEntityKey(kind: .task, id: taskID)])
+        XCTAssertEqual(result.report.conflicting, [SyncEntityKey(kind: .task, id: taskID)])
+        XCTAssertFalse(result.report.localSnapshotChanged)
+    }
+
+    /// There is no clock in the merge, so a device with a wrong clock cannot
+    /// overwrite this one just by looking "newer".
+    func test_merge_doesNotUseATimestampToBreakTies() throws {
+        let taskID = UUID()
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(tasks: [makeTask(id: taskID, title: "local", startedAt: makeDate(2026, 3, 1))]),
+            remote: makeSnapshot(tasks: [makeTask(id: taskID, title: "remote", startedAt: makeDate(2027, 1, 1))])
+        )
+
+        XCTAssertEqual(result.snapshot.tasks.first?.title, "local")
+        XCTAssertEqual(result.snapshot.tasks.first?.startedAt, makeDate(2026, 3, 1))
+    }
+
+    /// This verifies the explicit **local-preference merge helper**. It is *not* a
+    /// proof that the future sync protocol does not converge — convergence is
+    /// Phase E's baseline comparison, not this function.
+    ///
+    /// The roles are part of the contract, not an implementation detail: swapping
+    /// them must swap the winner. This fails if someone "improves" the helper into
+    /// something order-independent without saying so, or reintroduces a content-hash
+    /// authority rule.
+    func test_mergePreferringLocal_isDeliberatelyNotCommutative() throws {
+        let taskID = UUID()
+        let a = makeSnapshot(tasks: [makeTask(id: taskID, title: "a")])
+        let b = makeSnapshot(tasks: [makeTask(id: taskID, title: "b")])
+
+        XCTAssertEqual(try WeekyiiSnapshotMergeService.mergePreferringLocal(local: a, remote: b).snapshot.tasks.map(\.title), ["a"])
+        XCTAssertEqual(try WeekyiiSnapshotMergeService.mergePreferringLocal(local: b, remote: a).snapshot.tasks.map(\.title), ["b"])
+    }
+
+    func test_merge_rejectsASnapshotWithDuplicateKeys() throws {
+        let sharedID = UUID()
+        let malformed = makeSnapshot(tasks: [makeTask(id: sharedID), makeTask(id: sharedID)])
+
+        XCTAssertThrowsError(try WeekyiiSnapshotMergeService.mergePreferringLocal(local: malformed, remote: makeSnapshot())) { error in
+            XCTAssertEqual(
+                error as? WeekyiiSnapshotCodecError,
+                .duplicateEntityKey(SyncEntityKey(kind: .task, id: sharedID))
+            )
+        }
+    }
+
+    func test_merge_rejectsAVersionMismatch() throws {
+        let future = WeekyiiBusinessSnapshot(
+            version: WeekyiiBusinessSnapshot.currentVersion + 1,
+            weeks: [], days: [], tasks: [], suspendedTasks: [], attachments: [],
+            projects: [], mindStamps: [], taskTypes: [], habits: [], habitDayRecords: []
+        )
+
+        XCTAssertThrowsError(try WeekyiiSnapshotMergeService.mergePreferringLocal(local: makeSnapshot(), remote: future)) { error in
+            XCTAssertEqual(
+                error as? WeekyiiSnapshotCodecError,
+                .versionMismatch(local: WeekyiiBusinessSnapshot.currentVersion, remote: future.version)
+            )
+        }
+    }
+
+    /// The additive half: an attachment that only the remote side knows about still
+    /// lands on the local task, because the attachment's own `owner` says so.
+    func test_merge_attachesARemoteAttachmentToALocalTask() throws {
+        let taskID = UUID()
+        let attachmentID = UUID()
+
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(tasks: [makeTask(id: taskID)]),
+            remote: makeSnapshot(
+                tasks: [makeTask(id: taskID)],
+                attachments: [makeAttachment(id: attachmentID, owner: .task(taskID), bytes: Data([0x01]))]
+            )
+        )
+
+        XCTAssertEqual(result.snapshot.tasks.first?.attachmentIds, [attachmentID])
+        XCTAssertEqual(result.report.relationshipConflictsResolved, [SyncEntityKey(kind: .task, id: taskID)])
+        XCTAssertTrue(result.report.localSnapshotChanged)
+        XCTAssertTrue(result.report.isClean, "\(result.report.diagnostics)")
+    }
+
+    /// `attachment.owner` wins over a stale `task.attachmentIds`. The other rule
+    /// would silently drop an attachment that arrived from the remote side.
+    func test_merge_letsTheAttachmentsOwnerWinOverAStaleTaskListing() throws {
+        let staleOwnerID = UUID()
+        let realOwnerID = UUID()
+        let attachmentID = UUID()
+
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(
+                tasks: [
+                    makeTask(id: staleOwnerID, attachmentIds: [attachmentID]),
+                    makeTask(id: realOwnerID),
+                ],
+                attachments: [makeAttachment(id: attachmentID, owner: .task(realOwnerID), bytes: Data([0x01]))]
+            ),
+            remote: makeSnapshot()
+        )
+
+        let tasks = Dictionary(uniqueKeysWithValues: result.snapshot.tasks.map { ($0.id, $0) })
+        XCTAssertEqual(tasks[staleOwnerID]?.attachmentIds, [])
+        XCTAssertEqual(tasks[realOwnerID]?.attachmentIds, [attachmentID])
+        XCTAssertEqual(
+            Set(result.report.relationshipConflictsResolved),
+            Set([SyncEntityKey(kind: .task, id: staleOwnerID), SyncEntityKey(kind: .task, id: realOwnerID)])
+        )
+        XCTAssertTrue(result.report.isClean, "\(result.report.diagnostics)")
+    }
+
+    func test_merge_keepsSuspendedTaskAttachmentsSeparateFromTaskAttachments() throws {
+        let taskID = UUID()
+        let suspendedID = UUID()
+        let attachmentID = UUID()
+
+        let result = try WeekyiiSnapshotMergeService.mergePreferringLocal(
+            local: makeSnapshot(tasks: [makeTask(id: taskID)]),
+            remote: makeSnapshot(
+                suspendedTasks: [makeSuspendedTask(id: suspendedID)],
+                attachments: [makeAttachment(id: attachmentID, owner: .suspendedTask(suspendedID), bytes: Data([0x01]))]
+            )
+        )
+
+        XCTAssertEqual(result.snapshot.tasks.first?.attachmentIds, [])
+        XCTAssertEqual(result.snapshot.suspendedTasks.first?.attachmentIds, [attachmentID])
+        XCTAssertTrue(result.report.isClean, "\(result.report.diagnostics)")
+    }
+
+    func test_rebuildRelationships_isIdempotent() throws {
+        let taskID = UUID()
+        let attachmentID = UUID()
+        let snapshot = makeSnapshot(
+            tasks: [makeTask(id: taskID)],
+            attachments: [makeAttachment(id: attachmentID, owner: .task(taskID), bytes: Data([0x01]))]
+        )
+
+        let once = WeekyiiSnapshotMergeService.rebuildRelationships(snapshot)
+        let twice = WeekyiiSnapshotMergeService.rebuildRelationships(once.snapshot)
+
+        XCTAssertEqual(once.snapshot, twice.snapshot)
+        XCTAssertEqual(once.changedOwners, [SyncEntityKey(kind: .task, id: taskID)])
+        XCTAssertTrue(twice.changedOwners.isEmpty)
+    }
+
+    func test_rebuildRelationships_leavesAnOrphanAttachmentInPlace() throws {
+        let attachmentID = UUID()
+        let snapshot = makeSnapshot(
+            attachments: [makeAttachment(id: attachmentID, owner: .task(UUID()), bytes: Data([0x01]))]
+        )
+
+        let rebuilt = WeekyiiSnapshotMergeService.rebuildRelationships(snapshot)
+
+        XCTAssertEqual(rebuilt.snapshot.attachments.count, 1, "an unattachable row must not be dropped")
+        XCTAssertTrue(rebuilt.changedOwners.isEmpty)
+        XCTAssertEqual(WeekyiiSnapshotRepository.validate(rebuilt.snapshot).map(\.kind), [.orphanAttachment])
+    }
+
+    // MARK: - Archive adapter
+
+    func test_archiveAdapter_hoistsNestedAttachmentsAndHabitLogs() throws {
+        let taskID = UUID()
+        let attachmentID = UUID()
+        let habitID = UUID()
+        let logID = UUID()
+        let bytes = Data([0xAB, 0xCD])
+
+        let export = WeekyiiSnapshotArchiveAdapter.export(
+            makeSnapshot(
+                tasks: [makeTask(id: taskID, attachmentIds: [attachmentID])],
+                attachments: [makeAttachment(id: attachmentID, owner: .task(taskID), bytes: bytes)],
+                habits: [makeHabit(id: habitID)],
+                habitDayRecords: [makeHabitDayRecord(id: logID, habitId: habitID, dayId: "2026-03-12")]
+            ),
+            settings: makeSettings(),
+            appState: makeAppState()
+        )
+
+        XCTAssertTrue(export.isLossless)
+        XCTAssertEqual(export.payload.tasks.count, 1)
+        XCTAssertEqual(export.payload.tasks.first?.attachments.map(\.id), [attachmentID])
+        XCTAssertEqual(export.payload.tasks.first?.attachments.first?.data, bytes)
+        XCTAssertEqual(export.payload.habits?.first?.dayLogs?.map(\.id), [logID])
+
+        let restored = WeekyiiSnapshotArchiveAdapter.snapshot(from: export.payload)
+
+        XCTAssertEqual(restored.attachments.count, 1)
+        XCTAssertEqual(restored.attachments.first?.owner, .task(taskID))
+        XCTAssertEqual(restored.attachments.first?.data, bytes)
+        XCTAssertEqual(restored.habitDayRecords.count, 1)
+        XCTAssertEqual(restored.habitDayRecords.first?.habitId, habitID)
+    }
+
+    func test_archiveAdapter_roundTripsTheWholeGraph() throws {
+        let graph = makeGraph()
+        let export = WeekyiiSnapshotArchiveAdapter.export(
+            graph,
+            settings: makeSettings(),
+            appState: makeAppState()
+        )
+        XCTAssertTrue(export.isLossless)
+
+        let restored = WeekyiiSnapshotArchiveAdapter.snapshot(from: export.payload)
+
+        XCTAssertEqual(restored.weeks, graph.weeks)
+        XCTAssertEqual(restored.days, graph.days)
+        XCTAssertEqual(restored.tasks, graph.tasks)
+        XCTAssertEqual(restored.suspendedTasks, graph.suspendedTasks)
+        XCTAssertEqual(restored.attachments, graph.attachments)
+        XCTAssertEqual(restored.projects, graph.projects)
+        XCTAssertEqual(restored.mindStamps, graph.mindStamps)
+        XCTAssertEqual(restored.taskTypes, graph.taskTypes)
+        XCTAssertEqual(restored.habits, graph.habits)
+        XCTAssertEqual(restored.habitDayRecords, graph.habitDayRecords)
+        XCTAssertEqual(
+            try WeekyiiSnapshotCodec.snapshotHash(restored),
+            try WeekyiiSnapshotCodec.snapshotHash(graph)
+        )
+    }
+
+    func test_archiveAdapterIgnoresLegacyWatermarkAndExportsNeutralV1Value() throws {
+        let graph = makeGraph()
+        let initialExport = WeekyiiSnapshotArchiveAdapter.export(
+            graph,
+            settings: makeSettings(),
+            appState: makeAppState()
+        )
+        XCTAssertEqual(initialExport.payload.habits?.first?.generatedThroughDayId, "")
+
+        let encoded = try JSONEncoder().encode(initialExport.payload)
+        var archiveObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var habitRecords = try XCTUnwrap(archiveObject["habits"] as? [[String: Any]])
+        habitRecords[0]["generatedThroughDayId"] = "2099-12-31"
+        archiveObject["habits"] = habitRecords
+        let legacyPayloadData = try JSONSerialization.data(withJSONObject: archiveObject)
+        let legacyPayload = try JSONDecoder().decode(WeekyiiDataArchiveService.Payload.self, from: legacyPayloadData)
+
+        let normalized = WeekyiiSnapshotArchiveAdapter.snapshot(from: legacyPayload)
+        XCTAssertEqual(normalized.habits, graph.habits)
+
+        let reexport = WeekyiiSnapshotArchiveAdapter.export(
+            normalized,
+            settings: makeSettings(),
+            appState: makeAppState()
+        )
+        XCTAssertEqual(reexport.payload.habits?.first?.generatedThroughDayId, "")
+        XCTAssertEqual(WeekyiiDataArchiveService.currentFormatVersion, 1)
+        XCTAssertEqual(WeekyiiDataArchiveService.currentSchemaVersion, 8)
+    }
+
+    func test_archiveAdapter_reportsWhatTheArchiveFormatCannotHold() throws {
+        let orphanAttachmentID = UUID()
+        let orphanLogID = UUID()
+
+        let export = WeekyiiSnapshotArchiveAdapter.export(
+            makeSnapshot(
+                attachments: [makeAttachment(id: orphanAttachmentID, owner: .task(UUID()), bytes: Data([0x01]))],
+                habitDayRecords: [makeHabitDayRecord(id: orphanLogID, habitId: nil, dayId: "2026-03-12")]
+            ),
+            settings: makeSettings(),
+            appState: makeAppState()
+        )
+
+        XCTAssertFalse(export.isLossless)
+        XCTAssertEqual(
+            Set(export.droppedEntities),
+            Set([
+                SyncEntityKey(kind: .attachment, id: orphanAttachmentID),
+                SyncEntityKey(kind: .habitDayRecord, id: orphanLogID),
+            ])
+        )
+    }
+
+    /// The adapter changes the in-memory shape only. If someone bumps the archive
+    /// format version to carry the normalized shape, this fails.
+    func test_archiveAdapter_leavesTheArchiveFormatVersionAlone() throws {
+        XCTAssertEqual(WeekyiiDataArchiveService.currentFormatVersion, 1)
+        XCTAssertEqual(WeekyiiDataArchiveService.currentSchemaVersion, 8)
+        XCTAssertEqual(WeekyiiDataArchiveService.formatIdentifier, "com.fluentdesign.weekyii.archive")
+    }
+
+    // MARK: - Fixtures
+
+    private func makeGraph() -> WeekyiiBusinessSnapshot {
+        let weekId = "2026-W11"
+        let dayId = "2026-03-12"
+        let projectID = UUID()
+        let habitID = UUID()
+        let taskID = UUID()
+        let suspendedID = UUID()
+        let attachmentID = UUID()
+
+        return makeSnapshot(
+            weeks: [makeWeek(weekId: weekId)],
+            days: [makeDay(dayId: dayId, weekId: weekId)],
+            tasks: [
+                makeTask(id: taskID, dayId: dayId, projectId: projectID, habitId: habitID, attachmentIds: [attachmentID])
+            ],
+            suspendedTasks: [makeSuspendedTask(id: suspendedID)],
+            attachments: [makeAttachment(id: attachmentID, owner: .task(taskID), bytes: Data([0x01, 0x02]))],
+            projects: [makeProject(id: projectID)],
+            mindStamps: [MindStampSnapshot(id: UUID(), text: "stamp", imageBlob: nil, createdAt: makeDate(2026, 3, 1))],
+            taskTypes: [makeTaskType(idRaw: "custom-writing")],
+            habits: [makeHabit(id: habitID)],
+            habitDayRecords: [makeHabitDayRecord(id: UUID(), habitId: habitID, dayId: dayId)]
+        )
+    }
+
+    private func makeSnapshot(
+        weeks: [WeekSnapshot] = [],
+        days: [DaySnapshot] = [],
+        tasks: [TaskSnapshot] = [],
+        suspendedTasks: [SuspendedTaskSnapshot] = [],
+        attachments: [AttachmentSnapshot] = [],
+        projects: [ProjectSnapshot] = [],
+        mindStamps: [MindStampSnapshot] = [],
+        taskTypes: [TaskTypeSnapshot] = [],
+        habits: [HabitSnapshot] = [],
+        habitDayRecords: [HabitDayRecordSnapshot] = []
+    ) -> WeekyiiBusinessSnapshot {
+        WeekyiiBusinessSnapshot(
+            weeks: weeks,
+            days: days,
+            tasks: tasks,
+            suspendedTasks: suspendedTasks,
+            attachments: attachments,
+            projects: projects,
+            mindStamps: mindStamps,
+            taskTypes: taskTypes,
+            habits: habits,
+            habitDayRecords: habitDayRecords
+        )
+    }
+
+    private func makeWeek(weekId: String) -> WeekSnapshot {
+        WeekSnapshot(
+            weekId: weekId,
+            startDate: makeDate(2026, 3, 9),
+            endDate: makeDate(2026, 3, 15),
+            status: .present,
+            completedTasksCount: 0,
+            expiredTasksCount: 0,
+            totalStartedDays: 0
+        )
+    }
+
+    private func makeDay(dayId: String, weekId: String?) -> DaySnapshot {
+        DaySnapshot(
+            dayId: dayId,
+            weekId: weekId,
+            date: makeDate(2026, 3, 12),
+            dayOfWeek: "Thu",
+            status: .draft,
+            killTimeHour: 23,
+            killTimeMinute: 45,
+            followsDefaultKillTime: true,
+            initiatedAt: nil,
+            closedAt: nil,
+            executionModeRaw: ExecutionMode.strict.rawValue,
+            isDraftZoneUnlocked: false,
+            expiredCount: 0
+        )
+    }
+
+    private func makeTask(
+        id: UUID,
+        title: String = "T",
+        dayId: String? = nil,
+        projectId: UUID? = nil,
+        habitId: UUID? = nil,
+        startedAt: Date? = nil,
+        attachmentIds: [UUID] = []
+    ) -> TaskSnapshot {
+        TaskSnapshot(
+            id: id,
+            dayId: dayId,
+            projectId: projectId,
+            habitId: habitId,
+            title: title,
+            taskDescription: "",
+            taskType: .regular,
+            taskTypeIdRaw: TaskType.regular.rawValue,
+            order: 1,
+            zone: .draft,
+            startedAt: startedAt,
+            endedAt: nil,
+            completedOrder: 0,
+            steps: [],
+            // Sorted here because the repository also sorts, so a fixture and a
+            // rebuilt snapshot compare equal.
+            attachmentIds: attachmentIds.sorted { $0.uuidString < $1.uuidString }
+        )
+    }
+
+    private func makeSuspendedTask(id: UUID, attachmentIds: [UUID] = []) -> SuspendedTaskSnapshot {
+        SuspendedTaskSnapshot(
+            id: id,
+            title: "S",
+            taskDescription: "",
+            taskType: .regular,
+            taskTypeIdRaw: TaskType.regular.rawValue,
+            createdAt: makeDate(2026, 3, 1),
+            decisionDeadline: makeDate(2026, 3, 22),
+            preferredCountdownDays: 10,
+            snoozeCount: 0,
+            statusRaw: SuspendedTaskStatus.active.rawValue,
+            steps: [],
+            attachmentIds: attachmentIds.sorted { $0.uuidString < $1.uuidString }
+        )
+    }
+
+    private func makeAttachment(id: UUID, owner: AttachmentOwner, bytes: Data?) -> AttachmentSnapshot {
+        AttachmentSnapshot(
+            id: id,
+            owner: owner,
+            data: bytes,
+            fileName: "a.bin",
+            fileType: "application/octet-stream",
+            createdAt: makeDate(2026, 3, 1)
+        )
+    }
+
+    private func makeProject(id: UUID) -> ProjectSnapshot {
+        ProjectSnapshot(
+            id: id,
+            name: "P",
+            projectDescription: "",
+            color: "#C46A1A",
+            icon: "folder.fill",
+            status: .active,
+            startDate: makeDate(2026, 3, 1),
+            endDate: makeDate(2026, 3, 31),
+            createdAt: makeDate(2026, 3, 1),
+            tileSizeRaw: ProjectTileSize.medium.rawValue,
+            tileOrder: 0
+        )
+    }
+
+    private func makeTaskType(idRaw: String) -> TaskTypeSnapshot {
+        TaskTypeSnapshot(
+            idRaw: idRaw,
+            name: "写作",
+            iconName: "pencil",
+            colorHex: "#C46A1A",
+            baseKindRaw: TaskType.regular.rawValue,
+            sortOrder: 0,
+            isBuiltIn: false,
+            isArchived: false
+        )
+    }
+
+    private func makeHabit(id: UUID) -> HabitSnapshot {
+        HabitSnapshot(
+            id: id,
+            name: "H",
+            iconName: "repeat.circle.fill",
+            colorHex: "#34C759",
+            categoryRaw: HabitCategory.health.rawValue,
+            scheduleKindRaw: HabitScheduleKind.weekly.rawValue,
+            scheduleWeekdaysRaw: 0b0011111,
+            scheduleMonthDaysRaw: 0,
+            startDayId: "2026-03-01",
+            isActive: true,
+            createdAt: makeDate(2026, 3, 1),
+            sortOrder: 0
+        )
+    }
+
+    private func makeHabitDayRecord(id: UUID, habitId: UUID?, dayId: String) -> HabitDayRecordSnapshot {
+        HabitDayRecordSnapshot(
+            id: id,
+            habitId: habitId,
+            dayId: dayId,
+            statusRaw: HabitDayRecordStatus.pending.rawValue,
+            createdAt: makeDate(2026, 3, 12),
+            completedAt: nil
+        )
+    }
+
+    private func makeSettings() -> WeekyiiDataArchiveService.SettingsRecord {
+        WeekyiiDataArchiveService.SettingsRecord(
+            defaultKillTimeHour: 23,
+            defaultKillTimeMinute: 45,
+            defaultTaskTypeRaw: TaskType.regular.rawValue,
+            defaultTaskTypeIdRaw: TaskType.regular.rawValue,
+            defaultExecutionModeRaw: ExecutionMode.strict.rawValue,
+            killTimeReminderMinutes: 30,
+            fixedReminderEnabled: false,
+            fixedReminderHour: 9,
+            fixedReminderMinute: 0,
+            weekStartsOnMonday: true,
+            defaultProjectDurationDays: 30,
+            defaultProjectTileSizeRaw: ProjectTileSize.medium.rawValue,
+            pendingMonthShowRegular: true,
+            pendingMonthShowDDL: true,
+            pendingMonthShowLeisure: false,
+            selectedThemeRaw: WeekTheme.amber.rawValue,
+            appearanceModeRaw: "system",
+            premiumThemeUnlocked: false
+        )
+    }
+
+    private func makeAppState() -> WeekyiiDataArchiveService.AppStateRecord {
+        WeekyiiDataArchiveService.AppStateRecord(
+            daysStartedCount: 3,
+            dataRevision: 7,
+            stateTransitionRevision: 2,
+            systemStartDate: makeDate(2026, 1, 1),
+            lastProcessedDate: makeDate(2026, 3, 12),
+            lastRolloverAt: makeDate(2026, 3, 12)
+        )
+    }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 9, _ minute: Int = 0, _ second: Int = 0) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .iso8601)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        guard let date = components.date else {
+            fatalError("Invalid date components")
+        }
+        return date
     }
 }

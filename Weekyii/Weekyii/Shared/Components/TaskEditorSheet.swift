@@ -63,7 +63,8 @@ struct TaskEditorSheet: View {
                     id: UUID(),
                     title: step.title,
                     isCompleted: step.isCompleted,
-                    sortOrder: index
+                    sortOrder: index,
+                    createdAt: step.createdAt
                 )
             }
         )
@@ -538,6 +539,9 @@ private struct TaskStepDraft: Identifiable {
     var title: String
     var isCompleted: Bool
     var sortOrder: Int
+    /// Carried across from the persisted step so that saving an untouched step
+    /// does not look like a content change to the sync layer.
+    var createdAt: Date = Date()
 }
 
 struct ImagePreviewItem: Identifiable {

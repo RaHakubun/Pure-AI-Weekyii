@@ -559,9 +559,9 @@ struct TodayView: View {
                             }
                             .foregroundColor(.white)
                             .background(.white.opacity(0.2), in: Capsule())
-                            .buttonStyle(.plain)
-                            .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
-                            .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
+                        .buttonStyle(.plain)
+                        .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
+                        .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
                             .accessibilityIdentifier("focusExchangeButton")
                         }
 
@@ -644,7 +644,7 @@ struct TodayView: View {
                 }
             }
         }
-        
+
         // 已完成任务
         if !day.completedTasks.isEmpty {
             WeekCard {

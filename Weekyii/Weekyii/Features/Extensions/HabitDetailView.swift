@@ -17,7 +17,7 @@ struct HabitDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 identitySection(stats: stats)
-                actionSection
+                actionSection(stats: stats)
                 statisticsCard(stats: stats)
                 timelineSection
             }
@@ -29,6 +29,44 @@ struct HabitDetailView: View {
         .navigationTitle(habit.name)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("habitDetailView")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        Label(String(localized: "action.edit"), systemImage: "pencil")
+                    }
+                    .accessibilityIdentifier("habitDetailEditButton")
+
+                    Button {
+                        toggleActive()
+                    } label: {
+                        Label(
+                            habit.isActive
+                                ? String(localized: "habit.action.archive", defaultValue: "停用")
+                                : String(localized: "habit.action.restore", defaultValue: "恢复"),
+                            systemImage: habit.isActive ? "archivebox" : "arrow.uturn.backward"
+                        )
+                    }
+                    .accessibilityIdentifier("habitDetailArchiveButton")
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label(String(localized: "habit.detail.delete", defaultValue: "删除习惯"), systemImage: "trash")
+                    }
+                    .accessibilityIdentifier("habitDetailDeleteButton")
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(Color.textPrimary)
+                }
+                .accessibilityIdentifier("habitDetailMenu")
+            }
+        }
         .sheet(isPresented: $showingEditor, onDismiss: {
             viewModel.refresh()
         }) {
@@ -74,111 +112,61 @@ struct HabitDetailView: View {
     }
 
     private func identitySection(stats: HabitStatistics) -> some View {
-        HStack(alignment: .center, spacing: WeekSpacing.md) {
-            Image(systemName: habit.iconName)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(habit.habitColor)
-                .frame(width: 52, height: 52)
-                .background(habit.habitColor.opacity(0.12), in: Circle())
+        WeekCard(accentColor: habit.habitColor) {
+            HStack(alignment: .top, spacing: WeekSpacing.md) {
+                Image(systemName: habit.iconName)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(habit.habitColor)
+                    .frame(width: 58, height: 58)
+                    .background(habit.habitColor.opacity(0.12), in: Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(habit.name)
-                    .font(.titleMedium)
-                    .foregroundColor(.textPrimary)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(habit.name)
+                        .font(.titleMedium)
+                        .foregroundColor(.textPrimary)
+                        .lineLimit(2)
 
-                Text("\(habit.category.displayName) · \(habit.scheduleSummary)")
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-
-                if habit.startDate != nil {
-                    Text(startsOnText)
-                        .font(.caption)
+                    Text("\(habit.category.displayName) · \(habit.scheduleSummary)")
+                        .font(.subheadline)
                         .foregroundColor(.textSecondary)
+
+                    if habit.startDate != nil {
+                        Text(startsOnText)
+                            .font(.caption)
+                            .foregroundColor(.textTertiary)
+                    }
                 }
+
+                Spacer(minLength: 0)
+
+                HabitTodayStatusChip(status: stats.todayStatus)
             }
-
-            Spacer(minLength: WeekSpacing.sm)
-
-            HabitTodayStatusChip(status: stats.todayStatus)
         }
     }
 
+
     // MARK: - Actions
 
-    private var actionSection: some View {
-        VStack(spacing: WeekSpacing.md) {
-            HStack(spacing: WeekSpacing.md) {
-                Button {
-                    addToday()
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text(String(localized: "habit.detail.add_today", defaultValue: "加入今日"))
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(habit.isActive ? Color.accentGreen : Color.textTertiary)
-                    .clipShape(Capsule())
+    @ViewBuilder
+    private func actionSection(stats: HabitStatistics) -> some View {
+        if stats.todayStatus != .notScheduled && !stats.hasTodayTask {
+            Button {
+                addToday()
+            } label: {
+                HStack(spacing: WeekSpacing.xs) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(String(localized: "habit.detail.add_today", defaultValue: "加入今日"))
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(!habit.isActive)
-                .accessibilityIdentifier("habitDetailAddTodayButton")
-
-                Button {
-                    showingEditor = true
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text(String(localized: "action.edit"))
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundColor(.textPrimary)
-                    .padding(.horizontal, WeekSpacing.xl)
-                    .padding(.vertical, WeekSpacing.md)
-                    .background(Color.backgroundSecondary)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.backgroundTertiary, lineWidth: 1))
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityIdentifier("habitDetailEditButton")
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, WeekSpacing.md)
+                .background(Color.accentGreen)
+                .clipShape(Capsule())
             }
-
-            HStack {
-                Button {
-                    toggleActive()
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: habit.isActive ? "archivebox" : "arrow.uturn.backward")
-                        Text(
-                            habit.isActive
-                                ? String(localized: "habit.action.archive", defaultValue: "停用")
-                                : String(localized: "habit.action.restore", defaultValue: "恢复")
-                        )
-                    }
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                }
-                .accessibilityIdentifier("habitDetailArchiveButton")
-
-                Spacer()
-
-                Button {
-                    showingDeleteConfirm = true
-                } label: {
-                    HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "trash")
-                        Text(String(localized: "habit.detail.delete", defaultValue: "删除习惯"))
-                    }
-                    .font(.caption)
-                    .foregroundColor(.taskDDL)
-                }
-                .accessibilityIdentifier("habitDetailDeleteButton")
-            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("habitDetailAddTodayButton")
         }
     }
 
@@ -191,20 +179,23 @@ struct HabitDetailView: View {
                     .font(.titleSmall)
                     .foregroundColor(.textPrimary)
 
-                HStack(spacing: WeekSpacing.sm) {
+                HStack(spacing: 0) {
                     statColumn(
                         title: String(localized: "habit.stats.current_streak", defaultValue: "当前连续"),
                         value: "\(stats.currentStreak)"
                     )
+                    Divider().frame(height: 36)
                     statColumn(
                         title: String(localized: "habit.stats.longest_streak", defaultValue: "最长连续"),
                         value: "\(stats.longestStreak)"
                     )
+                    Divider().frame(height: 36)
                     statColumn(
                         title: String(localized: "habit.stats.completion_rate", defaultValue: "完成率"),
                         value: stats.completionRatePercent.map { "\($0)%" }
                             ?? String(localized: "habit.stats.placeholder", defaultValue: "—")
                     )
+                    Divider().frame(height: 36)
                     statColumn(
                         title: String(localized: "habit.stats.total_completed", defaultValue: "累计完成"),
                         value: "\(stats.completedCount)"
@@ -216,9 +207,9 @@ struct HabitDetailView: View {
     }
 
     private func statColumn(title: String, value: String) -> some View {
-        VStack(spacing: WeekSpacing.xs) {
+        VStack(spacing: 4) {
             Text(value)
-                .font(.titleSmall)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundColor(habit.habitColor)
                 .contentTransition(.numericText())
                 .lineLimit(1)
@@ -231,6 +222,7 @@ struct HabitDetailView: View {
         }
         .frame(maxWidth: .infinity)
     }
+
 
     // MARK: - Timeline
 
@@ -248,32 +240,51 @@ struct HabitDetailView: View {
                     .frame(maxWidth: .infinity)
                     .weekPaddingVertical(WeekSpacing.lg)
             } else {
-                LazyVStack(alignment: .leading, spacing: WeekSpacing.lg) {
+                LazyVStack(alignment: .leading, spacing: WeekSpacing.md) {
                     ForEach(groups) { group in
-                        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
                             Text(group.title)
-                                .font(.titleSmall)
-                                .foregroundColor(.textPrimary)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.textSecondary)
+                                .padding(.leading, WeekSpacing.xs)
 
                             VStack(spacing: 0) {
                                 ForEach(group.nodes) { node in
                                     timelineRow(node)
                                     if node.id != group.nodes.last?.id {
                                         Divider()
-                                            .padding(.leading, 18)
+                                            .padding(.leading, 22)
                                     }
                                 }
                             }
+                            .background(Color.backgroundSecondary)
+                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
+                            )
                         }
                     }
                 }
             }
 
-            Text(String(localized: "habit.timeline.footer", defaultValue: "「中断」= 当日已生成但未完成；「未记录」= 当日未生成（未打开 App 或已过截止时间）。"))
-                .font(.caption2)
-                .foregroundColor(.textTertiary)
+            // Footer note - wrapped in a subtle info chip
+            HStack(alignment: .top, spacing: WeekSpacing.xs) {
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.textTertiary)
+                Text(String(localized: "habit.timeline.footer", defaultValue: "「中断」= 当日已生成但未完成；「未记录」= 当日未生成（未打开 App 或已过截止时间）。"))
+                    .font(.caption2)
+                    .foregroundColor(.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, WeekSpacing.sm)
+            .padding(.vertical, WeekSpacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.small))
         }
     }
+
 
     private func timelineRow(_ node: HabitTimelineNode) -> some View {
         HStack(spacing: WeekSpacing.sm) {
@@ -286,11 +297,13 @@ struct HabitDetailView: View {
             Spacer(minLength: WeekSpacing.sm)
 
             Text(statusText(node))
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .foregroundColor(statusColor(node.state))
         }
-        .padding(.vertical, WeekSpacing.sm)
+        .padding(.horizontal, WeekSpacing.md)
+        .padding(.vertical, WeekSpacing.sm + 2)
     }
+
 
     @ViewBuilder
     private func timelineDot(_ state: HabitTimelineNodeState) -> some View {

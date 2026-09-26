@@ -1,116 +1,98 @@
 import Foundation
 import SwiftData
-#if DEBUG
-import CoreData
-#endif
 import CryptoKit
 
 enum WeekyiiPersistence {
-    nonisolated static let cloudKitContainerIdentifier = "iCloud.com.fluentdesign.Weekyii"
-
     enum StoreMode: Equatable {
-        case production
-        case localOnly
+        case persistent
         case inMemory
+    }
 
-        var cloudKitContainerIdentifier: String? {
-            switch self {
-            case .production:
-                return WeekyiiPersistence.cloudKitContainerIdentifier
-            case .localOnly, .inMemory:
-                return nil
-            }
-        }
+    enum PersistenceConsistencyDiagnostic: Equatable {
+        case multiplePresentWeeks(count: Int)
+    }
+
+    struct PersistenceConsistencyReport: Equatable {
+        let diagnostics: [PersistenceConsistencyDiagnostic]
+
+        var isConsistent: Bool { diagnostics.isEmpty }
+        static let clean = Self(diagnostics: [])
+    }
+
+    struct PersistenceBootstrapDiagnostics: Equatable {
+        let invariantRepair: DataInvariantRepairReport
+        let consistency: PersistenceConsistencyReport
+
+        static let clean = Self(
+            invariantRepair: DataInvariantRepairReport(),
+            consistency: .clean
+        )
     }
 
     enum LaunchState {
-        case ready(ModelContainer)
+        case resolving
+        case ready(ModelContainer, diagnostics: PersistenceBootstrapDiagnostics)
         case failed(String)
     }
 
     static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV8.self)
 
-    static func shouldInitializeCloudKitSchema(arguments: [String]) -> Bool {
-        #if DEBUG
-        arguments.contains("-initializeCloudKitSchema")
-        #else
-        false
-        #endif
-    }
-
-    #if DEBUG
-    static func initializeCloudKitDevelopmentSchema() throws {
-        guard let managedObjectModel = NSManagedObjectModel.makeManagedObjectModel(
-            for: WeekyiiSchemaV8.models
-        ) else {
-            throw WeekyiiPersistenceError.inconsistentState(
-                "Unable to synthesize the CloudKit managed object model."
-            )
-        }
-
-        let fileManager = FileManager.default
-        let schemaFolder = fileManager.temporaryDirectory
-            .appendingPathComponent("WeekyiiCloudKitSchema", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try fileManager.createDirectory(at: schemaFolder, withIntermediateDirectories: true)
-        defer { try? fileManager.removeItem(at: schemaFolder) }
-
-        try autoreleasepool {
-            let storeURL = schemaFolder.appendingPathComponent("Schema.store")
-            let description = NSPersistentStoreDescription(url: storeURL)
-            description.shouldAddStoreAsynchronously = false
-            description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
-                containerIdentifier: cloudKitContainerIdentifier
-            )
-
-            let container = NSPersistentCloudKitContainer(
-                name: "WeekyiiCloudKitSchema",
-                managedObjectModel: managedObjectModel
-            )
-            container.persistentStoreDescriptions = [description]
-
-            var loadError: Error?
-            container.loadPersistentStores { _, error in
-                loadError = error
-            }
-            if let loadError { throw loadError }
-
-            defer {
-                if let store = container.persistentStoreCoordinator.persistentStores.first {
-                    try? container.persistentStoreCoordinator.remove(store)
-                }
-            }
-
-            try container.initializeCloudKitSchema()
-        }
-    }
-    #endif
-
-    static func launchStoreMode(environment: [String: String]) -> StoreMode {
-        environment["XCTestConfigurationFilePath"] == nil ? .production : .localOnly
-    }
-
     static func bootstrapPersistentContainer(
-        environment: [String: String] = ProcessInfo.processInfo.environment,
         storeURL: URL? = nil,
-        storeMode: StoreMode? = nil,
-        referenceDate: Date = Date()
+        storeMode: StoreMode = .persistent,
+        referenceDate: Date = Date(),
+        legacyStoreURL: URL? = nil,
+        defaults: UserDefaults = .standard,
+        invariantRepair: (@MainActor (ModelContainer, Date) throws -> DataInvariantRepairReport)? = nil
     ) -> LaunchState {
         let resolvedStoreURL = storeURL ?? persistentStoreURL()
-        backupPersistentStoreIfExists(storeURL: resolvedStoreURL)
+        let resolvedLegacyStoreURL = legacyStoreURL
+            ?? LegacyStoreConsolidator.legacyStoreURL(beside: resolvedStoreURL)
 
         do {
+            // This must precede every production open of the canonical ModelContainer.
+            // A failure is fatal for launch: opening canonical anyway could hide data
+            // still stranded in the legacy store.
+            _ = try LegacyStoreConsolidator.consolidateIfNeeded(
+                canonicalStoreURL: resolvedStoreURL,
+                legacyStoreURL: resolvedLegacyStoreURL,
+                defaults: defaults
+            )
+            backupPersistentStoreIfExists(storeURL: resolvedStoreURL)
             let container = try makeModelContainer(
                 storeURL: resolvedStoreURL,
-                storeMode: storeMode ?? launchStoreMode(environment: environment)
+                storeMode: storeMode
             )
-            _ = DataInvariantRepairService(modelContainer: container).repair(referenceDate: referenceDate)
-            try validateContainerConsistency(container: container)
-            return .ready(container)
+            try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: container.mainContext)
+            let repairReport: DataInvariantRepairReport
+            if let invariantRepair {
+                repairReport = try invariantRepair(container, referenceDate)
+            } else {
+                repairReport = try DataInvariantRepairService(modelContainer: container)
+                    .repairForBootstrap(referenceDate: referenceDate)
+            }
+            let consistency = try validateContainerConsistency(container: container)
+            return .ready(
+                container,
+                diagnostics: PersistenceBootstrapDiagnostics(
+                    invariantRepair: repairReport,
+                    consistency: consistency
+                )
+            )
         } catch {
             print("Weekyii: persistent ModelContainer init failed: \(error.localizedDescription)")
-            return .failed("本地数据库无法打开。应用已停止写入，避免数据进一步受损。请先导出 Application Support/Weekyii 下的文件，再联系处理迁移。")
+            return .failed("本地数据整理或数据库初始化失败，应用已停止启动以保护数据：\(error.localizedDescription)。请先保留 Application Support/Weekyii 下的文件，再处理恢复或迁移。")
         }
+    }
+
+    static func persistentModelConfiguration(storeURL: URL? = nil) -> ModelConfiguration {
+        ModelConfiguration(
+            "Weekyii",
+            schema: currentSchema,
+            url: storeURL ?? persistentStoreURL(),
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
     }
 
     static func makeModelContainer(
@@ -118,22 +100,11 @@ enum WeekyiiPersistence {
         inMemory: Bool = false,
         storeMode: StoreMode? = nil
     ) throws -> ModelContainer {
-        let resolvedMode = storeMode ?? (inMemory ? .inMemory : .localOnly)
         let config: ModelConfiguration
-        if resolvedMode == .inMemory {
+        if inMemory || storeMode == .inMemory {
             config = ModelConfiguration("Weekyii", schema: currentSchema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         } else {
-            let url = storeURL ?? persistentStoreURL()
-            let cloudKitDatabase = resolvedMode.cloudKitContainerIdentifier.map {
-                ModelConfiguration.CloudKitDatabase.private($0)
-            } ?? .none
-            config = ModelConfiguration(
-                "Weekyii",
-                schema: currentSchema,
-                url: url,
-                allowsSave: true,
-                cloudKitDatabase: cloudKitDatabase
-            )
+            config = persistentModelConfiguration(storeURL: storeURL)
         }
 
         let container = try ModelContainer(
@@ -141,7 +112,6 @@ enum WeekyiiPersistence {
             migrationPlan: WeekyiiMigrationPlan.self,
             configurations: config
         )
-        try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: container.mainContext)
         return container
     }
 
@@ -195,13 +165,18 @@ enum WeekyiiPersistence {
         ].joined(separator: "\n")
     }
 
-    private static func validateContainerConsistency(container: ModelContainer) throws {
+    private static func validateContainerConsistency(
+        container: ModelContainer
+    ) throws -> PersistenceConsistencyReport {
         let context = container.mainContext
         let weeks = try context.fetch(FetchDescriptor<WeekModel>())
         let presentWeeks = weeks.filter { $0.status == .present }
         if presentWeeks.count > 1 {
-            throw WeekyiiPersistenceError.inconsistentState("Detected \(presentWeeks.count) present weeks.")
+            return PersistenceConsistencyReport(
+                diagnostics: [.multiplePresentWeeks(count: presentWeeks.count)]
+            )
         }
+        return .clean
     }
 
     private static func makeFileEntry(

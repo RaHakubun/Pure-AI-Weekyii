@@ -92,7 +92,6 @@ struct TaskTypeCatalog {
     }
 
     static func load(in context: ModelContext) throws -> TaskTypeCatalog {
-        try seedBuiltInTypesIfNeeded(in: context)
         let descriptor = FetchDescriptor<TaskTypeDefinition>()
         return TaskTypeCatalog(definitions: try context.fetch(descriptor))
     }

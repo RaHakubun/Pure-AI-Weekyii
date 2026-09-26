@@ -232,7 +232,8 @@ enum LiveActivityActionRouter {
         url: URL,
         modelContext: ModelContext,
         appState: AppState,
-        userSettings: UserSettings
+        userSettings: UserSettings,
+        timeProvider: (any TimeProviding)? = nil
     ) {
         handle(
             url: url,
@@ -240,7 +241,8 @@ enum LiveActivityActionRouter {
             appState: appState,
             userSettings: userSettings,
             notificationService: NotificationService.shared,
-            liveActivityService: TodayLiveActivityService.shared
+            liveActivityService: TodayLiveActivityService.shared,
+            timeProvider: timeProvider
         )
     }
 
@@ -250,13 +252,14 @@ enum LiveActivityActionRouter {
         appState: AppState,
         userSettings: UserSettings,
         notificationService: any NotificationScheduling,
-        liveActivityService: any LiveActivityManaging
+        liveActivityService: any LiveActivityManaging,
+        timeProvider: (any TimeProviding)? = nil
     ) {
         guard let request = LiveActivityAction.parse(url: url) else { return }
-        let timeProvider = TimeProvider()
+        let resolvedTimeProvider = timeProvider ?? TimeProvider()
         let viewModel = TodayViewModel(
             modelContext: modelContext,
-            timeProvider: timeProvider,
+            timeProvider: resolvedTimeProvider,
             notificationService: notificationService,
             appState: appState,
             userSettings: userSettings,
@@ -274,7 +277,7 @@ enum LiveActivityActionRouter {
                 try viewModel.doneFocus()
             case .postponeFocus:
                 guard let focus = viewModel.today?.focusTask else { return }
-                let targetDate = timeProvider.today.addingDays(request.days)
+                let targetDate = resolvedTimeProvider.today.addingDays(request.days)
                 let preview = try viewModel.previewPostpone(
                     taskID: focus.id,
                     taskTitle: focus.title,
@@ -288,8 +291,8 @@ enum LiveActivityActionRouter {
             appState.bumpDataRevision()
             WidgetSnapshotComposer.syncFromModelContext(
                 modelContext: modelContext,
-                now: timeProvider.now,
-                todayDate: timeProvider.today,
+                now: resolvedTimeProvider.now,
+                todayDate: resolvedTimeProvider.today,
                 selectedThemeRaw: userSettings.selectedThemeRaw,
                 appearanceModeRaw: userSettings.appearanceModeRaw,
                 premiumThemeUnlocked: userSettings.premiumThemeUnlocked
@@ -297,7 +300,7 @@ enum LiveActivityActionRouter {
             scheduleCriticalLiveActivitySync(
                 liveActivityService: liveActivityService,
                 modelContext: modelContext,
-                timeProvider: timeProvider,
+                timeProvider: resolvedTimeProvider,
                 userSettings: userSettings
             )
         } catch {
@@ -466,41 +469,31 @@ final class AppHealthCoordinator: AppHealthCoordinating {
 
 @main
 struct WeekyiiApp: App {
+    @UIApplicationDelegateAdaptor(WeekyiiAppDelegate.self) private var appDelegate
     @State private var launchState: WeekyiiPersistence.LaunchState
+    @State private var showLaunchOverlay = !WeekyiiApp.isUITesting && !WeekyiiApp.isRunningTests
     @StateObject private var appState = AppState()
-    @StateObject private var userSettings = UserSettings()
+    @StateObject private var userSettings: UserSettings
     @State private var appHealthCoordinator: AppHealthCoordinator?
-    @State private var cloudSyncMonitor = CloudSyncMonitor()
+    @State private var cloudSyncCoordinator: CloudSyncCoordinator
+    @State private var cloudSyncNetworkMonitor: CloudSyncNetworkRecoveryMonitor?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
 
     init() {
-        #if DEBUG
-        if WeekyiiPersistence.shouldInitializeCloudKitSchema(
-            arguments: ProcessInfo.processInfo.arguments
-        ) {
-            do {
-                try WeekyiiPersistence.initializeCloudKitDevelopmentSchema()
-                print("Weekyii: CloudKit development schema initialized.")
-            } catch {
-                _launchState = State(
-                    initialValue: .failed(
-                        "CloudKit 开发 Schema 初始化失败：\(error.localizedDescription)"
-                    )
-                )
-                return
-            }
-        }
-        #endif
+        let userSettings = UserSettings()
+        _userSettings = StateObject(wrappedValue: userSettings)
+        _cloudSyncCoordinator = State(initialValue: CloudSyncCoordinator(settings: userSettings))
 
-        if Self.isUITesting {
+        if Self.isUITesting || Self.isRunningTests {
             do {
+                let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+                try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: container.mainContext)
                 _launchState = State(
-                    initialValue: .ready(
-                        try WeekyiiPersistence.makeModelContainer(inMemory: true)
-                    )
+                    initialValue: .ready(container, diagnostics: .clean)
                 )
             } catch {
                 _launchState = State(
@@ -510,20 +503,23 @@ struct WeekyiiApp: App {
                 )
             }
         } else {
-            _launchState = State(
-                initialValue: WeekyiiPersistence.bootstrapPersistentContainer()
-            )
+            _launchState = State(initialValue: .resolving)
         }
     }
 
     var body: some Scene {
         WindowGroup {
             switch launchState {
-            case .ready(let modelContainer):
+            case .resolving:
+                PersistenceResolvingView()
+                    .task {
+                        bootstrapPersistentContainer()
+                    }
+            case .ready(let modelContainer, _):
                 ContentView()
                     .environmentObject(appState)
                     .environmentObject(userSettings)
-                    .environment(cloudSyncMonitor)
+                    .environment(cloudSyncCoordinator)
                     .modelContainer(modelContainer)
                     .preferredColorScheme(userSettings.effectiveColorScheme)
                     // Personalised themes restyle every SF Symbol at once via the
@@ -532,21 +528,29 @@ struct WeekyiiApp: App {
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)
-                        if CloudSyncMonitor.shouldStart(
-                            isRunningTests: Self.isRunningTests,
-                            isUITesting: Self.isUITesting
-                        ) {
-                            cloudSyncMonitor.start()
-                        }
                         Task { await NotificationService.shared.requestAuthorization() }
                         _ = appHealthCoordinator?.reconcile(trigger: .launch, force: false)
                         refreshWidgetSnapshot(modelContainer: modelContainer)
                         refreshLiveActivity(modelContainer: modelContainer)
                     }
+                    .task {
+                        guard !Self.isRunningTests else { return }
+                        cloudSyncCoordinator.attach(
+                            localStore: SwiftDataCloudSyncLocalStore(context: modelContainer.mainContext),
+                            onBusinessDataChanged: { appState.bumpDataRevision() }
+                        )
+                        let networkMonitor = CloudSyncNetworkRecoveryMonitor {
+                            await cloudSyncCoordinator.handle(.networkRecovered)
+                        }
+                        cloudSyncNetworkMonitor = networkMonitor
+                        networkMonitor.start()
+                        await cloudSyncCoordinator.handle(.appLaunch)
+                        appDelegate.attach(coordinator: cloudSyncCoordinator)
+                    }
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
-                            Task { await cloudSyncMonitor.refreshAccountStatus() }
+                            Task { await cloudSyncCoordinator.handle(.sceneActive) }
                             _ = appHealthCoordinator?.reconcile(trigger: .sceneActive, force: false)
                             refreshWidgetSnapshot(modelContainer: modelContainer)
                             refreshLiveActivity(modelContainer: modelContainer)
@@ -572,18 +576,25 @@ struct WeekyiiApp: App {
                         refreshWidgetSnapshot(modelContainer: modelContainer)
                         refreshLiveActivity(modelContainer: modelContainer)
                     }
-                    .onChange(of: cloudSyncMonitor.importRevision) { _, _ in
-                        guard !Self.isRunningTests else { return }
-                        _ = appHealthCoordinator?.reconcile(trigger: .manualResync, force: true)
-                        refreshWidgetSnapshot(modelContainer: modelContainer)
-                        refreshLiveActivity(modelContainer: modelContainer)
-                    }
                     .onReceive(minuteTimer) { _ in
                         guard !Self.isRunningTests else { return }
                         if scenePhase == .active {
                             _ = appHealthCoordinator?.reconcile(trigger: .minuteTick, force: false)
                             refreshWidgetSnapshot(modelContainer: modelContainer)
                             refreshLiveActivity(modelContainer: modelContainer)
+                        }
+                    }
+                    .overlay {
+                        if showLaunchOverlay {
+                            WeekyiiLaunchOverlay(
+                                reduceMotion: systemReduceMotion || userSettings.reduceMotionEnabled,
+                                onFinished: {
+                                    withAnimation(.easeOut(duration: 0.35)) {
+                                        showLaunchOverlay = false
+                                    }
+                                }
+                            )
+                            .transition(.opacity)
                         }
                     }
             case .failed(let message):
@@ -611,9 +622,34 @@ struct WeekyiiApp: App {
                 launchState = .failed("没有找到可用的本地恢复点。")
                 return
             }
-            launchState = WeekyiiPersistence.bootstrapPersistentContainer(storeURL: storeURL)
+            launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+                storeURL: storeURL
+            )
         } catch {
             launchState = .failed("恢复本地数据库失败：\(error.localizedDescription)")
+        }
+    }
+
+    private func bootstrapPersistentContainer() {
+        guard case .resolving = launchState else {
+            assertionFailure("Weekyii opened a persistence container more than once during launch.")
+            return
+        }
+
+        switch WeekyiiPersistence.bootstrapPersistentContainer() {
+        case .ready(let container, let diagnostics):
+            if diagnostics.invariantRepair.totalRepairs > 0 || !diagnostics.consistency.isConsistent {
+                print(
+                    "Weekyii: persistence bootstrap diagnostics "
+                        + "repairs=\(diagnostics.invariantRepair) "
+                        + "consistency=\(diagnostics.consistency.diagnostics)"
+                )
+            }
+            launchState = .ready(container, diagnostics: diagnostics)
+        case .failed(let message):
+            launchState = .failed(message)
+        case .resolving:
+            assertionFailure("bootstrapPersistentContainer cannot return a resolving state.")
         }
     }
 
@@ -704,5 +740,95 @@ private struct PersistenceFailureView: View {
             .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
             .padding(WeekSpacing.base)
         }
+    }
+}
+
+private struct PersistenceResolvingView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+            Text("正在打开本地数据…")
+                .font(.headline)
+            Text("本地数据准备完成后即可继续使用 Weekyii")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.backgroundPrimary)
+    }
+}
+
+/// Full-screen launch animation shown while the storyboard splash hands off:
+/// the wordmark is revealed left-to-right like being written, the subtitle fades
+/// in, then the overlay cross-fades away to the home screen.
+private struct WeekyiiLaunchOverlay: View {
+    let reduceMotion: Bool
+    let onFinished: () -> Void
+
+    @State private var logoWidth: CGFloat = 0
+    @State private var writeProgress: CGFloat = 0
+    @State private var subtitleOpacity: Double = 0
+
+    // Do not "sync" this value with LaunchScreen.storyboard: together with
+    // LaunchBackground.imageset it tunes the cached splash snapshot, whose sRGB
+    // bytes are read as Display P3 coordinates (#F6C47E -> #FFC172 on screen).
+    // Changing either value shifts the rendered splash; re-measure instead.
+    private let background = Color(red: 1.0, green: 0.760784, blue: 0.447059)
+    private let brandInk = Color.black
+
+    var body: some View {
+        ZStack {
+            background.ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Text("Weekyii")
+                    .font(.custom("SnellRoundhand-Bold", size: 42))
+                    .foregroundColor(brandInk)
+                    .fixedSize()
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.onAppear { logoWidth = proxy.size.width }
+                        }
+                    )
+                    .mask(alignment: .leading) {
+                        Rectangle().frame(width: max(logoWidth * writeProgress, 0.001))
+                    }
+
+                Text("以周为核心管理你的每一天")
+                    .font(.system(size: 16))
+                    .foregroundColor(brandInk.opacity(0.78))
+                    .opacity(subtitleOpacity)
+            }
+        }
+        .task { await runSequence() }
+    }
+
+    private func runSequence() async {
+        var attempts = 0
+        while logoWidth == 0 && attempts < 30 {
+            attempts += 1
+            try? await Task.sleep(nanoseconds: 16_000_000)
+        }
+
+        if reduceMotion {
+            writeProgress = 1
+            subtitleOpacity = 1
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            onFinished()
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 1.5)) {
+            writeProgress = 1
+        }
+        try? await Task.sleep(nanoseconds: 1_550_000_000)
+
+        withAnimation(.easeOut(duration: 0.35)) {
+            subtitleOpacity = 1
+        }
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+
+        onFinished()
     }
 }

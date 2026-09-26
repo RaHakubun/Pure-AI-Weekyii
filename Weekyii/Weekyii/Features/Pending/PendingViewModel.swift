@@ -93,7 +93,10 @@ final class PendingViewModel {
     var pendingWeeks: [WeekModel] = []
     var errorMessage: String?
 
-    init(modelContext: ModelContext, timeProvider: TimeProviding? = nil) {
+    init(
+        modelContext: ModelContext,
+        timeProvider: TimeProviding? = nil
+    ) {
         self.modelContext = modelContext
         self.timeProvider = timeProvider ?? PendingSystemTimeProvider()
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
@@ -522,49 +525,25 @@ final class PendingViewModel {
         }
     }
 
+    // These four helpers currently have no call sites — this view model delegates
+    // its CRUD to `taskMutationService` (see `addDraftTask` / `updateDraftTask`).
+    // They are kept delegating to `TaskResourceIdentity` rather than deleted so
+    // that wiring them up later cannot reintroduce identity churn.
+
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        appendStepCopies(to: task, from: steps)
+        TaskResourceIdentity.reconcileSteps(on: task, with: steps, in: modelContext)
     }
 
     private func replaceAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        appendAttachmentCopies(to: task, from: attachments)
+        TaskResourceIdentity.reconcileAttachments(on: task, with: attachments, in: modelContext)
     }
 
     private func appendStepCopies(to task: TaskItem, from steps: [TaskStep]) {
-        for step in normalizedStepCopies(from: steps) {
-            task.steps.append(step)
-        }
+        task.steps.append(contentsOf: TaskResourceIdentity.stepCopies(from: steps))
     }
 
     private func appendAttachmentCopies(to task: TaskItem, from attachments: [TaskAttachment]) {
-        for attachment in attachments {
-            let copy = TaskAttachment(
-                data: attachment.data,
-                fileName: attachment.fileName,
-                fileType: attachment.fileType
-            )
-            task.attachments.append(copy)
-        }
-    }
-
-    private func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
-        steps
-            .sorted {
-                if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
-                return $0.createdAt < $1.createdAt
-            }
-            .enumerated()
-            .map { index, step in
-                TaskStep(
-                    title: step.title,
-                    isCompleted: step.isCompleted,
-                    sortOrder: index
-                )
-            }
+        task.attachments.append(contentsOf: TaskResourceIdentity.duplicatedAttachmentCopies(from: attachments))
     }
 
     private func zonePriority(_ zone: TaskZone) -> Int {
@@ -582,4 +561,5 @@ final class PendingViewModel {
         formatter.setLocalizedDateFormatFromTemplate("EEE")
         return formatter.string(from: date)
     }
+
 }

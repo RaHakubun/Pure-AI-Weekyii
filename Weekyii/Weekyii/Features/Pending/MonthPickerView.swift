@@ -86,6 +86,7 @@ struct MonthPickerView: View {
                         in: Circle()
                     )
             }
+            .accessibilityIdentifier("monthPickerNextButton")
             .disabled(!canGoNext)
             .opacity(canGoNext ? 1 : 0.3)
         }

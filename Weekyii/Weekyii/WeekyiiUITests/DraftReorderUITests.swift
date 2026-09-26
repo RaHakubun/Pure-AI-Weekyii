@@ -16,7 +16,7 @@ final class ThemePickerScreenshotTests: XCTestCase {
             if alert.buttons["Allow"].exists { alert.buttons["Allow"].tap(); return true }
             return false
         }
-        app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
 
         let mineTab = app.tabBars.buttons["我的"]
@@ -527,12 +527,19 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(switchToMonth.waitForExistence(timeout: 3))
         switchToMonth.tap()
 
-        let seededDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        let calendar = Calendar(identifier: .iso8601)
+        let seededDate = calendar.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        if !calendar.isDate(seededDate, equalTo: Date(), toGranularity: .month) {
+            let nextMonth = app.buttons["monthPickerNextButton"]
+            XCTAssertTrue(nextMonth.waitForExistence(timeout: 3))
+            nextMonth.tap()
+        }
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let seededDayButton = app.buttons["pendingMonthDay_\(dateFormatter.string(from: seededDate))"]
         XCTAssertTrue(seededDayButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(seededDayButton.isEnabled)
         seededDayButton.tap()
 
         XCTAssertTrue(app.staticTexts["pendingSelectedDayTaskCount"].waitForExistence(timeout: 3))

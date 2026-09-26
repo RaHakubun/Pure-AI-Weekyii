@@ -183,7 +183,10 @@ struct WeekOverviewView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = WeekViewModel(modelContext: modelContext, timeProvider: TimeProvider())
+                viewModel = WeekViewModel(
+                    modelContext: modelContext,
+                    timeProvider: TimeProvider()
+                )
             }
             viewModel?.refresh()
         }
@@ -268,7 +271,10 @@ struct WeekOverviewContentView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = WeekViewModel(modelContext: modelContext, timeProvider: TimeProvider())
+                viewModel = WeekViewModel(
+                    modelContext: modelContext,
+                    timeProvider: TimeProvider()
+                )
             }
             viewModel?.refresh()
         }

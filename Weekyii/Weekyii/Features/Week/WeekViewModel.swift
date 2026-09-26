@@ -11,7 +11,10 @@ final class WeekViewModel {
     var presentWeek: WeekModel?
     var errorMessage: String?
 
-    init(modelContext: ModelContext, timeProvider: TimeProviding) {
+    init(
+        modelContext: ModelContext,
+        timeProvider: TimeProviding
+    ) {
         self.modelContext = modelContext
         self.timeProvider = timeProvider
     }

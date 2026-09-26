@@ -15,25 +15,17 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Weekyii" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="WkY-Logo-Label">
-                                <rect key="frame" x="86.0" y="404.0" width="221" height="44"/>
-                                <fontDescription key="fontDescription" name="SnellRoundhand-Bold" family="Snell Roundhand" pointSize="42"/>
-                                <color key="textColor" red="0.356863" green="0.309804" blue="0.913725" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="以周为核心管理你的每一天" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="WkY-Subtitle-Label">
-                                <rect key="frame" x="57" y="460" width="279" height="24"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="16"/>
-                                <color key="textColor" red="0.356863" green="0.309804" blue="0.913725" alpha="0.78039215689999998" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
+                            <!-- Splash-snapshot color carrier — not decoration. The cached launch snapshot bakes this image's pixels verbatim (sRGB bytes read as Display P3 coordinates). Removing it shifts the rendered splash color (measured on iOS 26.2 simulator: #FFC172 -> #FDB55D) and re-opens a seam against the in-app overlay. Do not remove without re-measuring. -->
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchBackground" translatesAutoresizingMaskIntoConstraints="NO" id="Lbg-1m-g01">
+                                <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                            </imageView>
                         </subviews>
-                        <color key="backgroundColor" red="1.0" green="0.701961" blue="0.278431" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.964706" green="0.768627" blue="0.494118" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <constraint firstItem="WkY-Logo-Label" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="CxX-centerX"/>
-                            <constraint firstItem="WkY-Logo-Label" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="CyY-centerY"/>
-                            <constraint firstItem="WkY-Subtitle-Label" firstAttribute="top" secondItem="WkY-Logo-Label" secondAttribute="bottom" constant="12" id="WkY-subtitleTop"/>
-                            <constraint firstItem="WkY-Subtitle-Label" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="WkY-subtitleCenterX"/>
+                            <constraint firstItem="Lbg-1m-g01" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="Lbg-cn-001"/>
+                            <constraint firstItem="Lbg-1m-g01" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="Lbg-cn-002"/>
+                            <constraint firstAttribute="trailing" secondItem="Lbg-1m-g01" secondAttribute="trailing" id="Lbg-cn-003"/>
+                            <constraint firstAttribute="bottom" secondItem="Lbg-1m-g01" secondAttribute="bottom" id="Lbg-cn-004"/>
                         </constraints>
                     </view>
                 </viewController>

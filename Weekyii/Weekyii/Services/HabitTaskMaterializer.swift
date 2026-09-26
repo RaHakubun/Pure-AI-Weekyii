@@ -8,7 +8,7 @@ struct HabitSyncOutcome: Equatable {
     var failedCount: Int = 0
     var missedRecordCount: Int = 0
     var saveFailed: Bool = false
-    /// 需要写库（含水位线推进）；不等于需要刷新 UI。
+    /// 需要写库（含记录更新）；不等于需要刷新 UI。
     fileprivate var needsSave: Bool = false
 
     /// 本次 sync 是否产生了新任务或补记（供测试与调用方判断；视图刷新由 stateTransitionRevision 承担）。
@@ -84,7 +84,7 @@ struct HabitTaskMaterializer {
         return outcome
     }
 
-    /// 手动加入今日（绕过水位线；成功后水位线推进到今天）。语义见 §2.9。
+    /// 手动加入今日。语义见 §2.9。
     @discardableResult
     func assignToday(habit: HabitModel, today: Date = Date(), now: Date = Date()) -> HabitAssignOutcome {
         guard habit.isActive else { return .failed(HabitError.saveFailed.localizedDescription) }
@@ -103,7 +103,6 @@ struct HabitTaskMaterializer {
             guard now < killDate(for: day) else { return .pastKillTime }
 
             try createHabitTask(habit: habit, in: day, todayKey: todayKey, now: now)
-            habit.generatedThroughDayId = max(habit.generatedThroughDayId, todayKey)
             try modelContext.save()
             return .created
         } catch {
@@ -133,14 +132,10 @@ struct HabitTaskMaterializer {
         now: Date,
         outcome: inout HabitSyncOutcome
     ) {
+        guard !habit.hasProcessed(dayId: todayKey) else { return }
         guard habit.hasSchedule else { return }
-        guard habit.startDayId <= todayKey else { return }               // 尚未生效：不写水位线
-        guard habit.generatedThroughDayId < todayKey else { return }     // 今日已处理（删除不复活）
-
-        guard habit.isScheduled(on: todayStart) else {
-            advanceWatermark(habit, to: todayKey, outcome: &outcome)
-            return
-        }
+        guard habit.startDayId <= todayKey else { return }
+        guard habit.isScheduled(on: todayStart) else { return }
 
         do {
             let day = try WeekDataStore(modelContext: modelContext)
@@ -148,20 +143,18 @@ struct HabitTaskMaterializer {
 
             if day.tasks.contains(where: { $0.habit?.id == habit.id }) {
                 outcome.skippedExistingCount += 1
-                advanceWatermark(habit, to: todayKey, outcome: &outcome)
                 return
             }
             guard day.status == .empty || day.status == .draft, now < killDate(for: day) else {
                 outcome.blockedCount += 1
-                advanceWatermark(habit, to: todayKey, outcome: &outcome)
                 return
             }
 
             try createHabitTask(habit: habit, in: day, todayKey: todayKey, now: now)
-            advanceWatermark(habit, to: todayKey, outcome: &outcome)
+            outcome.needsSave = true
             outcome.createdCount += 1
         } catch {
-            outcome.failedCount += 1      // 水位线不动，下次重试
+            outcome.failedCount += 1
         }
     }
 
@@ -181,12 +174,6 @@ struct HabitTaskMaterializer {
         let record = HabitDayRecord(dayId: todayKey, createdAt: now)
         record.habit = habit
         habit.records.append(record)
-    }
-
-    private func advanceWatermark(_ habit: HabitModel, to todayKey: String, outcome: inout HabitSyncOutcome) {
-        guard habit.generatedThroughDayId < todayKey else { return }
-        habit.generatedThroughDayId = todayKey
-        outcome.needsSave = true
     }
 
     private func killDate(for day: DayModel) -> Date {

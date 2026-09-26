@@ -18,13 +18,17 @@ final class HabitViewModel {
     init(
         modelContext: ModelContext,
         appState: any AppStateStore,
-        timeProvider: any TimeProviding = TimeProvider()
+        timeProvider: any TimeProviding
     ) {
         self.modelContext = modelContext
         self.appState = appState
         self.timeProvider = timeProvider
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
         self.materializer = HabitTaskMaterializer(modelContext: modelContext)
+    }
+
+    convenience init(modelContext: ModelContext, appState: any AppStateStore) {
+        self.init(modelContext: modelContext, appState: appState, timeProvider: TimeProvider())
     }
 
     nonisolated deinit {}
@@ -104,11 +108,6 @@ final class HabitViewModel {
         }
         guard scheduleHasSelection else { throw HabitError.scheduleEmpty }
 
-        let previousKindRaw = habit.scheduleKindRaw
-        let previousWeekdaysRaw = habit.scheduleWeekdaysRaw
-        let previousMonthDaysRaw = habit.scheduleMonthDaysRaw
-        let previousStartDayId = habit.startDayId
-
         habit.name = normalizedName
         habit.iconName = iconName
         habit.colorHex = colorHex
@@ -117,17 +116,6 @@ final class HabitViewModel {
         habit.scheduleWeekdays = scheduleWeekdays
         habit.scheduleMonthDays = scheduleMonthDays
         habit.startDayId = startDate.dayId
-
-        let planChanged = previousKindRaw != habit.scheduleKindRaw
-            || previousWeekdaysRaw != habit.scheduleWeekdaysRaw
-            || previousMonthDaysRaw != habit.scheduleMonthDaysRaw
-            || previousStartDayId != habit.startDayId
-        if planChanged {
-            let yesterdayKey = timeProvider.today.addingDays(-1).dayId
-            if habit.generatedThroughDayId >= yesterdayKey {
-                habit.generatedThroughDayId = yesterdayKey
-            }
-        }
 
         do {
             try modelContext.save()

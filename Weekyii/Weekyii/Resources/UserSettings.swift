@@ -6,11 +6,20 @@ import WidgetKit
 #endif
 
 final class UserSettings: ObservableObject {
+    private static let cloudSyncRequestedKey = "cloudSyncRequested"
+    private static let legacyCloudSyncEnabledKey = "cloudSyncEnabled"
+    private static let cloudSyncPreferenceMigratedV2Key = "weekyii.cloudSyncPreferenceMigratedV2"
+
     // Default Kill Time
     @Published var defaultKillTimeHour: Int {
         didSet { save() }
     }
     @Published var defaultKillTimeMinute: Int {
+        didSet { save() }
+    }
+
+    /// Explicit device-local opt-in for the future custom-zone sync engine.
+    @Published var cloudSyncRequested: Bool {
         didSet { save() }
     }
     
@@ -182,6 +191,17 @@ final class UserSettings: ObservableObject {
         // Load saved values or use defaults
         self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
         self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
+        let storedCloudSyncRequested = defaults.object(forKey: Self.cloudSyncRequestedKey) as? Bool
+        self.cloudSyncRequested = storedCloudSyncRequested ?? false
+        if storedCloudSyncRequested == nil {
+            defaults.set(false, forKey: Self.cloudSyncRequestedKey)
+        }
+        if defaults.object(forKey: Self.cloudSyncPreferenceMigratedV2Key) as? Bool != true {
+            // The legacy sync preference cannot opt into the new explicit
+            // sync engine. A valid V2 value above always takes precedence. Keep
+            // the retired value untouched for upgrade diagnostics and compatibility.
+            defaults.set(true, forKey: Self.cloudSyncPreferenceMigratedV2Key)
+        }
         
         let resolvedDefaultTaskType: TaskType
         if let rawTaskType = defaults.string(forKey: "defaultTaskType"),
@@ -210,7 +230,7 @@ final class UserSettings: ObservableObject {
         self.weekStartsOnMonday = defaults.object(forKey: "weekStartsOnMonday") as? Bool ?? true
         self.defaultProjectDurationDays = defaults.object(forKey: "defaultProjectDurationDays") as? Int ?? 7
         self.defaultProjectTileSizeRaw = defaults.string(forKey: "defaultProjectTileSize") ?? ProjectTileSize.medium.rawValue
-        self.defaultProjectColorHex = defaults.string(forKey: "defaultProjectColor") ?? "#C46A1A"
+        self.defaultProjectColorHex = defaults.string(forKey: "defaultProjectColor") ?? "#E39A3F"
         self.defaultProjectIconName = defaults.string(forKey: "defaultProjectIcon") ?? "folder.fill"
         self.boardColumnCount = defaults.object(forKey: "boardColumnCount") as? Int ?? 4
         self.reduceMotionEnabled = defaults.object(forKey: "reduceMotionEnabled") as? Bool ?? false
@@ -244,9 +264,14 @@ final class UserSettings: ObservableObject {
         syncNotificationConfiguration()
     }
     
+    func setCloudSyncRequested(_ requested: Bool) {
+        cloudSyncRequested = requested
+    }
+
     func save() {
         defaults.set(defaultKillTimeHour, forKey: "defaultKillTimeHour")
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
+        defaults.set(cloudSyncRequested, forKey: Self.cloudSyncRequestedKey)
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
         defaults.set(defaultTaskTypeIdRaw, forKey: "defaultTaskTypeId")
         defaults.set(defaultExecutionModeRaw, forKey: "defaultExecutionMode")

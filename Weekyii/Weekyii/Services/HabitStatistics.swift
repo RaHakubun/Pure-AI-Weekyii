@@ -31,6 +31,8 @@ struct HabitStatistics: Equatable {
     let missedCount: Int
     let totalRecordedCount: Int
     let todayStatus: HabitTodayStatus
+    /// 今日任务流中是否已存在该习惯的任务（任意区）。与记录状态解耦：删除任务后记录仍为 pending。
+    let hasTodayTask: Bool
 
     var completionRate: Double? {
         totalRecordedCount == 0 ? nil : Double(completedCount) / Double(totalRecordedCount)
@@ -52,7 +54,8 @@ enum HabitStatisticsCalculator {
             completedCount: map.values.filter { $0 == .completed }.count,
             missedCount: map.values.filter { $0 == .missed }.count,
             totalRecordedCount: map.values.filter { $0 != .pending }.count,
-            todayStatus: todayStatus(habit: habit, todayStart: todayStart, map: map)
+            todayStatus: todayStatus(habit: habit, todayStart: todayStart, map: map),
+            hasTodayTask: habit.tasks.contains { $0.day?.dayId == todayStart.dayId }
         )
     }
 

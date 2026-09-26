@@ -27,6 +27,10 @@ final class StateMachineTests: XCTestCase {
             lastRolloverAt = date
         }
 
+        func markRollover(at date: Date) {
+            lastRolloverAt = date
+        }
+
         func incrementDaysStarted() {}
 
         func bumpStateTransitionRevision() {
@@ -204,6 +208,34 @@ final class StateMachineTests: XCTestCase {
         let settings = UserSettings(defaults: defaults)
         settings.defaultExecutionMode = executionMode
         return settings
+    }
+
+    @MainActor
+    func test_reconcileExpiresStaleDaysAndInitializesRolloverState() throws {
+        let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
+        let yesterday = Calendar(identifier: .iso8601).date(byAdding: .day, value: -1, to: now)!
+        let week = WeekCalculator().makeWeek(for: now, status: .present)
+        let yesterdayDay = try XCTUnwrap(week.days.first(where: { $0.dayId == yesterday.dayId }))
+        yesterdayDay.status = .execute
+        yesterdayDay.tasks.append(TaskItem(title: "unfinished", order: 1, zone: .focus))
+        container.mainContext.insert(week)
+
+        let appState = makeAppState()
+        let machine = StateMachine(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: appState,
+            userSettings: makeSettings()
+        )
+
+        let report = machine.reconcile(now: now, force: true)
+
+        XCTAssertEqual(report.staleDaysExpiredCount, 1)
+        XCTAssertEqual(yesterdayDay.status, .expired)
+        XCTAssertEqual(appState.systemStartDate, now.startOfDay)
+        XCTAssertEqual(appState.lastProcessedDate, now.startOfDay)
+        XCTAssertNotNil(appState.lastRolloverAt)
     }
 
     @MainActor
@@ -459,7 +491,8 @@ final class StateMachineTests: XCTestCase {
 
         XCTAssertEqual(day.status, .expired)
         XCTAssertEqual(day.expiredCount, 0)
-        XCTAssertTrue(day.tasks.isEmpty)
+        XCTAssertEqual(day.tasks.map(\.title), ["A"])
+        XCTAssertTrue(day.sortedDraftTasks.isEmpty)
     }
 
     @MainActor
@@ -950,7 +983,8 @@ final class StateMachineTests: XCTestCase {
             appState: appState,
             userSettings: settings,
             notificationService: TestNotificationService(),
-            liveActivityService: NoopLiveActivityService()
+            liveActivityService: NoopLiveActivityService(),
+            timeProvider: MockTimeProvider(mockDate: today.addingTimeInterval(10 * 60 * 60))
         )
 
         XCTAssertEqual(day.completedTasks.count, 1)
@@ -979,7 +1013,8 @@ final class StateMachineTests: XCTestCase {
             appState: appState,
             userSettings: settings,
             notificationService: TestNotificationService(),
-            liveActivityService: NoopLiveActivityService()
+            liveActivityService: NoopLiveActivityService(),
+            timeProvider: MockTimeProvider(mockDate: today.addingTimeInterval(10 * 60 * 60))
         )
 
         let tomorrowId = today.addingDays(1).dayId
@@ -1020,7 +1055,8 @@ final class StateMachineTests: XCTestCase {
             appState: appState,
             userSettings: settings,
             notificationService: TestNotificationService(),
-            liveActivityService: service
+            liveActivityService: service,
+            timeProvider: MockTimeProvider(mockDate: today.addingTimeInterval(10 * 60 * 60))
         )
 
         wait(for: [reconcileExpectation], timeout: 2.0)
@@ -1193,6 +1229,20 @@ final class StateMachineTests: XCTestCase {
     }
 
     @MainActor
+    func test_doneFocus_finalTaskCompletesDay() throws {
+        let (day, viewModel) = try makeExecutingToday(
+            mode: .strict,
+            frozenTitles: []
+        )
+
+        try viewModel.doneFocus()
+
+        XCTAssertEqual(day.status, .completed)
+        XCTAssertNotNil(day.closedAt)
+        XCTAssertTrue(day.completedTasks.map(\.title) == ["First"])
+    }
+
+    @MainActor
     func test_doneFocus_recordsCompletedHabitForFocusTask() throws {
         let (day, viewModel) = try makeExecutingToday(mode: .strict, frozenTitles: [])
         let context = container.mainContext
@@ -1267,12 +1317,35 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(habit.records.count, 1)
         XCTAssertEqual(habit.records.first?.dayId, today.dayId)
         XCTAssertEqual(habit.records.first?.status, .pending)
-        XCTAssertEqual(habit.generatedThroughDayId, today.dayId)
 
         coordinator.reconcile(trigger: .launch, force: true)
 
         XCTAssertEqual(day.tasks.filter { $0.habit?.id == habit.id }.count, 1)
         XCTAssertEqual(habit.records.count, 1)
+    }
+
+    @MainActor
+    func test_appHealthDiagnosticsContainLocalStateOnly() throws {
+        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        container.mainContext.insert(WeekCalculator().makeWeek(for: now, status: .present))
+        try container.mainContext.save()
+
+        let coordinator = AppHealthCoordinator(
+            modelContainer: container,
+            timeProvider: MockTimeProvider(mockDate: now),
+            notificationService: .shared,
+            appState: makeAppState(),
+            userSettings: makeSettings(),
+            liveActivityService: NoopLiveActivityService()
+        )
+        Self.retainCoordinatorForTestLifetime(coordinator)
+
+        let diagnostics = coordinator.diagnosticsSnapshot()
+
+        XCTAssertTrue(diagnostics.contains("today=\(now.startOfDay.dayId)"))
+        XCTAssertTrue(diagnostics.contains("presentWeeks=1"))
+        XCTAssertFalse(diagnostics.contains("cloudSync="))
+        XCTAssertFalse(diagnostics.contains("coordinator-not-injected"))
     }
 
     @MainActor
@@ -1355,7 +1428,17 @@ final class StateMachineTests: XCTestCase {
     @MainActor
     func test_commitPostpone_doesNotScheduleFutureDayNotifications() throws {
         let context = container.mainContext
-        let now = Date().startOfDay.addingTimeInterval(10 * 60 * 60)
+        // Keep source and target inside the same ISO week. Using the simulator
+        // clock here makes the test fail every Sunday when targetDate rolls
+        // into the next week and is therefore absent from this fixture.
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .iso8601)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = 2026
+        components.month = 9
+        components.day = 19
+        components.hour = 10
+        let now = try XCTUnwrap(components.date)
         let targetDate = now.addingDays(1)
         let week = WeekCalculator().makeWeek(for: now, status: .present)
         context.insert(week)

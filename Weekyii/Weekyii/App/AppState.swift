@@ -46,6 +46,11 @@ final class AppState: ObservableObject, AppStateStore {
         save()
     }
 
+    func markRollover(at date: Date) {
+        lastRolloverAt = date
+        save()
+    }
+
     func reset() {
         daysStartedCount = 0
         dataRevision += 1

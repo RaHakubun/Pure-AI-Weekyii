@@ -73,7 +73,7 @@ final class HabitModel {
     var scheduleMonthDaysRaw: Int = 0
     /// 生效开始日（YYYY-MM-DD）；此前日期永不生成。
     var startDayId: String = ""
-    /// 已处理到的日期（YYYY-MM-DD，含）；空串 = 从未处理。仅前进；用户编辑计划时回拨为昨天。
+    /// Retained for V8 SwiftData and Archive v1 compatibility only. Never use for materialization or sync decisions.
     var generatedThroughDayId: String = ""
 
     var isActive: Bool = true
@@ -117,6 +117,10 @@ final class HabitModel {
         set { recordEntries = newValue }
     }
 
+    func hasProcessed(dayId: String) -> Bool {
+        records.contains { $0.dayId == dayId }
+    }
+
     var category: HabitCategory {
         get { HabitCategory(rawValue: categoryRaw) ?? .health }
         set { categoryRaw = newValue.rawValue }
@@ -149,11 +153,6 @@ final class HabitModel {
     }
 
     var startDate: Date? { WeekyiiDayId.date(from: startDayId) }
-
-    var generatedThroughDate: Date? {
-        get { WeekyiiDayId.date(from: generatedThroughDayId) }
-        set { generatedThroughDayId = newValue?.dayId ?? "" }
-    }
 
     var habitColor: Color { Color(hex: colorHex) }
 

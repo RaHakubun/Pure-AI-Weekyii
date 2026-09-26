@@ -148,52 +148,38 @@ struct TaskMutationService: TaskMutating {
         }
     }
 
-    func replaceTaskResources(for task: TaskItem, steps: [TaskStep], attachments: [TaskAttachment]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        task.steps.append(contentsOf: Self.normalizedStepCopies(from: steps))
+    // MARK: - Resource replacement
 
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        task.attachments.append(contentsOf: Self.attachmentCopies(from: attachments))
+    /// Replaces **only** the task's steps. Attachments are left untouched, so an
+    /// edit that does not concern attachments cannot churn their identity.
+    func replaceTaskSteps(for task: TaskItem, steps: [TaskStep]) {
+        TaskResourceIdentity.reconcileSteps(on: task, with: steps, in: modelContext)
+    }
+
+    /// Replaces **only** the task's attachments. Steps are left untouched.
+    func replaceTaskAttachments(for task: TaskItem, attachments: [TaskAttachment]) {
+        TaskResourceIdentity.reconcileAttachments(on: task, with: attachments, in: modelContext)
+    }
+
+    func replaceTaskSteps(for task: SuspendedTaskItem, steps: [TaskStep]) {
+        TaskResourceIdentity.reconcileSteps(on: task, with: steps, in: modelContext)
+    }
+
+    func replaceTaskAttachments(for task: SuspendedTaskItem, attachments: [TaskAttachment]) {
+        TaskResourceIdentity.reconcileAttachments(on: task, with: attachments, in: modelContext)
+    }
+
+    /// Replaces both resource kinds. Prefer the per-kind entry points above when
+    /// only one kind actually changed — passing the other kind through is what
+    /// used to rebuild it.
+    func replaceTaskResources(for task: TaskItem, steps: [TaskStep], attachments: [TaskAttachment]) {
+        replaceTaskSteps(for: task, steps: steps)
+        replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     func replaceTaskResources(for task: SuspendedTaskItem, steps: [TaskStep], attachments: [TaskAttachment]) {
-        task.steps.forEach { modelContext.delete($0) }
-        task.steps.removeAll(keepingCapacity: true)
-        task.steps.append(contentsOf: Self.normalizedStepCopies(from: steps))
-
-        task.attachments.forEach { modelContext.delete($0) }
-        task.attachments.removeAll(keepingCapacity: true)
-        task.attachments.append(contentsOf: Self.attachmentCopies(from: attachments))
-    }
-
-    static func normalizedStepCopies(from steps: [TaskStep]) -> [TaskStep] {
-        steps
-            .sorted {
-                if $0.sortOrder != $1.sortOrder {
-                    return $0.sortOrder < $1.sortOrder
-                }
-                return $0.createdAt < $1.createdAt
-            }
-            .enumerated()
-            .map { index, step in
-                TaskStep(
-                    title: step.title,
-                    isCompleted: step.isCompleted,
-                    sortOrder: index
-                )
-            }
-    }
-
-    static func attachmentCopies(from attachments: [TaskAttachment]) -> [TaskAttachment] {
-        attachments.map { attachment in
-            TaskAttachment(
-                data: attachment.data,
-                fileName: attachment.fileName,
-                fileType: attachment.fileType
-            )
-        }
+        replaceTaskSteps(for: task, steps: steps)
+        replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     private func renumberDraftTasks(in day: DayModel) {
@@ -428,9 +414,9 @@ struct TaskPostponeService {
                 }
                 renumberExecutionQueue(in: day)
             } else {
+                day.isDraftZoneUnlocked = false
                 day.status = .completed
                 day.closedAt = now
-                day.isDraftZoneUnlocked = false
             }
 
         case .frozen:
@@ -441,9 +427,9 @@ struct TaskPostponeService {
                     day.status = .empty
                 }
             } else if day.status == .execute, day.focusTask == nil, day.frozenTasks.isEmpty {
+                day.isDraftZoneUnlocked = false
                 day.status = .completed
                 day.closedAt = now
-                day.isDraftZoneUnlocked = false
             }
 
         case .complete:
@@ -480,5 +466,206 @@ struct TaskPostponeService {
     private func fetchWeek(by weekId: String) -> WeekModel? {
         let descriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
         return try? modelContext.fetch(descriptor).first
+    }
+}
+
+// MARK: - Resource identity
+
+/// Anything that owns a task's resources.
+///
+/// `TaskItem` and `SuspendedTaskItem` already expose exactly these two accessors,
+/// so conformance is empty — the protocol exists only so the reconciliation rules
+/// below have a single implementation instead of one per owner type.
+protocol TaskResourceOwner: AnyObject {
+    var steps: [TaskStep] { get set }
+    var attachments: [TaskAttachment] { get set }
+}
+
+extension TaskItem: TaskResourceOwner {}
+extension SuspendedTaskItem: TaskResourceOwner {}
+
+/// Identity rules for the two *resource* kinds hanging off a task: `TaskStep`
+/// and `TaskAttachment`.
+///
+/// ## Why this exists
+///
+/// Both kinds are separate persisted rows attached to their owner through
+/// cascade relationships. Every mutation path used to rebuild them from scratch
+/// ("delete all, then re-create all"), which meant:
+///
+/// * `TaskAttachment.id` — the attachment's business identity, and the key the
+///   sync layer addresses it by — was regenerated on **every** save, including
+///   saves that never touched attachments. To a UUID-keyed incremental sync that
+///   looks like "old attachment deleted, identical attachment created", so the
+///   same bytes get re-uploaded and an untouched aggregate still looks dirty.
+/// * `TaskStep.createdAt` was reset to "now" on every save, so a no-op save
+///   changed the task's content hash.
+/// * `SuspendedTaskLifecycleService.assignTask` re-created a suspended task's
+///   resources instead of moving them, minting new attachment identities for
+///   resources that had not changed at all.
+///
+/// ## The rules
+///
+/// | Intent | Identity |
+/// |---|---|
+/// | edit a resource in place | **preserved** — the row is updated, not replaced |
+/// | move a resource to another owner | **preserved** — same row, re-parented |
+/// | duplicate a resource | **regenerated** — new `UUID`, new `createdAt` |
+///
+/// Editing one resource kind must never rebuild the other kind.
+///
+/// `TaskStep` is deliberately *not* reconciled by identity: it has no stable
+/// business key, and the sync design embeds a task's steps in the task's own
+/// snapshot rather than addressing them individually. Preserving `createdAt` is
+/// enough to keep that embedded representation deterministic.
+enum TaskResourceIdentity {
+
+    // MARK: - Steps
+
+    /// Deterministic step order: `(sortOrder, createdAt)`.
+    static func sortedSteps(_ steps: [TaskStep]) -> [TaskStep] {
+        steps.sorted {
+            if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+            return $0.createdAt < $1.createdAt
+        }
+    }
+
+    /// Renumbers `sortOrder` to a dense 0-based sequence, **in place**. Reuses the
+    /// existing rows and mints nothing.
+    static func renumberSteps(_ steps: [TaskStep]) {
+        for (index, step) in sortedSteps(steps).enumerated() {
+            step.sortOrder = index
+        }
+    }
+
+    /// Copies `steps` for embedding into another owner, **preserving `createdAt`**
+    /// while renumbering `sortOrder`.
+    ///
+    /// This is the single implementation behind the `normalizedStepCopies` that
+    /// used to be duplicated across four view models.
+    static func stepCopies(from steps: [TaskStep]) -> [TaskStep] {
+        sortedSteps(steps).enumerated().map { index, step in
+            TaskStep(
+                title: step.title,
+                isCompleted: step.isCompleted,
+                sortOrder: index,
+                createdAt: step.createdAt
+            )
+        }
+    }
+
+    // MARK: - Attachments
+
+    /// Copies `attachments` for a **duplication**: every copy gets a fresh `id`
+    /// and `createdAt`. This is the only place where an *existing* attachment's
+    /// identity is deliberately minted anew.
+    static func duplicatedAttachmentCopies(from attachments: [TaskAttachment]) -> [TaskAttachment] {
+        orderedUniqueAttachments(attachments).map { attachment in
+            TaskAttachment(
+                data: attachment.data,
+                fileName: attachment.fileName,
+                fileType: attachment.fileType
+            )
+        }
+    }
+
+    /// De-duplicates by business identity, keeping the first occurrence and the
+    /// caller's order. Two rows carrying one `id` are one entity as far as the
+    /// sync layer is concerned, so this is a correctness guard, not a nicety.
+    static func orderedUniqueAttachments(_ attachments: [TaskAttachment]) -> [TaskAttachment] {
+        var seen = Set<UUID>()
+        var result: [TaskAttachment] = []
+        for attachment in attachments where seen.insert(attachment.id).inserted {
+            result.append(attachment)
+        }
+        return result
+    }
+
+    // MARK: - Reconciliation
+
+    /// Reconciles `steps` onto `owner`.
+    ///
+    /// Steps carry no business key, so this is a replace: rows the owner does not
+    /// already hold are deleted and re-created from `stepCopies(from:)`. When the
+    /// caller hands the owner's own rows back in, they are only reordered.
+    static func reconcileSteps<Owner: TaskResourceOwner>(
+        on owner: Owner,
+        with steps: [TaskStep],
+        in context: ModelContext
+    ) {
+        let existing = owner.steps
+        if !existing.isEmpty, holdsSameRows(existing, steps) {
+            renumberSteps(steps)
+            owner.steps = steps
+            return
+        }
+        for row in existing { context.delete(row) }
+        owner.steps = stepCopies(from: steps)
+    }
+
+    /// Reconciles `attachments` onto `owner` **by `id`**:
+    ///
+    /// * rows whose `id` is absent from `attachments` are deleted;
+    /// * rows whose `id` is present are updated **in place**, keeping their
+    ///   persisted row and their `createdAt`;
+    /// * ids that are new are inserted carrying the caller's `id` / `createdAt`.
+    ///
+    /// Updating in place rather than deleting and re-inserting is the whole point:
+    /// it is what keeps the attachment's business identity stable across edits.
+    static func reconcileAttachments<Owner: TaskResourceOwner>(
+        on owner: Owner,
+        with attachments: [TaskAttachment],
+        in context: ModelContext
+    ) {
+        let wanted = orderedUniqueAttachments(attachments)
+        let wantedIDs = Set(wanted.map(\.id))
+
+        var survivors: [UUID: TaskAttachment] = [:]
+        for existing in owner.attachments {
+            guard wantedIDs.contains(existing.id) else {
+                context.delete(existing)
+                continue
+            }
+            if let kept = survivors[existing.id] {
+                // Two persisted rows for one business id: keep the first, drop the rest.
+                if kept !== existing { context.delete(existing) }
+            } else {
+                survivors[existing.id] = existing
+            }
+        }
+
+        var reconciled: [TaskAttachment] = []
+        reconciled.reserveCapacity(wanted.count)
+        for incoming in wanted {
+            if let existing = survivors.removeValue(forKey: incoming.id) {
+                if existing !== incoming {
+                    existing.data = incoming.data
+                    existing.fileName = incoming.fileName
+                    existing.fileType = incoming.fileType
+                }
+                // `createdAt` belongs to the resource, not to the edit: the
+                // persisted value wins so a later save cannot drift it.
+                reconciled.append(existing)
+            } else {
+                reconciled.append(
+                    TaskAttachment(
+                        id: incoming.id,
+                        data: incoming.data,
+                        fileName: incoming.fileName,
+                        fileType: incoming.fileType,
+                        createdAt: incoming.createdAt
+                    )
+                )
+            }
+        }
+        owner.attachments = reconciled
+    }
+
+    /// True when `candidate` holds exactly the same rows as `existing` — i.e. the
+    /// caller passed the owner's own objects back in rather than copies.
+    private static func holdsSameRows(_ existing: [TaskStep], _ candidate: [TaskStep]) -> Bool {
+        guard existing.count == candidate.count else { return false }
+        let existingIDs = Set(existing.map(ObjectIdentifier.init))
+        return candidate.allSatisfy { existingIDs.contains(ObjectIdentifier($0)) }
     }
 }
