@@ -138,6 +138,24 @@ final class UserSettings: ObservableObject {
     @Published var pendingMonthShowLeisure: Bool {
         didSet { save() }
     }
+
+    // Past Month View Marker Settings (device-local display preference only;
+    // intentionally not part of SwiftData, iCloud sync or data archives)
+    @Published var pastMonthShowUnfinishedFace: Bool {
+        didSet { save() }
+    }
+    @Published var pastMonthShowNotStartedFace: Bool {
+        didSet { save() }
+    }
+    @Published var pastMonthShowCompletedCount: Bool {
+        didSet { save() }
+    }
+    @Published var pastMonthShowRecordDot: Bool {
+        didSet { save() }
+    }
+    @Published var pastMonthShowExpiredFlame: Bool {
+        didSet { save() }
+    }
     
     // Theme Settings
     @Published var selectedThemeRaw: String {
@@ -241,6 +259,12 @@ final class UserSettings: ObservableObject {
         self.pendingMonthShowRegular = defaults.object(forKey: "pendingMonthShowRegular") as? Bool ?? false
         self.pendingMonthShowDDL = defaults.object(forKey: "pendingMonthShowDDL") as? Bool ?? true
         self.pendingMonthShowLeisure = defaults.object(forKey: "pendingMonthShowLeisure") as? Bool ?? false
+        let pastMarkerDefaults = PastMonthMarkerOptions.default
+        self.pastMonthShowUnfinishedFace = defaults.object(forKey: "pastMonthShowUnfinishedFace") as? Bool ?? pastMarkerDefaults.showsUnfinishedFace
+        self.pastMonthShowNotStartedFace = defaults.object(forKey: "pastMonthShowNotStartedFace") as? Bool ?? pastMarkerDefaults.showsNotStartedFace
+        self.pastMonthShowCompletedCount = defaults.object(forKey: "pastMonthShowCompletedCount") as? Bool ?? pastMarkerDefaults.showsCompletedCount
+        self.pastMonthShowRecordDot = defaults.object(forKey: "pastMonthShowRecordDot") as? Bool ?? pastMarkerDefaults.showsRecordDot
+        self.pastMonthShowExpiredFlame = defaults.object(forKey: "pastMonthShowExpiredFlame") as? Bool ?? pastMarkerDefaults.showsExpiredFlame
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
@@ -302,6 +326,11 @@ final class UserSettings: ObservableObject {
         defaults.set(pendingMonthShowRegular, forKey: "pendingMonthShowRegular")
         defaults.set(pendingMonthShowDDL, forKey: "pendingMonthShowDDL")
         defaults.set(pendingMonthShowLeisure, forKey: "pendingMonthShowLeisure")
+        defaults.set(pastMonthShowUnfinishedFace, forKey: "pastMonthShowUnfinishedFace")
+        defaults.set(pastMonthShowNotStartedFace, forKey: "pastMonthShowNotStartedFace")
+        defaults.set(pastMonthShowCompletedCount, forKey: "pastMonthShowCompletedCount")
+        defaults.set(pastMonthShowRecordDot, forKey: "pastMonthShowRecordDot")
+        defaults.set(pastMonthShowExpiredFlame, forKey: "pastMonthShowExpiredFlame")
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(appearanceModeRaw, forKey: "appearanceMode")
         defaults.set(premiumThemeUnlocked, forKey: "premiumThemeUnlocked")
@@ -352,6 +381,25 @@ final class UserSettings: ObservableObject {
     var appearanceMode: AppearanceMode {
         get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
         set { appearanceModeRaw = newValue.rawValue }
+    }
+
+    var pastMonthMarkerOptions: PastMonthMarkerOptions {
+        get {
+            PastMonthMarkerOptions(
+                showsUnfinishedFace: pastMonthShowUnfinishedFace,
+                showsNotStartedFace: pastMonthShowNotStartedFace,
+                showsCompletedCount: pastMonthShowCompletedCount,
+                showsRecordDot: pastMonthShowRecordDot,
+                showsExpiredFlame: pastMonthShowExpiredFlame
+            )
+        }
+        set {
+            pastMonthShowUnfinishedFace = newValue.showsUnfinishedFace
+            pastMonthShowNotStartedFace = newValue.showsNotStartedFace
+            pastMonthShowCompletedCount = newValue.showsCompletedCount
+            pastMonthShowRecordDot = newValue.showsRecordDot
+            pastMonthShowExpiredFlame = newValue.showsExpiredFlame
+        }
     }
 
     var defaultExecutionMode: ExecutionMode {

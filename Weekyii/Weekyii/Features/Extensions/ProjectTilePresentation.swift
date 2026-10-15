@@ -84,7 +84,8 @@ struct ProjectTilePresentation: Equatable {
             primaryNumberFontSize = 22
         case .medium:
             showsTitle = true
-            titleLineLimit = isEditing ? 1 : 2
+            // Single line: a two-line limit splits long single words mid-word.
+            titleLineLimit = 1
             showsStatusChip = true
             showsNextTaskDate = !isEditing
             secondaryContent = isCompactBoard ? .none : .compactPills

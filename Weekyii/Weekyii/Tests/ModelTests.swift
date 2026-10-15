@@ -3,7 +3,211 @@ import SwiftData
 import Photos
 import SwiftUI
 import CryptoKit
+import ImageIO
 @testable import Weekyii
+
+final class KillTimeFireTests: XCTestCase {
+    func testEarlierCutoffAlwaysHasMoreFireAcrossTheWholeDay() {
+        var previous = KillTimeFlameBackground.intensity(remainingMinutes: 0)
+        for minutes in 1...1440 {
+            let next = KillTimeFlameBackground.intensity(remainingMinutes: Double(minutes))
+            guard previous > next, next > 0 else {
+                XCTFail("Fire must decrease continuously at \(minutes) minutes (\(previous) → \(next))")
+                return
+            }
+            XCTAssertGreaterThan(previous, next, "No dead zone at \(minutes) minutes")
+            XCTAssertGreaterThan(next, 0)
+            XCTAssertLessThanOrEqual(next, 1)
+            previous = next
+        }
+    }
+
+    func testOverdueCutoffSaturatesAndNearCutoffIsContinuous() {
+        XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: -60), 1)
+        XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: 0), 1)
+        XCTAssertGreaterThan(KillTimeFlameBackground.intensity(remainingMinutes: 1), 0.98)
+        XCTAssertGreaterThan(KillTimeFlameBackground.intensity(remainingMinutes: 60),
+                             KillTimeFlameBackground.intensity(remainingMinutes: 180))
+    }
+
+    func testFireGeometryStaysFiniteAndBelowItsCeilingAcrossSizesAndPressures() {
+        for width in [0.0, 1, 180, 320, 600, 1024] {
+            for height in [0.0, 1, 90, 220] {
+                let size = CGSize(width: width, height: height)
+                for pressure in [0.0, 0.02, 0.15, 0.4, 0.7, 1] {
+                    for time in [0.0, 0.5, 1.2, 7.9, 3600] {
+                        let profile = KillTimeFlameCeiling(left: height * 0.4, right: height * 0.8, transition: 0.4)
+                        let tongues = KillTimeFireField.tongues(size: size, time: time, intensity: pressure, ceiling: profile)
+                        if width == 0 || height == 0 {
+                            XCTAssertTrue(tongues.isEmpty)
+                        }
+                        for tongue in tongues {
+                            XCTAssertTrue(tongue.height.isFinite && tongue.halfWidth.isFinite && tongue.lean.isFinite && tongue.curl.isFinite)
+                            XCTAssertGreaterThanOrEqual(tongue.height, 0)
+                            XCTAssertLessThanOrEqual(tongue.height, KillTimeFireField.ceiling(at: tongue.root.x, size: size, profile: profile))
+                            XCTAssertGreaterThanOrEqual(tongue.root.x, 0)
+                            XCTAssertLessThanOrEqual(tongue.root.x, width)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testPressureReversalPreservesPhaseAndRaisesEveryTongue() {
+        let size = CGSize(width: 360, height: 220)
+        for time in [0.0, 0.4, 1.7, 8] {
+            let low = KillTimeFireField.tongues(size: size, time: time, intensity: 0.1, ceiling: nil)
+            let high = KillTimeFireField.tongues(size: size, time: time, intensity: 0.9, ceiling: nil)
+            let lowAgain = KillTimeFireField.tongues(size: size, time: time, intensity: 0.1, ceiling: nil)
+            XCTAssertEqual(low, lowAgain)
+            for (small, large) in zip(low, high) {
+                XCTAssertEqual(small.life, large.life)
+                XCTAssertEqual(small.root, large.root)
+                XCTAssertGreaterThan(large.height, small.height)
+                XCTAssertGreaterThanOrEqual(large.halfWidth, small.halfWidth)
+            }
+        }
+        XCTAssertNotEqual(
+            KillTimeFireField.tongues(size: size, time: 0, intensity: 0.8, ceiling: nil),
+            KillTimeFireField.tongues(size: size, time: 0.7, intensity: 0.8, ceiling: nil)
+        )
+    }
+
+    func testPauseAndResumePreserveTheFlameInsteadOfResettingIt() {
+        let start = Date(timeIntervalSinceReferenceDate: 1000)
+        var clock = KillTimeFireClock()
+        XCTAssertEqual(clock.time(at: start), 0)
+        clock.setRunning(true, at: start)
+        clock.setRunning(true, at: start.addingTimeInterval(1))
+        XCTAssertEqual(clock.time(at: start.addingTimeInterval(2)), 2)
+        clock.setRunning(false, at: start.addingTimeInterval(2))
+        XCTAssertEqual(clock.time(at: start.addingTimeInterval(500)), 2)
+        clock.setRunning(true, at: start.addingTimeInterval(500))
+        XCTAssertEqual(clock.time(at: start.addingTimeInterval(500)), 2)
+        XCTAssertEqual(clock.time(at: start.addingTimeInterval(501)), 3)
+    }
+
+    func testFlameMotionIsGentleOverHalfASecond() {
+        let size = CGSize(width: 360, height: 220)
+        for step in 0..<60 {
+            let time = Double(step) * 0.5
+            let before = KillTimeFireField.tongues(size: size, time: time, intensity: 1, ceiling: nil)
+            let after = KillTimeFireField.tongues(size: size, time: time + 0.5, intensity: 1, ceiling: nil)
+            for (first, second) in zip(before, after) {
+                let tipMotion = hypot(second.lean + second.curl - first.lean - first.curl, second.height - first.height)
+                XCTAssertLessThan(tipMotion, size.height * 0.16, "Avoid rapid flicker at phase \(time)")
+            }
+        }
+    }
+
+    func testMaterialPlanesHaveIndependentContoursAndRespondToPressure() {
+        let size = CGSize(width: 360, height: 220)
+        var phases: [Double] = []
+        for plane in KillTimeFireField.Plane.allCases {
+            let low = KillTimeFireField.tongues(size: size, time: 2, intensity: 0.1, ceiling: nil, plane: plane)
+            let high = KillTimeFireField.tongues(size: size, time: 2, intensity: 1, ceiling: nil, plane: plane)
+            phases.append(low.first?.life ?? -1)
+            for (small, large) in zip(low, high) {
+                XCTAssertEqual(small.life, large.life)
+                XCTAssertEqual(small.root, large.root)
+                XCTAssertGreaterThan(large.height, small.height)
+                XCTAssertLessThanOrEqual(large.height, size.height)
+            }
+        }
+        XCTAssertEqual(Set(phases).count, 3, "Each plane needs its own contour, not a scaled copy")
+    }
+
+    @MainActor
+    func testRenderAllThemesAndPressureLevelsForVisualReview() throws {
+        // Render actual drawing code at a fixed phase. Attachments make color,
+        // clipping, text contrast and the entire intensity range reviewable.
+        for isDark in [false, true] {
+            for (batch, themes) in [Array(WeekTheme.allCases.prefix(7)), Array(WeekTheme.allCases.suffix(7))].enumerated() {
+                let atlas = VStack(spacing: 8) {
+                    ForEach(themes) { theme in
+                        HStack(spacing: 8) {
+                            ForEach([360, 120, 15], id: \.self) { minutes in
+                                self.fireReviewCard(theme: theme, isDark: isDark, minutes: minutes, time: 0.7)
+                            }
+                        }
+                    }
+                }
+                .padding(8)
+                .background(isDark ? Color.black : Color.white)
+                let renderer = ImageRenderer(content: atlas)
+                renderer.scale = 1
+                let image = try XCTUnwrap(renderer.uiImage)
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "fire-themes-\(isDark ? "dark" : "light")-\(batch)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+        let phases = HStack(spacing: 8) {
+            ForEach([0.0, 2.0, 4.0, 6.0], id: \.self) { time in
+                self.fireReviewCard(theme: .amber, isDark: false, minutes: 15, time: time)
+            }
+        }
+        let image = try XCTUnwrap(ImageRenderer(content: phases).uiImage)
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "fire-rise-curl-decay"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testRenderMaterialBurnMotionForVisualReview() throws {
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, "com.compuserve.gif" as CFString, 160, nil))
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        for frame in 0..<160 {
+            let view = fireReviewCard(theme: .amber, isDark: false, minutes: 15, time: Double(frame) / 20)
+            let image = try XCTUnwrap(ImageRenderer(content: view).uiImage?.cgImage)
+            CGImageDestinationAddImage(destination, image, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.05]] as CFDictionary)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let attachment = XCTAttachment(data: data as Data, uniformTypeIdentifier: "com.compuserve.gif")
+        attachment.name = "material-fire-slow-motion"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func fireReviewCard(theme: WeekTheme, isDark: Bool, minutes: Int, time: Double) -> some View {
+        let colors = theme.palette(for: isDark ? .dark : .light, systemIsDark: isDark)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(theme.rawValue) · \(minutes)m").font(.system(size: 12, weight: .medium))
+                Spacer()
+                Image(systemName: "clock.fill").foregroundStyle(Color(hex: colors.accentOrange))
+            }
+            Text(minutes == 360 ? "23:00" : (minutes == 120 ? "19:00" : "17:15"))
+                .font(.system(size: 40, weight: .semibold, design: .serif)).monospacedDigit()
+            Spacer()
+            Rectangle().fill(Color(hex: colors.textSecondary).opacity(0.4)).frame(height: 3)
+            HStack {
+                Text("17:00")
+                Spacer()
+                Text("23:59")
+            }
+            .font(.system(size: 10, design: .monospaced))
+            Spacer().frame(height: 24)
+        }
+        .foregroundStyle(Color(hex: colors.textPrimary))
+        .padding(20)
+        .frame(width: 300, height: 210)
+        .background {
+            KillTimeFireCanvas(
+                intensity: KillTimeFlameBackground.intensity(remainingMinutes: Double(minutes)),
+                time: time,
+                ceiling: KillTimeFlameCeiling(left: 85, right: 155, transition: 0.48),
+                palette: KillTimeFirePalette(theme: theme, isDark: isDark)
+            )
+        }
+        .background(Color(hex: colors.backgroundSecondary))
+        .clipShape(.rect(cornerRadius: theme.visualStyle.cornerRadius))
+    }
+}
 
 final class ModelTests: XCTestCase {
     private struct FixedCloudSyncEntitlementProvider: CloudSyncEntitlementProviding {
@@ -2359,7 +2563,8 @@ final class ModelTests: XCTestCase {
             liveTick: 0
         )
 
-        XCTAssertEqual(presentation.titleLineLimit, 2)
+        // Titles stay on one line so long single words are never split mid-word.
+        XCTAssertEqual(presentation.titleLineLimit, 1)
         XCTAssertTrue(presentation.showsNextTaskDate)
         XCTAssertEqual(presentation.secondaryContent, .compactPills)
     }
@@ -7059,5 +7264,121 @@ final class WeekyiiSnapshotMergeServiceTests: XCTestCase {
             fatalError("Invalid date components")
         }
         return date
+    }
+}
+
+final class PastDayFailureRuleTests: XCTestCase {
+    private static var retainedUserSettings: [UserSettings] = []
+    private let today = "2026-09-27"
+
+    private func kind(
+        dayId: String = "2026-09-15",
+        status: DayStatus,
+        expiredCount: Int = 0,
+        initiatedAt: Date? = nil,
+        includeNotStarted: Bool = false
+    ) -> PastDayFailureKind? {
+        PastDayFailureRule.kind(
+            dayId: dayId,
+            status: status,
+            expiredCount: expiredCount,
+            initiatedAt: initiatedAt,
+            todayId: today,
+            includeNotStarted: includeNotStarted
+        )
+    }
+
+    func test_startedDayWithOpenTasksIsUnfinished() {
+        XCTAssertEqual(kind(status: .expired, expiredCount: 2, initiatedAt: Date()), .unfinished)
+    }
+
+    func test_closedDayCarryingExpiredCountStillCountsAsUnfinished() {
+        // Invariant repair turns any day with `closedAt` into `.completed`
+        // while leaving `expiredCount` untouched (e.g. developer seed data).
+        XCTAssertEqual(kind(status: .completed, expiredCount: 1, initiatedAt: Date()), .unfinished)
+    }
+
+    func test_completedAndEmptyDaysAreNotFailures() {
+        XCTAssertNil(kind(status: .completed, initiatedAt: Date()))
+        XCTAssertNil(kind(status: .empty))
+        XCTAssertNil(kind(status: .empty, includeNotStarted: true))
+    }
+
+    func test_notStartedDayOnlyCountsWhenOptedIn() {
+        // Habit materialization can turn an untouched day into a draft that
+        // later expires with zero count; that must stay unmarked by default.
+        XCTAssertNil(kind(status: .expired))
+        XCTAssertEqual(kind(status: .expired, includeNotStarted: true), .notStarted)
+        XCTAssertNil(kind(status: .expired, initiatedAt: Date(), includeNotStarted: true))
+    }
+
+    func test_openDaysAreUndecidedEvenWithStaleExpiredCount() {
+        XCTAssertNil(kind(dayId: today, status: .execute, expiredCount: 3, initiatedAt: Date()))
+        XCTAssertNil(kind(dayId: today, status: .draft, includeNotStarted: true))
+    }
+
+    func test_todayIsMarkedOnceItExpires() {
+        XCTAssertEqual(kind(dayId: today, status: .expired, expiredCount: 1, initiatedAt: Date()), .unfinished)
+    }
+
+    func test_futureDaysAreNeverMarked() {
+        XCTAssertNil(kind(dayId: "2026-09-28", status: .expired, expiredCount: 1, includeNotStarted: true))
+        XCTAssertNil(kind(dayId: "", status: .expired, expiredCount: 1))
+    }
+
+    func test_defaultOptionsShowOnlyUnfinishedFace() {
+        let options = PastMonthMarkerOptions.default
+        XCTAssertTrue(options.showsFace(for: .unfinished))
+        XCTAssertFalse(options.showsFace(for: .notStarted))
+        XCTAssertFalse(options.showsCompletedCount)
+        XCTAssertFalse(options.showsRecordDot)
+        XCTAssertFalse(options.showsExpiredFlame)
+        XCTAssertEqual(options.enabledCount, 1)
+        XCTAssertFalse(options.isEmpty)
+    }
+
+    func test_optionsCountEachMarkerIndependently() {
+        var options = PastMonthMarkerOptions.default
+        options.showsUnfinishedFace = false
+        XCTAssertTrue(options.isEmpty)
+
+        options.showsNotStartedFace = true
+        options.showsExpiredFlame = true
+        XCTAssertEqual(options.enabledCount, 2)
+        XCTAssertTrue(options.showsFace(for: .notStarted))
+        XCTAssertFalse(options.showsFace(for: .unfinished))
+    }
+
+    @MainActor
+    func test_markerTogglesDefaultAndPersistLocally() throws {
+        let suite = "WeekyiiPastMarker.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.pastMonthMarkerOptions, .default)
+
+        settings.pastMonthShowUnfinishedFace = false
+        settings.pastMonthShowCompletedCount = true
+        settings.pastMonthShowExpiredFlame = true
+
+        let reloaded = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(reloaded)
+        XCTAssertEqual(
+            reloaded.pastMonthMarkerOptions,
+            PastMonthMarkerOptions(
+                showsUnfinishedFace: false,
+                showsNotStartedFace: false,
+                showsCompletedCount: true,
+                showsRecordDot: false,
+                showsExpiredFlame: true
+            )
+        )
+
+        reloaded.pastMonthMarkerOptions = .default
+        let restored = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(restored)
+        XCTAssertEqual(restored.pastMonthMarkerOptions, .default)
     }
 }

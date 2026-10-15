@@ -400,8 +400,10 @@ struct AddProjectTaskSheet: View {
 
 // MARK: - FlowLayout
 
-private struct FlowLayout: Layout {
+struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+    /// Vertical gap between wrapped lines; defaults to `spacing`.
+    var lineSpacing: CGFloat? = nil
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = arrangeSubviews(proposal: proposal, subviews: subviews)
@@ -427,7 +429,7 @@ private struct FlowLayout: Layout {
             let size = subview.sizeThatFits(.unspecified)
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
-                currentY += lineHeight + spacing
+                currentY += lineHeight + (lineSpacing ?? spacing)
                 lineHeight = 0
             }
             positions.append(CGPoint(x: currentX, y: currentY))

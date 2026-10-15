@@ -19,7 +19,7 @@ struct HabitDetailView: View {
                 identitySection(stats: stats)
                 actionSection(stats: stats)
                 statisticsCard(stats: stats)
-                timelineSection
+                HabitHistorySection(habit: habit, startsOnText: startsOnText)
             }
             .padding(.horizontal, WeekSpacing.base)
             .padding(.vertical, WeekSpacing.md)
@@ -224,170 +224,6 @@ struct HabitDetailView: View {
     }
 
 
-    // MARK: - Timeline
-
-    private var timelineSection: some View {
-        let groups = timelineGroups
-        return VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            Text(String(localized: "habit.timeline.title", defaultValue: "时间线"))
-                .font(.titleMedium)
-                .foregroundColor(.textPrimary)
-
-            if groups.isEmpty {
-                Text(startsOnText)
-                    .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .weekPaddingVertical(WeekSpacing.lg)
-            } else {
-                LazyVStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    ForEach(groups) { group in
-                        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                            Text(group.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.textSecondary)
-                                .padding(.leading, WeekSpacing.xs)
-
-                            VStack(spacing: 0) {
-                                ForEach(group.nodes) { node in
-                                    timelineRow(node)
-                                    if node.id != group.nodes.last?.id {
-                                        Divider()
-                                            .padding(.leading, 22)
-                                    }
-                                }
-                            }
-                            .background(Color.backgroundSecondary)
-                            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Footer note - wrapped in a subtle info chip
-            HStack(alignment: .top, spacing: WeekSpacing.xs) {
-                Image(systemName: "info.circle")
-                    .font(.caption2)
-                    .foregroundColor(.textTertiary)
-                Text(String(localized: "habit.timeline.footer", defaultValue: "「中断」= 当日已生成但未完成；「未记录」= 当日未生成（未打开 App 或已过截止时间）。"))
-                    .font(.caption2)
-                    .foregroundColor(.textTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, WeekSpacing.sm)
-            .padding(.vertical, WeekSpacing.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.small))
-        }
-    }
-
-
-    private func timelineRow(_ node: HabitTimelineNode) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            timelineDot(node.state)
-
-            Text(node.date, format: .dateTime.month().day().weekday())
-                .font(.bodyMedium)
-                .foregroundColor(node.state == .unrecorded ? .textSecondary : .textPrimary)
-
-            Spacer(minLength: WeekSpacing.sm)
-
-            Text(statusText(node))
-                .font(.caption.weight(.medium))
-                .foregroundColor(statusColor(node.state))
-        }
-        .padding(.horizontal, WeekSpacing.md)
-        .padding(.vertical, WeekSpacing.sm + 2)
-    }
-
-
-    @ViewBuilder
-    private func timelineDot(_ state: HabitTimelineNodeState) -> some View {
-        switch state {
-        case .completed:
-            Circle()
-                .fill(habit.habitColor)
-                .frame(width: 10, height: 10)
-        case .missed:
-            Circle()
-                .strokeBorder(Color.taskDDL, lineWidth: 1.5)
-                .frame(width: 10, height: 10)
-        case .pending:
-            ZStack {
-                Circle()
-                    .fill(habit.habitColor.opacity(0.18))
-                Circle()
-                    .strokeBorder(habit.habitColor, lineWidth: 1.5)
-            }
-            .frame(width: 10, height: 10)
-        case .unrecorded:
-            Circle()
-                .strokeBorder(Color.textTertiary.opacity(0.45), lineWidth: 1.5)
-                .frame(width: 10, height: 10)
-        }
-    }
-
-    private func statusText(_ node: HabitTimelineNode) -> String {
-        switch node.state {
-        case .completed:
-            guard let completedAt = node.completedAt else {
-                return String(localized: "habit.record.status.completed", defaultValue: "已完成")
-            }
-            let time = Self.timeFormatter.string(from: completedAt)
-            return String(
-                format: String(localized: "habit.record.completed_at %@", defaultValue: "完成于 %@"),
-                locale: Locale.current,
-                time
-            )
-        case .missed:
-            return String(localized: "habit.record.status.missed", defaultValue: "中断")
-        case .pending:
-            return String(localized: "habit.record.status.pending", defaultValue: "待完成")
-        case .unrecorded:
-            return String(localized: "habit.record.unrecorded", defaultValue: "未记录")
-        }
-    }
-
-    private func statusColor(_ state: HabitTimelineNodeState) -> Color {
-        switch state {
-        case .completed, .pending: return habit.habitColor
-        case .missed: return .taskDDL
-        case .unrecorded: return .textTertiary
-        }
-    }
-
-    private var timelineGroups: [TimelineGroup] {
-        let nodes = HabitStatisticsCalculator.timeline(for: habit)
-        guard !nodes.isEmpty else { return [] }
-
-        let calendar = Calendar(identifier: .iso8601)
-        var groups: [TimelineGroup] = []
-        for node in nodes {
-            let components = calendar.dateComponents([.year, .month], from: node.date)
-            let key = "\(components.year ?? 0)-\(components.month ?? 0)"
-            if groups.last?.id == key {
-                groups[groups.count - 1].nodes.append(node)
-            } else {
-                groups.append(TimelineGroup(id: key, monthStart: node.date, nodes: [node]))
-            }
-        }
-        return groups
-    }
-
-    private struct TimelineGroup: Identifiable {
-        let id: String
-        let monthStart: Date
-        var nodes: [HabitTimelineNode]
-
-        var title: String {
-            monthStart.formatted(.dateTime.year().month())
-        }
-    }
-
     // MARK: - Helpers
 
     private var startsOnText: String {
@@ -398,12 +234,6 @@ struct HabitDetailView: View {
             startDate.formatted(date: .abbreviated, time: .omitted)
         )
     }
-
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
 
     // MARK: - Actions
 
@@ -454,6 +284,387 @@ struct HabitDetailView: View {
             dismiss()
         } catch {
             alertMessage = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Habit History
+
+/// One compact card: a small week / month / year switch, a calendar of dots and
+/// a single summary line. Built on `HabitStatisticsCalculator.timeline`;
+/// nothing new is stored.
+private struct HabitHistorySection: View {
+    let habit: HabitModel
+    let startsOnText: String
+
+    enum Range: String, CaseIterable, Identifiable {
+        case week, month, year
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .week: return String(localized: "habit.history.range.week", defaultValue: "周")
+            case .month: return String(localized: "habit.history.range.month", defaultValue: "月")
+            case .year: return String(localized: "habit.history.range.year", defaultValue: "年")
+            }
+        }
+        var component: Calendar.Component {
+            switch self {
+            case .week: return .weekOfYear
+            case .month: return .month
+            case .year: return .year
+            }
+        }
+    }
+
+    enum DayState {
+        case completed, missed, unrecorded, pending, upcoming, rest
+    }
+
+    @State private var range: Range = .month
+    @State private var offset = 0
+
+    private var calendar: Calendar { WeekyiiTimeZone.calendar }
+    private var today: Date { Date().startOfDay }
+
+    var body: some View {
+        let nodes = HabitStatisticsCalculator.timeline(for: habit)
+        let byDay = Dictionary(nodes.map { ($0.dayId, $0) }, uniquingKeysWith: { first, _ in first })
+
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            HStack {
+                Text(String(localized: "habit.history.title", defaultValue: "历史"))
+                    .font(.system(size: 18, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer(minLength: WeekSpacing.md)
+                if !nodes.isEmpty, habit.scheduleKind != .once {
+                    Picker(String(localized: "habit.history.range", defaultValue: "范围"), selection: $range) {
+                        ForEach(Range.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 132)
+                    .onChange(of: range) { _, _ in offset = 0 }
+                }
+            }
+
+            if nodes.isEmpty {
+                Text(startsOnText)
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, WeekSpacing.md)
+            } else if habit.scheduleKind == .once {
+                onceRow(nodes[0])
+            } else {
+                periodHeader
+                switch range {
+                case .week: weekDots(byDay: byDay)
+                case .month: monthDots(days: monthDays(of: periodStart), byDay: byDay, dot: 22, spacing: 10)
+                case .year: yearGrid(byDay: byDay)
+                }
+                Divider()
+                summaryLine(byDay: byDay)
+            }
+        }
+        .padding(WeekSpacing.lg)
+        .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.large, style: .continuous)
+                .stroke(Color.backgroundTertiary, lineWidth: 1)
+        )
+    }
+
+    // MARK: Pieces
+
+    private var periodHeader: some View {
+        HStack {
+            arrow("chevron.left", enabled: offset > minOffset) { offset -= 1 }
+            Spacer()
+            Text(periodTitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.textPrimary)
+            Spacer()
+            arrow("chevron.right", enabled: offset < 0) { offset += 1 }
+        }
+    }
+
+    private func arrow(_ name: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? Color.textSecondary : Color.textTertiary.opacity(0.4))
+        .disabled(!enabled)
+    }
+
+    private func weekDots(byDay: [String: HabitTimelineNode]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(0..<7, id: \.self) { index in
+                let date = periodStart.addingDays(index).startOfDay
+                VStack(spacing: 8) {
+                    Text(WeekyiiWeekday.localizedSymbol(for: date.isoWeekday))
+                        .font(.caption2)
+                        .foregroundStyle(Color.textTertiary)
+                    dot(date: date, byDay: byDay, size: 26)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func monthDots(days: [Date], byDay: [String: HabitTimelineNode], dot size: CGFloat, spacing: CGFloat) -> some View {
+        let leading = (days.first?.isoWeekday ?? 1) - 1
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+        return LazyVGrid(columns: columns, spacing: spacing) {
+            ForEach(1...7, id: \.self) { weekday in
+                Text(WeekyiiWeekday.localizedSymbol(for: weekday))
+                    .font(.caption2)
+                    .foregroundStyle(Color.textTertiary)
+            }
+            ForEach(0..<leading, id: \.self) { index in
+                Color.clear.frame(height: size).id("lead-\(index)")
+            }
+            ForEach(days, id: \.self) { date in
+                dot(date: date, byDay: byDay, size: size)
+            }
+        }
+    }
+
+    /// Twelve small months, 4 × 3. Tapping a month opens it in the month view.
+    private func yearGrid(byDay: [String: HabitTimelineNode]) -> some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: WeekSpacing.sm), count: 4)
+        return LazyVGrid(columns: columns, spacing: WeekSpacing.md) {
+            ForEach(0..<12, id: \.self) { index in
+                let monthStart = calendar.date(byAdding: .month, value: index, to: periodStart) ?? periodStart
+                Button {
+                    jumpToMonth(monthStart)
+                } label: {
+                    miniMonth(monthStart, byDay: byDay)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func miniMonth(_ monthStart: Date, byDay: [String: HabitTimelineNode]) -> some View {
+        let days = monthDays(of: monthStart)
+        let leading = (days.first?.isoWeekday ?? 1) - 1
+        // Fixed 7pt dots with 2pt gaps: a compact square calendar per month
+        // that leaves clear air between neighbouring months.
+        let cell: CGFloat = 7
+        let columns = Array(repeating: GridItem(.fixed(cell), spacing: 2), count: 7)
+        return VStack(alignment: .leading, spacing: 5) {
+            Text(monthStart.formatted(.dateTime.month(.abbreviated)))
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.textSecondary)
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 2) {
+                ForEach(0..<leading, id: \.self) { index in
+                    Color.clear.frame(width: cell, height: cell).id("mini-lead-\(index)")
+                }
+                ForEach(days, id: \.self) { date in
+                    Mark(state: state(of: date, byDay: byDay), tint: habit.habitColor, isMini: true)
+                        .frame(width: cell, height: cell)
+                }
+                // Six week-rows for every month so the blocks line up.
+                ForEach(0..<max(42 - leading - days.count, 0), id: \.self) { index in
+                    Color.clear.frame(width: cell, height: cell).id("mini-trail-\(index)")
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    /// Only today's dot carries its date, so the calendar stays clean.
+    private func dot(date: Date, byDay: [String: HabitTimelineNode], size: CGFloat) -> some View {
+        let dayState = state(of: date, byDay: byDay)
+        let isToday = date.dayId == today.dayId
+        let restSize: CGFloat = 6
+        return ZStack {
+            Mark(state: dayState, tint: habit.habitColor)
+                .frame(width: dayState == .rest ? restSize : size, height: dayState == .rest ? restSize : size)
+            if isToday {
+                Text("\(calendar.component(.day, from: date))")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(dayState == .completed ? .white : Color.weekyiiPrimary)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private func summaryLine(byDay: [String: HabitTimelineNode]) -> some View {
+        let nodes = periodDays().compactMap { byDay[$0.dayId] }
+        let done = nodes.filter { $0.state == .completed }.count
+        let missed = nodes.filter { $0.state == .missed }.count
+        let unrecorded = nodes.filter { $0.state == .unrecorded }.count
+        return HStack {
+            Text(String(
+                format: String(localized: "habit.history.summary.done", defaultValue: "完成 %1$lld / %2$lld"),
+                locale: Locale.current,
+                Int64(done),
+                Int64(nodes.count)
+            ))
+            .foregroundStyle(Color.textSecondary)
+            Spacer()
+            Text(String(
+                format: String(localized: "habit.history.summary.missed", defaultValue: "中断 %lld"),
+                locale: Locale.current,
+                Int64(missed)
+            ))
+            .foregroundStyle(Color.taskDDL)
+            Spacer()
+            Text(String(
+                format: String(localized: "habit.history.summary.unrecorded", defaultValue: "未记录 %lld"),
+                locale: Locale.current,
+                Int64(unrecorded)
+            ))
+            .foregroundStyle(Color.textTertiary)
+        }
+        .font(.caption)
+        .monospacedDigit()
+    }
+
+    private func onceRow(_ node: HabitTimelineNode) -> some View {
+        HStack {
+            Text(node.date.formatted(.dateTime.year().month().day().weekday()))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.textPrimary)
+            Spacer()
+            Mark(state: dayState(node.state), tint: habit.habitColor)
+                .frame(width: 22, height: 22)
+        }
+    }
+
+    // MARK: Period math
+
+    private var periodStart: Date {
+        let anchor: Date
+        switch range {
+        case .week:
+            anchor = today.startOfWeek
+        case .month:
+            anchor = calendar.dateInterval(of: .month, for: today)?.start ?? today
+        case .year:
+            anchor = calendar.dateInterval(of: .year, for: today)?.start ?? today
+        }
+        return calendar.date(byAdding: range.component, value: offset, to: anchor)?.startOfDay ?? anchor
+    }
+
+    /// The earliest period that still contains the habit's start day.
+    private var minOffset: Int {
+        guard let start = habit.startDate?.startOfDay else { return 0 }
+        let value: Int?
+        switch range {
+        case .week:
+            value = calendar.dateComponents([.weekOfYear], from: today.startOfWeek, to: start.startOfWeek).weekOfYear
+        case .month:
+            let current = calendar.dateInterval(of: .month, for: today)?.start ?? today
+            let first = calendar.dateInterval(of: .month, for: start)?.start ?? start
+            value = calendar.dateComponents([.month], from: current, to: first).month
+        case .year:
+            value = calendar.component(.year, from: start) - calendar.component(.year, from: today)
+        }
+        return min(value ?? 0, 0)
+    }
+
+    private func periodDays() -> [Date] {
+        guard let interval = calendar.dateInterval(of: range.component, for: periodStart) else { return [] }
+        return days(in: interval)
+    }
+
+    private func monthDays(of date: Date) -> [Date] {
+        guard let interval = calendar.dateInterval(of: .month, for: date) else { return [] }
+        return days(in: interval)
+    }
+
+    private func days(in interval: DateInterval) -> [Date] {
+        var days: [Date] = []
+        var cursor = interval.start.startOfDay
+        while cursor < interval.end {
+            days.append(cursor)
+            cursor = cursor.addingDays(1).startOfDay
+        }
+        return days
+    }
+
+    private func jumpToMonth(_ monthStart: Date) {
+        let current = calendar.dateInterval(of: .month, for: today)?.start ?? today
+        let months = calendar.dateComponents([.month], from: current, to: monthStart).month ?? 0
+        range = .month
+        // Changing `range` resets the offset; apply the target afterwards.
+        DispatchQueue.main.async {
+            offset = min(months, 0)
+        }
+    }
+
+    private var periodTitle: String {
+        switch range {
+        case .week:
+            return periodStart.formatted(.dateTime.month().day()) + " – " + periodStart.addingDays(6).formatted(.dateTime.month().day())
+        case .month:
+            return periodStart.formatted(.dateTime.year().month())
+        case .year:
+            return periodStart.formatted(.dateTime.year())
+        }
+    }
+
+    // MARK: State
+
+    private func state(of date: Date, byDay: [String: HabitTimelineNode]) -> DayState {
+        if let node = byDay[date.dayId] {
+            return dayState(node.state)
+        }
+        if date > today, let start = habit.startDate?.startOfDay, date >= start, habit.isScheduled(on: date) {
+            return .upcoming
+        }
+        return .rest
+    }
+
+    private func dayState(_ state: HabitTimelineNodeState) -> DayState {
+        switch state {
+        case .completed: return .completed
+        case .missed: return .missed
+        case .pending: return .pending
+        case .unrecorded: return .unrecorded
+        }
+    }
+
+    /// A single day as a dot.
+    struct Mark: View {
+        let state: DayState
+        let tint: Color
+        /// Tiny year-view cells: hairline strokes and dashes don't survive at
+        /// that size, so outlines become soft fills.
+        var isMini = false
+
+        var body: some View {
+            switch state {
+            case .completed:
+                Circle().fill(tint)
+            case .missed:
+                Circle().fill(Color.taskDDL.opacity(0.4))
+            case .unrecorded:
+                if isMini {
+                    Circle().fill(Color.textTertiary.opacity(0.22))
+                } else {
+                    Circle().strokeBorder(Color.textTertiary.opacity(0.45), lineWidth: 1.5)
+                }
+            case .pending:
+                if isMini {
+                    Circle().fill(Color.weekyiiPrimary)
+                } else {
+                    Circle().strokeBorder(tint, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
+                }
+            case .upcoming:
+                Circle().fill(tint.opacity(0.14))
+            case .rest:
+                Circle().fill(Color.backgroundTertiary.opacity(isMini ? 0.55 : 1))
+                    .scaleEffect(isMini ? 0.6 : 1)
+            }
         }
     }
 }

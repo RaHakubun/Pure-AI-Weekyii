@@ -63,6 +63,61 @@ final class ThemePickerScreenshotTests: XCTestCase {
 }
 
 final class DraftReorderUITests: XCTestCase {
+    func testKillTimeFirePreviewTracksDraggingAndCancelRestoresSavedTime() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        let slider = app.descendants(matching: .any).matching(identifier: "killTimeSlider").firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        for _ in 0..<4 {
+            if slider.isHittable && slider.frame.maxY < app.frame.maxY - 150 { break }
+            app.swipeUp()
+        }
+        let saved = slider.value as? String
+        XCTAssertNotNil(saved)
+        let early = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5))
+        let late = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5))
+        late.press(forDuration: 0.1, thenDragTo: early)
+        let earlierValue = slider.value as? String
+        XCTAssertNotEqual(earlierValue, saved)
+        attachFireScreenshot(app, name: "fire-preview-earlier")
+        early.press(forDuration: 0.1, thenDragTo: late)
+        let laterValue = slider.value as? String
+        XCTAssertNotEqual(laterValue, earlierValue)
+        XCTAssertLessThan(earlierValue ?? "", laterValue ?? "")
+        attachFireScreenshot(app, name: "fire-preview-later")
+        let cancel = app.buttons["取消"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+        cancel.tap()
+        XCTAssertEqual(slider.value as? String, saved)
+        attachFireScreenshot(app, name: "fire-preview-cancelled")
+    }
+
+    private func attachFireScreenshot(_ app: XCUIApplication, name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testPersistenceResolvingShowsOnlyLaunchPlaceholder() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-testPersistenceResolving"
+        ]
+        app.launch()
+
+        let placeholder = app.descendants(matching: .any)
+            .matching(identifier: "launch.persistence.placeholder")
+            .firstMatch
+        XCTAssertTrue(placeholder.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["正在打开本地数据…"].exists)
+        XCTAssertFalse(app.staticTexts["本地数据准备完成后即可继续使用 Weekyii"].exists)
+    }
+
     func testExtensionsHubUsesSquareShortcutsAboveProjects() {
         let app = XCUIApplication()
         app.launchArguments = [

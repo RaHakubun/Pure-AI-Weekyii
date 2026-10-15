@@ -185,17 +185,23 @@ struct TodayView: View {
             }
         }
         .sheet(item: $selectedTaskForDetail) { task in
-            TaskEditorSheet(
-                title: String(localized: "task.detail.title"),
-                isReadOnly: true,
-                initialTitle: task.title,
-                initialDescription: task.taskDescription,
-                initialType: task.taskType,
-                initialTypeIdRaw: task.taskTypeIdRaw,
-                initialSteps: task.steps,
-                initialAttachments: task.attachments,
-                onSave: { _, _, _, _, _ in }
-            )
+            // Today aggregates tasks from several sources; a habit task opens
+            // its own read-only card drawn from the habit.
+            if task.habit != nil {
+                HabitTaskDetailSheet(task: task)
+            } else {
+                TaskEditorSheet(
+                    title: String(localized: "task.detail.title"),
+                    isReadOnly: true,
+                    initialTitle: task.title,
+                    initialDescription: task.taskDescription,
+                    initialType: task.taskType,
+                    initialTypeIdRaw: task.taskTypeIdRaw,
+                    initialSteps: task.steps,
+                    initialAttachments: task.attachments,
+                    onSave: { _, _, _, _, _ in }
+                )
+            }
         }
         .sheet(item: $draftTaskEditorMode) { mode in
             draftTaskEditorSheet(mode: mode)
@@ -355,54 +361,165 @@ struct TodayView: View {
 
     @ViewBuilder
     private func killTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
+        if day.status == .expired {
+            TodayEndedKillTimeFootnote(hour: day.killTimeHour, minute: day.killTimeMinute)
+        } else {
+            editableKillTimeCard(day: day, viewModel: viewModel)
+        }
+    }
+
+    private func killTimeTitleRow(hour: Int, minute: Int, isEditable: Bool) -> some View {
+        HStack(spacing: WeekSpacing.xs) {
+            Image(systemName: "clock.fill")
+                .foregroundColor(.accentOrange)
+            Text(String(localized: "killtime.title"))
+                .font(.titleSmall)
+                .foregroundColor(.textPrimary)
+            Spacer(minLength: WeekSpacing.sm)
+            if isEditable {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    if let text = killTimeRemainingText(hour: hour, minute: minute, now: context.date) {
+                        Text(text)
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+    }
+
+    private func killTimeRemainingText(hour: Int, minute: Int, now: Date) -> String? {
+        let calendar = Calendar(identifier: .iso8601)
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = hour
+        components.minute = minute
+        guard let kill = calendar.date(from: components) else { return nil }
+        let minutes = Int(kill.timeIntervalSince(now) / 60)
+        guard minutes > 0 else { return nil }
+        if minutes >= 60 {
+            return String(
+                format: String(localized: "killtime.remaining.hours", defaultValue: "还剩 %1$lld 小时 %2$lld 分"),
+                locale: Locale.current,
+                Int64(minutes / 60),
+                Int64(minutes % 60)
+            )
+        }
+        return String(
+            format: String(localized: "killtime.remaining.minutes", defaultValue: "还剩 %lld 分钟"),
+            locale: Locale.current,
+            Int64(minutes)
+        )
+    }
+
+    private func killTimePendingBar(hour: Int, minute: Int, viewModel: TodayViewModel) -> some View {
+        HStack(spacing: WeekSpacing.md) {
+            Text(String(
+                format: String(localized: "killtime.pending.change_to", defaultValue: "改为 %@？"),
+                String(format: "%02d:%02d", hour, minute)
+            ))
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(.textPrimary)
+            .monospacedDigit()
+            Spacer(minLength: WeekSpacing.sm)
+            Button(String(localized: "action.cancel")) {
+                pendingTodayKillTimeHour = nil
+                pendingTodayKillTimeMinute = nil
+            }
+            .font(.subheadline)
+            .foregroundColor(.textSecondary)
+            .buttonStyle(.plain)
+            Button {
+                guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+                do {
+                    let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
+                    switch impact {
+                    case .normal:
+                        todayKillTimeConfirmMode = .normal
+                    case .immediateExpire(let expiredCount):
+                        todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
+                    }
+                    showingTodayKillTimeConfirm = true
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            } label: {
+                Text(String(localized: "killtime.pending.confirm", defaultValue: "确认"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.weekyiiPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(.horizontal, WeekSpacing.md)
+        .frame(maxHeight: .infinity)
+        .background(Color.accentOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func editableKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
         let displayedHour = pendingTodayKillTimeHour ?? day.killTimeHour
         let displayedMinute = pendingTodayKillTimeMinute ?? day.killTimeMinute
         let hasPendingChange = displayedHour != day.killTimeHour || displayedMinute != day.killTimeMinute
 
+        let isEditable = day.status == .draft || day.status == .execute
+
         WeekCard(accentColor: .accentOrange) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .foregroundColor(.accentOrange)
-                    Text(String(localized: "killtime.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                // The header row turns into the confirm bar while a change is
+                // pending, so the card never changes height mid-drag.
+                ZStack {
+                    if isEditable && hasPendingChange {
+                        killTimePendingBar(hour: displayedHour, minute: displayedMinute, viewModel: viewModel)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    } else {
+                        killTimeTitleRow(hour: displayedHour, minute: displayedMinute, isEditable: isEditable)
+                            .transition(.opacity)
+                    }
                 }
-                
+                .frame(height: 34)
+                .animation(.easeInOut(duration: 0.22), value: hasPendingChange)
+
                 KillTimeEditor(
                     hour: displayedHour,
                     minute: displayedMinute,
-                    isEditable: day.status == .draft || day.status == .execute,
+                    isEditable: isEditable,
+                    rangeAnchorMinutes: day.killTimeHour * 60 + day.killTimeMinute,
                     onChange: { hour, minute in
                         pendingTodayKillTimeHour = hour
                         pendingTodayKillTimeMinute = minute
                     }
                 )
-
-                if day.status == .draft || day.status == .execute, hasPendingChange {
-                    HStack(spacing: WeekSpacing.sm) {
-                        WeekButton("取消", style: .outline) {
-                            pendingTodayKillTimeHour = nil
-                            pendingTodayKillTimeMinute = nil
+            }
+            // Flames sit behind the content, fill the card to its edges
+            // (WeekCard pads by WeekSpacing.lg and clips) and may rise up to
+            // the slider's track.
+            .backgroundPreferenceValue(KillTimeLayoutAnchorKey.self) { anchors in
+                if isEditable {
+                    GeometryReader { proxy in
+                        // Measured in the content's space; the flames extend by
+                        // WeekSpacing.lg to the card edges, so add it back.
+                        let bottom = proxy.size.height + WeekSpacing.lg
+                        let ceiling: KillTimeFlameCeiling? = anchors.slider.map { sliderAnchor in
+                            let trackY = proxy[sliderAnchor].minY + KillTimeSlider.trackCenterY
+                            let timeRect = anchors.time.map { proxy[$0] }
+                            let totalWidth = proxy.size.width + WeekSpacing.lg * 2
+                            return KillTimeFlameCeiling(
+                                left: bottom - trackY + 22,
+                                right: bottom - (timeRect?.minY ?? trackY - 60),
+                                transition: ((timeRect?.maxX ?? proxy.size.width * 0.4) + WeekSpacing.lg) / totalWidth
+                            )
                         }
-                        Spacer(minLength: 0)
-                        WeekButton("确认修改", style: .primary) {
-                            guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
-                            do {
-                                let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
-                                switch impact {
-                                case .normal:
-                                    todayKillTimeConfirmMode = .normal
-                                case .immediateExpire(let expiredCount):
-                                    todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
-                                }
-                                showingTodayKillTimeConfirm = true
-                            } catch {
-                                errorMessage = error.localizedDescription
-                            }
-                        }
+                        KillTimeFlameBackground(
+                            hour: displayedHour,
+                            minute: displayedMinute,
+                            isAnimating: animationsActive,
+                            ceiling: ceiling
+                        )
+                        .padding(-WeekSpacing.lg)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -719,56 +836,22 @@ struct TodayView: View {
     }
     
     // MARK: - Expired State
-    
+
     @ViewBuilder
     private func expiredStateContent(day: DayModel) -> some View {
-        // 过期提示卡片
-        WeekCard(accentColor: .taskDDL) {
-            VStack(spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.taskDDL)
-                    Text(String(localized: "expired.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-                }
-                
-                HStack {
-                    Text(String(localized: "expired.count"))
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                    Spacer()
-                    Text("\(day.expiredCount)")
-                        .font(.titleMedium)
-                        .foregroundColor(.taskDDL)
-                }
-            }
-        }
-        
-        // 已完成任务
+        TodayExpiredOutcomeCard(day: day)
+
         if !day.completedTasks.isEmpty {
-            WeekCard {
-                VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.accentGreen)
-                        Text(String(localized: "complete.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.completedTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.accentGreen)
-                    }
-                    
-                    CompleteZoneView(tasks: day.completedTasks)
+            TodayExpiredCompletedList(
+                tasks: day.completedTasks,
+                expiredCount: day.expiredCount,
+                onTapTask: { task in
+                    selectedTaskForDetail = task
                 }
-            }
+            )
         }
     }
-    
+
     // MARK: - Helper Methods
 
     @ViewBuilder
@@ -796,37 +879,22 @@ struct TodayView: View {
     }
 
     @ViewBuilder
+    /// The button floats directly over the themed scene. A solid backdrop band
+    /// here would not match theme backgrounds (e.g. the sunset reflection) and
+    /// read as a halo; the scroll content already reserves room underneath.
     private var floatingStartButtonOverlay: some View {
-        VStack(spacing: 0) {
-            LinearGradient(
-                colors: [
-                    Color.backgroundPrimary.opacity(0),
-                    Color.backgroundPrimary
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 32)
-            .allowsHitTesting(false)
-
-            VStack(spacing: 0) {
-                WeekButton(
-                    "准备开始",
-                    icon: "play.circle.fill",
-                    style: .primary
-                ) {
-                    startFlowDetent = .fraction(0.5)
-                    startFlowCoordinator.present()
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("todayFloatingStartButton")
-            }
-            .padding(.horizontal, WeekSpacing.base)
-            .padding(.top, WeekSpacing.sm)
-            .padding(.bottom, WeekSpacing.sm)
-            .background(Color.backgroundPrimary)
+        WeekButton(
+            "准备开始",
+            icon: "play.circle.fill",
+            style: .primary
+        ) {
+            startFlowDetent = .fraction(0.5)
+            startFlowCoordinator.present()
         }
-        .ignoresSafeArea(edges: .bottom)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("todayFloatingStartButton")
+        .padding(.horizontal, WeekSpacing.base)
+        .padding(.vertical, WeekSpacing.sm)
     }
 
     @ViewBuilder
@@ -867,6 +935,9 @@ struct TodayView: View {
                     }
                 }
             )
+        case .edit(let task, _) where task.habit != nil:
+            // Habit tasks are owned by their habit and are never edited here.
+            HabitTaskDetailSheet(task: task)
         case .edit(let task, let context):
             TaskEditorSheet(
                 title: String(localized: "draft.edit_title"),
@@ -1804,5 +1875,769 @@ private struct LotrRainNightBackground: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Expired Day Presentation
+
+/// Outcome card shown once today has expired. It distinguishes a started day
+/// that ran out of time from a planned day that was never started, reading
+/// only persisted fields (`expiredCount`, `initiatedAt`, raw draft records).
+private struct TodayExpiredOutcomeCard: View {
+    let day: DayModel
+
+    /// Same rule as the Past calendar's grey face.
+    private var isNotStarted: Bool {
+        day.expiredCount == 0 && day.initiatedAt == nil
+    }
+
+    private var failureKind: PastDayFailureKind {
+        isNotStarted ? .notStarted : .unfinished
+    }
+
+    private var tint: Color {
+        isNotStarted ? .textTertiary : .taskDDL
+    }
+
+    private var killTimeText: String {
+        String(format: "%02d:%02d", day.killTimeHour, day.killTimeMinute)
+    }
+
+    /// Draft records survive expiry (hidden by `DayModel`'s terminal getters)
+    /// until garbage collection, so today's planned count is still readable.
+    private var plannedCount: Int {
+        day.tasks.filter { $0.zone == .draft }.count
+    }
+
+    private var completedCount: Int { day.completedTasks.count }
+    private var expiredCount: Int { day.expiredCount }
+
+    private var completionPercent: Int {
+        let total = completedCount + expiredCount
+        guard total > 0 else { return 0 }
+        return Int((Double(completedCount) / Double(total) * 100).rounded())
+    }
+
+    private var title: String {
+        isNotStarted
+            ? String(localized: "today.expired.not_started.title", defaultValue: "今天没有开始")
+            : String(localized: "today.expired.unfinished.title", defaultValue: "今天没能全部完成")
+    }
+
+    private var subtitle: String {
+        if isNotStarted {
+            if plannedCount > 0 {
+                return String(
+                    format: String(
+                        localized: "today.expired.not_started.subtitle",
+                        defaultValue: "写好的 %1$lld 项计划在 %2$@ 过期了"
+                    ),
+                    plannedCount,
+                    killTimeText
+                )
+            }
+            return String(
+                format: String(localized: "today.expired.not_started.subtitle_no_count", defaultValue: "计划在 %@ 过期了"),
+                killTimeText
+            )
+        }
+        return String(
+            format: String(localized: "today.expired.unfinished.subtitle", defaultValue: "%1$@ 截止时还剩 %2$lld 项"),
+            killTimeText,
+            expiredCount
+        )
+    }
+
+    var body: some View {
+        WeekCard(accentColor: tint) {
+            HStack(spacing: WeekSpacing.md) {
+                PastFailureFaceMark(kind: failureKind)
+                    .frame(width: 26, height: 26)
+                    .frame(width: 46, height: 46)
+                    .background(Circle().fill(tint.opacity(0.12)))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.titleSmall)
+                        .foregroundColor(.textPrimary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if isNotStarted {
+                Text(String(
+                    localized: "today.expired.not_started.comfort",
+                    defaultValue: "没关系。明天早一点点“开始”，让计划真正动起来。"
+                ))
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: WeekSpacing.sm) {
+                    outcomeBar
+                    HStack {
+                        Text(String(
+                            format: String(localized: "today.expired.stat.completed", defaultValue: "完成 %lld"),
+                            completedCount
+                        ))
+                        .foregroundColor(.accentGreen)
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "today.expired.stat.expired", defaultValue: "过期 %lld"),
+                            expiredCount
+                        ))
+                        .foregroundColor(.taskDDL)
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "today.expired.stat.rate", defaultValue: "完成率 %lld%%"),
+                            completionPercent
+                        ))
+                        .foregroundColor(.textSecondary)
+                    }
+                    .font(.captionBold)
+                    .monospacedDigit()
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Completed vs. expired share of the day, green then muted red.
+    private var outcomeBar: some View {
+        GeometryReader { proxy in
+            let total = max(completedCount + expiredCount, 1)
+            let gap: CGFloat = completedCount > 0 && expiredCount > 0 ? 2 : 0
+            let usable = max(proxy.size.width - gap, 0)
+            let completedWidth = usable * CGFloat(completedCount) / CGFloat(total)
+            HStack(spacing: gap) {
+                if completedCount > 0 {
+                    Capsule().fill(Color.accentGreen)
+                        .frame(width: completedWidth)
+                }
+                if expiredCount > 0 {
+                    Capsule().fill(Color.taskDDL.opacity(0.55))
+                }
+            }
+        }
+        .frame(height: 6)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Compact list of what did get done today: one hairline row per task with
+/// its finish time, plus a reminder that expired tasks keep no details.
+private struct TodayExpiredCompletedList: View {
+    let tasks: [TaskItem]
+    let expiredCount: Int
+    let onTapTask: (TaskItem) -> Void
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = WeekyiiTimeZone.timeZone
+        return formatter
+    }()
+
+    var body: some View {
+        WeekCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(String(localized: "today.expired.completed.title", defaultValue: "今日完成"))
+                        .font(.titleSmall)
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Text("\(tasks.count)")
+                        .font(.titleSmall)
+                        .foregroundColor(.accentGreen)
+                }
+                .padding(.bottom, WeekSpacing.sm)
+
+                ForEach(tasks) { task in
+                    Divider()
+                    Button {
+                        onTapTask(task)
+                    } label: {
+                        HStack(spacing: WeekSpacing.sm) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(.accentGreen)
+                            Text(task.title)
+                                .font(.bodyMedium)
+                                .foregroundColor(.textPrimary)
+                                .lineLimit(1)
+                            Spacer(minLength: WeekSpacing.sm)
+                            if let endedAt = task.endedAt {
+                                Text(Self.timeFormatter.string(from: endedAt))
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                    .monospacedDigit()
+                            }
+                        }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if expiredCount > 0 {
+                    Text(String(
+                        format: String(
+                            localized: "today.expired.completed.forgotten",
+                            defaultValue: "过期的 %lld 项不保留详情"
+                        ),
+                        expiredCount
+                    ))
+                    .font(.caption)
+                    .foregroundColor(.textTertiary)
+                    .padding(.top, WeekSpacing.sm)
+                }
+            }
+        }
+    }
+}
+
+/// Replaces the kill-time editor once the day is over: nothing left to adjust,
+/// so it becomes a quiet, locked footnote instead of a live countdown.
+private struct TodayEndedKillTimeFootnote: View {
+    let hour: Int
+    let minute: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+                .font(.caption2)
+            Text(String(
+                format: String(localized: "today.expired.killtime_footnote", defaultValue: "截止于 %@ · 今天已结束"),
+                String(format: "%02d:%02d", hour, minute)
+            ))
+            .monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundColor(.textSecondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, WeekSpacing.sm)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Habit Task Detail
+
+/// Read-only detail for a task generated by a habit. Same sheet as the normal
+/// task detail, but redrawn from the habit: the category sets the hero visual,
+/// the schedule kind sets the rhythm module. Reads existing data only.
+private struct HabitTaskDetailSheet: View {
+    let task: TaskItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let habit = task.habit {
+                    HabitTaskDetailContent(task: task, habit: habit)
+                        .weekPadding(WeekSpacing.base)
+                }
+            }
+            .background(Color.backgroundPrimary)
+            .navigationTitle(String(localized: "task.detail.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "action.done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HabitTaskDetailContent: View {
+    let task: TaskItem
+    let habit: HabitModel
+
+    private var stats: HabitStatistics { HabitStatisticsCalculator.statistics(for: habit) }
+    private var tint: Color { Color.weekyiiEmphasis(hex: habit.colorHex) }
+    private var isDoneToday: Bool { task.zone == .complete }
+    private var weekDays: [HabitWeekStripDay] { HabitWeekStripDay.currentWeek(for: habit) }
+
+    /// Share of this week's scheduled days already completed (0...1).
+    private var weekRatio: Double {
+        let scheduled = weekDays.filter { $0.state != .rest }
+        guard !scheduled.isEmpty else { return isDoneToday ? 1 : 0 }
+        let done = scheduled.filter { $0.state == .completed }.count
+        return Double(done) / Double(scheduled.count)
+    }
+
+    private var isCentered: Bool { habit.category == .mindfulness }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            headerCard
+            rhythmCard
+            if habit.scheduleKind != .once {
+                statsCard
+            }
+        }
+    }
+
+    // MARK: Header
+
+    private var headerCard: some View {
+        WeekCard(accentColor: tint) {
+            if isCentered {
+                VStack(spacing: WeekSpacing.sm) {
+                    hero.frame(width: 120, height: 96)
+                    titleBlock(alignment: .center)
+                    Text(String(localized: "habit.detail.mindfulness.line", defaultValue: "慢一点。这一件事，今天只为它留出时间。"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                HStack(alignment: .center, spacing: WeekSpacing.md) {
+                    hero.frame(width: 84, height: 84)
+                    titleBlock(alignment: .leading)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private func titleBlock(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            Text(habit.name)
+                .font(.system(size: 22, weight: .semibold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .multilineTextAlignment(alignment == .center ? .center : .leading)
+            Text(habit.category.displayName + " · " + habit.scheduleSummary)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(2)
+            statusChip
+        }
+    }
+
+    private var statusChip: some View {
+        Text(isDoneToday
+             ? String(localized: "habit.detail.status.done", defaultValue: "今日已打卡")
+             : String(localized: "habit.detail.status.pending", defaultValue: "今日待打卡"))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isDoneToday ? Color.accentGreen : tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background((isDoneToday ? Color.accentGreen : tint).opacity(0.12), in: Capsule())
+    }
+
+    @ViewBuilder
+    private var hero: some View {
+        switch habit.category {
+        case .fitness:
+            HabitHeroRings(outer: weekRatio, inner: Double(stats.currentStreak) / Double(max(stats.longestStreak, 1)), tint: tint)
+        case .learning:
+            HabitHeroBooks(completed: stats.completedCount, isDoneToday: isDoneToday, tint: tint)
+        case .mindfulness:
+            HabitHeroBreath(tint: tint)
+        case .health:
+            HabitHeroDrop(fill: weekRatio, tint: tint)
+        case .creativity:
+            HabitHeroSparks(lit: stats.completedCount, tint: tint)
+        case .social:
+            HabitHeroCircles(isTogether: isDoneToday, tint: tint)
+        case .productivity:
+            HabitHeroTarget(rate: stats.completionRate ?? 0, tint: tint)
+        }
+    }
+
+    // MARK: Rhythm
+
+    @ViewBuilder
+    private var rhythmCard: some View {
+        switch habit.scheduleKind {
+        case .weekly:
+            WeekCard {
+                sectionLabel(
+                    String(localized: "habit.detail.rhythm.week", defaultValue: "本周节奏"),
+                    trailing: "\(weekDays.filter { $0.state == .completed }.count) / \(weekDays.filter { $0.state != .rest }.count)"
+                )
+                HabitDetailWeekStrip(days: weekDays, tint: tint)
+            }
+        case .monthly:
+            WeekCard {
+                sectionLabel(Date().formatted(.dateTime.month(.wide)), trailing: monthProgressText)
+                HabitDetailMonthGrid(habit: habit, tint: tint)
+            }
+        case .once:
+            WeekCard {
+                VStack(spacing: WeekSpacing.xs) {
+                    Text(String(localized: "habit.detail.once.label", defaultValue: "约定的那一天"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                    if let date = habit.startDate {
+                        Text(date.formatted(.dateTime.month(.defaultDigits)) + " · " + date.formatted(.dateTime.day()))
+                            .font(.system(size: 40, weight: .regular, design: .serif))
+                            .foregroundStyle(tint)
+                    }
+                    Text(isDoneToday
+                         ? String(localized: "habit.detail.once.done", defaultValue: "已经完成，这个习惯就此圆满")
+                         : String(localized: "habit.detail.once.today", defaultValue: "就是今天，完成后这个习惯自然结束"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var monthProgressText: String {
+        let days = HabitDetailMonthGrid.monthStates(for: habit)
+        let scheduled = days.filter { $0.state != .rest }
+        return "\(scheduled.filter { $0.state == .completed }.count) / \(scheduled.count)"
+    }
+
+    // MARK: Stats
+
+    private var statsCard: some View {
+        WeekCard {
+            HStack(spacing: 0) {
+                if habit.scheduleKind == .weekly {
+                    statItem("\(stats.currentStreak)", String(localized: "habit.detail.stat.current_streak", defaultValue: "当前连续"))
+                    statItem("\(stats.longestStreak)", String(localized: "habit.detail.stat.longest_streak", defaultValue: "最长连续"))
+                } else {
+                    statItem("\(stats.completedCount)", String(localized: "habit.detail.stat.completed", defaultValue: "累计完成"))
+                    statItem("\(stats.missedCount)", String(localized: "habit.detail.stat.missed", defaultValue: "中断"))
+                }
+                statItem(
+                    stats.completionRatePercent.map { "\($0)%" } ?? "—",
+                    String(localized: "habit.detail.stat.rate", defaultValue: "完成率")
+                )
+            }
+        }
+    }
+
+    private func statItem(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 22, weight: .regular, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .monospacedDigit()
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sectionLabel(_ title: String, trailing: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.textTertiary)
+            Spacer()
+            Text(trailing)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.textTertiary)
+                .monospacedDigit()
+        }
+    }
+}
+
+// MARK: Rhythm modules
+
+private struct HabitDetailWeekStrip: View {
+    let days: [HabitWeekStripDay]
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(days) { day in
+                VStack(spacing: 6) {
+                    HabitDayMark(state: day.state, tint: tint)
+                        .frame(width: 26, height: 26)
+                    Text(WeekyiiWeekday.localizedSymbol(for: day.isoWeekday))
+                        .font(.system(size: 11, weight: day.isToday ? .semibold : .regular))
+                        .foregroundStyle(day.isToday ? Color.weekyiiPrimary : Color.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitDetailMonthGrid: View {
+    let habit: HabitModel
+    let tint: Color
+
+    struct Cell: Identifiable {
+        let id: String
+        let day: Int
+        let isToday: Bool
+        let state: HabitWeekStripDay.State
+    }
+
+    /// Same rules as the week strip, applied to every day of the current month.
+    @MainActor
+    static func monthStates(for habit: HabitModel, today: Date = Date()) -> [Cell] {
+        let calendar = WeekyiiTimeZone.calendar
+        let todayStart = today.startOfDay
+        guard let interval = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
+        let start = habit.startDate?.startOfDay
+        var statusByDay: [String: HabitDayRecordStatus] = [:]
+        for record in habit.records {
+            statusByDay[record.dayId] = record.status
+        }
+        var cells: [Cell] = []
+        var cursor = interval.start.startOfDay
+        while cursor < interval.end {
+            let dayId = cursor.dayId
+            let isToday = dayId == todayStart.dayId
+            let state: HabitWeekStripDay.State
+            if let start, cursor >= start, habit.isScheduled(on: cursor) {
+                switch statusByDay[dayId] {
+                case .completed: state = .completed
+                case .missed: state = .missed
+                case .pending: state = cursor < todayStart ? .unrecorded : .pendingToday
+                case nil: state = isToday ? .pendingToday : (cursor < todayStart ? .unrecorded : .upcoming)
+                }
+            } else {
+                state = .rest
+            }
+            cells.append(Cell(id: dayId, day: calendar.component(.day, from: cursor), isToday: isToday, state: state))
+            cursor = cursor.addingDays(1)
+        }
+        return cells
+    }
+
+    var body: some View {
+        let cells = Self.monthStates(for: habit)
+        let leading = cells.first.flatMap { WeekyiiDayId.date(from: $0.id)?.isoWeekday }.map { $0 - 1 } ?? 0
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
+        VStack(spacing: 6) {
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(1...7, id: \.self) { weekday in
+                    Text(WeekyiiWeekday.localizedSymbol(for: weekday))
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                ForEach(0..<leading, id: \.self) { index in
+                    Color.clear.frame(height: 26).id("lead-\(index)")
+                }
+                ForEach(cells) { cell in
+                    ZStack {
+                        HabitDayMark(state: cell.state, tint: tint, shape: .rounded)
+                        Text("\(cell.day)")
+                            .font(.system(size: 10, weight: cell.isToday ? .bold : .regular))
+                            .foregroundStyle(cell.state == .completed ? .white : Color.textSecondary)
+                    }
+                    .frame(height: 26)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitDayMark: View {
+    enum MarkShape { case circle, rounded }
+
+    let state: HabitWeekStripDay.State
+    let tint: Color
+    var shape: MarkShape = .circle
+
+    var body: some View {
+        switch state {
+        case .completed:
+            base.fill(tint)
+        case .missed:
+            base.fill(Color.taskDDL.opacity(0.3))
+        case .unrecorded:
+            base.stroke(Color.textTertiary.opacity(0.4), lineWidth: 1.5).padding(1)
+        case .pendingToday:
+            base.stroke(tint, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5])).padding(1)
+        case .upcoming:
+            base.fill(tint.opacity(0.14))
+        case .rest:
+            if shape == .rounded {
+                base.fill(Color.backgroundTertiary.opacity(0.5))
+            } else {
+                Circle().fill(Color.backgroundTertiary).frame(width: 7, height: 7)
+            }
+        }
+    }
+
+    private var base: AnyShape {
+        shape == .circle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+// MARK: Category heroes (decorative, derived from existing statistics)
+
+private struct HabitHeroRings: View {
+    let outer: Double
+    let inner: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            ring(progress: outer, lineWidth: 9, inset: 0, color: tint)
+            ring(progress: inner, lineWidth: 7, inset: 15, color: Color.accentOrange)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func ring(progress: Double, lineWidth: CGFloat, inset: CGFloat, color: Color) -> some View {
+        ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: min(max(progress, 0.001), 1))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .padding(inset + lineWidth / 2)
+    }
+}
+
+private struct HabitHeroBooks: View {
+    let completed: Int
+    let isDoneToday: Bool
+    let tint: Color
+
+    private let heights: [CGFloat] = [0.72, 0.86, 0.64, 0.8, 0.7, 0.9, 0.6]
+
+    var body: some View {
+        let solid = min(completed, 6)
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(0..<solid, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(tint.opacity(index.isMultiple(of: 2) ? 1 : 0.6))
+                    .frame(width: 9)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .scaleEffect(y: heights[index % heights.count], anchor: .bottom)
+            }
+            if !isDoneToday {
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(tint, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                    .frame(width: 9)
+                    .scaleEffect(y: 0.66, anchor: .bottom)
+            }
+            if solid == 0 && isDoneToday {
+                RoundedRectangle(cornerRadius: 2).fill(tint).frame(width: 9).scaleEffect(y: 0.7, anchor: .bottom)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroBreath: View {
+    let tint: Color
+    @Environment(\.weekyiiReduceMotion) private var reduceMotion
+    @State private var inhale = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<4, id: \.self) { index in
+                Circle()
+                    .fill(tint.opacity([0.08, 0.12, 0.2, 0.5][index]))
+                    .scaleEffect(CGFloat(4 - index) / 4 * (inhale ? 1 : 0.88))
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                inhale = true
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroDrop: View {
+    let fill: Double
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Image(systemName: "drop.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(tint.opacity(0.15))
+                Rectangle()
+                    .fill(tint)
+                    .frame(height: proxy.size.height * min(max(fill, 0.06), 1))
+                    .mask(alignment: .bottom) {
+                        Image(systemName: "drop.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                    }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroSparks: View {
+    let lit: Int
+    let tint: Color
+
+    var body: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(0..<9, id: \.self) { index in
+                Image(systemName: "sparkle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(index < min(lit, 9) ? tint : tint.opacity(0.15))
+                    .rotationEffect(.degrees(Double(index * 17 % 40) - 20))
+            }
+        }
+        .padding(4)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroCircles: View {
+    let isTogether: Bool
+    let tint: Color
+
+    var body: some View {
+        let offset: CGFloat = isTogether ? 9 : 18
+        ZStack {
+            Circle().fill(tint.opacity(0.35)).frame(width: 46, height: 46).offset(x: -offset)
+            Circle().fill(tint.opacity(0.75)).frame(width: 46, height: 46).offset(x: offset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroTarget: View {
+    let rate: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .stroke(tint.opacity(0.2 + Double(index) * 0.15), lineWidth: 2)
+                    .padding(CGFloat(index) * 13 + 6)
+            }
+            Circle()
+                .trim(from: 0, to: min(max(rate, 0.001), 1))
+                .stroke(tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(3)
+            Circle().fill(tint).frame(width: 12, height: 12)
+        }
+        .accessibilityHidden(true)
     }
 }

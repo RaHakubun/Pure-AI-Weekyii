@@ -17,9 +17,14 @@ struct KillTimeSlider: View {
 
     // MARK: Layout
 
-    private let thumbDiameter: CGFloat = 18
+    static let layoutThumbDiameter: CGFloat = 18
+    static let layoutTopRulerHeight: CGFloat = 20
+    /// Vertical centre of the track, measured from the slider's top edge.
+    static var trackCenterY: CGFloat { layoutTopRulerHeight + layoutThumbDiameter / 2 }
+
+    private let thumbDiameter: CGFloat = KillTimeSlider.layoutThumbDiameter
     private let trackHeight: CGFloat = 4
-    private let topRulerHeight: CGFloat = 20
+    private let topRulerHeight: CGFloat = KillTimeSlider.layoutTopRulerHeight
     private let bottomRulerHeight: CGFloat = 32   // 多留空间给时间标签
 
     // MARK: State
@@ -55,7 +60,7 @@ struct KillTimeSlider: View {
         GeometryReader { proxy in
             let totalWidth  = proxy.size.width
             let thumbRadius = thumbDiameter / 2
-            let trackWidth  = totalWidth - thumbDiameter
+            let trackWidth  = max(1, totalWidth - thumbDiameter)
 
             let lb    = effectiveLowerBound
             let range = max(1.0, upperBound - lb)
@@ -95,6 +100,17 @@ struct KillTimeSlider: View {
             .gesture(makeGesture(thumbRadius: thumbRadius, trackWidth: trackWidth))
         }
         .frame(height: topRulerHeight + thumbDiameter + bottomRulerHeight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "killtime.title"))
+        .accessibilityValue(String(format: "%02d:%02d", Int(displayValue) / 60, Int(displayValue) % 60))
+        .accessibilityIdentifier("killTimeSlider")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onChange(min(displayValue + 15, upperBound))
+            case .decrement: onChange(max(displayValue - 15, effectiveLowerBound))
+            @unknown default: break
+            }
+        }
     }
 
     // MARK: - Track Row

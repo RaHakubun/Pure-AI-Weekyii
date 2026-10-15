@@ -196,7 +196,7 @@ private struct HabitsModulePreview: View {
             ) { habit in
                 HabitLiveTile(
                     habit: habit,
-                    habitCount: viewModel.activeHabits.count,
+                    streak: viewModel.statistics(for: habit).currentStreak,
                     completedToday: progress.completed,
                     scheduledToday: progress.scheduled
                 )
@@ -217,62 +217,151 @@ private struct HabitsModulePreview: View {
 
 private struct HabitLiveTile: View {
     let habit: HabitModel
-    let habitCount: Int
+    let streak: Int
     let completedToday: Int
     let scheduledToday: Int
 
+    private var subtitle: String {
+        guard streak > 0 else { return habit.scheduleSummary }
+        return habit.scheduleSummary + " · " + String(
+            format: String(localized: "extensions.hub.habits.streak", defaultValue: "连续 %lld 天"),
+            locale: Locale.current,
+            Int64(streak)
+        )
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HubTileHeader(
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HubModuleLabel(
                 title: String(localized: "extensions.module.habits.title", defaultValue: "习惯追踪"),
-                icon: "repeat.circle.fill",
+                icon: habit.iconName,
                 tint: habit.habitColor,
-                trailing: "\(completedToday)/\(scheduledToday)"
+                trailing: String(
+                    format: String(localized: "extensions.hub.habits.today_progress", defaultValue: "今日 %1$lld / %2$lld"),
+                    locale: Locale.current,
+                    Int64(completedToday),
+                    Int64(scheduledToday)
+                )
             )
 
-            HStack(alignment: .center, spacing: WeekSpacing.md) {
-                Image(systemName: habit.iconName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(habit.habitColor)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(habit.name)
-                        .font(.headline)
-                        .foregroundStyle(Color.textPrimary)
-                        .lineLimit(1)
-
-                    Text(habit.scheduleSummary)
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: WeekSpacing.sm)
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    if habitCount > 1 {
-                        Text(
-                            String(
-                                format: String(localized: "extensions.hub.habits.more", defaultValue: "还有 %lld 个习惯"),
-                                locale: Locale.current,
-                                Int64(habitCount - 1)
-                            )
-                        )
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(Color.textSecondary)
-                    }
-
-                    Label(
-                        String(localized: "extensions.hub.empty.tap_to_see_all"),
-                        systemImage: "chevron.right"
-                    )
-                    .font(.caption2.weight(.medium))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(habit.name)
+                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
                     .foregroundStyle(Color.textTertiary)
-                }
+                    .lineLimit(1)
             }
+
+            HabitWeekStrip(days: HabitWeekStripDay.currentWeek(for: habit), tint: habit.habitColor)
+                .padding(.top, 2)
         }
         .padding(WeekSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// One day of the habit's current ISO week, derived read-only from the
+/// schedule and existing day records, using the same rules as HabitStatisticsCalculator.
+struct HabitWeekStripDay: Identifiable {
+    enum State {
+        case completed
+        case missed
+        case unrecorded
+        case pendingToday
+        case upcoming
+        case rest
+    }
+
+    let dayId: String
+    let isoWeekday: Int
+    let isToday: Bool
+    let state: State
+
+    var id: String { dayId }
+
+    @MainActor
+    static func currentWeek(for habit: HabitModel, today: Date = Date()) -> [HabitWeekStripDay] {
+        let todayStart = today.startOfDay
+        let weekStart = todayStart.startOfWeek
+        let start = habit.startDate?.startOfDay
+        var statusByDay: [String: HabitDayRecordStatus] = [:]
+        for record in habit.records {
+            statusByDay[record.dayId] = record.status
+        }
+
+        return (0..<7).map { offset in
+            let date = weekStart.addingDays(offset).startOfDay
+            let dayId = date.dayId
+            let isToday = dayId == todayStart.dayId
+            let state: State
+            if let start, date >= start, habit.isScheduled(on: date) {
+                switch statusByDay[dayId] {
+                case .completed:
+                    state = .completed
+                case .missed:
+                    state = .missed
+                case .pending:
+                    state = date < todayStart ? .unrecorded : .pendingToday
+                case nil:
+                    if isToday {
+                        state = .pendingToday
+                    } else if date < todayStart {
+                        state = .unrecorded
+                    } else {
+                        state = .upcoming
+                    }
+                }
+            } else {
+                state = .rest
+            }
+            return HabitWeekStripDay(dayId: dayId, isoWeekday: date.isoWeekday, isToday: isToday, state: state)
+        }
+    }
+}
+
+private struct HabitWeekStrip: View {
+    let days: [HabitWeekStripDay]
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(days) { day in
+                VStack(spacing: 4) {
+                    mark(for: day.state)
+                        .frame(width: 18, height: 18)
+                    Text(WeekyiiWeekday.localizedSymbol(for: day.isoWeekday))
+                        .font(.system(size: 10, weight: day.isToday ? .semibold : .regular))
+                        .foregroundStyle(day.isToday ? Color.weekyiiPrimary : Color.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func mark(for state: HabitWeekStripDay.State) -> some View {
+        switch state {
+        case .completed:
+            Circle().fill(Color.accentGreen)
+        case .missed:
+            Circle().fill(Color.taskDDL.opacity(0.35))
+        case .unrecorded:
+            Circle().stroke(Color.textTertiary.opacity(0.4), lineWidth: 1.5)
+                .padding(1)
+        case .pendingToday:
+            Circle()
+                .stroke(Color.weekyiiPrimary, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))
+                .padding(1)
+        case .upcoming:
+            Circle().fill(Color.backgroundTertiary)
+        case .rest:
+            Circle().fill(Color.backgroundTertiary)
+                .frame(width: 6, height: 6)
+        }
     }
 }
 
@@ -1270,7 +1359,7 @@ private struct HubEmptyTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            HubTileHeader(title: title, icon: icon, tint: tint, trailing: "")
+            HubModuleLabel(title: title, icon: icon, tint: tint, trailing: "")
             Spacer(minLength: 0)
             Text(message)
                 .font(.subheadline.weight(.semibold))
@@ -1293,7 +1382,7 @@ private struct HabitEmptyLiveTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HubTileHeader(title: title, icon: icon, tint: tint, trailing: "")
+            HubModuleLabel(title: title, icon: icon, tint: tint, trailing: "")
 
             HStack(alignment: .center, spacing: WeekSpacing.sm) {
                 Image(systemName: "plus.circle.fill")
@@ -1327,7 +1416,7 @@ private struct MindStampLiveTile: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 Color.accentPink.opacity(0.08)
 
                 if let image {
@@ -1343,20 +1432,22 @@ private struct MindStampLiveTile: View {
                     )
                 }
 
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    HubTileHeader(
-                        title: String(localized: "extensions.module.mindstamps.title"),
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    HubModuleLabel(
+                        title: String(localized: "extensions.module.mindstamps.title") + " · \(totalCount)",
                         icon: "bandage.fill",
                         tint: image == nil ? .accentPink : .white,
-                        trailing: "\(totalCount)"
+                        textColor: image == nil ? .textTertiary : .white.opacity(0.85),
+                        trailing: ""
                     )
 
                     Spacer(minLength: 0)
 
-                    Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : stamp.text)
-                        .font(.subheadline.weight(.semibold))
+                    Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : "\u{201C}\(stamp.text)\u{201D}")
+                        .font(.system(size: 19, weight: .regular, design: .serif))
                         .foregroundStyle(image == nil ? Color.textPrimary : .white)
                         .lineLimit(image == nil ? 3 : 2)
+                        .minimumScaleFactor(0.8)
                         .multilineTextAlignment(.leading)
 
                     Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
@@ -1364,6 +1455,7 @@ private struct MindStampLiveTile: View {
                         .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
                 }
                 .padding(WeekSpacing.md)
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             }
         }
     }
@@ -1376,60 +1468,67 @@ private struct SuspendedTaskLiveTile: View {
 
     private var deadline: Date { calendar.startOfDay(for: task.decisionDeadline) }
     private var today: Date { calendar.startOfDay(for: Date()) }
+    private var daysLeft: Int { calendar.dateComponents([.day], from: today, to: deadline).day ?? 0 }
 
-    private var deadlineLabel: String {
-        if deadline < today { return String(localized: "extensions.hub.suspended.deadline.overdue") }
-        if calendar.isDate(deadline, inSameDayAs: today) { return String(localized: "extensions.hub.suspended.deadline.today") }
-        let days = calendar.dateComponents([.day], from: today, to: deadline).day ?? 0
-        if days <= 7 {
-            return String(
-                format: String(localized: "extensions.hub.suspended.deadline.days"),
-                locale: Locale.current,
-                Int64(days)
-            )
-        }
-        return String(
-            format: String(localized: "extensions.hub.suspended.deadline.date"),
-            locale: Locale.current,
-            deadline.formatted(.dateTime.month().day())
-        )
+    private var countdownColor: Color {
+        daysLeft <= 0 ? .taskDDL : .suspendedModuleTint
     }
 
-    private var deadlineColor: Color {
-        deadline <= today ? .taskDDL : .suspendedModuleTint
+    /// Big numeral + caption: how long until this task must be decided.
+    private var countdown: (value: String, caption: String) {
+        if daysLeft > 0 {
+            return ("\(daysLeft)", String(localized: "extensions.hub.suspended.countdown.days", defaultValue: "天后决定"))
+        }
+        if daysLeft == 0 {
+            return (
+                String(localized: "extensions.hub.suspended.countdown.today_value", defaultValue: "今天"),
+                String(localized: "extensions.hub.suspended.countdown.today", defaultValue: "需要决定")
+            )
+        }
+        return ("\(-daysLeft)", String(localized: "extensions.hub.suspended.countdown.overdue", defaultValue: "天前已到期"))
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            HubTileHeader(
-                title: String(localized: "extensions.module.suspended.title"),
+        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+            HubModuleLabel(
+                title: String(localized: "extensions.module.suspended.title")
+                    + " · "
+                    + String(
+                        format: String(localized: "extensions.hub.suspended.count"),
+                        locale: Locale.current,
+                        Int64(totalCount)
+                    ),
                 icon: "hourglass.circle.fill",
                 tint: .suspendedModuleTint,
-                trailing: String(
-                    format: String(localized: "extensions.hub.suspended.count"),
-                    locale: Locale.current,
-                    Int64(totalCount)
-                )
+                trailing: ""
             )
 
             Spacer(minLength: 0)
 
-            Text(task.title)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-
-            HStack(spacing: WeekSpacing.xs) {
-                Label(task.taskType.displayName, systemImage: task.taskType.iconName)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(task.taskType.color)
-                Spacer(minLength: 0)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(countdown.value)
+                    .font(.system(size: 40, weight: .regular, design: .serif))
+                    .foregroundStyle(countdownColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+                Text(countdown.caption)
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
             }
 
-            Text(deadlineLabel)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(deadlineColor)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(task.taskType.color)
+                    .frame(width: 6, height: 6)
+                Text(task.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(task.title + ", " + task.taskType.displayName)
         }
         .padding(WeekSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1439,168 +1538,343 @@ private struct SuspendedTaskLiveTile: View {
 private struct ProjectFocusLiveTile: View {
     let snapshot: ProjectTileSnapshot
     let projectCount: Int
+    private let calendar = Calendar(identifier: .iso8601)
 
     /// 焦点卡在浅色卡片上呈现，项目色只作前景与描边，过亮的色系需压暗后才可读。
     private var projectColor: Color { Color.weekyiiEmphasis(hex: snapshot.colorHex) }
-    private var progressPercent: Int { Int((snapshot.progress * 100).rounded()) }
+
+    /// Display-only split of the snapshot counts. `remainingCount` already
+    /// includes overdue tasks, so the open-and-on-time share is derived here
+    /// instead of showing the overdue ones twice.
+    private var openCount: Int { max(snapshot.remainingCount - snapshot.expiredCount, 0) }
+
+    /// One segment per task reads well up to this size; beyond it the bar
+    /// switches to proportional blocks so segments never become hairlines.
+    private static let segmentLimit = 20
+
+    private var today: Date { calendar.startOfDay(for: Date()) }
+
+    private var nextTaskIsOverdue: Bool {
+        guard let date = snapshot.nextTaskDate else { return false }
+        return calendar.startOfDay(for: date) < today
+    }
+
+    private var laterTasks: [ProjectTileTaskEntry] {
+        var entries = snapshot.upcomingTasks
+        if let first = entries.first,
+           first.title == snapshot.nextTaskTitle,
+           first.date.map({ calendar.isDate($0, inSameDayAs: snapshot.nextTaskDate ?? .distantPast) }) ?? (snapshot.nextTaskDate == nil) {
+            entries.removeFirst()
+        }
+        return entries
+    }
+
+    private var statusLine: (text: String, color: Color) {
+        if snapshot.totalCount == 0 {
+            return (String(localized: "extensions.hub.projects.status.empty", defaultValue: "还没有任务"), .textTertiary)
+        }
+        if snapshot.completedCount >= snapshot.totalCount {
+            return (String(localized: "extensions.hub.projects.status.done", defaultValue: "全部完成"), .accentGreen)
+        }
+        if snapshot.expiredCount > 0 {
+            let overdue = String(
+                format: String(localized: "extensions.hub.projects.status.overdue", defaultValue: "%lld 项已逾期"),
+                locale: Locale.current,
+                Int64(snapshot.expiredCount)
+            )
+            if openCount == 0 {
+                return (overdue + String(localized: "extensions.hub.projects.status.stalled_suffix", defaultValue: "，项目停滞中"), .taskDDL)
+            }
+            return (overdue, .taskDDL)
+        }
+        return (
+            String(
+                format: String(localized: "extensions.hub.projects.status.open", defaultValue: "待推进 %lld 项"),
+                locale: Locale.current,
+                Int64(openCount)
+            ),
+            .textSecondary
+        )
+    }
 
     var body: some View {
-        tileContent
-            .padding(WeekSpacing.md)
-    }
-
-    private var tileContent: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HStack(spacing: WeekSpacing.sm) {
-                Image(systemName: snapshot.icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(projectColor)
-                    .frame(width: 34, height: 34)
-                    .background(projectColor.opacity(0.12), in: Circle())
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(String(localized: "extensions.module.projects.title"))
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                    Text(snapshot.name)
-                        .font(.headline)
-                        .foregroundStyle(Color.textPrimary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: WeekSpacing.sm)
-
-                Text(String(localized: "extensions.module.see_all"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(projectColor)
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(projectColor)
-            }
-
-            HStack(alignment: .center, spacing: WeekSpacing.md) {
-                ZStack {
-                    Circle()
-                        .stroke(projectColor.opacity(0.12), lineWidth: 6)
-                    Circle()
-                        .trim(from: 0, to: min(max(snapshot.progress, 0), 1))
-                        .stroke(projectColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 1) {
-                        Text("\(progressPercent)%")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(projectColor)
-                            .contentTransition(.numericText())
-                        Text(String(localized: "extensions.hub.projects.progress_label", defaultValue: "完成"))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Color.textTertiary)
-                    }
-                }
-                .frame(width: 58, height: 58)
-
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    if let nextTaskDate = snapshot.nextTaskDate {
-                        HStack(spacing: WeekSpacing.xs) {
-                            Image(systemName: "calendar")
-                                .font(.caption2)
-                                .foregroundStyle(Color.textTertiary)
-                            Text(nextTaskDate, format: .dateTime.month().day())
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(projectColor)
-                            Text(String(localized: "extensions.hub.projects.deadline_label", defaultValue: "截止"))
-                                .font(.caption2)
-                                .foregroundStyle(Color.textTertiary)
-                        }
-                    }
-
-                    Text(
-                        String(
-                            format: String(localized: "extensions.hub.projects.active_count"),
-                            locale: Locale.current,
-                            Int64(projectCount)
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(Color.textTertiary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                Text(String(localized: "extensions.hub.projects.next_step"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.textSecondary)
-                    .textCase(.uppercase)
-
-                Text(snapshot.nextTaskTitle ?? String(localized: "extensions.hub.projects.no_next_task"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(
-                        snapshot.nextTaskTitle != nil ? Color.textPrimary : Color.textTertiary
-                    )
-                    .lineLimit(2)
-            }
-            .padding(WeekSpacing.sm)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(projectColor.opacity(0.06), in: RoundedRectangle(cornerRadius: WeekRadius.small))
-            .overlay(
-                RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous)
-                    .stroke(projectColor.opacity(0.14), lineWidth: 1)
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HubModuleLabel(
+                title: String(localized: "extensions.module.projects.title"),
+                icon: snapshot.icon,
+                tint: projectColor,
+                trailing: String(
+                    format: String(localized: "extensions.hub.projects.total_projects", defaultValue: "共 %lld 个项目"),
+                    locale: Locale.current,
+                    Int64(projectCount)
+                )
             )
 
-            VStack(spacing: WeekSpacing.sm) {
-                HStack(spacing: WeekSpacing.sm) {
-                    hubStatTile(
-                        title: String(localized: "project.stat.total"),
-                        value: snapshot.totalCount,
-                        tint: .textPrimary
+            HStack(alignment: .firstTextBaseline) {
+                Text(snapshot.name)
+                    .font(.system(size: 24, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: WeekSpacing.sm)
+                if snapshot.totalCount > 0 {
+                    Text(
+                        String(
+                            format: String(localized: "extensions.hub.projects.completed_ratio", defaultValue: "%1$lld / %2$lld 完成"),
+                            locale: Locale.current,
+                            Int64(snapshot.completedCount),
+                            Int64(snapshot.totalCount)
+                        )
                     )
-                    hubStatTile(
-                        title: String(localized: "project.stat.completed"),
-                        value: snapshot.completedCount,
-                        tint: .accentGreen
-                    )
-                }
-                HStack(spacing: WeekSpacing.sm) {
-                    hubStatTile(
-                        title: String(localized: "project.stat.remaining"),
-                        value: snapshot.remainingCount,
-                        tint: projectColor
-                    )
-                    hubStatTile(
-                        title: String(localized: "project.stat.expired"),
-                        value: snapshot.expiredCount,
-                        tint: .taskDDL
-                    )
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+                    .monospacedDigit()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            VStack(alignment: .leading, spacing: 6) {
+                taskSegments
+                Text(statusLine.text)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(statusLine.color)
+            }
+
+            // An empty project has nothing to step into; the status line says it all.
+            if snapshot.totalCount > 0 {
+                nextStepBlock
+                    .padding(.top, WeekSpacing.xs)
+            }
+
+            if !laterTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(laterTasks.enumerated()), id: \.offset) { _, entry in
+                        HStack {
+                            Text(entry.title)
+                                .font(.caption)
+                                .foregroundStyle(Color.textSecondary)
+                                .lineLimit(1)
+                            Spacer(minLength: WeekSpacing.sm)
+                            if let date = entry.date {
+                                Text(date, format: .dateTime.month().day())
+                                    .font(.caption2)
+                                    .foregroundStyle(entry.isOverdue ? Color.taskDDL : Color.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
+
+            // The stretched card's spare height goes to real content: the
+            // two-week rhythm chart, or an invitation when there is nothing yet.
+            if snapshot.totalCount == 0 {
+                emptyProjectPrompt
+            } else {
+                ProjectHubRhythmChart(points: snapshot.trend, accent: projectColor)
+                    .padding(.top, WeekSpacing.sm)
+            }
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var emptyProjectPrompt: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(projectColor.opacity(0.5))
+            Text(String(localized: "extensions.hub.projects.empty_prompt", defaultValue: "进入项目，安排第一项任务"))
+                .font(.subheadline)
+                .foregroundStyle(Color.textSecondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 96, maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous)
+                .strokeBorder(projectColor.opacity(0.22), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        )
+        .padding(.top, WeekSpacing.sm)
+    }
+
+    /// Completed (green) → overdue (red) → open (neutral), one capsule per task.
+    @ViewBuilder
+    private var taskSegments: some View {
+        let completed = snapshot.completedCount
+        let overdue = snapshot.expiredCount
+        let open = openCount
+        if snapshot.totalCount == 0 {
+            Capsule().fill(Color.backgroundTertiary).frame(height: 8)
+        } else if snapshot.totalCount <= Self.segmentLimit {
+            HStack(spacing: 4) {
+                ForEach(0..<completed, id: \.self) { _ in segment(Color.accentGreen) }
+                ForEach(0..<overdue, id: \.self) { _ in segment(Color.taskDDL.opacity(0.8)) }
+                ForEach(0..<open, id: \.self) { _ in segment(Color.backgroundTertiary) }
+            }
+            .frame(height: 8)
+        } else {
+            GeometryReader { proxy in
+                let total = CGFloat(max(completed + overdue + open, 1))
+                let width = proxy.size.width - 8
+                HStack(spacing: 4) {
+                    if completed > 0 { segment(Color.accentGreen).frame(width: width * CGFloat(completed) / total) }
+                    if overdue > 0 { segment(Color.taskDDL.opacity(0.8)).frame(width: width * CGFloat(overdue) / total) }
+                    if open > 0 { segment(Color.backgroundTertiary) }
+                }
+            }
+            .frame(height: 8)
         }
     }
 
-    /// 统计瓦片吃掉卡片拉伸的富余高度：空白有多少它长多少，卡内永不留无规划的空区。
-    private func hubStatTile(title: String, value: Int, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(Color.textSecondary)
-            Text("\(value)")
-                .font(.titleSmall)
-                .foregroundStyle(tint)
-                .contentTransition(.numericText())
+    private func segment(_ color: Color) -> some View {
+        Capsule().fill(color).frame(maxWidth: .infinity)
+    }
+
+    private var nextStepBlock: some View {
+        let accent = nextTaskIsOverdue ? Color.taskDDL : projectColor
+        return HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(snapshot.nextTaskTitle == nil ? Color.backgroundTertiary : accent)
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "extensions.hub.projects.next_step"))
+                    .font(.caption2)
+                    .foregroundStyle(Color.textTertiary)
+                Text(snapshot.nextTaskTitle ?? String(localized: "extensions.hub.projects.no_next_task"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(snapshot.nextTaskTitle != nil ? Color.textPrimary : Color.textTertiary)
+                    .lineLimit(2)
+                if let date = snapshot.nextTaskDate {
+                    Text(nextTaskDateText(date))
+                        .font(.caption2)
+                        .foregroundStyle(nextTaskIsOverdue ? Color.taskDDL : Color.textSecondary)
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(WeekSpacing.sm)
-        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: WeekRadius.small))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func nextTaskDateText(_ date: Date) -> String {
+        let dateText = date.formatted(.dateTime.month().day())
+        let day = calendar.startOfDay(for: date)
+        if calendar.isDate(day, inSameDayAs: today) {
+            return dateText + " · " + String(localized: "extensions.hub.projects.next.today", defaultValue: "今天")
+        }
+        if day < today {
+            let days = calendar.dateComponents([.day], from: day, to: today).day ?? 0
+            return dateText + " · " + String(
+                format: String(localized: "extensions.hub.projects.next.overdue_days", defaultValue: "已逾期 %lld 天"),
+                locale: Locale.current,
+                Int64(days)
+            )
+        }
+        return dateText
+    }
+}
+
+/// Two-week rhythm of a project, read from the snapshot's existing trend
+/// points: green = finished that day, red = still owed from a past day,
+/// accent = planned ahead. Bars grow to whatever height the card offers.
+private struct ProjectHubRhythmChart: View {
+    let points: [ProjectTileTrendPoint]
+    let accent: Color
+    private let calendar = Calendar(identifier: .iso8601)
+
+    private var today: Date { calendar.startOfDay(for: Date()) }
+    private var peak: Int { max(points.map { $0.completed + $0.planned }.max() ?? 0, 1) }
+    private var isQuiet: Bool { points.allSatisfy { $0.completed == 0 && $0.planned == 0 } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: WeekSpacing.sm) {
+                Text(String(localized: "extensions.hub.projects.rhythm.title", defaultValue: "近两周节奏"))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Color.textTertiary)
+                Spacer(minLength: 0)
+                legendItem(Color.accentGreen, String(localized: "extensions.hub.projects.rhythm.done", defaultValue: "完成"))
+                legendItem(Color.taskDDL.opacity(0.45), String(localized: "extensions.hub.projects.rhythm.owed", defaultValue: "欠下"))
+                legendItem(accent.opacity(0.45), String(localized: "extensions.hub.projects.rhythm.planned", defaultValue: "计划"))
+            }
+
+            GeometryReader { proxy in
+                HStack(alignment: .bottom, spacing: 4) {
+                    ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                        bar(for: point, height: proxy.size.height)
+                    }
+                }
+            }
+            .frame(minHeight: 36, maxHeight: .infinity)
+            .overlay {
+                if isQuiet {
+                    Text(String(localized: "extensions.hub.projects.rhythm.quiet", defaultValue: "这两周还没有动静"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+
+            HStack(spacing: 4) {
+                ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                    let isToday = calendar.isDate(point.day, inSameDayAs: today)
+                    Text(isToday
+                         ? String(localized: "extensions.hub.projects.next.today", defaultValue: "今天")
+                         : point.day.formatted(.dateTime.day()))
+                        .font(.system(size: 9, weight: isToday ? .semibold : .regular))
+                        .foregroundStyle(isToday ? Color.weekyiiPrimary : Color.textTertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "extensions.hub.projects.rhythm.title", defaultValue: "近两周节奏"))
+    }
+
+    @ViewBuilder
+    private func bar(for point: ProjectTileTrendPoint, height: CGFloat) -> some View {
+        let day = calendar.startOfDay(for: point.day)
+        let isFuture = day > today
+        let unit = height / CGFloat(peak)
+        ZStack(alignment: .bottom) {
+            if isFuture {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .strokeBorder(Color.backgroundTertiary, lineWidth: 1)
+            } else {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.backgroundTertiary.opacity(0.55))
+            }
+            VStack(spacing: 2) {
+                if point.planned > 0 {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(isFuture ? accent.opacity(0.45) : Color.taskDDL.opacity(0.45))
+                        .frame(height: max(4, unit * CGFloat(point.planned) - 2))
+                }
+                if point.completed > 0 {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Color.accentGreen)
+                        .frame(height: max(4, unit * CGFloat(point.completed)))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func legendItem(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 3) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 7, height: 7)
+            Text(text)
+                .font(.system(size: 9))
+                .foregroundStyle(Color.textTertiary)
+        }
     }
 }
 
 private struct ProjectEmptyLiveTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            HubTileHeader(
+            HubModuleLabel(
                 title: String(localized: "extensions.module.projects.title"),
                 icon: "folder.fill",
                 tint: .weekyiiPrimary,
-                trailing: String(localized: "extensions.module.see_all")
+                trailing: ""
             )
             HStack(alignment: .center, spacing: WeekSpacing.sm) {
                 Image(systemName: "folder.badge.plus")
@@ -1624,27 +1898,36 @@ private struct ProjectEmptyLiveTile: View {
 }
 
 
-private struct HubTileHeader: View {
+/// Module label shared by every hub face: a small tinted icon anchors the
+/// module, while the text stays quiet so colour belongs to the content.
+private struct HubModuleLabel: View {
     let title: String
-    let icon: String
-    let tint: Color
+    var icon: String? = nil
+    var tint: Color = .textTertiary
+    var textColor: Color = .textTertiary
     let trailing: String
 
     var body: some View {
-        HStack(spacing: WeekSpacing.xs) {
-            Image(systemName: icon)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
-                .background(tint.opacity(0.12), in: Circle())
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 24, height: 24)
+                    .background(tint.opacity(0.12), in: Circle())
+            }
             Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tint)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(textColor)
+                .tracking(0.4)
+                .lineLimit(1)
             Spacer(minLength: 0)
             if !trailing.isEmpty {
                 Text(trailing)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(tint)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(textColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
             }
         }
     }
@@ -1681,9 +1964,17 @@ private struct ProjectsFullView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .current: "进行中"
-            case .completed: "已完成"
-            case .archived: "已归档"
+            case .current: String(localized: "project.filter.current", defaultValue: "进行中")
+            case .completed: String(localized: "project.filter.completed", defaultValue: "已完成")
+            case .archived: String(localized: "project.filter.archived", defaultValue: "已归档")
+            }
+        }
+
+        func includes(_ status: ProjectStatus) -> Bool {
+            switch self {
+            case .current: status == .planning || status == .active
+            case .completed: status == .completed
+            case .archived: status == .archived
             }
         }
     }
@@ -1767,12 +2058,24 @@ private struct ProjectsFullView: View {
                 if viewModel.projects.isEmpty {
                     emptyStateView
                 } else {
-                    Picker("项目状态", selection: $selectedFilter) {
+                    Picker(String(localized: "project.filter.label", defaultValue: "项目状态"), selection: $selectedFilter) {
                         ForEach(ProjectFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                            Text(filterLabel(filter)).tag(filter)
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    if selectedFilter == .current, !isEditingTiles, let summary = overdueSummary {
+                        HStack(spacing: 5) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                            Text(summary)
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(Color.taskDDL)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                    }
 
                     if tileProjects.isEmpty {
                         WeekCard {
@@ -1780,13 +2083,17 @@ private struct ProjectsFullView: View {
                                 Image(systemName: selectedFilter == .archived ? "archivebox" : "tray")
                                     .font(.system(size: 32))
                                     .foregroundStyle(Color.textTertiary)
-                                Text("这里还没有\(selectedFilter.title)的项目")
+                                Text(String(
+                                    format: String(localized: "project.filter.empty", defaultValue: "这里还没有%@的项目"),
+                                    selectedFilter.title
+                                ))
                                     .font(.bodyMedium)
                                     .foregroundStyle(Color.textSecondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, WeekSpacing.lg)
                         }
+
                     } else {
                         if isEditingTiles {
                             Text(String(localized: "project.tiles.edit_hint"))
@@ -1804,6 +2111,7 @@ private struct ProjectsFullView: View {
                                     .layoutValue(key: TileColSpanLayoutKey.self, value: project.tileSize.colSpan)
                                     .layoutValue(key: TileRowSpanLayoutKey.self, value: project.tileSize.rowSpan)
                             }
+
                         }
                         .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.id))
                         .animation(draggingProjectID == nil ? .interactiveSpring(response: 0.22, dampingFraction: 0.88) : nil, value: tileProjects.map(\.tileSizeRaw))
@@ -1814,39 +2122,45 @@ private struct ProjectsFullView: View {
                             }
                         }
                     }
-
-                    if selectedFilter == .current {
-                        Button {
-                            showingCreateSheet = true
-                        } label: {
-                            HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 14))
-                                Text(String(localized: "project.add"))
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, WeekSpacing.xl)
-                            .padding(.vertical, WeekSpacing.md)
-                            .background(Color.weekyiiGradient)
-                            .clipShape(Capsule())
-                            .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
-                        }
-                        .accessibilityIdentifier("projectsFooterCreateButton")
-                        .buttonStyle(ScaleButtonStyle())
-                        .padding(.top, BoardMetrics.footerSpacing)
-                        .padding(.bottom, BoardMetrics.footerSpacing)
-                    }
                 }
             }
             .padding(.horizontal, BoardMetrics.horizontalPadding)
             .padding(.top, WeekSpacing.sm)
+            .padding(.bottom, BoardMetrics.footerSpacing)
             .frame(maxWidth: .infinity, alignment: .top)
         }
     }
 
+    private func filterLabel(_ filter: ProjectFilter) -> String {
+        let count = viewModel.projects.filter { filter.includes($0.status) }.count
+        return count > 0 ? "\(filter.title) · \(count)" : filter.title
+    }
+
+    /// "2 个项目有逾期任务，共 8 项" — read from the same tile snapshots.
+    private var overdueSummary: String? {
+        let overdueCounts = tileProjects.map { snapshotForTile($0).expiredCount }.filter { $0 > 0 }
+        guard !overdueCounts.isEmpty else { return nil }
+        return String(
+            format: String(localized: "project.board.overdue_summary", defaultValue: "%1$lld 个项目有逾期任务，共 %2$lld 项"),
+            locale: Locale.current,
+            Int64(overdueCounts.count),
+            Int64(overdueCounts.reduce(0, +))
+        )
+    }
+
     @ToolbarContentBuilder
     private var editToolbar: some ToolbarContent {
+        if !viewModel.projects.isEmpty, !isEditingTiles {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCreateSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel(String(localized: "project.add"))
+                .accessibilityIdentifier("projectsToolbarCreateButton")
+            }
+        }
         if !tileProjects.isEmpty {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(isEditingTiles ? String(localized: "action.done") : String(localized: "action.edit")) {
@@ -2147,48 +2461,57 @@ private struct ProjectMetroTileView: View {
     }
 
     private func miniTileBody(presentation: ProjectTilePresentation) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
             tileIconBadge(size: 10)
 
             Spacer(minLength: 0)
 
-            compactPrimaryPanel(for: presentation.livePanel)
+            miniPrimaryValue
 
             if presentation.showsTitle {
                 Text(snapshot.name)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(tileInk.opacity(0.92))
-                    .lineLimit(presentation.titleLineLimit)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay(alignment: .topTrailing) {
+            // In edit mode this corner belongs to the delete button.
+            if snapshot.expiredCount > 0, !isEditing {
+                Circle()
+                    .fill(Self.overdueInk)
+                    .frame(width: 9, height: 9)
+                    .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 1.5))
+                    .accessibilityHidden(true)
             }
         }
     }
 
     private func smallTileBody(presentation: ProjectTilePresentation) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: WeekSpacing.xs) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center, spacing: WeekSpacing.xs) {
                 tileIconBadge(size: 9)
 
                 if presentation.showsTitle {
-                    Text(snapshot.name)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(tileInk.opacity(0.92))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    tileTitle(size: 14)
                 }
 
-                compactPrimaryPanel(for: presentation.livePanel)
+                if snapshot.expiredCount > 0 {
+                    overdueChip(compact: true)
+                }
             }
 
             Spacer(minLength: 0)
 
-            if presentation.showsProgressBar {
-                tileProgressBar(height: 4)
-            }
-
-            if presentation.secondaryContent == .microStatsStrip, !isEmptyProject {
-                smallStatsStrip
+            if isEmptyProject {
+                addFirstTaskPanel(showsHint: false, compact: true)
+            } else {
+                taskSegments(height: 5)
+                if presentation.secondaryContent == .microStatsStrip {
+                    ratioLine
+                }
             }
         }
     }
@@ -2198,26 +2521,22 @@ private struct ProjectMetroTileView: View {
             tileHeader(
                 presentation: presentation,
                 titleFontSize: isEditing ? 15 : 17,
-                titleWeight: .bold
+                titleWeight: .semibold
             )
 
             Spacer(minLength: 0)
 
-            mediumPrimaryPanel(presentation: presentation)
-                .foregroundStyle(tileInk)
-                .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.28), value: presentation.livePanel)
-
-            if presentation.showsProgressBar {
-                tileProgressBar(height: 5)
-            }
-
-            if presentation.secondaryContent == .compactPills, !isEmptyProject {
-                mediumPillRow(panel: presentation.livePanel)
-            }
-
-            if !isEditing {
+            if isEmptyProject {
+                addFirstTaskPanel(showsHint: !isEditing, compact: false)
                 Spacer(minLength: 0)
+            } else {
+                completedRatioHero(fontSize: presentation.primaryNumberFontSize * 0.7)
+
+                taskSegments(height: 6)
+
+                if presentation.secondaryContent == .compactPills {
+                    nextStepLine
+                }
             }
         }
     }
@@ -2227,7 +2546,7 @@ private struct ProjectMetroTileView: View {
             tileHeader(
                 presentation: presentation,
                 titleFontSize: isEditing ? 15 : 16,
-                titleWeight: .bold,
+                titleWeight: .semibold,
                 showsTrendLegend: presentation.showsTrendChart && trendFutureStartIndex != nil
             )
 
@@ -2240,11 +2559,12 @@ private struct ProjectMetroTileView: View {
 
             if presentation.taskRowCount > 0, !snapshot.upcomingTasks.isEmpty {
                 tileTaskList(limit: presentation.taskRowCount)
-            } else if presentation.secondaryContent == .compactPills {
-                wideFallbackPanel(presentation: presentation)
             } else if isEmptyProject {
-                // 窄板上的 wide 会让位给图表，空项目时整块就只剩标题；补一条低强度说明。
-                emptyStatePanel(titleSize: 13, hintSize: 9)
+                Spacer(minLength: 0)
+                addFirstTaskPanel(showsHint: !isEditing, compact: false)
+            } else if presentation.secondaryContent == .compactPills {
+                completedRatioHero(fontSize: 24)
+                nextStepLine
             }
 
             Spacer(minLength: 0)
@@ -2257,16 +2577,11 @@ private struct ProjectMetroTileView: View {
         titleWeight: Font.Weight,
         showsTrendLegend: Bool = false
     ) -> some View {
-        HStack(alignment: .top, spacing: WeekSpacing.xs) {
+        HStack(alignment: .center, spacing: WeekSpacing.xs) {
             tileIconBadge(size: 11)
 
             if presentation.showsTitle {
-                Text(snapshot.name)
-                    .font(.system(size: titleFontSize, weight: titleWeight, design: .rounded))
-                    .foregroundStyle(tileInk)
-                    .lineLimit(presentation.titleLineLimit)
-                    .minimumScaleFactor(0.72)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                tileTitle(size: titleFontSize, weight: titleWeight)
             }
 
             if showsTrendLegend {
@@ -2274,14 +2589,7 @@ private struct ProjectMetroTileView: View {
             }
 
             if presentation.showsStatusChip {
-                Text(statusText)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(tileInk.opacity(0.85))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.white.opacity(0.96), in: Capsule())
-                    .fixedSize()
-                    .layoutPriority(1)
+                healthChip
             }
         }
     }
@@ -2295,112 +2603,235 @@ private struct ProjectMetroTileView: View {
             .background(tileInk.opacity(0.08), in: Capsule())
     }
 
-    /// 空项目的说明文案。"什么都没有"是一条低价值信息，不该占用满级视觉权重。
-    private func emptyStatePanel(titleSize: CGFloat, hintSize: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(String(localized: "project.tasks.empty"))
-                .font(.system(size: titleSize, weight: .medium, design: .rounded))
-                .foregroundStyle(tileInk.opacity(0.50))
-            if !isEditing {
-                Text(String(localized: "project.tile.empty.hint"))
-                    .font(.system(size: hintSize, weight: .medium, design: .rounded))
-                    .foregroundStyle(tileInk.opacity(0.35))
-                    .lineLimit(1)
-            }
-        }
-    }
+    // MARK: Display helpers (read-only views of the snapshot)
 
-    @ViewBuilder
-    private func compactPrimaryPanel(for panel: ProjectTileLivePanel) -> some View {
-        switch panel {
-        case .progress:
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text("\(Int(snapshot.progress * 100))")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                Text("%")
-                    .font(.system(size: 10, weight: .semibold))
-            }
+    /// Deep red that stays legible on every pastel tile surface.
+    private static let overdueInk = Color(hex: "#8E2A1C")
+
+    /// `remainingCount` already contains overdue tasks; split them for display.
+    private var openCount: Int { max(snapshot.remainingCount - snapshot.expiredCount, 0) }
+
+    /// Beyond this many tasks one-segment-per-task turns into hairlines.
+    private static let segmentLimit = 20
+
+    private var isStalled: Bool { snapshot.expiredCount > 0 && openCount == 0 }
+
+    /// Single line, tail-truncated: long words are never split mid-word.
+    private func tileTitle(size: CGFloat, weight: Font.Weight = .semibold) -> some View {
+        Text(snapshot.name)
+            .font(.system(size: size, weight: weight, design: .serif))
             .foregroundStyle(tileInk)
-        case .metrics, .nextTask:
-            if isEmptyProject {
-                // 空项目画 "✓ 0" 会被读成"全部完成"，改成无完成语义的占位符。
-                Image(systemName: "circle.dashed")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(tileInk.opacity(0.45))
-                    .accessibilityLabel(Text(String(localized: "project.tasks.empty")))
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: snapshot.remainingCount > 0 ? "clock.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(tileInk.opacity(snapshot.remainingCount > 0 ? 0.9 : 0.7))
-                    Text("\(snapshot.remainingCount > 0 ? snapshot.remainingCount : snapshot.completedCount)")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(tileInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Overdue beats everything; an empty project reads as planning; a healthy
+    /// project with tasks needs no badge at all.
+    @ViewBuilder
+    private var healthChip: some View {
+        if snapshot.expiredCount > 0 {
+            overdueChip(compact: false)
+        } else if isEmptyProject {
+            Text(statusText)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tileInk.opacity(0.75))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(.white.opacity(0.92), in: Capsule())
+                .fixedSize()
+                .layoutPriority(1)
+        }
+    }
+
+    private func overdueChip(compact: Bool) -> some View {
+        Text(
+            String(
+                format: compact
+                    ? String(localized: "project.tile.overdue.compact", defaultValue: "%lld 逾期")
+                    : String(localized: "project.tile.overdue", defaultValue: "%lld 项逾期"),
+                locale: Locale.current,
+                Int64(snapshot.expiredCount)
+            )
+        )
+        .font(.system(size: 10, weight: .bold))
+        .foregroundStyle(Color.taskDDL)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(.white.opacity(0.96), in: Capsule())
+        .fixedSize()
+        .layoutPriority(1)
+    }
+
+    /// One capsule per task: completed (ink) → overdue (deep red) → open (faint).
+    @ViewBuilder
+    private func taskSegments(height: CGFloat) -> some View {
+        let completed = snapshot.completedCount
+        let overdue = snapshot.expiredCount
+        let open = openCount
+        if snapshot.totalCount <= Self.segmentLimit {
+            HStack(spacing: 3) {
+                ForEach(0..<completed, id: \.self) { _ in segment(tileInk.opacity(0.85)) }
+                ForEach(0..<overdue, id: \.self) { _ in segment(Self.overdueInk) }
+                ForEach(0..<open, id: \.self) { _ in segment(tileInk.opacity(0.14)) }
+            }
+            .frame(height: height)
+            .accessibilityHidden(true)
+        } else {
+            GeometryReader { proxy in
+                let total = CGFloat(max(completed + overdue + open, 1))
+                let width = max(proxy.size.width - 6, 0)
+                HStack(spacing: 3) {
+                    if completed > 0 { segment(tileInk.opacity(0.85)).frame(width: width * CGFloat(completed) / total) }
+                    if overdue > 0 { segment(Self.overdueInk).frame(width: width * CGFloat(overdue) / total) }
+                    if open > 0 { segment(tileInk.opacity(0.14)) }
                 }
             }
+            .frame(height: height)
+            .accessibilityHidden(true)
         }
     }
 
-    @ViewBuilder
-    private func mediumPrimaryPanel(presentation: ProjectTilePresentation) -> some View {
-        switch presentation.livePanel {
-        case .progress:
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text("\(Int(snapshot.progress * 100))")
-                    .font(.system(size: presentation.primaryNumberFontSize, weight: .bold, design: .rounded))
-                Text("%")
-                    .font(.system(size: presentation.primaryNumberFontSize * 0.375, weight: .semibold))
-            }
-        case .metrics:
-            if !isEditing {
-                emptyStatePanel(titleSize: 15, hintSize: 10)
-            }
-        case .nextTask:
-            nextTaskPanel(
-                showsDate: presentation.showsNextTaskDate,
-                titleFontSize: 17,
-                secondaryFontSize: 12
-            )
-        }
+    private func segment(_ color: Color) -> some View {
+        Capsule().fill(color).frame(maxWidth: .infinity)
     }
 
-    private func mediumPillRow(panel: ProjectTileLivePanel) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
-            metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: tileInk.opacity(0.72))
-            metricPill(
-                icon: panel == .progress ? "list.bullet" : "clock.fill",
-                value: panel == .progress ? snapshot.totalCount : snapshot.remainingCount,
-                tint: tileInk.opacity(0.92)
-            )
-        }
+    private var completedRatioText: String {
+        String(
+            format: String(localized: "extensions.hub.projects.completed_ratio", defaultValue: "%1$lld / %2$lld 完成"),
+            locale: Locale.current,
+            Int64(snapshot.completedCount),
+            Int64(snapshot.totalCount)
+        )
     }
 
-    @ViewBuilder
-    private func wideFallbackPanel(presentation: ProjectTilePresentation) -> some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            switch presentation.livePanel {
-            case .nextTask:
-                nextTaskPanel(
-                    showsDate: presentation.showsNextTaskDate,
-                    titleFontSize: 14,
-                    secondaryFontSize: 10
-                )
-            case .progress:
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
-                    Text("\(Int(snapshot.progress * 100))")
-                        .font(.system(size: presentation.primaryNumberFontSize, weight: .bold, design: .rounded))
-                    Text("%")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-            case .metrics:
-                emptyStatePanel(titleSize: 14, hintSize: 10)
-            }
+    /// "0 / 5 完成 · 停滞中" — every number carries its own label.
+    private var ratioLine: some View {
+        let stalled = isStalled
+            ? " · " + String(localized: "project.tile.stalled", defaultValue: "停滞中")
+            : ""
+        return Text(completedRatioText + stalled)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(tileInk.opacity(0.78))
+            .lineLimit(1)
+    }
 
-            if !isEmptyProject {
-                wideStatsStrip
-            }
+    private func completedRatioHero(fontSize: CGFloat) -> some View {
+        HStack(alignment: .lastTextBaseline, spacing: 4) {
+            Text("\(snapshot.completedCount)")
+                .font(.system(size: fontSize, weight: .regular, design: .serif))
+                .contentTransition(.numericText())
+            Text("/ \(snapshot.totalCount)")
+                .font(.system(size: fontSize * 0.42, weight: .semibold))
+            Text(String(localized: "extensions.hub.projects.rhythm.done", defaultValue: "完成"))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(tileInk.opacity(0.75))
         }
         .foregroundStyle(tileInk)
+        .lineLimit(1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(completedRatioText)
+    }
+
+    /// "下一步 · 标题 · 逾期 N 天" on one line; falls back to the ratio line.
+    @ViewBuilder
+    private var nextStepLine: some View {
+        if let title = snapshot.nextTaskTitle,
+           !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            HStack(spacing: 0) {
+                Text(String(localized: "extensions.hub.projects.next_step") + " · " + title)
+                    .foregroundStyle(tileInk.opacity(0.8))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let suffix = nextTaskDateSuffix {
+                    Text(" · " + suffix.text)
+                        .fontWeight(suffix.isOverdue ? .bold : .medium)
+                        .foregroundStyle(suffix.isOverdue ? Self.overdueInk : tileInk.opacity(0.8))
+                        .fixedSize()
+                }
+            }
+            .font(.system(size: 10, weight: .medium))
+        } else {
+            ratioLine
+        }
+    }
+
+    private var nextTaskDateSuffix: (text: String, isOverdue: Bool)? {
+        guard let date = snapshot.nextTaskDate else { return nil }
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let day = calendar.startOfDay(for: date)
+        if day < today {
+            let days = calendar.dateComponents([.day], from: day, to: today).day ?? 0
+            return (
+                String(
+                    format: String(localized: "project.tile.overdue_days", defaultValue: "逾期 %lld 天"),
+                    locale: Locale.current,
+                    Int64(days)
+                ),
+                true
+            )
+        }
+        if calendar.isDate(day, inSameDayAs: today) {
+            return (String(localized: "extensions.hub.projects.next.today", defaultValue: "今天"), false)
+        }
+        return (date.formatted(.dateTime.month().day()), false)
+    }
+
+    /// Mini tile: the single most useful number, always with its word.
+    @ViewBuilder
+    private var miniPrimaryValue: some View {
+        if isEmptyProject {
+            Text(String(localized: "project.tile.no_tasks", defaultValue: "无任务"))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(tileInk.opacity(0.75))
+        } else {
+            let value: (count: Int, label: String, isOverdue: Bool) = {
+                if snapshot.expiredCount > 0 {
+                    return (snapshot.expiredCount, String(localized: "project.tile.overdue.word", defaultValue: "逾期"), true)
+                }
+                if openCount > 0 {
+                    return (openCount, String(localized: "project.tile.open.word", defaultValue: "待办"), false)
+                }
+                return (snapshot.completedCount, String(localized: "extensions.hub.projects.rhythm.done", defaultValue: "完成"), false)
+            }()
+            HStack(alignment: .lastTextBaseline, spacing: 3) {
+                Text("\(value.count)")
+                    .font(.system(size: 20, weight: .regular, design: .serif))
+                    .foregroundStyle(value.isOverdue ? Self.overdueInk : tileInk)
+                Text(value.label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(value.isOverdue ? Self.overdueInk : tileInk.opacity(0.78))
+            }
+            .lineLimit(1)
+        }
+    }
+
+    /// Empty projects invite the first step instead of a faint "nothing here".
+    private func addFirstTaskPanel(showsHint: Bool, compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.system(size: compact ? 9 : 11, weight: .bold))
+                    .frame(width: compact ? 18 : 22, height: compact ? 18 : 22)
+                    .overlay(
+                        Circle().strokeBorder(tileInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
+                    )
+                Text(String(localized: "project.tile.add_first", defaultValue: "添加第一项任务"))
+                    .font(.system(size: compact ? 11 : 13, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(tileInk.opacity(0.82))
+
+            if showsHint {
+                Text(String(localized: "project.tile.add_first.hint", defaultValue: "把它拆成今天能做的一小步"))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(tileInk.opacity(0.72))
+                    .lineLimit(2)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var trendLegend: some View {
@@ -2534,64 +2965,6 @@ private struct ProjectMetroTileView: View {
                 }
             }
         }
-    }
-
-    private func tileProgressBar(height: CGFloat) -> some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(tileInk.opacity(0.14))
-
-                Capsule()
-                    .fill(tileInk.opacity(0.90))
-                    .frame(width: proxy.size.width * CGFloat(min(max(snapshot.progress, 0), 1)))
-            }
-        }
-        .frame(height: height)
-    }
-
-    private func nextTaskPanel(showsDate: Bool, titleFontSize: CGFloat, secondaryFontSize: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(snapshot.nextTaskTitle ?? String(localized: "project.tasks.empty"))
-                .font(.system(size: titleFontSize, weight: .semibold, design: .rounded))
-                .lineLimit(2)
-
-            if showsDate, let date = snapshot.nextTaskDate {
-                Text(date, format: .dateTime.month().day())
-                    .font(.system(size: secondaryFontSize, weight: .medium, design: .rounded))
-                    .foregroundStyle(tileInk.opacity(0.84))
-            }
-        }
-    }
-
-    private var smallStatsStrip: some View {
-        HStack(spacing: WeekSpacing.xs) {
-            metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: tileInk.opacity(0.72))
-            metricPill(icon: "list.bullet", value: snapshot.totalCount, tint: tileInk.opacity(0.92))
-        }
-    }
-
-    private var wideStatsStrip: some View {
-        HStack(spacing: WeekSpacing.xs) {
-            metricPill(icon: "checkmark.circle.fill", value: snapshot.completedCount, tint: tileInk.opacity(0.72))
-            metricPill(icon: "clock.fill", value: snapshot.remainingCount, tint: tileInk.opacity(0.92))
-            if snapshot.expiredCount > 0 {
-                metricPill(icon: "exclamationmark.triangle.fill", value: snapshot.expiredCount, tint: tileInk)
-            }
-        }
-    }
-
-    private func metricPill(icon: String, value: Int, tint: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .semibold))
-            Text("\(value)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-        }
-        .foregroundStyle(tint)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(tileInk.opacity(0.10), in: Capsule())
     }
 
     private var scaleValue: CGFloat {

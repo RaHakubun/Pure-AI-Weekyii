@@ -488,7 +488,9 @@ struct WeekyiiApp: App {
         _userSettings = StateObject(wrappedValue: userSettings)
         _cloudSyncCoordinator = State(initialValue: CloudSyncCoordinator(settings: userSettings))
 
-        if Self.isUITesting || Self.isRunningTests {
+        if Self.isUITesting && ProcessInfo.processInfo.arguments.contains("-testPersistenceResolving") {
+            _launchState = State(initialValue: .resolving)
+        } else if Self.isUITesting || Self.isRunningTests {
             do {
                 let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
                 try TaskTypeCatalog.seedBuiltInTypesIfNeeded(in: container.mainContext)
@@ -513,6 +515,7 @@ struct WeekyiiApp: App {
             case .resolving:
                 PersistenceResolvingView()
                     .task {
+                        guard !Self.isUITesting else { return }
                         bootstrapPersistentContainer()
                     }
             case .ready(let modelContainer, _):
@@ -745,18 +748,17 @@ private struct PersistenceFailureView: View {
 
 private struct PersistenceResolvingView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .controlSize(.large)
-            Text("正在打开本地数据…")
-                .font(.headline)
-            Text("本地数据准备完成后即可继续使用 Weekyii")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.backgroundPrimary)
+        WeekyiiLaunchStyle.background
+            .ignoresSafeArea()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Weekyii")
+            .accessibilityIdentifier("launch.persistence.placeholder")
     }
+}
+
+private enum WeekyiiLaunchStyle {
+    static let background = Color(red: 1.0, green: 0.760784, blue: 0.447059)
+    static let brandInk = Color.black
 }
 
 /// Full-screen launch animation shown while the storyboard splash hands off:
@@ -774,17 +776,14 @@ private struct WeekyiiLaunchOverlay: View {
     // LaunchBackground.imageset it tunes the cached splash snapshot, whose sRGB
     // bytes are read as Display P3 coordinates (#F6C47E -> #FFC172 on screen).
     // Changing either value shifts the rendered splash; re-measure instead.
-    private let background = Color(red: 1.0, green: 0.760784, blue: 0.447059)
-    private let brandInk = Color.black
-
     var body: some View {
         ZStack {
-            background.ignoresSafeArea()
+            WeekyiiLaunchStyle.background.ignoresSafeArea()
 
             VStack(spacing: 12) {
                 Text("Weekyii")
                     .font(.custom("SnellRoundhand-Bold", size: 42))
-                    .foregroundColor(brandInk)
+                    .foregroundColor(WeekyiiLaunchStyle.brandInk)
                     .fixedSize()
                     .background(
                         GeometryReader { proxy in
@@ -797,7 +796,7 @@ private struct WeekyiiLaunchOverlay: View {
 
                 Text("以周为核心管理你的每一天")
                     .font(.system(size: 16))
-                    .foregroundColor(brandInk.opacity(0.78))
+                    .foregroundColor(WeekyiiLaunchStyle.brandInk.opacity(0.78))
                     .opacity(subtitleOpacity)
             }
         }

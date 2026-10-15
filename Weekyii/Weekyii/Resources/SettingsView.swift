@@ -257,6 +257,17 @@ struct SettingsView: View {
                 }
 
                 NavigationLink {
+                    pastSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        title: String(localized: "settings.section.past", defaultValue: "过去"),
+                        value: settings.pastMonthMarkerOptions.summaryText,
+                        icon: "clock.arrow.circlepath",
+                        tint: .indigo
+                    )
+                }
+
+                NavigationLink {
                     futureSettingsPage
                 } label: {
                     SettingsNavigationRow(
@@ -426,6 +437,12 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var pastSettingsPage: some View {
+        Form { pastMarkerSection }
+            .navigationTitle(String(localized: "settings.section.past", defaultValue: "过去"))
+            .navigationBarTitleDisplayMode(.inline)
+    }
+
     private var futureSettingsPage: some View {
         Form { futureSection }
             .navigationTitle("未来")
@@ -588,6 +605,154 @@ struct SettingsView: View {
         } header: {
             Text(String(localized: "settings.usage_history.overview", defaultValue: "概览"))
         }
+    }
+
+    // MARK: - Past Month Markers
+    @ViewBuilder
+    private var pastMarkerSection: some View {
+        let options = settings.pastMonthMarkerOptions
+
+        Section {
+            PastMarkerSettingsPreview(options: options)
+        } header: {
+            Text(String(localized: "settings.past.markers.preview", defaultValue: "预览"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.preview.footer",
+                defaultValue: "这是示意数据，开关改动后，「过去」月历会同步变成这个样子。"
+            ))
+        }
+
+        Section {
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowUnfinishedFace },
+                    set: { settings.pastMonthShowUnfinishedFace = $0 }
+                ),
+                title: String(localized: "settings.past.markers.unfinished", defaultValue: "没完成的一天"),
+                subtitle: String(
+                    localized: "settings.past.markers.unfinished.subtitle",
+                    defaultValue: "开始执行后，到截止时间仍有任务没完成"
+                ),
+                tint: .taskDDL
+            ) {
+                PastFailureFaceMark(kind: .unfinished).frame(width: 17, height: 17)
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowNotStartedFace },
+                    set: { settings.pastMonthShowNotStartedFace = $0 }
+                ),
+                title: String(localized: "settings.past.markers.not_started", defaultValue: "未启动的一天"),
+                subtitle: String(
+                    localized: "settings.past.markers.not_started.subtitle",
+                    defaultValue: "有计划却没点开始就过期，只有习惯自动生成任务的日子也算"
+                ),
+                tint: .gray
+            ) {
+                PastFailureFaceMark(kind: .notStarted).frame(width: 17, height: 17)
+            }
+        } header: {
+            Text(String(localized: "settings.past.markers.failure_header", defaultValue: "失败提醒"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.failure_footer",
+                defaultValue: "本周和今天一过截止时间就会立即标出，不必等到整周结束。"
+            ))
+        }
+
+        Section {
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowCompletedCount },
+                    set: { settings.pastMonthShowCompletedCount = $0 }
+                ),
+                title: String(localized: "settings.past.markers.completed_count", defaultValue: "完成数量"),
+                subtitle: String(
+                    localized: "settings.past.markers.completed_count.subtitle",
+                    defaultValue: "在日期右上角显示当天完成了几项"
+                ),
+                tint: .accentGreen
+            ) {
+                PastCompletedCountBadge(count: 3)
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowRecordDot },
+                    set: { settings.pastMonthShowRecordDot = $0 }
+                ),
+                title: String(localized: "settings.past.markers.record", defaultValue: "有记录"),
+                subtitle: String(
+                    localized: "settings.past.markers.record.subtitle",
+                    defaultValue: "当天有计划、执行或完成记录时显示绿点"
+                ),
+                tint: .accentGreen
+            ) {
+                PastRecordDotMark()
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowExpiredFlame },
+                    set: { settings.pastMonthShowExpiredFlame = $0 }
+                ),
+                title: String(localized: "settings.past.markers.expired", defaultValue: "有过期"),
+                subtitle: String(
+                    localized: "settings.past.markers.expired.subtitle",
+                    defaultValue: "当天有任务过期时显示小火苗"
+                ),
+                tint: .taskDDL
+            ) {
+                PastExpiredFlameMark(size: 13)
+            }
+        } header: {
+            Text(String(localized: "settings.past.markers.stats_header", defaultValue: "完成统计"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.stats_footer",
+                defaultValue: "“有过期”和“没完成的一天”判定条件相同，可以只留一种，也可以同时显示。"
+            ))
+        }
+
+        Section {
+            Button(String(localized: "settings.past.markers.reset", defaultValue: "恢复默认")) {
+                settings.pastMonthMarkerOptions = .default
+            }
+            .disabled(options == .default)
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.local_footer",
+                defaultValue: "默认只显示“没完成的一天”。这些选项只保存在本机，不会通过 iCloud 同步。"
+            ))
+        }
+    }
+
+    private func pastMarkerToggle<Mark: View>(
+        isOn: Binding<Bool>,
+        title: String,
+        subtitle: String,
+        tint: Color,
+        @ViewBuilder mark: () -> Mark
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 12) {
+                // The icon is the real calendar glyph, so users recognise it on sight.
+                mark()
+                    .frame(width: 28, height: 28)
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        // The count badge icon contains text, which List would otherwise pick as
+        // the separator inset; pin every row's separator to the title (28 + 12).
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + 40 }
     }
 
     // MARK: - Future
@@ -2746,6 +2911,80 @@ private struct ExecutionModeOptionCard: View {
                 .stroke(isSelected ? accentColor : Color.backgroundTertiary, lineWidth: isSelected ? 2 : 1)
         }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Four sample days rendered with the real calendar cell, so every toggle
+/// shows its effect immediately without leaving Settings.
+private struct PastMarkerSettingsPreview: View {
+    let options: PastMonthMarkerOptions
+    @Environment(\.weekyiiReduceMotion) private var reduceMotion
+
+    private struct Sample: Identifiable {
+        let id: Int
+        let caption: String
+        let summary: PastMonthDaySummary?
+    }
+
+    private let samples: [Sample] = [
+        Sample(
+            id: 12,
+            caption: String(localized: "settings.past.markers.sample.done", defaultValue: "顺利完成"),
+            summary: PastMonthDaySummary(dayId: "sample-12", completedCount: 4, expiredCount: 0, hasRecord: true, failure: nil)
+        ),
+        Sample(
+            id: 13,
+            caption: String(localized: "settings.past.markers.sample.unfinished", defaultValue: "没完成"),
+            summary: PastMonthDaySummary(dayId: "sample-13", completedCount: 2, expiredCount: 1, hasRecord: true, failure: .unfinished)
+        ),
+        Sample(
+            id: 14,
+            caption: String(localized: "settings.past.markers.sample.not_started", defaultValue: "未启动"),
+            summary: PastMonthDaySummary(dayId: "sample-14", completedCount: 0, expiredCount: 0, hasRecord: true, failure: .notStarted)
+        ),
+        Sample(
+            id: 15,
+            caption: String(localized: "settings.past.markers.sample.empty", defaultValue: "空白"),
+            summary: nil
+        )
+    ]
+
+    var body: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            HStack(spacing: 0) {
+                ForEach(samples) { sample in
+                    VStack(spacing: 2) {
+                        PastCalendarDayLabel(
+                            dayNumber: sample.id,
+                            numberColor: .textPrimary,
+                            isEmphasized: false,
+                            highlight: .none,
+                            summary: sample.summary,
+                            options: options
+                        )
+                        Text(sample.caption)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            if options.isEmpty {
+                Text(String(
+                    localized: "settings.past.markers.preview.empty",
+                    defaultValue: "月历上不会显示任何标记"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                PastMarkerLegend(options: options)
+            }
+        }
+        .padding(.vertical, WeekSpacing.xs)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: options)
+        .accessibilityElement(children: .combine)
     }
 }
 
