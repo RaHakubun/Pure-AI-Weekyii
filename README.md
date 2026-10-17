@@ -1,4 +1,15 @@
-# Weekyii｜只做周计划
+<div align="center">
+  <img src="Weekyii/Weekyii/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="Weekyii app icon" width="128" />
+  <h1>Weekyii｜只做周计划</h1>
+  <p><strong>以周安排方向，以当天专注推进任务。</strong></p>
+  <p>同一套任务哲学，两种实现：文件驱动的 AI Native 原型，以及原生 iOS 应用。</p>
+  <p>
+    <img alt="iOS 18+" src="https://img.shields.io/badge/iOS-18%2B-30343B?style=for-the-badge&logo=apple&logoColor=white" />
+    <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-087E8B?style=for-the-badge&logo=swift&logoColor=white" />
+    <img alt="SwiftData" src="https://img.shields.io/badge/Storage-SwiftData-5945A5?style=for-the-badge" />
+    <img alt="CloudKit" src="https://img.shields.io/badge/Sync-Optional%20CloudKit-5271B4?style=for-the-badge&logo=icloud&logoColor=white" />
+  </p>
+</div>
 
 Weekyii 是一个以周为规划单位、以当天专注执行为核心的任务管理项目。本仓库同时包含两种实现形态：一种是由 Markdown 文件和自然语言约定驱动的 AI Native 模拟原型；另一种是可在 iPhone 和 iPad 上运行的原生 iOS 应用。两者表达相同的产品理念，但使用各自独立的数据和运行机制。
 
@@ -18,6 +29,33 @@ LLM可以在这个仓库里面通过分析用户需求，按照已经规定好�
 ## 实现形态二：iOS 原生应用
 
 原生应用工程位于 [`Weekyii/Weekyii`](Weekyii/Weekyii)，项目文件为 [`Weekyii.xcodeproj`](Weekyii/Weekyii/Weekyii.xcodeproj)。它将 Weekyii 的周计划和专注执行规则实现为 SwiftUI 界面与 Swift 业务代码，使用 SwiftData 保存本机业务数据。它不是通过 LLM 命令改写 Markdown 文件来运行的，也不与上面的文件模拟原型共享运行时数据。
+
+### iOS 界面一览
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="Weekyii/Weekyii/docs/assets/week-topology-connectors-2026-09-14/01-overview.png">
+        <img src="Weekyii/Weekyii/docs/assets/week-topology-connectors-2026-09-14/01-overview.png" alt="Weekyii 本周概览界面" width="220" />
+      </a><br />
+      <strong>本周概览</strong><br />查看一周进度和日期结构
+    </td>
+    <td align="center" width="33%">
+      <a href="Weekyii/Weekyii/docs/assets/week-topology-connectors-2026-09-14/02-focused-day.png">
+        <img src="Weekyii/Weekyii/docs/assets/week-topology-connectors-2026-09-14/02-focused-day.png" alt="Weekyii 展开的日期与任务队列" width="220" />
+      </a><br />
+      <strong>展开日期</strong><br />从周结构进入某一天的任务流
+    </td>
+    <td align="center" width="33%">
+      <a href="Weekyii/Weekyii/docs/assets/week-topology-2026-09-14/05-task-inspector.png">
+        <img src="Weekyii/Weekyii/docs/assets/week-topology-2026-09-14/05-task-inspector.png" alt="Weekyii 任务检查界面" width="220" />
+      </a><br />
+      <strong>查看任务</strong><br />检查日期中的任务及其状态
+    </td>
+  </tr>
+</table>
+
+<sub>以上为仓库内 2026-09-14 的开发界面截图，包含用于演示的 Draft Task 示例数据；应用界面与数据会持续迭代。</sub>
 
 ### 产品结构
 
@@ -43,6 +81,22 @@ LLM可以在这个仓库里面通过分析用户需求，按照已经规定好�
 
 当天启动后，系统按严格或灵动执行模式管理队列。截止时间由真实日期和时分组合解析；到期状态由业务状态机协调。截止时间卡片中的火焰根据绝对截止时间表达剩余压力，动画时间只在允许动画、页面可见且系统处于活动状态时推进；减少动效时仍保留静态压力表达。
 
+```mermaid
+flowchart LR
+    subgraph Day[当天状态]
+        Draft[草稿日] -->|启动| Execute[执行中]
+        Execute -->|全部任务完成| Completed[已完成]
+        Execute -->|截止时间到达| Expired[已过期]
+    end
+
+    subgraph Queue[任务队列]
+        DraftList[有序草稿任务] -->|第一项| Focus[当前专注任务]
+        DraftList -->|其余任务| Frozen[冻结队列]
+        Frozen -->|当前任务完成| Focus
+        Focus -->|完成后归档| Complete[完成区]
+    end
+```
+
 「启动托管」是可选的自动启动入口，默认关闭。用户可以设置每日启动时间；App 在启动、回到前台或前台定期协调时检查当天是否具备启动条件，并复用与手动启动相同的任务启动事务。若 App 在设定时间没有运行，重新打开后可以补检查；iOS 不保证 App 关闭或后台挂起时准点执行。习惯物化检查没有关键错误、且确认当天没有可启动任务时，才记录当天跳过；不会凭空创建任务。
 
 ### 习惯与历史结果
@@ -62,6 +116,26 @@ LLM可以在这个仓库里面通过分析用户需求，按照已经规定好�
 - **App 健康协调**：`AppHealthCoordinator` 在 App 启动、回到前台及前台分钟检查时依次协调日期状态、习惯任务物化、自动启动、通知和 Live Activity。习惯任务物化先于自动启动检查，避免新生成的今日习惯任务被遗漏。
 - **本地数据与 iCloud**：SwiftData 保存本机业务库；CloudKit 同步由独立协调器管理，而不是依赖 SwiftData 自动同步。用户可在设置中启用；同步流程包含账户检查、传输、合并、重试及账户变更时的处理。不能把后台同步理解为所有设备在离线期间都具备严格的实时一致性。
 - **归档与恢复**：设置支持以 JSON 归档导入或导出业务数据；本地持久化启动、导入和恢复流程还包含恢复点保护与数据一致性检查。
+
+```mermaid
+flowchart LR
+    User[用户操作] --> UI[SwiftUI 页面]
+    UI --> VM[Feature ViewModels]
+    VM --> Services[业务服务]
+    Services --> Store[(本机 SwiftData)]
+
+    Lifecycle[App 启动 / 前台恢复 / 分钟检查] --> Health[AppHealthCoordinator]
+    Health --> State[StateMachine]
+    Health --> Habit[HabitTaskMaterializer]
+    Health --> Start[自动启动资格检查]
+    Start --> StartService[DayStartService]
+    StartService --> Store
+
+    Store --> Snapshot[WidgetSnapshotComposer]
+    Snapshot --> Widgets[WidgetKit / Live Activity]
+    Health --> Notifications[本地通知协调]
+    Store <--> Cloud[可选 CloudKit 同步协调器]
+```
 
 ### 工程目录
 
