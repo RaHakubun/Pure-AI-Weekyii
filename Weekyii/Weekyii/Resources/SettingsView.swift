@@ -35,6 +35,7 @@ struct SettingsView: View {
     @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
     @State private var showingImportConfirm = false
     @State private var showingInitialCloudSyncDecision = false
+    @State private var showingAutoStartEnableConfirm = false
     
     var body: some View {
         NavigationStack {
@@ -113,6 +114,18 @@ struct SettingsView: View {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
             Text("今日任务流已过期，无法同步到今天。本次提交已取消。")
+        }
+        .alert("开启启动托管？", isPresented: $showingAutoStartEnableConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+            Button("开启托管") {
+                updateAutoStartSettings(
+                    isEnabled: true,
+                    hour: settings.autoStartConfiguration.hour,
+                    minute: settings.autoStartConfiguration.minute
+                )
+            }
+        } message: {
+            Text("到达设定时间后，今日草稿可能自动进入专注；启动后无法撤回。首次在今天设定时间之后开启，将从明天生效。")
         }
         .alert("回滚到最新备份", isPresented: $showingRestoreBackupConfirm) {
             Button("取消", role: .cancel) { }
@@ -342,6 +355,7 @@ struct SettingsView: View {
             Section("执行方式") {
                 executionModeSettings
                 killTimeSettings
+                autoStartSettings
             }
             Section("提醒") {
                 reminderSettings
@@ -356,6 +370,62 @@ struct SettingsView: View {
         }
         .navigationTitle("今日节奏")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var autoStartSettings: some View {
+        Group {
+            Toggle(isOn: Binding(
+                get: { settings.autoStartConfiguration.isEnabled },
+                set: { isEnabled in
+                    if isEnabled {
+                        if settings.autoStartWasEverEnabled {
+                            updateAutoStartSettings(
+                                isEnabled: true,
+                                hour: settings.autoStartConfiguration.hour,
+                                minute: settings.autoStartConfiguration.minute
+                            )
+                        } else {
+                            showingAutoStartEnableConfirm = true
+                        }
+                    } else {
+                        updateAutoStartSettings(
+                            isEnabled: false,
+                            hour: settings.autoStartConfiguration.hour,
+                            minute: settings.autoStartConfiguration.minute
+                        )
+                    }
+                }
+            )) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "play.circle.fill", color: .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("启动托管")
+                        Text("自动开始今日草稿任务")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            DatePicker(selection: autoStartTimeBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "clock.fill", color: .orange)
+                    Text("每日启动时间")
+                }
+            }
+            .datePickerStyle(.compact)
+
+            Text(autoStartEffectiveDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 2)
+
+            Text("到达设定时间后，若今日已有草稿任务，将自动进入专注。App 未运行时会在下次打开后补启动。启动后无法撤回。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var languageSettingsPage: some View {
@@ -1809,6 +1879,89 @@ struct SettingsView: View {
         }
     }
 
+    private var autoStartTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let timeProvider = TimeProvider()
+                return AutoStartSchedule.date(
+                    on: timeProvider.today,
+                    hour: settings.autoStartConfiguration.hour,
+                    minute: settings.autoStartConfiguration.minute
+                ) ?? timeProvider.now
+            },
+            set: { newDate in
+                let components = WeekyiiTimeZone.calendar.dateComponents([.hour, .minute], from: newDate)
+                updateAutoStartSettings(
+                    isEnabled: settings.autoStartConfiguration.isEnabled,
+                    hour: components.hour ?? settings.autoStartConfiguration.hour,
+                    minute: components.minute ?? settings.autoStartConfiguration.minute
+                )
+            }
+        )
+    }
+
+    private var autoStartEffectiveDescription: String {
+        let timeProvider = TimeProvider()
+        let configuration = settings.autoStartConfiguration
+        let plan = settings.autoStartDailyPlan.flatMap {
+            $0.dayId == timeProvider.today.dayId ? $0 : nil
+        }
+        let todayStatus = todayDayModel(for: timeProvider.today.dayId)?.status
+        if todayStatus == .execute || todayStatus == .completed || todayStatus == .expired {
+            return configuration.isEnabled
+                ? "今日已经启动或结束；新的托管设置从明日起生效。"
+                : "托管已关闭；今日状态不变，设定时间会保留。"
+        }
+        guard configuration.isEnabled else {
+            if let plan, plan.hour != configuration.hour || plan.minute != configuration.minute {
+                return "托管已关闭；今天原计划时间仍是 \(String(format: "%02d:%02d", plan.hour, plan.minute))，新时间从明日起生效。"
+            }
+            return "托管已关闭；设定时间会保留，开启后才会自动启动。"
+        }
+
+        guard let plan else {
+            return "今日计划 \(String(format: "%02d:%02d", configuration.hour, configuration.minute))。App 未运行时会在下次打开后补启动。"
+        }
+        if plan.wasSkipped {
+            return "今日已跳过启动托管；新计划从明日起生效。"
+        }
+        guard plan.isEnabled else {
+            return "今天不再自动启动；启动托管从明日起生效。"
+        }
+        if plan.hour != configuration.hour || plan.minute != configuration.minute {
+            return "今天仍按原计划 \(String(format: "%02d:%02d", plan.hour, plan.minute))；新时间从明日起生效。"
+        }
+        return "今日计划 \(String(format: "%02d:%02d", plan.hour, plan.minute))。App 未运行时会在下次打开后补启动。"
+    }
+
+    private func updateAutoStartSettings(isEnabled: Bool, hour: Int, minute: Int) {
+        let timeProvider = TimeProvider()
+        let now = timeProvider.now
+        let today = WeekyiiTimeZone.calendar.startOfDay(for: now)
+        let dayId = today.dayId
+        settings.updateAutoStartConfiguration(
+            isEnabled: isEnabled,
+            hour: hour,
+            minute: minute,
+            today: today,
+            dayId: dayId,
+            todayStatus: todayDayModel(for: dayId)?.status,
+            now: now
+        )
+
+        if isEnabled {
+            _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
+            WidgetSnapshotComposer.syncFromModelContext(
+                modelContext: modelContext,
+                now: now,
+                todayDate: today,
+                selectedThemeRaw: settings.selectedThemeRaw,
+                appearanceModeRaw: settings.appearanceModeRaw,
+                premiumThemeUnlocked: settings.premiumThemeUnlocked
+            )
+        }
+    }
+
     private var pendingDefaultKillTimeDateBinding: Binding<Date> {
         Binding(
             get: {
@@ -1941,7 +2094,10 @@ struct SettingsView: View {
     }
 
     private func todayDayModel() -> DayModel? {
-        let dayId = Date().dayId
+        todayDayModel(for: Date().dayId)
+    }
+
+    private func todayDayModel(for dayId: String) -> DayModel? {
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
         return try? modelContext.fetch(descriptor).first
     }
@@ -2007,6 +2163,7 @@ struct SettingsView: View {
             notificationService: .shared,
             appState: appState,
             userSettings: settings,
+            autoStartSettings: settings,
             liveActivityService: TodayLiveActivityService.shared
         )
     }

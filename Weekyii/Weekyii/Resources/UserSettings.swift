@@ -5,10 +5,30 @@ import SwiftUI
 import WidgetKit
 #endif
 
+struct AutoStartConfiguration: Codable, Equatable {
+    var isEnabled: Bool
+    var hour: Int
+    var minute: Int
+
+    static let `default` = AutoStartConfiguration(isEnabled: false, hour: 9, minute: 0)
+}
+
+struct AutoStartDailyPlan: Codable, Equatable {
+    var dayId: String
+    var isEnabled: Bool
+    var hour: Int
+    var minute: Int
+    var wasSkipped: Bool
+    var activationDeferredUntilTomorrow: Bool
+}
+
 final class UserSettings: ObservableObject {
     private static let cloudSyncRequestedKey = "cloudSyncRequested"
     private static let legacyCloudSyncEnabledKey = "cloudSyncEnabled"
     private static let cloudSyncPreferenceMigratedV2Key = "weekyii.cloudSyncPreferenceMigratedV2"
+    private static let autoStartConfigurationKey = "weekyii.autoStart.configuration"
+    private static let autoStartDailyPlanKey = "weekyii.autoStart.dailyPlan"
+    private static let autoStartWasEverEnabledKey = "weekyii.autoStart.wasEverEnabled"
 
     // Default Kill Time
     @Published var defaultKillTimeHour: Int {
@@ -34,6 +54,10 @@ final class UserSettings: ObservableObject {
     @Published var defaultExecutionModeRaw: String {
         didSet { save() }
     }
+
+    @Published private(set) var autoStartConfiguration: AutoStartConfiguration
+    @Published private(set) var autoStartDailyPlan: AutoStartDailyPlan?
+    private(set) var autoStartWasEverEnabled: Bool
     
     // Notification Settings
     @Published var killTimeReminderMinutes: Int {
@@ -231,6 +255,13 @@ final class UserSettings: ObservableObject {
         self.defaultTaskType = resolvedDefaultTaskType
         self.defaultTaskTypeIdRaw = defaults.string(forKey: "defaultTaskTypeId") ?? resolvedDefaultTaskType.rawValue
         self.defaultExecutionModeRaw = defaults.string(forKey: "defaultExecutionMode") ?? ExecutionMode.strict.rawValue
+        let storedAutoStartConfiguration = defaults.data(forKey: Self.autoStartConfigurationKey)
+            .flatMap { try? JSONDecoder().decode(AutoStartConfiguration.self, from: $0) }
+        self.autoStartConfiguration = storedAutoStartConfiguration ?? .default
+        self.autoStartDailyPlan = defaults.data(forKey: Self.autoStartDailyPlanKey)
+            .flatMap { try? JSONDecoder().decode(AutoStartDailyPlan.self, from: $0) }
+        self.autoStartWasEverEnabled = defaults.bool(forKey: Self.autoStartWasEverEnabledKey)
+            || (storedAutoStartConfiguration?.isEnabled ?? false)
         
         self.killTimeReminderMinutes = defaults.object(forKey: "killTimeReminderMinutes") as? Int ?? 60
         self.fixedReminderEnabled = defaults.object(forKey: "fixedReminderEnabled") as? Bool ?? false
@@ -292,6 +323,108 @@ final class UserSettings: ObservableObject {
         cloudSyncRequested = requested
     }
 
+    @discardableResult
+    func ensureAutoStartPlan(dayId: String) -> AutoStartDailyPlan {
+        if let plan = autoStartDailyPlan, plan.dayId == dayId {
+            return plan
+        }
+
+        let plan = AutoStartDailyPlan(
+            dayId: dayId,
+            isEnabled: autoStartConfiguration.isEnabled,
+            hour: autoStartConfiguration.hour,
+            minute: autoStartConfiguration.minute,
+            wasSkipped: false,
+            activationDeferredUntilTomorrow: false
+        )
+        autoStartDailyPlan = plan
+        save()
+        return plan
+    }
+
+    func updateAutoStartConfiguration(
+        isEnabled: Bool,
+        hour: Int,
+        minute: Int,
+        today: Date,
+        dayId: String,
+        todayStatus: DayStatus?,
+        now: Date
+    ) {
+        let boundedHour = min(max(hour, 0), 23)
+        let boundedMinute = min(max(minute, 0), 59)
+        let currentPlan = ensureAutoStartPlan(dayId: dayId)
+        let wasEverEnabled = autoStartWasEverEnabled
+        let isBeforeTodaysPlan = AutoStartSchedule.date(
+            on: today,
+            hour: currentPlan.hour,
+            minute: currentPlan.minute
+        ).map { now < $0 } ?? false
+
+        autoStartConfiguration = AutoStartConfiguration(
+            isEnabled: isEnabled,
+            hour: boundedHour,
+            minute: boundedMinute
+        )
+        if isEnabled {
+            autoStartWasEverEnabled = true
+        }
+
+        if todayStatus == .execute || todayStatus == .completed || todayStatus == .expired {
+            save()
+            return
+        }
+
+        var updatedPlan = currentPlan
+        if isBeforeTodaysPlan {
+            updatedPlan.hour = boundedHour
+            updatedPlan.minute = boundedMinute
+        }
+
+        if !isEnabled {
+            // Turning the switch off takes effect immediately for today's plan.
+            updatedPlan.isEnabled = false
+        } else if !updatedPlan.wasSkipped {
+            if !isBeforeTodaysPlan && !wasEverEnabled {
+                // Persist the first late opt-in for the rest of this day so a
+                // later time edit or switch cycle cannot silently activate it.
+                updatedPlan.activationDeferredUntilTomorrow = true
+                updatedPlan.isEnabled = false
+            } else if !updatedPlan.activationDeferredUntilTomorrow {
+                updatedPlan.isEnabled = true
+            } else {
+                updatedPlan.isEnabled = false
+            }
+        } else {
+            // A same-day skip is sticky, including across repeated switch changes.
+            updatedPlan.isEnabled = false
+        }
+
+        autoStartDailyPlan = updatedPlan
+        save()
+    }
+
+    func markAutoStartSkipped(dayId: String) {
+        guard var plan = autoStartDailyPlan,
+              plan.dayId == dayId,
+              !plan.wasSkipped else { return }
+        plan.wasSkipped = true
+        plan.isEnabled = false
+        autoStartDailyPlan = plan
+        save()
+    }
+
+    func restoreAutoStartConfiguration(isEnabled: Bool, hour: Int, minute: Int) {
+        autoStartConfiguration = AutoStartConfiguration(
+            isEnabled: isEnabled,
+            hour: min(max(hour, 0), 23),
+            minute: min(max(minute, 0), 59)
+        )
+        autoStartWasEverEnabled = isEnabled
+        autoStartDailyPlan = nil
+        save()
+    }
+
     func save() {
         defaults.set(defaultKillTimeHour, forKey: "defaultKillTimeHour")
         defaults.set(defaultKillTimeMinute, forKey: "defaultKillTimeMinute")
@@ -299,6 +432,16 @@ final class UserSettings: ObservableObject {
         defaults.set(defaultTaskType.rawValue, forKey: "defaultTaskType")
         defaults.set(defaultTaskTypeIdRaw, forKey: "defaultTaskTypeId")
         defaults.set(defaultExecutionModeRaw, forKey: "defaultExecutionMode")
+        if let data = try? JSONEncoder().encode(autoStartConfiguration) {
+            defaults.set(data, forKey: Self.autoStartConfigurationKey)
+        }
+        if let autoStartDailyPlan,
+           let data = try? JSONEncoder().encode(autoStartDailyPlan) {
+            defaults.set(data, forKey: Self.autoStartDailyPlanKey)
+        } else {
+            defaults.removeObject(forKey: Self.autoStartDailyPlanKey)
+        }
+        defaults.set(autoStartWasEverEnabled, forKey: Self.autoStartWasEverEnabledKey)
         defaults.set(killTimeReminderMinutes, forKey: "killTimeReminderMinutes")
         defaults.set(fixedReminderEnabled, forKey: "fixedReminderEnabled")
         defaults.set(fixedReminderHour, forKey: "fixedReminderHour")

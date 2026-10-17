@@ -55,11 +55,36 @@ private struct PendingPostponeRequest {
     let targetDate: Date
 }
 
+private struct KillTimeEditDraft: Equatable {
+    let dayId: String
+    let baseHour: Int
+    let baseMinute: Int
+    var proposedHour: Int
+    var proposedMinute: Int
+
+    var hasChanges: Bool {
+        proposedHour != baseHour || proposedMinute != baseMinute
+    }
+
+    func isValid(for day: DayModel) -> Bool {
+        dayId == day.dayId
+            && baseHour == day.killTimeHour
+            && baseMinute == day.killTimeMinute
+            && (day.status == .draft || day.status == .execute)
+    }
+}
+
 struct TodayView: View {
-    private enum TodayKillTimeConfirmMode {
+    private enum TodayKillTimeConfirmMode: Equatable {
         case normal
         case immediateExpire(expiredCount: Int)
     }
+
+    private struct KillTimeConfirmationSnapshot: Equatable {
+        let draft: KillTimeEditDraft
+        let mode: TodayKillTimeConfirmMode
+    }
+
     private let floatingStartOverlayReserveHeight: CGFloat = 120
     let animationsActive: Bool
 
@@ -108,10 +133,8 @@ struct TodayView: View {
     @State private var startFlowCoordinator = TodayStartFlowCoordinator()
     @State private var startFlowStamp: MindStampItem?
     @State private var startFlowDetent: PresentationDetent = .fraction(0.5)
-    @State private var pendingTodayKillTimeHour: Int?
-    @State private var pendingTodayKillTimeMinute: Int?
-    @State private var showingTodayKillTimeConfirm = false
-    @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
+    @State private var killTimeEditDraft: KillTimeEditDraft?
+    @State private var killTimeConfirmation: KillTimeConfirmationSnapshot?
     @State private var selectedSection: TodaySection = .today
     @State private var taskForPostpone: TaskItem?
     @State private var pendingPostponeRequest: PendingPostponeRequest?
@@ -175,6 +198,22 @@ struct TodayView: View {
         }
         .onChange(of: userSettings.defaultKillTimeMinute) { _, _ in
             viewModel?.refresh()
+        }
+        .onChange(of: viewModel?.today?.dayId) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+        }
+        .onChange(of: viewModel?.today?.status) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+            if viewModel?.today?.status != .draft, startFlowCoordinator.isPresented {
+                startFlowStamp = nil
+                startFlowCoordinator.cancel()
+            }
+        }
+        .onChange(of: viewModel?.today?.killTimeHour) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+        }
+        .onChange(of: viewModel?.today?.killTimeMinute) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
         }
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
@@ -368,7 +407,7 @@ struct TodayView: View {
         }
     }
 
-    private func killTimeTitleRow(hour: Int, minute: Int, isEditable: Bool) -> some View {
+    private func killTimeTitleRow(deadline: Date?, isEditable: Bool) -> some View {
         HStack(spacing: WeekSpacing.xs) {
             Image(systemName: "clock.fill")
                 .foregroundColor(.accentOrange)
@@ -378,7 +417,7 @@ struct TodayView: View {
             Spacer(minLength: WeekSpacing.sm)
             if isEditable {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    if let text = killTimeRemainingText(hour: hour, minute: minute, now: context.date) {
+                    if let text = killTimeRemainingText(deadline: deadline, now: context.date) {
                         Text(text)
                             .font(.caption)
                             .foregroundColor(.textSecondary)
@@ -389,13 +428,11 @@ struct TodayView: View {
         }
     }
 
-    private func killTimeRemainingText(hour: Int, minute: Int, now: Date) -> String? {
-        let calendar = Calendar(identifier: .iso8601)
-        var components = calendar.dateComponents([.year, .month, .day], from: now)
-        components.hour = hour
-        components.minute = minute
-        guard let kill = calendar.date(from: components) else { return nil }
-        let minutes = Int(kill.timeIntervalSince(now) / 60)
+    private func killTimeRemainingText(deadline: Date?, now: Date) -> String? {
+        guard let deadline else { return nil }
+        let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: now)
+        guard remaining > 0 else { return nil }
+        let minutes = Int(remaining)
         guard minutes > 0 else { return nil }
         if minutes >= 60 {
             return String(
@@ -412,7 +449,7 @@ struct TodayView: View {
         )
     }
 
-    private func killTimePendingBar(hour: Int, minute: Int, viewModel: TodayViewModel) -> some View {
+    private func killTimePendingBar(hour: Int, minute: Int, day: DayModel, viewModel: TodayViewModel) -> some View {
         HStack(spacing: WeekSpacing.md) {
             Text(String(
                 format: String(localized: "killtime.pending.change_to", defaultValue: "改为 %@？"),
@@ -423,23 +460,40 @@ struct TodayView: View {
             .monospacedDigit()
             Spacer(minLength: WeekSpacing.sm)
             Button(String(localized: "action.cancel")) {
-                pendingTodayKillTimeHour = nil
-                pendingTodayKillTimeMinute = nil
+                clearKillTimeEditing()
             }
             .font(.subheadline)
             .foregroundColor(.textSecondary)
             .buttonStyle(.plain)
             Button {
-                guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+                guard let draft = validKillTimeEditDraft(for: day) else {
+                    clearKillTimeEditing()
+                    return
+                }
                 do {
-                    let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
+                    let impact = try viewModel.evaluateKillTimeChangeImpact(
+                        hour: draft.proposedHour,
+                        minute: draft.proposedMinute,
+                        expectedDayId: draft.dayId,
+                        expectedHour: draft.baseHour,
+                        expectedMinute: draft.baseMinute
+                    )
+                    let mode: TodayKillTimeConfirmMode
                     switch impact {
                     case .normal:
-                        todayKillTimeConfirmMode = .normal
+                        mode = .normal
                     case .immediateExpire(let expiredCount):
-                        todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
+                        mode = .immediateExpire(expiredCount: expiredCount)
                     }
-                    showingTodayKillTimeConfirm = true
+                    killTimeConfirmation = KillTimeConfirmationSnapshot(draft: draft, mode: mode)
+                } catch let error as WeekyiiError {
+                    switch error {
+                    case .killTimePreviewOutdated, .cannotEditStartedDay:
+                        clearKillTimeEditing()
+                    default:
+                        break
+                    }
+                    errorMessage = error.localizedDescription
                 } catch {
                     errorMessage = error.localizedDescription
                 }
@@ -460,9 +514,11 @@ struct TodayView: View {
 
     @ViewBuilder
     private func editableKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
-        let displayedHour = pendingTodayKillTimeHour ?? day.killTimeHour
-        let displayedMinute = pendingTodayKillTimeMinute ?? day.killTimeMinute
-        let hasPendingChange = displayedHour != day.killTimeHour || displayedMinute != day.killTimeMinute
+        let preview = validKillTimeEditDraft(for: day)
+        let displayedHour = preview?.proposedHour ?? day.killTimeHour
+        let displayedMinute = preview?.proposedMinute ?? day.killTimeMinute
+        let hasPendingChange = preview?.hasChanges ?? false
+        let deadline = KillTimeDeadline.date(for: day.date, hour: displayedHour, minute: displayedMinute)
 
         let isEditable = day.status == .draft || day.status == .execute
 
@@ -472,10 +528,10 @@ struct TodayView: View {
                 // pending, so the card never changes height mid-drag.
                 ZStack {
                     if isEditable && hasPendingChange {
-                        killTimePendingBar(hour: displayedHour, minute: displayedMinute, viewModel: viewModel)
+                        killTimePendingBar(hour: displayedHour, minute: displayedMinute, day: day, viewModel: viewModel)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     } else {
-                        killTimeTitleRow(hour: displayedHour, minute: displayedMinute, isEditable: isEditable)
+                        killTimeTitleRow(deadline: deadline, isEditable: isEditable)
                             .transition(.opacity)
                     }
                 }
@@ -483,19 +539,19 @@ struct TodayView: View {
                 .animation(.easeInOut(duration: 0.22), value: hasPendingChange)
 
                 KillTimeEditor(
+                    dayDate: day.date,
                     hour: displayedHour,
                     minute: displayedMinute,
                     isEditable: isEditable,
                     rangeAnchorMinutes: day.killTimeHour * 60 + day.killTimeMinute,
                     onChange: { hour, minute in
-                        pendingTodayKillTimeHour = hour
-                        pendingTodayKillTimeMinute = minute
+                        updateKillTimePreview(hour: hour, minute: minute, for: day)
                     }
                 )
             }
             // Flames sit behind the content, fill the card to its edges
-            // (WeekCard pads by WeekSpacing.lg and clips) and may rise up to
-            // the slider's track.
+            // (WeekCard pads by WeekSpacing.lg and clips). Normal flames stay
+            // below the track; urgent flames can rise into the space above it.
             .backgroundPreferenceValue(KillTimeLayoutAnchorKey.self) { anchors in
                 if isEditable {
                     GeometryReader { proxy in
@@ -509,27 +565,41 @@ struct TodayView: View {
                             return KillTimeFlameCeiling(
                                 left: bottom - trackY + 22,
                                 right: bottom - (timeRect?.minY ?? trackY - 60),
-                                transition: ((timeRect?.maxX ?? proxy.size.width * 0.4) + WeekSpacing.lg) / totalWidth
+                                transition: ((timeRect?.maxX ?? proxy.size.width * 0.4) + WeekSpacing.lg) / totalWidth,
+                                trackHeight: bottom - trackY
                             )
                         }
-                        KillTimeFlameBackground(
-                            hour: displayedHour,
-                            minute: displayedMinute,
-                            isAnimating: animationsActive,
-                            ceiling: ceiling
-                        )
-                        .padding(-WeekSpacing.lg)
+                        if let deadline {
+                            KillTimeFlameBackground(
+                                deadline: deadline,
+                                animationsActive: animationsActive,
+                                ceiling: ceiling,
+                                selectableRange: anchors.selectableRange
+                            )
+                            .padding(-WeekSpacing.lg)
+                        } else {
+                            Color.clear
+                        }
                     }
                 }
             }
         }
         .alert(
             todayKillTimeConfirmTitle,
-            isPresented: $showingTodayKillTimeConfirm
+            isPresented: Binding(
+                get: { killTimeConfirmation != nil },
+                set: { isPresented in
+                    if !isPresented { killTimeConfirmation = nil }
+                }
+            )
         ) {
-            Button(String(localized: "action.cancel"), role: .cancel) { }
+            let confirmation = killTimeConfirmation
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                killTimeConfirmation = nil
+            }
             Button("确认") {
-                applyPendingTodayKillTime(viewModel: viewModel)
+                guard let confirmation else { return }
+                applyTodayKillTime(confirmation, viewModel: viewModel)
             }
         } message: {
             Text(todayKillTimeConfirmMessage)
@@ -1058,37 +1128,106 @@ struct TodayView: View {
     }
 
     private var todayKillTimeConfirmTitle: String {
-        switch todayKillTimeConfirmMode {
+        switch killTimeConfirmation?.mode {
         case .normal:
             return "确认修改截止时间"
-        case .immediateExpire:
+        case .immediateExpire(_):
             return "新时间会导致今日任务立即过期"
+        case nil:
+            return "确认修改截止时间"
         }
     }
 
     private var todayKillTimeConfirmMessage: String {
-        switch todayKillTimeConfirmMode {
+        switch killTimeConfirmation?.mode {
         case .normal:
             return "确认后将更新今日截止时间。"
         case .immediateExpire(let expiredCount):
             return "确认后今日未完成内容将立即过期（\(expiredCount) 项）。"
+        case nil:
+            return "确认后将更新今日截止时间。"
         }
     }
 
-    private func applyPendingTodayKillTime(viewModel: TodayViewModel) {
-        guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+    private func applyTodayKillTime(_ confirmation: KillTimeConfirmationSnapshot, viewModel: TodayViewModel) {
+        let draft = confirmation.draft
         do {
-            switch todayKillTimeConfirmMode {
+            switch confirmation.mode {
             case .normal:
-                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: false)
-            case .immediateExpire:
-                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: true)
+                try viewModel.changeKillTime(
+                    hour: draft.proposedHour,
+                    minute: draft.proposedMinute,
+                    expectedDayId: draft.dayId,
+                    expectedHour: draft.baseHour,
+                    expectedMinute: draft.baseMinute,
+                    allowImmediateExpire: false,
+                    confirmedExpiredCount: nil
+                )
+            case .immediateExpire(let expiredCount):
+                try viewModel.changeKillTime(
+                    hour: draft.proposedHour,
+                    minute: draft.proposedMinute,
+                    expectedDayId: draft.dayId,
+                    expectedHour: draft.baseHour,
+                    expectedMinute: draft.baseMinute,
+                    allowImmediateExpire: true,
+                    confirmedExpiredCount: expiredCount
+                )
             }
-            pendingTodayKillTimeHour = nil
-            pendingTodayKillTimeMinute = nil
+            clearKillTimeEditing()
+        } catch let error as WeekyiiError {
+            switch error {
+            case .killTimeImmediateExpireConfirmationRequired(_), .killTimeImmediateExpireImpactChanged(_):
+                killTimeConfirmation = nil
+            case .killTimePreviewOutdated, .cannotEditStartedDay:
+                clearKillTimeEditing()
+            default:
+                killTimeConfirmation = nil
+            }
+            errorMessage = error.localizedDescription
         } catch {
+            killTimeConfirmation = nil
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func validKillTimeEditDraft(for day: DayModel) -> KillTimeEditDraft? {
+        guard let draft = killTimeEditDraft, draft.isValid(for: day) else { return nil }
+        return draft
+    }
+
+    private func updateKillTimePreview(hour: Int, minute: Int, for day: DayModel) {
+        guard (day.status == .draft || day.status == .execute),
+              (0...23).contains(hour), (0...59).contains(minute) else {
+            clearKillTimeEditing()
+            return
+        }
+
+        let current = validKillTimeEditDraft(for: day)
+        let draft = KillTimeEditDraft(
+            dayId: day.dayId,
+            baseHour: current?.baseHour ?? day.killTimeHour,
+            baseMinute: current?.baseMinute ?? day.killTimeMinute,
+            proposedHour: hour,
+            proposedMinute: minute
+        )
+        killTimeConfirmation = nil
+        killTimeEditDraft = draft.hasChanges ? draft : nil
+    }
+
+    private func invalidateKillTimeEditingIfNeeded(for day: DayModel?) {
+        guard let day, let draft = killTimeEditDraft, draft.isValid(for: day) else {
+            clearKillTimeEditing()
+            return
+        }
+        if let confirmation = killTimeConfirmation, !confirmation.draft.isValid(for: day) {
+            killTimeConfirmation = nil
+        }
+    }
+
+    private func clearKillTimeEditing() {
+        killTimeEditDraft = nil
+        killTimeConfirmation = nil
     }
 
     @ViewBuilder
@@ -2402,8 +2541,8 @@ private struct HabitDetailMonthGrid: View {
                 switch statusByDay[dayId] {
                 case .completed: state = .completed
                 case .missed: state = .missed
-                case .pending: state = cursor < todayStart ? .unrecorded : .pendingToday
-                case nil: state = isToday ? .pendingToday : (cursor < todayStart ? .unrecorded : .upcoming)
+                case .pending: state = cursor < todayStart ? .missed : .pendingToday
+                case nil: state = isToday ? .pendingToday : (cursor < todayStart ? .missed : .upcoming)
                 }
             } else {
                 state = .rest
@@ -2457,8 +2596,6 @@ private struct HabitDayMark: View {
             base.fill(tint)
         case .missed:
             base.fill(Color.taskDDL.opacity(0.3))
-        case .unrecorded:
-            base.stroke(Color.textTertiary.opacity(0.4), lineWidth: 1.5).padding(1)
         case .pendingToday:
             base.stroke(tint, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5])).padding(1)
         case .upcoming:

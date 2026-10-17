@@ -3,7 +3,7 @@ import Foundation
 enum HabitTodayStatus: Equatable {
     case completed
     case pending
-    case notGenerated
+    case missed
     case notScheduled
 }
 
@@ -12,7 +12,6 @@ enum HabitTimelineNodeState: Equatable {
     case completed
     case missed        // 显示为「中断」
     case pending       // 仅今天
-    case unrecorded    // 计划内无记录（D2 跳过口径），与 missed 视觉可区分
 }
 
 struct HabitTimelineNode: Equatable, Identifiable {
@@ -59,34 +58,37 @@ enum HabitStatisticsCalculator {
         )
     }
 
-    /// 完整历史时间线（决策 D4）：startDay → today 的全部计划日，倒序。
+    /// 历史结果时间线：读取已落盘的计划日结果；今天尚无记录时显示 pending，历史缺失记录不伪装成业务状态。
     /// 纯推导，不新增落盘字段；非计划日不产生节点。
     static func timeline(for habit: HabitModel, today: Date = Date()) -> [HabitTimelineNode] {
         guard habit.hasSchedule, let start = habit.startDate?.startOfDay else { return [] }
         let map = recordStatusMap(for: habit)
         let completedTimes = completedAtMap(for: habit)
 
+        let todayStart = today.startOfDay
         let calendar = Calendar(identifier: .iso8601)
         let startDay = start.startOfDay
         var nodes: [HabitTimelineNode] = []
-        var cursor = today.startOfDay
+        var cursor = todayStart
         var scanned = 0
         while cursor >= startDay, scanned < 3660 {
             scanned += 1
             if habit.isScheduled(on: cursor) {
-                let state: HabitTimelineNodeState
+                let state: HabitTimelineNodeState?
                 switch map[cursor.dayId] {
                 case .completed: state = .completed
                 case .missed: state = .missed
                 case .pending: state = .pending
-                case nil: state = .unrecorded
+                case nil: state = cursor == todayStart ? .pending : nil
                 }
-                nodes.append(HabitTimelineNode(
-                    dayId: cursor.dayId,
-                    date: cursor,
-                    state: state,
-                    completedAt: completedTimes[cursor.dayId]
-                ))
+                if let state {
+                    nodes.append(HabitTimelineNode(
+                        dayId: cursor.dayId,
+                        date: cursor,
+                        state: state,
+                        completedAt: completedTimes[cursor.dayId]
+                    ))
+                }
             }
             guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
             cursor = previous
@@ -168,7 +170,7 @@ enum HabitStatisticsCalculator {
             switch map[dayStart.dayId] {
             case .completed: streak += 1
             case .missed: return streak
-            case .pending, nil: continue      // 今天宽限；未记录日跳过（决策 D2）
+            case .pending, nil: continue      // A missed record is the streak break after settlement.
             }
         }
         return streak
@@ -216,8 +218,8 @@ enum HabitStatisticsCalculator {
         switch map[todayStart.dayId] {
         case .completed: return .completed
         case .pending: return .pending
-        case .missed: return .notGenerated
-        case nil: return .notGenerated
+        case .missed: return .missed
+        case nil: return .pending
         }
     }
 }

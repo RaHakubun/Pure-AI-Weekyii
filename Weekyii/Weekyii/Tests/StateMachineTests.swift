@@ -496,6 +496,304 @@ final class StateMachineTests: XCTestCase {
     }
 
     @MainActor
+    func test_changeKillTime_commitsNormalSameDayEditWithMatchingSnapshot() throws {
+        let now = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 10, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: now)
+        let oldHour = fixture.day.killTimeHour
+        let oldMinute = fixture.day.killTimeMinute
+        let scheduledBefore = fixture.notifications.scheduledKillTimeSnapshots.count
+
+        let impact = try fixture.viewModel.evaluateKillTimeChangeImpact(
+            hour: 22,
+            minute: 15,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: oldHour,
+            expectedMinute: oldMinute
+        )
+        XCTAssertEqual(impact, .normal)
+
+        try fixture.viewModel.changeKillTime(
+            hour: 22,
+            minute: 15,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: oldHour,
+            expectedMinute: oldMinute,
+            allowImmediateExpire: false,
+            confirmedExpiredCount: nil
+        )
+
+        XCTAssertEqual(fixture.day.killTimeHour, 22)
+        XCTAssertEqual(fixture.day.killTimeMinute, 15)
+        XCTAssertEqual(fixture.day.status, .execute)
+        XCTAssertFalse(fixture.day.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.scheduledKillTimeSnapshots.count, scheduledBefore + 1)
+    }
+
+    @MainActor
+    func test_changeKillTime_commitsImmediateExpiryOnlyAfterExplicitConsent() throws {
+        let now = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 20, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: now)
+
+        let impact = try fixture.viewModel.evaluateKillTimeChangeImpact(
+            hour: 19,
+            minute: 59,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: fixture.day.killTimeHour,
+            expectedMinute: fixture.day.killTimeMinute
+        )
+        XCTAssertEqual(impact, .immediateExpire(expiredCount: 2))
+
+        try fixture.viewModel.changeKillTime(
+            hour: 19,
+            minute: 59,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: fixture.day.killTimeHour,
+            expectedMinute: fixture.day.killTimeMinute,
+            allowImmediateExpire: true,
+            confirmedExpiredCount: 2
+        )
+
+        XCTAssertEqual(fixture.day.killTimeHour, 19)
+        XCTAssertEqual(fixture.day.killTimeMinute, 59)
+        XCTAssertEqual(fixture.day.status, .expired)
+        XCTAssertEqual(fixture.day.expiredCount, 2)
+        XCTAssertFalse(fixture.day.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.cancelledKillTimeDayIDs, [fixture.day.dayId])
+        XCTAssertEqual(fixture.notifications.removedDeliveredKillTimeDayIDs, [fixture.day.dayId])
+    }
+
+    @MainActor
+    func test_changeKillTimeRequiresNewConfirmationWhenDeadlinePassesAfterNormalAssessment() throws {
+        let initialTime = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 19, minute: 59)
+        let fixture = try makeKillTimeEditFixture(at: initialTime, followsDefaultKillTime: true)
+        let expectedHour = fixture.day.killTimeHour
+        let expectedMinute = fixture.day.killTimeMinute
+        let scheduledBefore = fixture.notifications.scheduledKillTimeSnapshots.count
+        let cancelledBefore = fixture.notifications.cancelledKillTimeDayIDs
+        let deliveredBefore = fixture.notifications.removedDeliveredKillTimeDayIDs
+
+        XCTAssertEqual(
+            try fixture.viewModel.evaluateKillTimeChangeImpact(
+                hour: 20,
+                minute: 0,
+                expectedDayId: fixture.day.dayId,
+                expectedHour: expectedHour,
+                expectedMinute: expectedMinute
+            ),
+            .normal
+        )
+
+        fixture.timeProvider.mockDate = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 20, minute: 0)
+        XCTAssertThrowsError(try fixture.viewModel.changeKillTime(
+            hour: 20,
+            minute: 0,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: expectedHour,
+            expectedMinute: expectedMinute,
+            allowImmediateExpire: false,
+            confirmedExpiredCount: nil
+        )) { error in
+            XCTAssertEqual(error as? WeekyiiError, .killTimeImmediateExpireConfirmationRequired(expiredCount: 2))
+        }
+
+        XCTAssertEqual(fixture.day.killTimeHour, expectedHour)
+        XCTAssertEqual(fixture.day.killTimeMinute, expectedMinute)
+        XCTAssertEqual(fixture.day.status, .execute)
+        XCTAssertTrue(fixture.day.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.scheduledKillTimeSnapshots.count, scheduledBefore)
+        XCTAssertEqual(fixture.notifications.cancelledKillTimeDayIDs, cancelledBefore)
+        XCTAssertEqual(fixture.notifications.removedDeliveredKillTimeDayIDs, deliveredBefore)
+    }
+
+    @MainActor
+    func test_changeKillTimeRejectsWhenSavedCutoffChangesAfterPreview() throws {
+        let now = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 10, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: now, followsDefaultKillTime: true)
+        let expectedHour = fixture.day.killTimeHour
+        let expectedMinute = fixture.day.killTimeMinute
+
+        _ = try fixture.viewModel.evaluateKillTimeChangeImpact(
+            hour: 22,
+            minute: 0,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: expectedHour,
+            expectedMinute: expectedMinute
+        )
+        fixture.day.killTimeMinute = 30
+        try container.mainContext.save()
+        let scheduledBefore = fixture.notifications.scheduledKillTimeSnapshots.count
+        let cancelledBefore = fixture.notifications.cancelledKillTimeDayIDs
+        let deliveredBefore = fixture.notifications.removedDeliveredKillTimeDayIDs
+
+        XCTAssertThrowsError(try fixture.viewModel.changeKillTime(
+            hour: 22,
+            minute: 0,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: expectedHour,
+            expectedMinute: expectedMinute,
+            allowImmediateExpire: false,
+            confirmedExpiredCount: nil
+        )) { error in
+            XCTAssertEqual(error as? WeekyiiError, .killTimePreviewOutdated)
+        }
+
+        XCTAssertEqual(fixture.day.killTimeHour, expectedHour)
+        XCTAssertEqual(fixture.day.killTimeMinute, 30)
+        XCTAssertEqual(fixture.day.status, .execute)
+        XCTAssertTrue(fixture.day.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.scheduledKillTimeSnapshots.count, scheduledBefore)
+        XCTAssertEqual(fixture.notifications.cancelledKillTimeDayIDs, cancelledBefore)
+        XCTAssertEqual(fixture.notifications.removedDeliveredKillTimeDayIDs, deliveredBefore)
+    }
+
+    @MainActor
+    func test_resolveTodayReloadsWhenCachedDayDoesNotMatchCurrentDate() throws {
+        let initialTime = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 10, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: initialTime)
+        let cachedDay = fixture.day
+        let currentDay = try XCTUnwrap(fixture.nextDay)
+        currentDay.status = .draft
+        currentDay.killTimeHour = 23
+        currentDay.killTimeMinute = 45
+        currentDay.followsDefaultKillTime = true
+        currentDay.tasks.append(TaskItem(title: "Tomorrow", order: 1, zone: .draft))
+        try container.mainContext.save()
+        fixture.timeProvider.mockDate = try makeKillTimeTestDate(year: 2026, month: 10, day: 17, hour: 10, minute: 0)
+
+        let impact = try fixture.viewModel.evaluateKillTimeChangeImpact(
+            hour: 22,
+            minute: 30,
+            expectedDayId: currentDay.dayId,
+            expectedHour: currentDay.killTimeHour,
+            expectedMinute: currentDay.killTimeMinute
+        )
+        XCTAssertEqual(impact, .normal)
+        try fixture.viewModel.changeKillTime(
+            hour: 22,
+            minute: 30,
+            expectedDayId: currentDay.dayId,
+            expectedHour: 23,
+            expectedMinute: 45,
+            allowImmediateExpire: false,
+            confirmedExpiredCount: nil
+        )
+
+        XCTAssertEqual(fixture.viewModel.today?.dayId, currentDay.dayId)
+        XCTAssertEqual(cachedDay.killTimeHour, 23)
+        XCTAssertEqual(cachedDay.killTimeMinute, 45)
+        XCTAssertEqual(currentDay.killTimeHour, 22)
+        XCTAssertEqual(currentDay.killTimeMinute, 30)
+        XCTAssertFalse(currentDay.followsDefaultKillTime)
+    }
+
+    @MainActor
+    func test_previousDayPreviewCannotModifyCurrentDayAfterRollover() throws {
+        let initialTime = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 10, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: initialTime, followsDefaultKillTime: true)
+        let previousDay = fixture.day
+        let currentDay = try XCTUnwrap(fixture.nextDay)
+        currentDay.status = .draft
+        currentDay.killTimeHour = 18
+        currentDay.killTimeMinute = 0
+        currentDay.followsDefaultKillTime = true
+        currentDay.tasks.append(TaskItem(title: "Tomorrow", order: 1, zone: .draft))
+        try container.mainContext.save()
+        fixture.timeProvider.mockDate = try makeKillTimeTestDate(year: 2026, month: 10, day: 17, hour: 10, minute: 0)
+        let scheduledBefore = fixture.notifications.scheduledKillTimeSnapshots.count
+        let cancelledBefore = fixture.notifications.cancelledKillTimeDayIDs
+        let deliveredBefore = fixture.notifications.removedDeliveredKillTimeDayIDs
+
+        XCTAssertThrowsError(try fixture.viewModel.changeKillTime(
+            hour: 17,
+            minute: 0,
+            expectedDayId: previousDay.dayId,
+            expectedHour: previousDay.killTimeHour,
+            expectedMinute: previousDay.killTimeMinute,
+            allowImmediateExpire: false,
+            confirmedExpiredCount: nil
+        )) { error in
+            XCTAssertEqual(error as? WeekyiiError, .killTimePreviewOutdated)
+        }
+
+        XCTAssertEqual(previousDay.killTimeHour, 23)
+        XCTAssertEqual(previousDay.killTimeMinute, 45)
+        XCTAssertEqual(currentDay.killTimeHour, 18)
+        XCTAssertEqual(currentDay.killTimeMinute, 0)
+        XCTAssertEqual(currentDay.status, .draft)
+        XCTAssertTrue(currentDay.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.scheduledKillTimeSnapshots.count, scheduledBefore)
+        XCTAssertEqual(fixture.notifications.cancelledKillTimeDayIDs, cancelledBefore)
+        XCTAssertEqual(fixture.notifications.removedDeliveredKillTimeDayIDs, deliveredBefore)
+    }
+
+    @MainActor
+    func test_changeKillTimeRequiresUpdatedConsentWhenExpiredCountChanges() throws {
+        let now = try makeKillTimeTestDate(year: 2026, month: 10, day: 16, hour: 20, minute: 0)
+        let fixture = try makeKillTimeEditFixture(at: now, followsDefaultKillTime: true)
+        let expectedHour = fixture.day.killTimeHour
+        let expectedMinute = fixture.day.killTimeMinute
+        let scheduledBefore = fixture.notifications.scheduledKillTimeSnapshots.count
+        let cancelledBefore = fixture.notifications.cancelledKillTimeDayIDs
+        let deliveredBefore = fixture.notifications.removedDeliveredKillTimeDayIDs
+
+        XCTAssertEqual(
+            try fixture.viewModel.evaluateKillTimeChangeImpact(
+                hour: 19,
+                minute: 59,
+                expectedDayId: fixture.day.dayId,
+                expectedHour: expectedHour,
+                expectedMinute: expectedMinute
+            ),
+            .immediateExpire(expiredCount: 2)
+        )
+
+        fixture.day.tasks.append(TaskItem(title: "Third", order: 3, zone: .frozen))
+        try container.mainContext.save()
+
+        XCTAssertThrowsError(try fixture.viewModel.changeKillTime(
+            hour: 19,
+            minute: 59,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: expectedHour,
+            expectedMinute: expectedMinute,
+            allowImmediateExpire: true,
+            confirmedExpiredCount: 2
+        )) { error in
+            XCTAssertEqual(error as? WeekyiiError, .killTimeImmediateExpireImpactChanged(expiredCount: 3))
+        }
+
+        XCTAssertEqual(fixture.day.killTimeHour, expectedHour)
+        XCTAssertEqual(fixture.day.killTimeMinute, expectedMinute)
+        XCTAssertEqual(fixture.day.status, .execute)
+        XCTAssertTrue(fixture.day.followsDefaultKillTime)
+        XCTAssertEqual(fixture.notifications.scheduledKillTimeSnapshots.count, scheduledBefore)
+        XCTAssertEqual(fixture.notifications.cancelledKillTimeDayIDs, cancelledBefore)
+        XCTAssertEqual(fixture.notifications.removedDeliveredKillTimeDayIDs, deliveredBefore)
+
+        XCTAssertEqual(
+            try fixture.viewModel.evaluateKillTimeChangeImpact(
+                hour: 19,
+                minute: 59,
+                expectedDayId: fixture.day.dayId,
+                expectedHour: expectedHour,
+                expectedMinute: expectedMinute
+            ),
+            .immediateExpire(expiredCount: 3)
+        )
+        try fixture.viewModel.changeKillTime(
+            hour: 19,
+            minute: 59,
+            expectedDayId: fixture.day.dayId,
+            expectedHour: expectedHour,
+            expectedMinute: expectedMinute,
+            allowImmediateExpire: true,
+            confirmedExpiredCount: 3
+        )
+        XCTAssertEqual(fixture.day.status, .expired)
+        XCTAssertEqual(fixture.day.expiredCount, 3)
+    }
+
+    @MainActor
     func test_staleOpenDayExpirationRefreshesWeekSummaryMetrics() throws {
         let context = container.mainContext
         let appState = makeAppState()
@@ -1583,6 +1881,54 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(report.suspendedAutoDeletedCount, 1)
         let remaining = try container.mainContext.fetch(FetchDescriptor<SuspendedTaskItem>())
         XCTAssertEqual(remaining.map(\.id), [active.id])
+    }
+
+    @MainActor
+    private func makeKillTimeEditFixture(
+        at date: Date,
+        followsDefaultKillTime: Bool = false
+    ) throws -> (
+        day: DayModel,
+        nextDay: DayModel?,
+        viewModel: TodayViewModel,
+        timeProvider: MutableTimeProvider,
+        notifications: TestNotificationService
+    ) {
+        let context = container.mainContext
+        let week = WeekCalculator().makeWeek(for: date, status: .present)
+        context.insert(week)
+        let day = try XCTUnwrap(week.days.first(where: { $0.dayId == date.dayId }))
+        day.status = .execute
+        day.killTimeHour = 23
+        day.killTimeMinute = 45
+        day.followsDefaultKillTime = followsDefaultKillTime
+        let focus = TaskItem(title: "First", order: 1, zone: .focus)
+        focus.startedAt = date
+        day.tasks.append(focus)
+        day.tasks.append(TaskItem(title: "Second", order: 2, zone: .frozen))
+
+        let nextDate = Calendar(identifier: .iso8601).date(byAdding: .day, value: 1, to: date)
+        let nextDay = nextDate.flatMap { nextDate in week.days.first(where: { $0.dayId == nextDate.dayId }) }
+        try context.save()
+
+        let timeProvider = MutableTimeProvider(mockDate: date)
+        let notifications = TestNotificationService()
+        let viewModel = TodayViewModel(
+            modelContext: context,
+            timeProvider: timeProvider,
+            notificationService: notifications,
+            appState: makeAppState(),
+            userSettings: makeUserSettings(executionMode: .strict)
+        )
+        Self.retainTodayViewModelForTestLifetime(viewModel)
+        viewModel.refresh()
+
+        return (day, nextDay, viewModel, timeProvider, notifications)
+    }
+
+    private func makeKillTimeTestDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) throws -> Date {
+        let components = DateComponents(year: year, month: month, day: day, hour: hour, minute: minute)
+        return try XCTUnwrap(Calendar(identifier: .iso8601).date(from: components))
     }
 
     @MainActor

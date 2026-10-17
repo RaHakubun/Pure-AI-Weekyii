@@ -303,8 +303,8 @@ struct HabitTodayStatusChip: View {
             return (String(localized: "habit.today.completed", defaultValue: "今日已完成"), .accentGreen)
         case .pending:
             return (String(localized: "habit.today.pending", defaultValue: "今日待完成"), .accentOrange)
-        case .notGenerated:
-            return (String(localized: "habit.today.not_generated", defaultValue: "今日未生成"), .textTertiary)
+        case .missed:
+            return (String(localized: "habit.today.missed", defaultValue: "今日已中断"), .taskDDL)
         case .notScheduled:
             return (String(localized: "habit.today.not_scheduled", defaultValue: "今日无需"), .textTertiary)
         }

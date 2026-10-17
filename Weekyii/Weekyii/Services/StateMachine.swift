@@ -175,10 +175,26 @@ struct StateMachine {
         let today = timeProvider.today
         let descriptor = FetchDescriptor<DayModel>()
         let allDays = (try? modelContext.fetch(descriptor)) ?? []
+        let emptyPastDays = allDays.filter { day in
+            day.date < today
+                && day.status == .empty
+        }
+        let expiredPastDays = allDays.filter { $0.date < today && $0.status == .expired }
+        let habits = emptyPastDays.isEmpty && expiredPastDays.isEmpty
+            ? []
+            : ((try? modelContext.fetch(FetchDescriptor<HabitModel>())) ?? [])
+        // Revisit persisted expired dates so a failed settlement can retry without a new marker.
+        _ = HabitRecordService.settleExpiredDays(expiredPastDays, among: habits, at: timeProvider.now)
+        let scheduledEmptyDayIds = Set(emptyPastDays
+            .filter { HabitRecordService.hasScheduledHabit(on: $0, among: habits) }
+            .map(\.dayId))
+
         var expiredCount = 0
         for day in allDays where day.date < today {
-            guard day.status == .execute || day.status == .draft else { continue }
-            let pendingExpiredCount = day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
+            let hasOpenTasks = day.status == .execute || day.status == .draft
+            let isScheduledEmptyDay = day.status == .empty && scheduledEmptyDayIds.contains(day.dayId)
+            guard hasOpenTasks || isScheduledEmptyDay else { continue }
+            let pendingExpiredCount = day.status == .execute ? (day.focusTaskCount + day.frozenTasks.count) : 0
             if expire(day: day, expiredCount: pendingExpiredCount) {
                 expiredCount += 1
             }
@@ -236,21 +252,21 @@ struct StateMachine {
 
     private func processKillTime() -> Int {
         guard let today = fetchDay(by: timeProvider.today.dayId) else { return 0 }
-        guard today.status == .execute || today.status == .draft else { return 0 }
+        if today.status == .expired {
+            // Retry an incomplete same-day habit settlement on later reconciliations.
+            HabitRecordService.settleExpiredDay(today, in: modelContext, at: timeProvider.now)
+            return 0
+        }
+        guard today.status == .execute || today.status == .draft || today.status == .empty else { return 0 }
 
         guard let killDate = killDate(for: today) else { return 0 }
-        if timeProvider.now >= killDate {
-            let expiredCount: Int
-            if today.status == .draft {
-                expiredCount = 0
-            } else {
-                expiredCount = today.focusTaskCount + today.frozenTasks.count
-            }
-            _ = expire(day: today, expiredCount: expiredCount)
-            notificationService.cancelKillTimeNotification(for: today)
-            return 1
-        }
-        return 0
+        guard timeProvider.now >= killDate else { return 0 }
+        guard today.status != .empty || HabitRecordService.hasScheduledHabit(on: today, in: modelContext) else { return 0 }
+
+        let expiredCount = today.status == .execute ? today.focusTaskCount + today.frozenTasks.count : 0
+        _ = expire(day: today, expiredCount: expiredCount)
+        notificationService.cancelKillTimeNotification(for: today)
+        return 1
     }
 
     private func syncTodayDefaultKillTimeIfNeeded(lastProcessedBeforeRun: Date?) {
@@ -278,11 +294,7 @@ struct StateMachine {
     }
 
     private func killDate(for day: DayModel) -> Date? {
-        var components = calendar.dateComponents([.year, .month, .day], from: day.date)
-        components.hour = day.killTimeHour
-        components.minute = day.killTimeMinute
-        components.second = 0
-        return calendar.date(from: components)
+        KillTimeDeadline.date(for: day.date, hour: day.killTimeHour, minute: day.killTimeMinute)
     }
 
     @discardableResult
@@ -291,6 +303,7 @@ struct StateMachine {
         day.status = .expired
         day.expiredCount = expiredCount
         day.isDraftZoneUnlocked = false
+        HabitRecordService.settleExpiredDay(day, in: modelContext, at: timeProvider.now)
         notificationService.cancelKillTimeNotification(for: day)
         return true
     }

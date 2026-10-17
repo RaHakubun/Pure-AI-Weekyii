@@ -76,7 +76,7 @@ final class DraftReorderUITests: XCTestCase {
         let saved = slider.value as? String
         XCTAssertNotNil(saved)
         let early = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5))
-        let late = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5))
+        let late = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
         late.press(forDuration: 0.1, thenDragTo: early)
         let earlierValue = slider.value as? String
         XCTAssertNotEqual(earlierValue, saved)
@@ -91,6 +91,34 @@ final class DraftReorderUITests: XCTestCase {
         cancel.tap()
         XCTAssertEqual(slider.value as? String, saved)
         attachFireScreenshot(app, name: "fire-preview-cancelled")
+    }
+
+    func testKillTimeFirePreviewConfirmationCommitsCapturedSnapshot() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let slider = app.descendants(matching: .any).matching(identifier: "killTimeSlider").firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        for _ in 0..<4 {
+            if slider.isHittable && slider.frame.maxY < app.frame.maxY - 150 { break }
+            app.swipeUp()
+        }
+
+        let saved = slider.value as? String
+        let early = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5))
+        let proposed = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        early.press(forDuration: 0.1, thenDragTo: proposed)
+        let proposedValue = slider.value as? String
+        XCTAssertNotEqual(proposedValue, saved)
+
+        app.buttons["确认"].firstMatch.tap()
+        let confirmation = app.alerts["确认修改截止时间"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["确认"].tap()
+
+        XCTAssertTrue(app.buttons["取消"].waitForNonExistence(timeout: 3))
+        XCTAssertEqual(slider.value as? String, proposedValue)
     }
 
     private func attachFireScreenshot(_ app: XCUIApplication, name: String) {

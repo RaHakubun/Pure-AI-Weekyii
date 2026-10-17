@@ -135,6 +135,9 @@ enum WeekyiiDataArchiveService {
         let weekStartsOnMonday: Bool; let defaultProjectDurationDays: Int; let defaultProjectTileSizeRaw: String
         let pendingMonthShowRegular: Bool; let pendingMonthShowDDL: Bool; let pendingMonthShowLeisure: Bool
         let selectedThemeRaw: String; let appearanceModeRaw: String; let premiumThemeUnlocked: Bool
+        var autoStartEnabled: Bool? = nil
+        var autoStartHour: Int? = nil
+        var autoStartMinute: Int? = nil
     }
     struct AppStateRecord: Codable {
         let daysStartedCount: Int; let dataRevision: Int; let stateTransitionRevision: Int
@@ -232,7 +235,7 @@ enum WeekyiiDataArchiveService {
             suspendedTasks: suspended.map { suspendedRecord($0) },
             taskTypes: taskTypes.map { .init(idRaw: $0.idRaw, name: $0.name, iconName: $0.iconName, colorHex: $0.colorHex, baseKindRaw: $0.baseKindRaw, sortOrder: $0.sortOrder, isBuiltIn: $0.isBuiltIn, isArchived: $0.isArchived) },
             habits: habits.map { habitRecord($0) },
-            settings: .init(defaultKillTimeHour: settings.defaultKillTimeHour, defaultKillTimeMinute: settings.defaultKillTimeMinute, defaultTaskTypeRaw: settings.defaultTaskType.rawValue, defaultTaskTypeIdRaw: settings.defaultTaskTypeIdRaw, defaultExecutionModeRaw: settings.defaultExecutionModeRaw, killTimeReminderMinutes: settings.killTimeReminderMinutes, fixedReminderEnabled: settings.fixedReminderEnabled, fixedReminderHour: settings.fixedReminderHour, fixedReminderMinute: settings.fixedReminderMinute, weekStartsOnMonday: settings.weekStartsOnMonday, defaultProjectDurationDays: settings.defaultProjectDurationDays, defaultProjectTileSizeRaw: settings.defaultProjectTileSizeRaw, pendingMonthShowRegular: settings.pendingMonthShowRegular, pendingMonthShowDDL: settings.pendingMonthShowDDL, pendingMonthShowLeisure: settings.pendingMonthShowLeisure, selectedThemeRaw: settings.selectedThemeRaw, appearanceModeRaw: settings.appearanceModeRaw, premiumThemeUnlocked: settings.premiumThemeUnlocked),
+            settings: .init(defaultKillTimeHour: settings.defaultKillTimeHour, defaultKillTimeMinute: settings.defaultKillTimeMinute, defaultTaskTypeRaw: settings.defaultTaskType.rawValue, defaultTaskTypeIdRaw: settings.defaultTaskTypeIdRaw, defaultExecutionModeRaw: settings.defaultExecutionModeRaw, killTimeReminderMinutes: settings.killTimeReminderMinutes, fixedReminderEnabled: settings.fixedReminderEnabled, fixedReminderHour: settings.fixedReminderHour, fixedReminderMinute: settings.fixedReminderMinute, weekStartsOnMonday: settings.weekStartsOnMonday, defaultProjectDurationDays: settings.defaultProjectDurationDays, defaultProjectTileSizeRaw: settings.defaultProjectTileSizeRaw, pendingMonthShowRegular: settings.pendingMonthShowRegular, pendingMonthShowDDL: settings.pendingMonthShowDDL, pendingMonthShowLeisure: settings.pendingMonthShowLeisure, selectedThemeRaw: settings.selectedThemeRaw, appearanceModeRaw: settings.appearanceModeRaw, premiumThemeUnlocked: settings.premiumThemeUnlocked, autoStartEnabled: settings.autoStartConfiguration.isEnabled, autoStartHour: settings.autoStartConfiguration.hour, autoStartMinute: settings.autoStartConfiguration.minute),
             appState: .init(daysStartedCount: appState.daysStartedCount, dataRevision: appState.dataRevision, stateTransitionRevision: appState.stateTransitionRevision, systemStartDate: appState.systemStartDate, lastProcessedDate: appState.lastProcessedDate, lastRolloverAt: appState.lastRolloverAt)
         )
     }
@@ -275,6 +278,11 @@ enum WeekyiiDataArchiveService {
         guard payload.tasks.allSatisfy({ $0.projectId == nil || projectIds.contains($0.projectId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属项目的任务。") }
         guard payload.tasks.allSatisfy({ $0.habitId == nil || habitIds.contains($0.habitId!) }) else { throw WeekyiiArchiveError.invalidData("存在找不到所属习惯的任务。") }
         guard (0...23).contains(payload.settings.defaultKillTimeHour), (0...59).contains(payload.settings.defaultKillTimeMinute) else { throw WeekyiiArchiveError.invalidData("默认截止时间超出范围。") }
+        let autoStartHour = payload.settings.autoStartHour ?? 9
+        let autoStartMinute = payload.settings.autoStartMinute ?? 0
+        guard (0...23).contains(autoStartHour), (0...59).contains(autoStartMinute) else {
+            throw WeekyiiArchiveError.invalidData("启动托管时间超出范围。")
+        }
         guard payload.days.allSatisfy({ (0...23).contains($0.killTimeHour) && (0...59).contains($0.killTimeMinute) }) else { throw WeekyiiArchiveError.invalidData("日期截止时间超出范围。") }
         guard payload.suspendedTasks.allSatisfy({ SuspendedTaskStatus(rawValue: $0.statusRaw) != nil }) else { throw WeekyiiArchiveError.invalidData("暂存任务状态未知。") }
     }
@@ -378,6 +386,11 @@ enum WeekyiiDataArchiveService {
         settings.weekStartsOnMonday = value.weekStartsOnMonday; settings.defaultProjectDurationDays = value.defaultProjectDurationDays; settings.defaultProjectTileSizeRaw = value.defaultProjectTileSizeRaw
         settings.pendingMonthShowRegular = value.pendingMonthShowRegular; settings.pendingMonthShowDDL = value.pendingMonthShowDDL; settings.pendingMonthShowLeisure = value.pendingMonthShowLeisure
         settings.selectedThemeRaw = value.selectedThemeRaw; settings.appearanceModeRaw = value.appearanceModeRaw; settings.premiumThemeUnlocked = value.premiumThemeUnlocked
+        settings.restoreAutoStartConfiguration(
+            isEnabled: value.autoStartEnabled ?? false,
+            hour: value.autoStartHour ?? 9,
+            minute: value.autoStartMinute ?? 0
+        )
     }
     private static func apply(_ value: AppStateRecord, to state: AppState) {
         state.daysStartedCount = value.daysStartedCount; state.dataRevision = value.dataRevision; state.stateTransitionRevision = value.stateTransitionRevision

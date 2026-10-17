@@ -269,7 +269,6 @@ struct HabitWeekStripDay: Identifiable {
     enum State {
         case completed
         case missed
-        case unrecorded
         case pendingToday
         case upcoming
         case rest
@@ -304,12 +303,12 @@ struct HabitWeekStripDay: Identifiable {
                 case .missed:
                     state = .missed
                 case .pending:
-                    state = date < todayStart ? .unrecorded : .pendingToday
+                    state = date < todayStart ? .missed : .pendingToday
                 case nil:
                     if isToday {
                         state = .pendingToday
                     } else if date < todayStart {
-                        state = .unrecorded
+                        state = .missed
                     } else {
                         state = .upcoming
                     }
@@ -349,9 +348,6 @@ private struct HabitWeekStrip: View {
             Circle().fill(Color.accentGreen)
         case .missed:
             Circle().fill(Color.taskDDL.opacity(0.35))
-        case .unrecorded:
-            Circle().stroke(Color.textTertiary.opacity(0.4), lineWidth: 1.5)
-                .padding(1)
         case .pendingToday:
             Circle()
                 .stroke(Color.weekyiiPrimary, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5]))

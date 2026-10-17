@@ -150,6 +150,7 @@
 		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
 		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
 		F7A100212F70000100AAA001 /* LegacyStoreConsolidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */; };
+		F8A100012F80000100AAA001 /* DayStartService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A100022F80000100AAA001 /* DayStartService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -334,6 +335,7 @@
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
 		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStoreConsolidatorTests.swift; sourceTree = "<group>"; };
+		F8A100022F80000100AAA001 /* DayStartService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayStartService.swift; sourceTree = "<group>"; };
 		A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouterTests.swift; sourceTree = "<group>"; };
 		A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitor.swift; sourceTree = "<group>"; };
 		A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitorTests.swift; sourceTree = "<group>"; };
@@ -537,6 +539,7 @@
 				C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */,
 				C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
+				F8A100022F80000100AAA001 /* DayStartService.swift */,
 				C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */,
 				C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */,
 				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
@@ -935,6 +938,7 @@
 				944E58692F2B593A00DB2DEE /* PendingView.swift in Sources */,
 				9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */,
 				944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */,
+				F8A100012F80000100AAA001 /* DayStartService.swift in Sources */,
 				9466DE502F69868200EF5E24 /* KillTimeSlider.swift in Sources */,
 				A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */,
 				944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,

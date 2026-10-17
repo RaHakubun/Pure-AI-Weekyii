@@ -365,6 +365,7 @@ final class AppHealthCoordinator: AppHealthCoordinating {
     private let notificationService: NotificationService
     private let appState: any AppStateStore
     private let userSettings: any NotificationSettingsReadable & KillTimeSettings & LiveActivityThemeReadable
+    private let autoStartSettings: UserSettings?
     private let liveActivityService: any LiveActivityManaging
     private var stateMachine: StateMachine
     private let calendar = Calendar(identifier: .iso8601)
@@ -376,6 +377,7 @@ final class AppHealthCoordinator: AppHealthCoordinating {
         notificationService: NotificationService,
         appState: any AppStateStore,
         userSettings: any NotificationSettingsReadable & KillTimeSettings & LiveActivityThemeReadable,
+        autoStartSettings: UserSettings? = nil,
         liveActivityService: any LiveActivityManaging
     ) {
         self.modelContainer = modelContainer
@@ -383,6 +385,7 @@ final class AppHealthCoordinator: AppHealthCoordinating {
         self.notificationService = notificationService
         self.appState = appState
         self.userSettings = userSettings
+        self.autoStartSettings = autoStartSettings
         self.liveActivityService = liveActivityService
         self.stateMachine = StateMachine(
             modelContainer: modelContainer,
@@ -404,10 +407,19 @@ final class AppHealthCoordinator: AppHealthCoordinating {
         isReconciling = true
         defer { isReconciling = false }
 
-        let report = stateMachine.reconcile(now: timeProvider.now, force: force || trigger == .manualResync)
+        let now = timeProvider.now
+        let today = WeekyiiTimeZone.calendar.startOfDay(for: now)
+        let report = stateMachine.reconcile(now: now, force: force || trigger == .manualResync)
 
-        HabitTaskMaterializer(modelContext: modelContainer.mainContext)
-            .sync(today: timeProvider.today, now: timeProvider.now)
+        let habitOutcome = HabitTaskMaterializer(modelContext: modelContainer.mainContext)
+            .sync(today: today, now: now)
+
+        if autoStartSettings?.autoStartConfiguration.isEnabled == true {
+            clearAutoStartFailureIfNeeded()
+            attemptAutomaticStartIfEligible(
+                canMarkNoTasksAsSkipped: !habitOutcome.saveFailed && habitOutcome.failedCount == 0
+            )
+        }
 
         rescheduleNotificationsAfterReconcile()
         liveActivityService.reconcile(
@@ -418,6 +430,73 @@ final class AppHealthCoordinator: AppHealthCoordinating {
             premiumThemeUnlocked: userSettings.premiumThemeUnlocked
         )
         return report
+    }
+
+    private func attemptAutomaticStartIfEligible(canMarkNoTasksAsSkipped: Bool) {
+        guard let settings = autoStartSettings,
+              settings.autoStartConfiguration.isEnabled else { return }
+
+        let now = timeProvider.now
+        let today = WeekyiiTimeZone.calendar.startOfDay(for: now)
+        let dayId = today.dayId
+        let plan = settings.ensureAutoStartPlan(dayId: dayId)
+        guard plan.dayId == dayId, plan.isEnabled, !plan.wasSkipped,
+              let scheduledStart = AutoStartSchedule.date(on: today, hour: plan.hour, minute: plan.minute) else {
+            return
+        }
+
+        guard now >= scheduledStart else { return }
+
+        let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        guard let day = try? modelContainer.mainContext.fetch(descriptor).first,
+              day.dayId == dayId else { return }
+        guard day.status == .draft || day.status == .empty else { return }
+        guard let killTime = KillTimeDeadline.date(
+            for: day.date,
+            hour: day.killTimeHour,
+            minute: day.killTimeMinute,
+            timeZone: WeekyiiTimeZone.timeZone
+        ), scheduledStart < killTime, now < killTime else {
+            return
+        }
+
+        let validDraftTasks = day.sortedDraftTasks.filter {
+            !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard !validDraftTasks.isEmpty else {
+            if canMarkNoTasksAsSkipped {
+                settings.markAutoStartSkipped(dayId: dayId)
+            }
+            return
+        }
+        guard day.status == .draft else { return }
+
+        let startTime = timeProvider.now
+        guard WeekyiiTimeZone.calendar.startOfDay(for: startTime).dayId == dayId,
+              startTime >= scheduledStart,
+              startTime < killTime else { return }
+
+        do {
+            try DayStartService(modelContext: modelContainer.mainContext, appState: appState)
+                .start(day: day, at: startTime, executionMode: settings.defaultExecutionMode)
+        } catch {
+            recordAutoStartFailure("启动托管未能启动今日任务：\(error.localizedDescription)")
+        }
+    }
+
+    private func recordAutoStartFailure(_ message: String) {
+        guard appState.runtimeErrorMessage == nil else { return }
+        appState.runtimeErrorMessage = message
+        appState.save()
+    }
+
+    private func clearAutoStartFailureIfNeeded() {
+        guard let message = appState.runtimeErrorMessage,
+              // Clear legacy coordinator messages from the previous materialization gate.
+              message.hasPrefix("习惯任务未能完整同步，启动托管本次未执行")
+                || message.hasPrefix("启动托管未能启动今日任务：") else { return }
+        appState.runtimeErrorMessage = nil
+        appState.save()
     }
 
     func diagnosticsSnapshot() -> String {
@@ -663,6 +742,7 @@ struct WeekyiiApp: App {
             notificationService: .shared,
             appState: appState,
             userSettings: userSettings,
+            autoStartSettings: userSettings,
             liveActivityService: TodayLiveActivityService.shared
         )
     }

@@ -317,7 +317,7 @@ private struct HabitHistorySection: View {
     }
 
     enum DayState {
-        case completed, missed, unrecorded, pending, upcoming, rest
+        case completed, missed, pending, upcoming, rest
     }
 
     @State private var range: Range = .month
@@ -500,7 +500,6 @@ private struct HabitHistorySection: View {
         let nodes = periodDays().compactMap { byDay[$0.dayId] }
         let done = nodes.filter { $0.state == .completed }.count
         let missed = nodes.filter { $0.state == .missed }.count
-        let unrecorded = nodes.filter { $0.state == .unrecorded }.count
         return HStack {
             Text(String(
                 format: String(localized: "habit.history.summary.done", defaultValue: "完成 %1$lld / %2$lld"),
@@ -516,13 +515,6 @@ private struct HabitHistorySection: View {
                 Int64(missed)
             ))
             .foregroundStyle(Color.taskDDL)
-            Spacer()
-            Text(String(
-                format: String(localized: "habit.history.summary.unrecorded", defaultValue: "未记录 %lld"),
-                locale: Locale.current,
-                Int64(unrecorded)
-            ))
-            .foregroundStyle(Color.textTertiary)
         }
         .font(.caption)
         .monospacedDigit()
@@ -629,7 +621,6 @@ private struct HabitHistorySection: View {
         case .completed: return .completed
         case .missed: return .missed
         case .pending: return .pending
-        case .unrecorded: return .unrecorded
         }
     }
 
@@ -647,12 +638,6 @@ private struct HabitHistorySection: View {
                 Circle().fill(tint)
             case .missed:
                 Circle().fill(Color.taskDDL.opacity(0.4))
-            case .unrecorded:
-                if isMini {
-                    Circle().fill(Color.textTertiary.opacity(0.22))
-                } else {
-                    Circle().strokeBorder(Color.textTertiary.opacity(0.45), lineWidth: 1.5)
-                }
             case .pending:
                 if isMini {
                     Circle().fill(Color.weekyiiPrimary)

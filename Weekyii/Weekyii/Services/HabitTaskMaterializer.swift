@@ -43,6 +43,62 @@ enum HabitRecordService {
             habit.records.append(record)
         }
     }
+
+    @discardableResult
+    static func settleExpiredDay(_ expiredDay: DayModel, in modelContext: ModelContext, at settledAt: Date) -> Int {
+        guard expiredDay.status == .expired, !expiredDay.dayId.isEmpty else { return 0 }
+        let descriptor = FetchDescriptor<HabitModel>()
+        guard let habits = try? modelContext.fetch(descriptor) else { return 0 }
+        return settleExpiredDays([expiredDay], among: habits, at: settledAt)
+    }
+
+    @discardableResult
+    static func settleExpiredDays(_ expiredDays: [DayModel], among habits: [HabitModel], at settledAt: Date) -> Int {
+        var daysById: [String: DayModel] = [:]
+        for day in expiredDays where day.status == .expired && !day.dayId.isEmpty {
+            daysById[day.dayId] = day
+        }
+
+        var settledCount = 0
+        for habit in habits {
+            let recordsByDayId = Dictionary(grouping: habit.records, by: \.dayId)
+            for (dayId, expiredDay) in daysById {
+                let records = recordsByDayId[dayId] ?? []
+                if !records.isEmpty {
+                    for record in records where record.statusRaw == HabitDayRecordStatus.pending.rawValue {
+                        record.status = .missed
+                        settledCount += 1
+                    }
+                    continue
+                }
+
+                guard isScheduledForGeneration(habit, on: expiredDay.date, dayId: dayId) else { continue }
+                let record = HabitDayRecord(dayId: dayId, createdAt: settledAt)
+                record.status = .missed
+                record.habit = habit
+                habit.records.append(record)
+                settledCount += 1
+            }
+        }
+        return settledCount
+    }
+
+    static func hasScheduledHabit(on day: DayModel, among habits: [HabitModel]) -> Bool {
+        habits.contains { isScheduledForGeneration($0, on: day.date, dayId: day.dayId) }
+    }
+
+    static func hasScheduledHabit(on day: DayModel, in modelContext: ModelContext) -> Bool {
+        let descriptor = FetchDescriptor<HabitModel>()
+        guard let habits = try? modelContext.fetch(descriptor) else { return false }
+        return hasScheduledHabit(on: day, among: habits)
+    }
+
+    fileprivate static func isScheduledForGeneration(_ habit: HabitModel, on date: Date, dayId: String) -> Bool {
+        habit.isActive
+            && habit.hasSchedule
+            && habit.startDayId <= dayId
+            && habit.isScheduled(on: date)
+    }
 }
 
 /// 仅今日物化 + 过期记录补记。语义见计划 §2.1 / §2.2 / §2.3。
@@ -90,7 +146,9 @@ struct HabitTaskMaterializer {
         guard habit.isActive else { return .failed(HabitError.saveFailed.localizedDescription) }
         let todayStart = today.startOfDay
         let todayKey = todayStart.dayId
-        guard habit.isScheduled(on: todayStart) else { return .notScheduledToday }
+        guard HabitRecordService.isScheduledForGeneration(habit, on: todayStart, dayId: todayKey) else {
+            return .notScheduledToday
+        }
 
         do {
             let day = try WeekDataStore(modelContext: modelContext)
@@ -116,6 +174,7 @@ struct HabitTaskMaterializer {
     private func sweepPendingRecords(habits: [HabitModel], todayKey: String) -> Int {
         var missed = 0
         for habit in habits {
+            // Historical fallback only; today's expired records are settled by StateMachine.
             for record in habit.records
             where record.statusRaw == HabitDayRecordStatus.pending.rawValue && record.dayId < todayKey {
                 record.statusRaw = HabitDayRecordStatus.missed.rawValue
@@ -133,9 +192,7 @@ struct HabitTaskMaterializer {
         outcome: inout HabitSyncOutcome
     ) {
         guard !habit.hasProcessed(dayId: todayKey) else { return }
-        guard habit.hasSchedule else { return }
-        guard habit.startDayId <= todayKey else { return }
-        guard habit.isScheduled(on: todayStart) else { return }
+        guard HabitRecordService.isScheduledForGeneration(habit, on: todayStart, dayId: todayKey) else { return }
 
         do {
             let day = try WeekDataStore(modelContext: modelContext)

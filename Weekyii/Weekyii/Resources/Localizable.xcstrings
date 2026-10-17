@@ -2590,22 +2590,6 @@
         }
       }
     },
-    "habit.history.summary.unrecorded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld unrecorded"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未记录 %lld"
-          }
-        }
-      }
-    },
     "habit.history.title" : {
       "localizations" : {
         "en" : {
@@ -2659,17 +2643,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "To do"
-          }
-        }
-      }
-    },
-    "habit.record.unrecorded" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not recorded"
           }
         }
       }
@@ -2866,12 +2839,18 @@
         }
       }
     },
-    "habit.today.not_generated" : {
+    "habit.today.missed" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not generated"
+            "value" : "Interrupted today"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已中断"
           }
         }
       }
@@ -10232,6 +10211,12 @@
     "到期" : {
 
     },
+    "到达设定时间后，今日草稿可能自动进入专注；启动后无法撤回。首次在今天设定时间之后开启，将从明天生效。" : {
+
+    },
+    "到达设定时间后，若今日已有草稿任务，将自动进入专注。App 未运行时会在下次打开后补启动。启动后无法撤回。" : {
+
+    },
     "单文件包含任务、项目、标签、图片与设置" : {
 
     },
@@ -10266,6 +10251,9 @@
 
     },
     "含图片" : {
+
+    },
+    "启动托管" : {
 
     },
     "呆胶布内容：%@" : {
@@ -10365,6 +10353,12 @@
 
     },
     "开发者与诊断" : {
+
+    },
+    "开启启动托管？" : {
+
+    },
+    "开启托管" : {
 
     },
     "开始 %@" : {
@@ -10577,6 +10571,9 @@
     "每套主题仍保留独立的色彩与印象画。" : {
 
     },
+    "每日启动时间" : {
+
+    },
     "每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。" : {
 
     },
@@ -10656,6 +10653,9 @@
 
     },
     "编辑项目信息" : {
+
+    },
+    "自动开始今日草稿任务" : {
 
     },
     "草稿任务" : {

@@ -30,6 +30,76 @@ final class KillTimeFireTests: XCTestCase {
                              KillTimeFlameBackground.intensity(remainingMinutes: 180))
     }
 
+    func testKillTimeDeadlineResolvesDayAndTimeAndClearsSubseconds() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16, hour: 12, minute: 30, second: 45, nanosecond: 500_000_000)))
+
+        let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: deadline)
+
+        XCTAssertEqual(components.year, 2026)
+        XCTAssertEqual(components.month, 10)
+        XCTAssertEqual(components.day, 16)
+        XCTAssertEqual(components.hour, 23)
+        XCTAssertEqual(components.minute, 59)
+        XCTAssertEqual(components.second, 0)
+        XCTAssertEqual(components.nanosecond, 0)
+        XCTAssertNil(KillTimeDeadline.date(for: day, hour: 24, minute: 0))
+        XCTAssertNil(KillTimeDeadline.date(for: day, hour: 23, minute: 60))
+        XCTAssertNil(KillTimeDeadline.date(for: day, hour: -1, minute: 0))
+    }
+
+    func testKillTimeDeadlinePressureMatchesExistingCurveBeforeAndAtCutoff() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let samples: [(minutesBefore: Double, expectedIntensity: Double)] = [
+            (12 * 60, exp(-4)),
+            (3 * 60, exp(-1)),
+            (15, exp(-15.0 / 180.0)),
+            (0, 1)
+        ]
+
+        for sample in samples {
+            let now = deadline.addingTimeInterval(-sample.minutesBefore * 60)
+            let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: now)
+            XCTAssertEqual(remaining, sample.minutesBefore, accuracy: 0.000_001)
+            XCTAssertEqual(
+                KillTimeFlameBackground.intensity(remainingMinutes: remaining),
+                sample.expectedIntensity,
+                accuracy: 0.000_001
+            )
+        }
+
+        let after = deadline.addingTimeInterval(2 * 60)
+        let remainingAfter = KillTimeDeadline.remainingMinutes(until: deadline, at: after)
+        XCTAssertEqual(remainingAfter, -2, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: remainingAfter), 1)
+    }
+
+    func testKillTimeDeadlineRemainsOverdueAcrossMidnight() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let afterMidnight = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 17, hour: 0, minute: 1)))
+
+        let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: afterMidnight)
+
+        XCTAssertEqual(remaining, -2, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: remaining), 1)
+        XCTAssertLessThan(KillTimeFlameBackground.intensity(remainingMinutes: 23 * 60 + 59), 0.001)
+    }
+
+    func testKillTimeDeadlineRejectsLocalTimesSkippedByDaylightSavingTransition() throws {
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = timeZone
+        let springForwardDay = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 3, day: 8, hour: 12)))
+
+        XCTAssertNil(KillTimeDeadline.date(for: springForwardDay, hour: 2, minute: 30, timeZone: timeZone))
+        XCTAssertNotNil(KillTimeDeadline.date(for: springForwardDay, hour: 3, minute: 30, timeZone: timeZone))
+    }
+
     func testFireGeometryStaysFiniteAndBelowItsCeilingAcrossSizesAndPressures() {
         for width in [0.0, 1, 180, 320, 600, 1024] {
             for height in [0.0, 1, 90, 220] {
@@ -116,6 +186,75 @@ final class KillTimeFireTests: XCTestCase {
             }
         }
         XCTAssertEqual(Set(phases).count, 3, "Each plane needs its own contour, not a scaled copy")
+    }
+
+    /// Inner planes must carry their own trajectory. Before the 2026-10-16
+    /// refactor they were seeded with the outer plane's traits, so every inner
+    /// height was exactly heightScale x the outer height at the same index.
+    func testMaterialPlanesShapeIndependentlyInsteadOfReplayingTheOuterTrajectory() {
+        let size = CGSize(width: 360, height: 220)
+        let profile = KillTimeFlameCeiling(left: 99, right: 154, transition: 0.45)
+        for time in [0.4, 1.7, 8.0, 37.3] {
+            // Pressure below the urgent crossing keeps every tongue unclamped,
+            // so a scaled copy would repeat one ratio (0.68) for every lick.
+            let outer = KillTimeFireField.tongues(size: size, time: time, intensity: 0.3, ceiling: profile)
+            let middle = KillTimeFireField.tongues(size: size, time: time, intensity: 0.3, ceiling: profile, plane: .middle)
+            var ratios: [CGFloat] = []
+            for tongue in middle {
+                guard let match = outer.first(where: { $0.root.x == tongue.root.x }) else { continue }
+                ratios.append(tongue.height / match.height)
+            }
+            XCTAssertFalse(ratios.isEmpty, "Middle plane lost its licks at time \(time)")
+            let distinct = Set(ratios.map { ($0 * 100).rounded() }).count
+            XCTAssertGreaterThanOrEqual(distinct, 4, "Middle plane replays the outer contour at time \(time)")
+            XCTAssertTrue(ratios.contains { abs($0 - 0.68) > 0.05 },
+                          "Middle plane is still a scaled copy of outer at time \(time)")
+        }
+    }
+
+    /// `life` must actually shape the fire. Before the refactor it was computed
+    /// and dropped, so every lick kept ~87% of its peak height at all times.
+    func testEveryLickIsBornPeaksAndRecedesOverItsOwnCycle() {
+        let size = CGSize(width: 360, height: 220)
+        let count = 16
+        var lowest = [CGFloat](repeating: .greatestFiniteMagnitude, count: count)
+        var highest = [CGFloat](repeating: 0, count: count)
+        for step in 0..<240 {
+            let tongues = KillTimeFireField.tongues(size: size, time: Double(step) * 0.5, intensity: 1, ceiling: nil)
+            for (index, tongue) in tongues.prefix(count).enumerated() {
+                lowest[index] = min(lowest[index], tongue.height)
+                highest[index] = max(highest[index], tongue.height)
+            }
+        }
+        for index in 0..<count {
+            XCTAssertLessThan(lowest[index] / highest[index], 0.5,
+                              "Lick \(index) never recedes (min \(lowest[index]), max \(highest[index]))")
+            XCTAssertGreaterThan(highest[index], 60, "Lick \(index) never peaks (max \(highest[index]))")
+        }
+    }
+
+    /// The spine must bend continuously. With lean 0 and curl 30 the mid-body
+    /// sits ~9pt toward the tip; before the refactor only the tip was
+    /// displaced, so the body below 85% of the height stayed vertical.
+    func testFlameSpineBendsContinuouslyInsteadOfYankingTheTip() {
+        let tongue = KillTimeFireField.Tongue(
+            root: CGPoint(x: 100, y: 200),
+            height: 100,
+            halfWidth: 8,
+            lean: 0,
+            curl: 30,
+            life: 0.5,
+            fork: 0,
+            waist: 0.5,
+            belly: 0
+        )
+        let path = KillTimeFireField.flamePath(tongue)
+        // Cubic spine at u = 0.5: 0.125*100 + 0.375*101.8 + 0.375*112.6 + 0.125*130 = 109.15
+        XCTAssertTrue(path.contains(CGPoint(x: 109.15, y: 148.5)), "Mid-body must follow the bend toward the tip")
+        // Cubic spine at u = 0.75: 0.0156*100 + 0.1406*101.8 + 0.4219*112.6 + 0.4219*130 = 118.2
+        XCTAssertTrue(path.contains(CGPoint(x: 118.2, y: 122.9)), "Upper body must bend further toward the tip")
+        // Well outside the silhouette: proves the assertions above are not vacuous.
+        XCTAssertFalse(path.contains(CGPoint(x: 130, y: 150)), "A point beyond the spine must stay outside")
     }
 
     @MainActor
@@ -1609,7 +1748,7 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(nodes.map(\.dayId), [
             "2026-09-16", "2026-09-15", "2026-09-14",
-            "2026-09-11", "2026-09-10", "2026-09-09",
+            "2026-09-11", "2026-09-10",
             "2026-09-08", "2026-09-07",
         ])
 
@@ -1618,9 +1757,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(byDay["2026-09-15"]?.state, .missed)
         XCTAssertEqual(byDay["2026-09-14"]?.state, .completed)
         XCTAssertEqual(byDay["2026-09-14"]?.completedAt, completedAt)
-        XCTAssertEqual(byDay["2026-09-09"]?.state, .unrecorded)
-        XCTAssertNil(byDay["2026-09-09"]?.completedAt)
-        XCTAssertNotEqual(byDay["2026-09-15"]?.state, byDay["2026-09-09"]?.state)
+        XCTAssertNil(byDay["2026-09-09"])
     }
 
     // MARK: - Habit view model
