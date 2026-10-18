@@ -34,3 +34,12 @@
 - Upload receipt: `/tmp/weekyii-release-20261018-upload.log` when performed; this file alone does not prove external availability.
 - Real-device in-place upgrade and multi-device sync: not verified in this run.
 - Upload and external availability must be verified separately; a successful archive is not an upload receipt or Beta Review approval.
+
+## Release outcome
+
+- Source release commit: `864f563`; pushed to `origin/online-chatgpt-develop` with separate fix `2f44608` and test adjustment `c3daeea`.
+- Upload succeeded at 2026-10-18 20:00:17 local time; `Upload succeeded` and `EXPORT SUCCEEDED` in `/tmp/weekyii-release-20261018-upload.log`.
+- Apple finished processing. Export compliance questionnaire completed, test notes saved, external group selected and submitted with automatic tester notification enabled.
+- App Store Connect build ID: `2618c54a-30ab-4bd3-8d06-b117510b2371`. Final visible status: **正在测试** for 1.1 (5), assigned to internal **Apple haha** and external **外部体验者**; invitation count 6.
+- Existing testers can update through TestFlight. This does not certify real-device in-place migration or multi-device iCloud sync; those remain tester validation items.
+- Only local Xcode `UserInterfaceState.xcuserstate` remains modified and excluded from commits. This outcome documentation is a follow-up documentation-only commit; it does not alter the uploaded binary.
