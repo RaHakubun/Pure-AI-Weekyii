@@ -1,0 +1,22 @@
+# Build artifacts
+.build/
+DerivedData/
+.derivedData*/
+*.xcuserstate
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Testing
+coverage/
+
+# Temporary files
+*.tmp
+*.temp

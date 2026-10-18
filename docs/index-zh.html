@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080705">
+    <script>
+        (() => {
+            const key = "weekyii-appearance";
+            const saved = localStorage.getItem(key);
+            const mode = ["system", "light", "dark"].includes(saved) ? saved : "system";
+            const resolved = mode === "system"
+                ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+                : mode;
+            document.documentElement.dataset.themeMode = mode;
+            document.documentElement.dataset.theme = resolved;
+        })();
+    </script>
+    <meta name="description" content="Weekyii 不是另一张无限增长的待办清单，而是一套面向 iPhone 与 iPad、以周为边界、以启动为承诺、以完成为记忆的本地优先任务系统。">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Weekyii — 以周为核的承诺式任务系统">
+    <meta property="og:description" content="终结无限待办：以周规划，以日立约，一次专注一件事，只保存真正完成的记忆。">
+    <meta property="og:url" content="https://rahakubun.github.io/Pure-AI-Weekyii/index-zh.html">
+    <link rel="canonical" href="https://rahakubun.github.io/Pure-AI-Weekyii/index-zh.html">
+    <link rel="alternate" hreflang="en" href="https://rahakubun.github.io/Pure-AI-Weekyii/">
+    <link rel="alternate" hreflang="zh-CN" href="https://rahakubun.github.io/Pure-AI-Weekyii/index-zh.html">
+    <link rel="alternate" hreflang="x-default" href="https://rahakubun.github.io/Pure-AI-Weekyii/">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="site.css">
+    <title>Weekyii — 以周为核的承诺式任务系统</title>
+</head>
+<body>
+    <a class="skip-link" href="#chapter-1">跳转至编年史</a>
+    <div class="site-shell">
+        <div class="progress" aria-hidden="true"></div>
+        <header class="topbar">
+            <a class="wordmark" href="#chapter-1">WEEKYII</a>
+            <nav class="top-actions" aria-label="网站链接">
+                <a href="legacy-zh.html"><span class="legacy-label">初代编年史 · </span>旧版</a>
+                <a href="https://github.com/RaHakubun/Pure-AI-Weekyii">GitHub</a>
+                <label class="appearance-picker">
+                    <span class="sr-only">网页外观</span>
+                    <select data-appearance aria-label="网页外观">
+                        <option value="system">跟随系统</option>
+                        <option value="light">浅色</option>
+                        <option value="dark">深色</option>
+                    </select>
+                </label>
+                <a class="language-link" data-language-link href="index.html" lang="en">EN</a>
+            </nav>
+        </header>
+
+        <main class="slides" id="chronicle">
+            <section class="slide active" id="chapter-1" data-nav="门扉" aria-labelledby="title-1">
+                <div class="slide-inner centered">
+                    <p class="chapter reveal">第一幕 · 门扉</p>
+                    <h1 class="title reveal delay-1" id="title-1">不是管理更多任务，<br>而是<span class="gold">完成这一周</span></h1>
+                    <p class="lede reveal delay-2">Weekyii 不是另一张无限增长的待办清单。它是一套面向 iPhone 与 iPad、以周为边界的承诺式任务系统：以周规划，以日立约，一次只直面一件事，让每个周期真正开始、真正结束，并留下你确实完成过的生活。</p>
+                    <div class="seal-row reveal delay-3">
+                        <span class="seal">周驱动任务系统</span>
+                        <span class="seal">启动即承诺</span>
+                        <span class="seal">数据完全本地</span>
+                        <span class="seal">iPhone + iPad</span>
+                    </div>
+                    <p class="inscription reveal delay-3">“计划不是收藏意图。进入今日之事，必须直面今日。”</p>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-2" data-nav="裂痕" aria-labelledby="title-2">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第二幕 · 裂痕</p>
+                    <h2 class="section-title reveal delay-1" id="title-2">无尽清单，从不要求你承担<span class="gold">后果</span></h2>
+                    <p class="lede reveal delay-2">绝大多数任务工具优化的是“记下更多”，Weekyii 关心的是“最终完成”。当任务能够零代价地后移、复制和永久保留，清单管理得越精致，真正的选择反而越容易被推迟。</p>
+                    <div class="grid three reveal delay-3">
+                        <article class="card"><p class="card-kicker">01 · 无限延期</p><h3 class="card-title">“明天再做”没有代价</h3><p>任务一次次后移，规划退化为愿望仓库；你管理的是列表，不再是时间。</p></article>
+                        <article class="card"><p class="card-kicker">02 · 无限残留</p><h3 class="card-title">失败永远追赶下一天</h3><p>过期义务与新任务挤在一起，昨日的噪声持续侵占今天的注意力。</p></article>
+                        <article class="card"><p class="card-kicker">03 · 无限周期</p><h3 class="card-title">努力从未形成闭环</h3><p>没有每日仪式与每周边界，完成只是一次勾选，而不是可回望的生活记录。</p></article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-3" data-nav="誓约" aria-labelledby="title-3">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第三幕 · 誓约</p>
+                    <h2 class="section-title reveal delay-1" id="title-3">Weekyii 的答案：<span class="gold">让任务承担时间</span></h2>
+                    <div class="grid three reveal delay-2">
+                        <article class="card"><p class="card-kicker">仪式 · 作出选择</p><h3 class="card-title">启动把计划变成承诺</h3><p>编辑草稿时一切仍可改变；只有亲手启动今日，任务才进入不可轻率对待的执行阶段。</p></article>
+                        <article class="card"><p class="card-kicker">专注 · 保护注意力</p><h3 class="card-title">当前永远只有一项任务</h3><p>Focus 只呈现此刻，Frozen 守护之后的顺序，把“我该做什么”变成一个明确答案。</p></article>
+                        <article class="card"><p class="card-kicker">遗忘 · 终结负债</p><h3 class="card-title">未完成不再永久统治你</h3><p>每日截止到来后，未履行的承诺过期；过去承认结果，却不把失败原样搬进明天。</p></article>
+                    </div>
+                    <p class="lede reveal delay-3">这不是对 Todo List 的装饰性改造，而是一套完整的时间纪律：规划有边界，执行有顺序，失败有终点，完成才进入历史。</p>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-4" data-nav="时间引擎" aria-labelledby="title-4">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第四幕 · 时间引擎</p>
+                    <h2 class="section-title reveal delay-1" id="title-4">时间不是标签，而是系统的<span class="gold">运行引擎</span></h2>
+                    <div class="figure-card reveal delay-2">
+                        <img src="assets/week-state-machine.svg" alt="Weekyii 在未来、当下与过去之间推进周状态">
+                        <div class="copy-block">
+                            <p><strong>未来</strong>、<strong>当下</strong>与<strong>过去</strong>不是三个手工清单，而是随真实日期推进的状态。未来可以被准备，却不会提前侵占今天；当时间抵达，它才进入可执行的当下。</p>
+                            <p>每日截止与每周交替会自动收束未决状态、写入编年史并推动新周期。Weekyii 不只是“给任务加日期”，而是让整个任务世界服从时间。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-5" data-nav="五大领域" aria-labelledby="title-5">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第五幕 · 五大领域</p>
+                    <h2 class="section-title reveal delay-1" id="title-5">从一个念头，到一次完成：<span class="gold">五域闭环</span></h2>
+                    <div class="grid five reveal delay-2">
+                        <article class="card realm"><span class="realm-mark">I</span><h3 class="realm-title">今日 · 执行</h3><p>把有限任务立为誓约，并依次穿过 Focus、Frozen 与 Complete。</p></article>
+                        <article class="card realm"><span class="realm-mark">II</span><h3 class="realm-title">过去 · 证明</h3><p>让完成日、周节奏、月趋势与贡献热力证明真正发生过的努力。</p></article>
+                        <article class="card realm"><span class="realm-mark">III</span><h3 class="realm-title">未来 · 准备</h3><p>提前塑造尚未到来的日与周，却不让远期计划挤进当前视野。</p></article>
+                        <article class="card realm"><span class="realm-mark">IV</span><h3 class="realm-title">扩展 · 承载</h3><p>分别安放思想、未决任务与跨周项目，避免把一切都伪装成今日待办。</p></article>
+                        <article class="card realm"><span class="realm-mark">V</span><h3 class="realm-title">设置 · 掌控</h3><p>由你决定截止时间、任务类型、视觉世界、数据保护与运行规则。</p></article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-6" data-nav="启动仪式" aria-labelledby="title-6">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第六幕 · 启动仪式</p>
+                    <h2 class="section-title reveal delay-1" id="title-6">真正的差异，发生在你按下<span class="gold">启动</span>之后</h2>
+                    <div class="flow reveal delay-2" role="group" aria-label="每日承诺流程">
+                        <div class="flow-step"><strong>草稿</strong>趁今日尚未封印，自由编排任务。</div>
+                        <div class="flow-step"><strong>确认</strong>两阶段仪式让决定变得明确。</div>
+                        <div class="flow-step"><strong>专注</strong>只有一项任务立于 Focus 区。</div>
+                        <div class="flow-step"><strong>推进</strong>完成后，下一项 Frozen 任务向前。</div>
+                        <div class="flow-step"><strong>收束</strong>履行誓约，或迎接每日截止。</div>
+                    </div>
+                    <div class="figure-card reveal delay-3">
+                        <div class="copy-block"><p>启动时，一条<strong>呆胶布寄语</strong>可以随仪式一同出现，使原本功利性的按钮成为属于个人的门槛。每日截止始终可见，实时状态也会传递到系统界面。</p><p>进入执行以后，顺序便拥有意义：Weekyii 守护注意力不被随意重排，同时如实记录真正完成的工作。</p></div>
+                        <img src="assets/commitment-mechanism.svg" alt="Weekyii 从草稿走向完成或过期的承诺机制">
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-7" data-nav="任务血脉" aria-labelledby="title-7">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第七幕 · 任务血脉</p>
+                    <h2 class="section-title reveal delay-1" id="title-7">一项任务承载的不只是<span class="gold">标题</span></h2>
+                    <div class="grid three reveal delay-2">
+                        <article class="card"><p class="card-kicker">结构</p><h3 class="card-title">步骤与附件</h3><p>将工作拆为有序步骤，并让图片或支撑材料与任务一同保存。</p></article>
+                        <article class="card"><p class="card-kicker">来源</p><h3 class="card-title">项目血脉</h3><p>在项目中建立的任务会保留关联，并在进入具体日期后继续携带这段来源。</p></article>
+                        <article class="card"><p class="card-kicker">身份</p><h3 class="card-title">自定义任务类型</h3><p>定义名称、图标与颜色，同时继承普通、截止或休闲的底层行为。</p></article>
+                    </div>
+                    <div class="grid three reveal delay-3">
+                        <article class="card"><h3 class="card-title">普通</h3><p>属于今日工作最基础、最普遍的行动路径。</p></article>
+                        <article class="card"><h3 class="card-title">截止</h3><p>让时间压力与紧迫性获得明确的视觉和行为区分。</p></article>
+                        <article class="card"><h3 class="card-title">休闲</h3><p>让休息与恢复被看见，却不假装它们是普通劳动。</p></article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-8" data-nav="未来工坊" aria-labelledby="title-8">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第八幕 · 未来工坊</p>
+                    <h2 class="section-title reveal delay-1" id="title-8">向前规划，却不污染<span class="gold">当下</span></h2>
+                    <div class="grid two reveal delay-2">
+                        <article class="card"><p class="card-kicker">两种视界</p><h3 class="card-title">周视图与日历视图</h3><p>在近处的一周和更广阔的月份之间切换；日期标记揭示哪些未来日已经承载任务。</p></article>
+                        <article class="card"><p class="card-kicker">连续性</p><h3 class="card-title">移动、复制与后移</h3><p>提前准备完整未来周，在日期间复制任务，或将任务送往一个明确的目的日，而不是模糊的“以后”。</p></article>
+                    </div>
+                    <p class="lede reveal delay-3">Weekyii 把“计划”与“承诺”严格分开：未来可以自由塑造，但只有日期抵达并完成启动仪式，任务才取得支配今日注意力的资格。</p>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-9" data-nav="过去编年史" aria-labelledby="title-9">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第九幕 · 过去编年史</p>
+                    <h2 class="section-title reveal delay-1" id="title-9">历史不记录愿望，只记录<span class="gold">证据</span></h2>
+                    <div class="stats reveal delay-2">
+                        <div class="stat"><span class="stat-value">日</span><span class="stat-label">完成细节</span></div>
+                        <div class="stat"><span class="stat-value">周</span><span class="stat-label">节奏与汇总</span></div>
+                        <div class="stat"><span class="stat-value">月</span><span class="stat-label">趋势与回顾</span></div>
+                        <div class="stat"><span class="stat-value">热力</span><span class="stat-label">贡献地图</span></div>
+                    </div>
+                    <div class="grid two reveal delay-3">
+                        <article class="card"><h3 class="card-title">完成之事保留形状</h3><p>回看真正跨过终点的任务、步骤、时间，以及它们曾属于哪一天。</p></article>
+                        <article class="card"><h3 class="card-title">过期之事只留下数量</h3><p>编年史承认一次未履行的承诺，却不让完整细节继续纠缠下一天。</p></article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-10" data-nav="三个扩展领域" aria-labelledby="title-10">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第十幕 · 三个扩展领域</p>
+                    <h2 class="section-title reveal delay-1" id="title-10">拒绝把人生的一切，都塞进<span class="gold">待办清单</span></h2>
+                    <div class="figure-card reveal delay-2">
+                        <img src="assets/mindstamp-projects.svg" alt="围绕每日任务流的呆胶布、悬置任务与项目">
+                        <div class="grid">
+                            <article class="card"><h3 class="card-title">呆胶布 · 思想不是任务</h3><p>保存一个念头、一句话或一枚私人信号，让灵感拥有位置，却不制造虚假的执行压力。</p></article>
+                            <article class="card"><h3 class="card-title">悬置任务 · 犹豫也有期限</h3><p>未决任务必须在倒计时结束前进入真实日期、被郑重延长，或被系统放下。</p></article>
+                            <article class="card"><h3 class="card-title">项目 · 长期仍须落到今天</h3><p>项目承载跨周目标与上下文，但任何真正的进展，都必须回到某一天的誓约。</p></article>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-11" data-nav="项目节奏" aria-labelledby="title-11">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第十一幕 · 项目节奏</p>
+                    <h2 class="section-title reveal delay-1" id="title-11">长期工作需要节奏，而不是另一个<span class="gold">收件箱</span></h2>
+                    <div class="grid three reveal delay-2">
+                        <article class="card"><p class="card-kicker">周期</p><h3 class="card-title">看得见的地平线</h3><p>项目拥有自己的日期范围、进度与生命周期，不会沦为脱离时间的容器。</p></article>
+                        <article class="card"><p class="card-kicker">磁贴</p><h3 class="card-title">让重要性拥有形状</h3><p>项目磁贴可以占据不同视觉重量，使扩展领域保持编排感，而不是一张扁平清单。</p></article>
+                        <article class="card"><p class="card-kicker">执行</p><h3 class="card-title">最终仍要回到今日</h3><p>在项目内创建任务会自动建立关联；真正去做，仍要把它安放进某个具体日期。</p></article>
+                    </div>
+                    <p class="lede reveal delay-3">从长期目标到今日行动，再从完成记录回到项目进度，Weekyii 让项目、日期与任务始终属于同一条可追溯的生命线。</p>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-12" data-nav="十种世界" aria-labelledby="title-12">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第十二幕 · 十种世界</p>
+                    <h2 class="section-title reveal delay-1" id="title-12">同一份誓约，披上<span class="gold">十片天空</span></h2>
+                    <p class="lede reveal delay-2">每套主题都拥有自己的光线、对比与印象画；浅色、深色与跟随系统均可选择，动态风景只在真正服务于“今日”体验时运行。</p>
+                    <div class="theme-orbit reveal delay-3">
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#6f451d,#d49a47)">琥珀</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#153b58,#4f9ec4)">海蓝</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#233b2b,#78a16b)">森绿</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#602f43,#ca7b91)">玫瑰</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#483b68,#9e8dcc)">薰紫</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#24272d,#777e89)">石墨</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#792f28,#ef9a54)">落日</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#235749,#80c5a2)">薄荷</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#11172d,#4a5b96)">极夜</div>
+                        <div class="theme-token" style="--theme:linear-gradient(135deg,#090806,#8d6c32)">魔戒</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-13" data-nav="屏幕之外" aria-labelledby="title-13">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第十三幕 · 屏幕之外</p>
+                    <h2 class="section-title reveal delay-1" id="title-13">少一次打开 App，多一次<span class="gold">回到当下</span></h2>
+                    <div class="grid four reveal delay-2">
+                        <article class="card"><p class="card-kicker">主屏</p><h3 class="card-title">桌面小组件</h3><p>查看状态、进度、任务预览与本周轮廓。</p></article>
+                        <article class="card"><p class="card-kicker">锁屏</p><h3 class="card-title">锁屏组件</h3><p>不必重新打开完整 App，也能让正在发生的承诺保持在近处。</p></article>
+                        <article class="card"><p class="card-kicker">实时</p><h3 class="card-title">实时活动</h3><p>通过系统支持的实时界面，持续追踪今天的执行状态。</p></article>
+                        <article class="card"><p class="card-kicker">灵动</p><h3 class="card-title">灵动岛</h3><p>在紧凑与展开形态中呈现状态和进度。</p></article>
+                    </div>
+                    <p class="lede reveal delay-3">小组件、锁屏、实时活动与灵动岛不是附属展示，而是把唯一的当前任务送到你最容易看见的地方，让系统帮助你减少选择，而不是增加操作。</p>
+                </div>
+            </section>
+
+            <section class="slide" id="chapter-14" data-nav="数据主权与前路" aria-labelledby="title-14">
+                <div class="slide-inner">
+                    <p class="chapter reveal">第十四幕 · 数据主权与前路</p>
+                    <h2 class="section-title reveal delay-1" id="title-14">一套已经闭环的任务系统，<span class="gold">一份完全属于你的记录</span></h2>
+                    <div class="grid three reveal delay-2">
+                        <article class="card"><p class="card-kicker">本地</p><h3 class="card-title">以 SwiftData 为核心</h3><p>任务、周、项目、类型、附件与设置共同存放在 App 的本地数据模型中。</p></article>
+                        <article class="card"><p class="card-kicker">可迁移</p><h3 class="card-title">一份带版本的归档</h3><p>导出单一文件，覆盖互相关联的 Weekyii 记录，包括附件图片与运行设置。</p></article>
+                        <article class="card"><p class="card-kicker">可恢复</p><h3 class="card-title">验证通过，才完整替换</h3><p>SHA-256 与引用关系校验先于完整替换；本地恢复点守护导入以前的数据状态。</p></article>
+                    </div>
+                    <p class="lede reveal delay-3">从周计划、每日启动、单任务专注、截止收束，到未来规划、历史回顾、项目、主题、系统组件与完整归档，本页所述的 iPhone 与 iPad 核心体验均已在当前分支实现。Weekyii 仍在继续进化；云账户、跨设备同步与商店发布是下一段道路，不会被伪装成已经交付的能力。</p>
+                    <div class="cta-row reveal delay-3">
+                        <a class="button" href="https://github.com/RaHakubun/Pure-AI-Weekyii/tree/online-chatgpt-develop">探索完整的 Weekyii</a>
+                        <a class="button secondary" href="legacy-zh.html">阅读初代编年史</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <nav class="nav-dots" aria-label="章节导航"></nav>
+        <div class="controls" role="group" aria-label="演示控制">
+            <button class="arrow" type="button" data-previous aria-label="上一幕">↑</button>
+            <span>滚轮 · 滑动 · 方向键</span>
+            <button class="arrow" type="button" data-next aria-label="下一幕">↓</button>
+        </div>
+    </div>
+    <script src="site.js"></script>
+</body>
+</html>

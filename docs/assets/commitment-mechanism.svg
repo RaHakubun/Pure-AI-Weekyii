@@ -1,0 +1,43 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#120F0C"/>
+      <stop offset="1" stop-color="#21170F"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D8B16A"/>
+      <stop offset="1" stop-color="#9D5C2A"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="800" rx="28" fill="url(#bg2)"/>
+
+  <rect x="90" y="180" width="290" height="430" rx="18" fill="#18120D" stroke="#C9A15A"/>
+  <text x="235" y="250" fill="#F0E0C4" font-size="36" text-anchor="middle" font-family="Georgia, serif">Draft</text>
+  <text x="235" y="290" fill="#B9AD9A" font-size="22" text-anchor="middle" font-family="Georgia, serif">editable</text>
+
+  <rect x="455" y="120" width="290" height="550" rx="18" fill="#1F160F" stroke="#C9A15A" stroke-width="2"/>
+  <text x="600" y="200" fill="#F0E0C4" font-size="40" text-anchor="middle" font-family="Georgia, serif">Focus Zone</text>
+  <text x="600" y="242" fill="#D5BC8D" font-size="24" text-anchor="middle" font-family="Georgia, serif">start = commitment</text>
+  <rect x="500" y="285" width="200" height="72" rx="12" fill="#2A1B11" stroke="rgba(201,161,90,0.6)"/>
+  <text x="600" y="330" fill="#EFD7AF" font-size="24" text-anchor="middle" font-family="Georgia, serif">T01 in focus</text>
+  <rect x="500" y="380" width="200" height="72" rx="12" fill="#17110C" stroke="rgba(201,161,90,0.35)"/>
+  <text x="600" y="425" fill="#B9AD9A" font-size="23" text-anchor="middle" font-family="Georgia, serif">T02 frozen</text>
+  <rect x="500" y="475" width="200" height="72" rx="12" fill="#17110C" stroke="rgba(201,161,90,0.35)"/>
+  <text x="600" y="520" fill="#B9AD9A" font-size="23" text-anchor="middle" font-family="Georgia, serif">T03 frozen</text>
+
+  <rect x="820" y="180" width="290" height="430" rx="18" fill="#18120D" stroke="#C9A15A"/>
+  <text x="965" y="248" fill="#F0E0C4" font-size="36" text-anchor="middle" font-family="Georgia, serif">Outcome</text>
+  <text x="965" y="292" fill="#D5BC8D" font-size="24" text-anchor="middle" font-family="Georgia, serif">reward / penalty</text>
+  <text x="965" y="360" fill="#EFD7AF" font-size="26" text-anchor="middle" font-family="Georgia, serif">Complete = Reward</text>
+  <text x="965" y="412" fill="#D5BC8D" font-size="26" text-anchor="middle" font-family="Georgia, serif">Expire = Forget</text>
+  <text x="965" y="464" fill="#B9AD9A" font-size="26" text-anchor="middle" font-family="Georgia, serif">Neglect = Penalty</text>
+
+  <path d="M380 390 H445" stroke="url(#accent2)" stroke-width="6" stroke-linecap="round"/>
+  <polygon points="445,390 430,382 430,398" fill="#D8B16A"/>
+  <path d="M745 390 H810" stroke="url(#accent2)" stroke-width="6" stroke-linecap="round"/>
+  <polygon points="810,390 795,382 795,398" fill="#D8B16A"/>
+
+  <rect x="290" y="690" width="620" height="72" rx="12" fill="#14100C" stroke="rgba(201,161,90,0.6)"/>
+  <text x="600" y="735" fill="#F0E0C4" font-size="30" text-anchor="middle" font-family="Georgia, serif">Start is Commitment · Expire is Forgetting · Complete is Reward</text>
+</svg>

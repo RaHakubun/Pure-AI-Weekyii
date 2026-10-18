@@ -23,7 +23,7 @@ struct CardInteractionModifier: ViewModifier {
         content
             .scaleEffect(isPressed ? 0.98 : 1.0)
             .shadow(
-                color: isPressed ? Color.black.opacity(0.1) : Color.black.opacity(0.15),
+                color: isPressed ? WeekShadow.light.color : WeekShadow.medium.color,
                 radius: isPressed ? 4 : 8,
                 y: isPressed ? 2 : 4
             )

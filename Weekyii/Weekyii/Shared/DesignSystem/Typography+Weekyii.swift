@@ -6,18 +6,18 @@ extension Font {
     // MARK: Display - 超大标题
     
     /// 超大标题 - 用于品牌标识
-    static let displayLarge = Font.system(size: 48, weight: .bold, design: .rounded)
+    static let displayLarge = Font.system(size: 46, weight: .bold, design: .serif)
     
     // MARK: Titles - 标题系列
     
     /// 大标题 - 用于页面标题
-    static let titleLarge = Font.system(size: 34, weight: .bold, design: .rounded)
+    static let titleLarge = Font.system(size: 32, weight: .bold, design: .serif)
     
     /// 中标题 - 用于 Section 标题
-    static let titleMedium = Font.system(size: 24, weight: .semibold, design: .rounded)
+    static let titleMedium = Font.system(size: 22, weight: .semibold, design: .serif)
     
     /// 小标题 - 用于卡片标题
-    static let titleSmall = Font.system(size: 18, weight: .semibold, design: .rounded)
+    static let titleSmall = Font.system(size: 18, weight: .semibold, design: .serif)
     
     // MARK: Body - 正文系列
     

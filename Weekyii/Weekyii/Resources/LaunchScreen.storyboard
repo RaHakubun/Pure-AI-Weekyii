@@ -21,11 +21,19 @@
                                 <color key="textColor" red="0.356863" green="0.309804" blue="0.913725" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="249" verticalHuggingPriority="251" text="以周为核心管理你的每一天" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="WkY-Subtitle-Label">
+                                <rect key="frame" x="57" y="460" width="279" height="24"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="16"/>
+                                <color key="textColor" red="0.356863" green="0.309804" blue="0.913725" alpha="0.78039215689999998" colorSpace="custom" customColorSpace="sRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" red="1.0" green="0.701961" blue="0.278431" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
                             <constraint firstItem="WkY-Logo-Label" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="CxX-centerX"/>
                             <constraint firstItem="WkY-Logo-Label" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="CyY-centerY"/>
+                            <constraint firstItem="WkY-Subtitle-Label" firstAttribute="top" secondItem="WkY-Logo-Label" secondAttribute="bottom" constant="12" id="WkY-subtitleTop"/>
+                            <constraint firstItem="WkY-Subtitle-Label" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="WkY-subtitleCenterX"/>
                         </constraints>
                     </view>
                 </viewController>

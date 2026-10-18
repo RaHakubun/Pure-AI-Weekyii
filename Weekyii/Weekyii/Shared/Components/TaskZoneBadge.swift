@@ -12,7 +12,7 @@ struct TaskZoneBadge: View {
             .padding(.horizontal, WeekSpacing.sm)
             .padding(.vertical, WeekSpacing.xs)
             .background(zoneColor.opacity(0.15))
-            .cornerRadius(WeekRadius.small)
+            .cornerRadius(WeekRadius.full)
     }
     
     private var zoneName: String {
