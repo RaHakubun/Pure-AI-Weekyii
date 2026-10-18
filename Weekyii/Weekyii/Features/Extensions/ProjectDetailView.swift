@@ -410,6 +410,8 @@ struct ProjectDetailView: View {
                     WeekCard {
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
                             Button {
+                                // Overdue-only days have nothing to expand.
+                                guard !section.tasks.isEmpty else { return }
                                 toggleSection(section.id)
                             } label: {
                                 HStack {
@@ -434,9 +436,8 @@ struct ProjectDetailView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .disabled(section.tasks.isEmpty)
 
-                            if expandedSectionIDs.contains(section.id) {
+                            if expandedSectionIDs.contains(section.id) && !section.tasks.isEmpty {
                                 VStack(spacing: WeekSpacing.sm) {
                                     ForEach(section.tasks) { task in
                                         taskRow(task)
