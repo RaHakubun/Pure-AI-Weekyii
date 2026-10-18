@@ -1,11 +1,6 @@
 import SwiftUI
 import SwiftData
 
-private enum PendingDisplayMode {
-    case weekList
-    case month
-}
-
 private struct PendingMonthAddTarget: Identifiable {
     let id: String
     let day: DayModel
@@ -29,9 +24,15 @@ struct PendingView: View {
     @State private var monthEditTarget: PendingMonthEditTarget?
     @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
-    @State private var displayMode: PendingDisplayMode = .weekList
     @State private var monthSummaries: [String: PendingViewModel.MonthDaySummary] = [:]
     private let calendar = Calendar(identifier: .iso8601)
+
+    /// Week list or month calendar. Stored in `UserSettings` (device-local), so
+    /// the last chosen view is restored after the app restarts.
+    private var displayMode: WeekBrowseMode {
+        get { settings.pendingBrowseMode }
+        nonmutating set { settings.pendingBrowseMode = newValue }
+    }
 
     var body: some View {
         NavigationStack {

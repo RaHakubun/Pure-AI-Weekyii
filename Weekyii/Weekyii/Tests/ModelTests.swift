@@ -4790,6 +4790,48 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(WeekOutlookText.hint(.noTasks, days: days).isEmpty)
     }
 
+    // MARK: - Pending / Past browse mode
+
+    @MainActor
+    func test_browseModesDefaultToWeekListAndPersistAcrossRelaunch() {
+        let defaults = makeSuiteDefaults()
+        let settings = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.pendingBrowseMode, .weekList)
+        XCTAssertEqual(settings.pastBrowseMode, .weekList)
+
+        settings.pendingBrowseMode = .month
+        let relaunched = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(relaunched)
+        XCTAssertEqual(relaunched.pendingBrowseMode, .month)
+        XCTAssertEqual(relaunched.pastBrowseMode, .weekList, "the two tabs are remembered separately")
+
+        relaunched.pendingBrowseMode = .weekList
+        relaunched.pastBrowseMode = .month
+        let relaunchedAgain = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(relaunchedAgain)
+        XCTAssertEqual(relaunchedAgain.pendingBrowseMode, .weekList)
+        XCTAssertEqual(relaunchedAgain.pastBrowseMode, .month)
+    }
+
+    @MainActor
+    func test_browseModesIgnoreUnknownValuesAndAreNotRestoredUnderUITests() {
+        let defaults = makeSuiteDefaults()
+        defaults.set("timeline", forKey: UserSettings.pendingBrowseModeKey)
+        defaults.set(WeekBrowseMode.month.rawValue, forKey: UserSettings.pastBrowseModeKey)
+
+        let settings = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.pendingBrowseMode, .weekList)
+        XCTAssertEqual(settings.pastBrowseMode, .month)
+
+        let uiTestSettings = UserSettings(defaults: defaults, restoresBrowseModes: false)
+        Self.retainedUserSettings.append(uiTestSettings)
+        XCTAssertEqual(uiTestSettings.pastBrowseMode, .weekList)
+        uiTestSettings.pendingBrowseMode = .month
+        XCTAssertEqual(defaults.string(forKey: UserSettings.pendingBrowseModeKey), "timeline", "UI test runs must not store a mode")
+    }
+
     private func makeTemporaryStoreURL() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
