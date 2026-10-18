@@ -4192,6 +4192,163 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(sections[2].isExpandedByDefault)
     }
 
+    // MARK: - Project overdue rules (count only, never a next step)
+
+    func test_projectTaskTimeline_isOverdueMatrix() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let pastDraftDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .draft)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+        let todayDraftDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        let todayExecuteDay = DayModel(dayId: today.dayId, date: today, status: .execute)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        func task(_ zone: TaskZone, on day: DayModel?) -> TaskItem {
+            let item = TaskItem(title: "T", order: 1, zone: zone)
+            item.day = day
+            return item
+        }
+
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.draft, on: pastDay), today: today, calendar: calendar))
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.draft, on: pastDraftDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.complete, on: pastDay), today: today, calendar: calendar))
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.focus, on: todayExpiredDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.complete, on: todayExpiredDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: todayDraftDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.focus, on: todayExecuteDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: futureDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: nil), today: today, calendar: calendar))
+    }
+
+    func test_projectTaskTimeline_nextTaskSkipsOverdueAndTodayExpired() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+        let project = ProjectModel(name: "Next", startDate: yesterday, endDate: tomorrow.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        let pastTask = TaskItem(title: "Past", order: 1, zone: .draft)
+        pastTask.day = pastDay
+        let todayTask = TaskItem(title: "Today expired", order: 1, zone: .focus)
+        todayTask.day = todayExpiredDay
+        let futureSecond = TaskItem(title: "Future B", order: 2, zone: .draft)
+        futureSecond.day = futureDay
+        let futureFirst = TaskItem(title: "Future A", order: 1, zone: .draft)
+        futureFirst.day = futureDay
+        let unscheduled = TaskItem(title: "No day", order: 0, zone: .draft)
+
+        project.tasks = [pastTask, todayTask, futureSecond, futureFirst, unscheduled]
+
+        let actionable = ProjectTaskTimeline.actionableTasks(in: project, today: today, calendar: calendar)
+        XCTAssertEqual(actionable.map(\.title), ["Future A", "Future B"])
+        XCTAssertEqual(ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar)?.title, "Future A")
+        XCTAssertEqual(project.expiredTaskCount, 2)
+    }
+
+    func test_projectTaskTimeline_noNextTaskWhenOnlyOverdueRemains() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let project = ProjectModel(name: "Stalled", startDate: yesterday.addingDays(-3), endDate: today.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let overdue = TaskItem(title: "Overdue", order: 1, zone: .draft)
+        overdue.day = pastDay
+        project.tasks = [overdue]
+
+        XCTAssertNil(ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar))
+
+        let snapshot = ProjectDetailComposer.projectDetailSnapshot(
+            project: project,
+            calendar: calendar,
+            referenceDate: today
+        )
+        XCTAssertNil(snapshot.nextTaskTitle)
+        XCTAssertNil(snapshot.nextTaskDate)
+        XCTAssertEqual(snapshot.expiredCount, 1)
+        XCTAssertEqual(snapshot.remainingCount, 1)
+    }
+
+    func test_projectTaskLedgerSections_hideOverdueTasksButKeepCount() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let project = ProjectModel(name: "Ledger overdue", startDate: yesterday, endDate: today.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+
+        let pastDone = TaskItem(title: "Past done", order: 1, zone: .complete)
+        pastDone.day = pastDay
+        let pastOverdue = TaskItem(title: "Past overdue", order: 2, zone: .draft)
+        pastOverdue.day = pastDay
+        let todayOverdue = TaskItem(title: "Today overdue", order: 1, zone: .focus)
+        todayOverdue.day = todayExpiredDay
+
+        project.tasks = [pastDone, pastOverdue, todayOverdue]
+
+        let sections = ProjectDetailComposer.projectTaskLedgerSections(
+            project: project,
+            calendar: calendar,
+            referenceDate: today
+        )
+
+        XCTAssertEqual(sections.count, 2)
+        XCTAssertEqual(sections[0].tasks.map(\.title), ["Past done"])
+        XCTAssertEqual(sections[0].expiredCount, 1)
+        XCTAssertTrue(sections[1].tasks.isEmpty)
+        XCTAssertEqual(sections[1].expiredCount, 1)
+        XCTAssertFalse(sections.flatMap(\.tasks).contains { $0.zone != .complete && $0.day?.status == .expired })
+    }
+
+    @MainActor
+    func test_projectTileSnapshot_nextStepIsNotDuplicatedAndOverdueIsHidden() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let project = ProjectModel(name: "Tile", startDate: yesterday, endDate: tomorrow.addingDays(5))
+        context.insert(project)
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+        context.insert(pastDay)
+        context.insert(futureDay)
+
+        let overdue = TaskItem(title: "Overdue", order: 1, zone: .draft)
+        // Two tasks share title and day: identity must come from the task id.
+        let first = TaskItem(title: "Same", order: 1, zone: .draft)
+        let second = TaskItem(title: "Same", order: 2, zone: .draft)
+        for (item, day) in [(overdue, pastDay), (first, futureDay), (second, futureDay)] {
+            item.project = project
+            day.tasks.append(item)
+        }
+        try context.save()
+
+        let viewModel = ExtensionsViewModel(modelContext: context)
+        viewModel.refresh()
+
+        let snapshot = try XCTUnwrap(viewModel.tileSnapshotsByProjectID[project.id])
+        XCTAssertEqual(snapshot.nextTaskID, first.id)
+        XCTAssertEqual(snapshot.expiredCount, 1)
+        XCTAssertEqual(snapshot.upcomingTasks.map(\.taskID), [first.id, second.id])
+        XCTAssertFalse(snapshot.upcomingTasks.contains { $0.title == "Overdue" || $0.isOverdue })
+
+        let laterTasks = snapshot.upcomingTasks.filter { $0.taskID != snapshot.nextTaskID }
+        XCTAssertEqual(laterTasks.map(\.taskID), [second.id])
+    }
+
     func test_widgetSnapshotComposer_buildsPriorityOrderedPreviewAndTheme() {
         let now = makeDate(2026, 3, 16, 9, 30)
         let day = DayModel(dayId: "2026-03-16", date: now, status: .execute)

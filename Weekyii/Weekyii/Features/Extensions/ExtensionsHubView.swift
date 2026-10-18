@@ -1555,14 +1555,12 @@ private struct ProjectFocusLiveTile: View {
         return calendar.startOfDay(for: date) < today
     }
 
+    /// Actionable tasks after the next step. Matched by task identity, so the
+    /// next step is never listed twice, even when titles or dates repeat.
+    /// Overdue tasks are not part of `upcomingTasks` (count only).
     private var laterTasks: [ProjectTileTaskEntry] {
-        var entries = snapshot.upcomingTasks
-        if let first = entries.first,
-           first.title == snapshot.nextTaskTitle,
-           first.date.map({ calendar.isDate($0, inSameDayAs: snapshot.nextTaskDate ?? .distantPast) }) ?? (snapshot.nextTaskDate == nil) {
-            entries.removeFirst()
-        }
-        return entries
+        guard let nextTaskID = snapshot.nextTaskID else { return snapshot.upcomingTasks }
+        return snapshot.upcomingTasks.filter { $0.taskID != nextTaskID }
     }
 
     private var statusLine: (text: String, color: Color) {
@@ -2918,7 +2916,9 @@ private struct ProjectMetroTileView: View {
 
     private func tileTaskList(limit: Int) -> some View {
         let rows = Array(snapshot.upcomingTasks.prefix(limit))
-        let hiddenCount = max(snapshot.remainingCount - rows.count, 0)
+        // Overdue tasks are shown by the separate expired counter below, so
+        // only open, on-time tasks count towards "more".
+        let hiddenCount = max(openCount - rows.count, 0)
 
         return VStack(alignment: .leading, spacing: 3) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, entry in
