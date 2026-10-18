@@ -137,9 +137,6 @@
     "~" : {
 
     },
-    "1.0.0" : {
-
-    },
     "99+" : {
 
     },
@@ -6175,70 +6172,6 @@
         }
       }
     },
-    "settings.about.days_started" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Days Started"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已启动天数"
-          }
-        }
-      }
-    },
-    "settings.about.header" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "About"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关于"
-          }
-        }
-      }
-    },
-    "settings.about.start_date" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Started Using"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始使用"
-          }
-        }
-      }
-    },
-    "settings.about.version" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Version"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "版本"
-          }
-        }
-      }
-    },
     "settings.about.companion_prefix" : {
       "localizations" : {
         "en" : {
@@ -6251,6 +6184,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我们已经一起走过"
+          }
+        }
+      }
+    },
+    "settings.about.days_started" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Days Started"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启动天数"
           }
         }
       }
@@ -6347,6 +6296,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Weekyii 怎么用"
+          }
+        }
+      }
+    },
+    "settings.about.header" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
           }
         }
       }
@@ -6459,6 +6425,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收集的印章"
+          }
+        }
+      }
+    },
+    "settings.about.start_date" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Started Using"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始使用"
           }
         }
       }
@@ -6651,6 +6634,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "周"
+          }
+        }
+      }
+    },
+    "settings.about.version" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
           }
         }
       }
@@ -9616,6 +9616,7 @@
       }
     },
     "settings.usage_history.overview" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9632,6 +9633,7 @@
       }
     },
     "settings.usage_history.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11023,9 +11025,6 @@
 
     },
     "全局视图" : {
-
-    },
-    "关于 Weekyii" : {
 
     },
     "关闭全屏" : {
