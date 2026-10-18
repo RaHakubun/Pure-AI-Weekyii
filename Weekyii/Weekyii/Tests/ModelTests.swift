@@ -213,15 +213,24 @@ final class KillTimeFireTests: XCTestCase {
         XCTAssertEqual(clock.time(at: start.addingTimeInterval(501)), 3)
     }
 
-    func testFlameMotionIsGentleOverHalfASecond() {
+    func testFlameMotionRemainsContinuousBetweenDisplayFrames() {
         let size = CGSize(width: 360, height: 220)
-        for step in 0..<60 {
-            let time = Double(step) * 0.5
+        // The current tongues grow, extinguish and reappear. A half-second
+        // interval spans 30 frames and is no longer a useful flicker measure.
+        // Keep a frame-level regression budget: no tip may jump more than 3%
+        // of the canvas height in one 60 Hz frame. This is not a visual QA claim.
+        let frameInterval = 1.0 / 60.0
+        for step in 0..<1800 {
+            let time = Double(step) * frameInterval
             let before = KillTimeFireField.tongues(size: size, time: time, intensity: 1, ceiling: nil)
-            let after = KillTimeFireField.tongues(size: size, time: time + 0.5, intensity: 1, ceiling: nil)
+            let after = KillTimeFireField.tongues(size: size, time: time + frameInterval, intensity: 1, ceiling: nil)
+            XCTAssertFalse(before.isEmpty)
+            XCTAssertEqual(before.count, after.count)
             for (first, second) in zip(before, after) {
+                XCTAssertEqual(first.root, second.root, "Tongues must retain their identity between frames")
                 let tipMotion = hypot(second.lean + second.curl - first.lean - first.curl, second.height - first.height)
-                XCTAssertLessThan(tipMotion, size.height * 0.16, "Avoid rapid flicker at phase \(time)")
+                XCTAssertTrue(tipMotion.isFinite)
+                XCTAssertLessThan(tipMotion, size.height * 0.03, "Avoid a single-frame jump at phase \(time)")
             }
         }
     }
@@ -1559,10 +1568,23 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(monthEndModel.tasks.isEmpty)
         XCTAssertTrue(missingDate.records.isEmpty)
 
-        // 缺日月份不产生时间线节点；含 31 日的 8 月节点存在。
+        // 历史计划日没有落盘记录时不生成占位节点，9 月缺少 31 日也不补造节点。
         let nodes = HabitStatisticsCalculator.timeline(for: missingDate, today: monthEnd)
-        XCTAssertEqual(nodes.map(\.dayId), ["2026-08-31"])
-        XCTAssertFalse(nodes.contains { $0.dayId.hasPrefix("2026-09") })
+        XCTAssertTrue(nodes.isEmpty)
+        XCTAssertTrue(missingDate.records.isEmpty, "Reading the timeline must not materialize history")
+
+        // 同一个有效的历史计划日一旦有真实记录，就应出现在时间线中。
+        let recordedDay = HabitDayRecord(dayId: "2026-08-31")
+        recordedDay.status = .completed
+        recordedDay.completedAt = makeDate(2026, 8, 31, 9)
+        recordedDay.habit = missingDate
+        missingDate.records.append(recordedDay)
+        context.insert(recordedDay)
+        let recordedNodes = HabitStatisticsCalculator.timeline(for: missingDate, today: monthEnd)
+        XCTAssertEqual(recordedNodes.map(\.dayId), ["2026-08-31"])
+        XCTAssertEqual(recordedNodes.first?.state, .completed)
+        XCTAssertEqual(recordedNodes.first?.completedAt, recordedDay.completedAt)
+        XCTAssertFalse(recordedNodes.contains { $0.dayId.hasPrefix("2026-09") })
 
         let days = try context.fetch(FetchDescriptor<DayModel>())
         XCTAssertFalse(days.contains { $0.dayId > monthEnd.dayId })
@@ -1801,11 +1823,8 @@ final class ModelTests: XCTestCase {
 
         let nodes = HabitStatisticsCalculator.timeline(for: habit, today: today)
 
-        XCTAssertEqual(nodes.map(\.dayId), [
-            "2026-09-16", "2026-09-15", "2026-09-14",
-            "2026-09-11", "2026-09-10",
-            "2026-09-08", "2026-09-07",
-        ])
+        XCTAssertEqual(nodes.map(\.dayId), ["2026-09-16", "2026-09-15", "2026-09-14"])
+        XCTAssertEqual(habit.records.count, 3, "Reading the timeline must not create missing historical records")
 
         let byDay = Dictionary(uniqueKeysWithValues: nodes.map { ($0.dayId, $0) })
         XCTAssertEqual(byDay["2026-09-16"]?.state, .pending)
@@ -1813,6 +1832,9 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(byDay["2026-09-14"]?.state, .completed)
         XCTAssertEqual(byDay["2026-09-14"]?.completedAt, completedAt)
         XCTAssertNil(byDay["2026-09-09"])
+        for missingDay in ["2026-09-11", "2026-09-10", "2026-09-08", "2026-09-07"] {
+            XCTAssertNil(byDay[missingDay], "A scheduled date without a record must not become a history node")
+        }
     }
 
     // MARK: - Habit view model
