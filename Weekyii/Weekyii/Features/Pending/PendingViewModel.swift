@@ -32,17 +32,17 @@ final class PendingViewModel {
         var displayName: String {
             switch self {
             case .relaxed:
-                return "轻松推进"
+                return String(localized: "pending.week.outlook.tone.relaxed", defaultValue: "轻松推进")
             case .steady:
-                return "平稳推进"
+                return String(localized: "pending.week.outlook.tone.steady", defaultValue: "平稳推进")
             case .frontLooseBackTight:
-                return "前松后紧"
+                return String(localized: "pending.week.outlook.tone.frontLooseBackTight", defaultValue: "前松后紧")
             case .midweekCongestion:
-                return "周中拥堵"
+                return String(localized: "pending.week.outlook.tone.midweekCongestion", defaultValue: "周中拥堵")
             case .deadlineRush:
-                return "临期冲刺"
+                return String(localized: "pending.week.outlook.tone.deadlineRush", defaultValue: "临期冲刺")
             case .overloadWarning:
-                return "过载预警"
+                return String(localized: "pending.week.outlook.tone.overloadWarning", defaultValue: "过载预警")
             }
         }
     }
@@ -53,14 +53,67 @@ final class PendingViewModel {
         let leisure: Int
     }
 
+    /// One day of the week card's distribution strip. Plain task counts, so
+    /// every number the card shows can be checked against the week detail.
+    struct WeekOutlookDay: Equatable {
+        let date: Date
+        let taskCount: Int
+        let deadlineCount: Int
+    }
+
+    /// A task worth preparing ahead, shown on the week card without opening it.
+    struct WeekOutlookKeyTask: Equatable, Identifiable {
+        enum Reason: Equatable {
+            /// A DDL task. `typeName` is set for custom DDL-based task types.
+            case deadline(typeName: String?)
+            /// The task's project ends within this week.
+            case projectDue
+            /// Part of a project that ends later.
+            case project(name: String)
+            /// A task broken into several steps.
+            case steps(Int)
+        }
+
+        let id: UUID
+        let title: String
+        let date: Date
+        let baseKind: TaskType
+        let reason: Reason
+    }
+
+    /// One concrete, data-backed suggestion. Day values are indexes into
+    /// `WeekOutlookSnapshot.days` (0 = Monday).
+    enum WeekOutlookHint: Equatable {
+        case noTasks
+        /// DDL concentrate on `deadlineDays`, and an earlier day is at most half as full.
+        case startDeadlinesEarly(deadlineDays: [Int], deadlineCount: Int, lightDay: Int, lightDayTaskCount: Int)
+        case deadlineCluster(deadlineDays: [Int], deadlineCount: Int)
+        /// One day is clearly busier than the week's average.
+        case busiestDay(day: Int, taskCount: Int, lightDay: Int, lightDayTaskCount: Int)
+        case evenlySpread(minCount: Int, maxCount: Int)
+    }
+
     struct WeekOutlookSnapshot: Equatable {
         let tone: WeekOutlookTone
-        let headline: String
-        let advice: String
         let typeCounts: WeekTypeCounts
-        let peakDays: [String]
+        /// Weighted load per day (Monday first). Drives the tone only.
         let dayLoadSeries: [Double]
+        /// Seven days, Monday first.
+        var days: [WeekOutlookDay] = []
+        /// At most `PendingViewModel.keyTaskLimit` tasks, most important first.
+        var keyTasks: [WeekOutlookKeyTask] = []
+        /// Key tasks left out by the limit, and how many of them are DDL.
+        var hiddenKeyTaskCount: Int = 0
+        var hiddenDeadlineCount: Int = 0
+        var hint: WeekOutlookHint = .noTasks
+
+        var hasTasks: Bool { days.contains { $0.taskCount > 0 } }
     }
+
+    /// Key tasks shown on a week card; the rest are summarised as a count.
+    static let keyTaskLimit = 3
+    /// A task with at least this many steps counts as key work.
+    static let keyTaskMinimumSteps = 3
 
     struct MonthDaySummary: Equatable {
         let dayId: String
@@ -249,20 +302,46 @@ final class PendingViewModel {
             uniquingKeysWith: { first, _ in first }
         )
 
+        let weekLastDay = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+
         var regularSeries: [Int] = []
         var ddlSeries: [Int] = []
         var leisureSeries: [Int] = []
-        var dayLabels: [String] = []
+        var days: [WeekOutlookDay] = []
+        var keyTaskCandidates: [KeyTaskCandidate] = []
 
         for offset in 0..<7 {
             guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { continue }
             let day = dayMap[date]
             let tasks = day?.tasks ?? []
+            let ddlCount = tasks.filter { taskBaseKind($0, catalog: catalog) == .ddl }.count
             regularSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .regular }.count)
-            ddlSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .ddl }.count)
+            ddlSeries.append(ddlCount)
             leisureSeries.append(tasks.filter { taskBaseKind($0, catalog: catalog) == .leisure }.count)
-            dayLabels.append(Self.weekdayLabel(for: date))
+            days.append(WeekOutlookDay(date: date, taskCount: tasks.count, deadlineCount: ddlCount))
+            for task in tasks where task.zone != .complete {
+                if let candidate = keyTaskCandidate(
+                    task,
+                    on: date,
+                    weekRange: start...weekLastDay,
+                    catalog: catalog,
+                    calendar: calendar
+                ) {
+                    keyTaskCandidates.append(candidate)
+                }
+            }
         }
+
+        let rankedKeyTasks = keyTaskCandidates
+            .sorted { lhs, rhs in
+                if lhs.tier != rhs.tier { return lhs.tier < rhs.tier }
+                if lhs.task.date != rhs.task.date { return lhs.task.date < rhs.task.date }
+                if lhs.order != rhs.order { return lhs.order < rhs.order }
+                return lhs.task.id.uuidString < rhs.task.id.uuidString
+            }
+            .map(\.task)
+        let shownKeyTasks = Array(rankedKeyTasks.prefix(keyTaskLimit))
+        let hiddenKeyTasks = rankedKeyTasks.dropFirst(keyTaskLimit)
 
         let dayLoadSeries = zip(regularSeries, zip(ddlSeries, leisureSeries)).map { regular, tuple in
             let (ddl, leisure) = tuple
@@ -274,7 +353,6 @@ final class PendingViewModel {
         let totalLeisure = leisureSeries.reduce(0, +)
         let totalLoad = dayLoadSeries.reduce(0, +)
         let peakLoad = dayLoadSeries.max() ?? 0
-        let activeDays = dayLoadSeries.filter { $0 > 0 }.count
 
         let maxPairDDL: Int = ddlSeries.count >= 2
             ? (0..<(ddlSeries.count - 1)).map { ddlSeries[$0] + ddlSeries[$0 + 1] }.max() ?? 0
@@ -291,13 +369,6 @@ final class PendingViewModel {
         let backLoad = dayLoadSeries.suffix(4).reduce(0, +)
         let backVsFrontGapRatio = frontLoad > 0 ? (backLoad - frontLoad) / frontLoad : 0
 
-        let peakDayIndexes = dayLoadSeries.enumerated()
-            .filter { $0.element > 0 && $0.element == peakLoad }
-            .map(\.offset)
-            .prefix(2)
-        let peakDays = peakDayIndexes.map { dayLabels[$0] }
-        let peakDaysText = peakDays.isEmpty ? "节奏分布较均匀" : "高压在" + peakDays.joined(separator: "/")
-
         let tone: WeekOutlookTone
         if peakLoad >= 8 || totalLoad >= 28 {
             tone = .overloadWarning
@@ -313,39 +384,121 @@ final class PendingViewModel {
             tone = .steady
         }
 
-        let headline: String
-        let advice: String
-        switch tone {
-        case .relaxed:
-            headline = activeDays == 0
-                ? "这一周任务较空，适合先定一个主目标"
-                : "整体负载偏轻，按节奏推进即可"
-            advice = "保持节奏并留1天机动"
-        case .steady:
-            headline = peakDays.isEmpty ? "节奏平稳，可按日常推进" : "\(peakDaysText)，整体可控"
-            advice = "每天推进1-2个关键项"
-        case .frontLooseBackTight:
-            headline = "后半周会明显变紧，建议提前启动关键事项"
-            advice = "周一周二先清关键任务"
-        case .midweekCongestion:
-            headline = "周中任务明显聚集，\(peakDaysText)"
-            advice = "把周中任务前移一天"
-        case .deadlineRush:
-            headline = "DDL集中出现，\(peakDaysText)"
-            advice = "先做DDL，再推进常规"
-        case .overloadWarning:
-            headline = "本周负载偏高，\(peakDaysText)"
-            advice = "建议拆分或减载安排"
-        }
-
         return WeekOutlookSnapshot(
             tone: tone,
-            headline: headline,
-            advice: advice,
             typeCounts: WeekTypeCounts(regular: totalRegular, ddl: totalDDL, leisure: totalLeisure),
-            peakDays: peakDays,
-            dayLoadSeries: dayLoadSeries
+            dayLoadSeries: dayLoadSeries,
+            days: days,
+            keyTasks: shownKeyTasks,
+            hiddenKeyTaskCount: hiddenKeyTasks.count,
+            hiddenDeadlineCount: hiddenKeyTasks.filter { $0.baseKind == .ddl }.count,
+            hint: weekHint(for: days)
         )
+    }
+
+    private struct KeyTaskCandidate {
+        /// 0 = DDL, 1 = project ends this week, 2 = other project task or multi-step task.
+        let tier: Int
+        let order: Int
+        let task: WeekOutlookKeyTask
+    }
+
+    private static func keyTaskCandidate(
+        _ task: TaskItem,
+        on date: Date,
+        weekRange: ClosedRange<Date>,
+        catalog: TaskTypeCatalog?,
+        calendar: Calendar
+    ) -> KeyTaskCandidate? {
+        let kind = taskBaseKind(task, catalog: catalog)
+        let tier: Int
+        let reason: WeekOutlookKeyTask.Reason
+        if kind == .ddl {
+            tier = 0
+            reason = .deadline(typeName: customTypeName(for: task, catalog: catalog))
+        } else if let project = task.project, weekRange.contains(calendar.startOfDay(for: project.endDate)) {
+            tier = 1
+            reason = .projectDue
+        } else if let project = task.project {
+            tier = 2
+            reason = .project(name: project.name)
+        } else if task.steps.count >= keyTaskMinimumSteps {
+            tier = 2
+            reason = .steps(task.steps.count)
+        } else {
+            return nil
+        }
+        return KeyTaskCandidate(
+            tier: tier,
+            order: task.order,
+            task: WeekOutlookKeyTask(id: task.id, title: task.title, date: date, baseKind: kind, reason: reason)
+        )
+    }
+
+    /// Name of a user-defined task type; nil for the built-in types.
+    private static func customTypeName(for task: TaskItem, catalog: TaskTypeCatalog?) -> String? {
+        guard let catalog else { return nil }
+        let definition = catalog.definition(for: task.taskTypeIdRaw)
+        guard definition.idRaw == task.taskTypeIdRaw, !definition.isBuiltIn else { return nil }
+        let name = definition.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
+    /// Picks the first rule that fits the week's actual task counts:
+    /// 1. no tasks; 2. where DDL concentrate (and whether an earlier day is
+    /// light enough to start them early); 3. one clearly busiest day;
+    /// 4. otherwise an even spread.
+    static func weekHint(for days: [WeekOutlookDay]) -> WeekOutlookHint {
+        let counts = days.map(\.taskCount)
+        let deadlines = days.map(\.deadlineCount)
+        let total = counts.reduce(0, +)
+        guard total > 0 else { return .noTasks }
+
+        var deadlineDays: [Int] = []
+        if deadlines.count >= 2 {
+            var bestStart = 0
+            var bestSum = -1
+            for index in 0..<(deadlines.count - 1) where deadlines[index] + deadlines[index + 1] > bestSum {
+                bestSum = deadlines[index] + deadlines[index + 1]
+                bestStart = index
+            }
+            if bestSum >= 3, deadlines[bestStart] > 0, deadlines[bestStart + 1] > 0 {
+                deadlineDays = [bestStart, bestStart + 1]
+            }
+        }
+        if deadlineDays.isEmpty, let peak = deadlines.max(), peak >= 2, let index = deadlines.firstIndex(of: peak) {
+            deadlineDays = [index]
+        }
+        if let firstDeadlineDay = deadlineDays.first {
+            let deadlineCount = deadlineDays.map { deadlines[$0] }.reduce(0, +)
+            let fullest = deadlineDays.map { counts[$0] }.max() ?? 0
+            // Lightest earlier day that is at most half as full; on ties, the
+            // one closest to the deadlines.
+            let lightDay = (0..<firstDeadlineDay)
+                .filter { counts[$0] * 2 <= fullest }
+                .min { counts[$0] != counts[$1] ? counts[$0] < counts[$1] : $0 > $1 }
+            if let lightDay {
+                return .startDeadlinesEarly(
+                    deadlineDays: deadlineDays,
+                    deadlineCount: deadlineCount,
+                    lightDay: lightDay,
+                    lightDayTaskCount: counts[lightDay]
+                )
+            }
+            return .deadlineCluster(deadlineDays: deadlineDays, deadlineCount: deadlineCount)
+        }
+
+        let maxCount = counts.max() ?? 0
+        let average = Double(total) / Double(counts.count)
+        if let busiest = counts.firstIndex(of: maxCount),
+           Double(maxCount) >= average * 1.5,
+           Double(maxCount) - average >= 3,
+           let lightDay = counts.indices
+               .filter({ $0 != busiest })
+               .min(by: { counts[$0] != counts[$1] ? counts[$0] < counts[$1] : $0 < $1 }) {
+            return .busiestDay(day: busiest, taskCount: maxCount, lightDay: lightDay, lightDayTaskCount: counts[lightDay])
+        }
+        return .evenlySpread(minCount: counts.min() ?? 0, maxCount: maxCount)
     }
 
     private static func taskBaseKind(_ task: TaskItem, catalog: TaskTypeCatalog?) -> TaskType {
@@ -555,11 +708,139 @@ final class PendingViewModel {
         }
     }
 
-    private static func weekdayLabel(for date: Date) -> String {
+    /// Short weekday in the app's language: "周四" / "Thu".
+    static func weekdayLabel(for date: Date) -> String {
+        weekdayLabel(for: date, template: "EEE")
+    }
+
+    /// Narrow weekday for the distribution strip: "四" / "T".
+    static func narrowWeekdayLabel(for date: Date) -> String {
+        weekdayLabel(for: date, template: "EEEEE")
+    }
+
+    private static func weekdayLabel(for date: Date, template: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        formatter.setLocalizedDateFormatFromTemplate(template)
         return formatter.string(from: date)
     }
 
+}
+
+// MARK: - Week outlook text
+
+/// All user-facing week outlook wording, localized (en / zh-Hans).
+enum WeekOutlookText {
+    typealias KeyTask = PendingViewModel.WeekOutlookKeyTask
+    typealias Hint = PendingViewModel.WeekOutlookHint
+    typealias Day = PendingViewModel.WeekOutlookDay
+
+    static var title: String {
+        String(localized: "pending.week.outlook.title", defaultValue: "周预报")
+    }
+
+    static var emptyWeek: String {
+        String(localized: "pending.week.outlook.empty", defaultValue: "还没有安排任务")
+    }
+
+    static var noKeyTasks: String {
+        String(localized: "pending.week.outlook.noKeyTasks", defaultValue: "这一周没有 DDL 或项目任务")
+    }
+
+    static func reason(_ reason: KeyTask.Reason) -> String {
+        switch reason {
+        case .deadline(let typeName):
+            return typeName ?? TaskType.ddl.displayName
+        case .projectDue:
+            return String(localized: "pending.week.outlook.reason.projectDue", defaultValue: "项目截止")
+        case .project(let name):
+            return name
+        case .steps(let count):
+            return String(
+                format: String(localized: "pending.week.outlook.reason.steps", defaultValue: "%lld 步"),
+                locale: Locale.current,
+                Int64(count)
+            )
+        }
+    }
+
+    /// "另有 N 个 DDL" when everything hidden is DDL, otherwise "另有 N 项重点任务".
+    static func hiddenKeyTasks(total: Int, deadlines: Int) -> String? {
+        guard total > 0 else { return nil }
+        if deadlines == total {
+            return String(
+                format: String(localized: "pending.week.outlook.more.deadlines", defaultValue: "另有 %lld 个 DDL"),
+                locale: Locale.current,
+                Int64(total)
+            )
+        }
+        return String(
+            format: String(localized: "pending.week.outlook.more.keyTasks", defaultValue: "另有 %lld 项重点任务"),
+            locale: Locale.current,
+            Int64(total)
+        )
+    }
+
+    static func hint(_ hint: Hint, days: [Day]) -> String {
+        func dayName(_ index: Int) -> String {
+            guard days.indices.contains(index) else { return "" }
+            return PendingViewModel.weekdayLabel(for: days[index].date)
+        }
+        func dayNames(_ indexes: [Int]) -> String {
+            guard indexes.count == 2 else { return indexes.map(dayName).joined() }
+            return String(
+                format: String(localized: "pending.week.outlook.days.pair", defaultValue: "%1$@、%2$@"),
+                locale: Locale.current,
+                dayName(indexes[0]),
+                dayName(indexes[1])
+            )
+        }
+
+        switch hint {
+        case .noTasks:
+            return String(localized: "pending.week.outlook.hint.noTasks", defaultValue: "先定一个主目标")
+        case let .startDeadlinesEarly(deadlineDays, deadlineCount, lightDay, lightDayTaskCount):
+            return String(
+                format: String(
+                    localized: "pending.week.outlook.hint.startEarly",
+                    defaultValue: "%1$@有 %2$lld 个 DDL，%3$@只有 %4$lld 项，可以提前处理"
+                ),
+                locale: Locale.current,
+                dayNames(deadlineDays),
+                Int64(deadlineCount),
+                dayName(lightDay),
+                Int64(lightDayTaskCount)
+            )
+        case let .deadlineCluster(deadlineDays, deadlineCount):
+            return String(
+                format: String(localized: "pending.week.outlook.hint.deadlineCluster", defaultValue: "DDL 集中在%1$@（共 %2$lld 个）"),
+                locale: Locale.current,
+                dayNames(deadlineDays),
+                Int64(deadlineCount)
+            )
+        case let .busiestDay(day, taskCount, lightDay, lightDayTaskCount):
+            return String(
+                format: String(localized: "pending.week.outlook.hint.busiest", defaultValue: "%1$@最满（%2$lld 项），%3$@只有 %4$lld 项"),
+                locale: Locale.current,
+                dayName(day),
+                Int64(taskCount),
+                dayName(lightDay),
+                Int64(lightDayTaskCount)
+            )
+        case let .evenlySpread(minCount, maxCount):
+            if minCount == maxCount {
+                return String(
+                    format: String(localized: "pending.week.outlook.hint.evenSame", defaultValue: "每天 %lld 项，分布均匀"),
+                    locale: Locale.current,
+                    Int64(maxCount)
+                )
+            }
+            return String(
+                format: String(localized: "pending.week.outlook.hint.even", defaultValue: "每天 %1$lld–%2$lld 项，分布较均匀"),
+                locale: Locale.current,
+                Int64(minCount),
+                Int64(maxCount)
+            )
+        }
+    }
 }

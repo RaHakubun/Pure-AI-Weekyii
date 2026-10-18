@@ -4658,6 +4658,138 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(outlook.tone, .frontLooseBackTight)
     }
 
+    // MARK: - Week outlook key tasks and hint
+
+    @MainActor
+    func test_pendingWeekOutlook_keyTasksRankDeadlinesThenProjectDueThenOtherKeyWork() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+        let days = week.days.sorted { $0.date < $1.date }
+        let start = days[0].date
+
+        let multiStep = TaskItem(title: "Steps", taskType: .regular, order: 1, zone: .draft)
+        multiStep.steps = (1...3).map { TaskStep(title: "S\($0)", sortOrder: $0) }
+        days[0].tasks.append(multiStep)
+
+        let dueProject = ProjectModel(name: "Due", startDate: start, endDate: start.addingDays(3))
+        let projectDue = TaskItem(title: "Project due", taskType: .regular, order: 1, zone: .draft)
+        projectDue.project = dueProject
+        days[1].tasks.append(projectDue)
+
+        let firstDeadline = TaskItem(title: "DDL A", taskType: .ddl, order: 1, zone: .draft)
+        days[2].tasks.append(firstDeadline)
+        let secondDeadline = TaskItem(title: "DDL B", taskType: .ddl, order: 1, zone: .draft)
+        days[4].tasks.append(secondDeadline)
+
+        let laterProject = ProjectModel(name: "Later", startDate: start, endDate: start.addingDays(30))
+        let projectTask = TaskItem(title: "Project later", taskType: .regular, order: 1, zone: .draft)
+        projectTask.project = laterProject
+        days[3].tasks.append(projectTask)
+
+        days[5].tasks.append(TaskItem(title: "Plain", taskType: .regular, order: 1, zone: .draft))
+        days[6].tasks.append(TaskItem(title: "Done DDL", taskType: .ddl, order: 1, zone: .complete))
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.keyTasks.map(\.title), ["DDL A", "DDL B", "Project due"])
+        XCTAssertEqual(outlook.keyTasks.map(\.reason), [.deadline(typeName: nil), .deadline(typeName: nil), .projectDue])
+        XCTAssertEqual(outlook.hiddenKeyTaskCount, 2, "project task ending later + multi-step task")
+        XCTAssertEqual(outlook.hiddenDeadlineCount, 0)
+        XCTAssertFalse(outlook.keyTasks.contains { $0.title == "Plain" || $0.title == "Done DDL" })
+        XCTAssertEqual(outlook.days.count, 7)
+        XCTAssertEqual(outlook.days.map(\.taskCount), [1, 1, 1, 1, 1, 1, 1])
+        XCTAssertEqual(outlook.days.map(\.deadlineCount), [0, 0, 1, 0, 1, 0, 1])
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hiddenKeyTasksAreSummarisedAsDeadlines() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [2, 0, 1, 0, 2, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.keyTasks.count, PendingViewModel.keyTaskLimit)
+        XCTAssertEqual(outlook.hiddenKeyTaskCount, 2)
+        XCTAssertEqual(outlook.hiddenDeadlineCount, 2)
+        XCTAssertNotNil(WeekOutlookText.hiddenKeyTasks(total: 2, deadlines: 2))
+        XCTAssertNil(WeekOutlookText.hiddenKeyTasks(total: 0, deadlines: 0))
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_emptyWeekHasNoKeyTasksAndNoTasksHint() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertFalse(outlook.hasTasks)
+        XCTAssertTrue(outlook.keyTasks.isEmpty)
+        XCTAssertEqual(outlook.hint, .noTasks)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hintFollowsActualDayCounts() {
+        func hint(_ counts: [Int], _ deadlines: [Int]) -> PendingViewModel.WeekOutlookHint {
+            let start = makeDate(2026, 3, 30)
+            let days = (0..<7).map {
+                PendingViewModel.WeekOutlookDay(date: start.addingDays($0), taskCount: counts[$0], deadlineCount: deadlines[$0])
+            }
+            return PendingViewModel.weekHint(for: days)
+        }
+
+        XCTAssertEqual(hint([0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]), .noTasks)
+        // DDL on Wed/Thu, Tue is light: start them early.
+        XCTAssertEqual(
+            hint([7, 2, 8, 9, 6, 6, 4], [1, 0, 3, 3, 1, 0, 0]),
+            .startDeadlinesEarly(deadlineDays: [2, 3], deadlineCount: 6, lightDay: 1, lightDayTaskCount: 2)
+        )
+        // DDL cluster at the start of the week: nothing earlier to use.
+        XCTAssertEqual(
+            hint([4, 4, 0, 0, 0, 0, 0], [2, 2, 0, 0, 0, 0, 0]),
+            .deadlineCluster(deadlineDays: [0, 1], deadlineCount: 4)
+        )
+        // Single day with 2 DDL; the lightest earlier day is picked.
+        XCTAssertEqual(
+            hint([3, 1, 6, 0, 0, 0, 0], [0, 0, 2, 0, 0, 0, 0]),
+            .startDeadlinesEarly(deadlineDays: [2], deadlineCount: 2, lightDay: 1, lightDayTaskCount: 1)
+        )
+        // One clearly busiest day, no DDL pattern.
+        XCTAssertEqual(
+            hint([9, 2, 3, 3, 3, 3, 2], [0, 0, 0, 0, 0, 0, 0]),
+            .busiestDay(day: 0, taskCount: 9, lightDay: 1, lightDayTaskCount: 2)
+        )
+        // Evenly filled week: no "peak" is invented.
+        XCTAssertEqual(hint([5, 6, 5, 6, 5, 6, 5], [0, 0, 0, 0, 0, 0, 0]), .evenlySpread(minCount: 5, maxCount: 6))
+        XCTAssertEqual(hint([2, 2, 2, 2, 2, 2, 2], [0, 1, 0, 0, 1, 0, 0]), .evenlySpread(minCount: 2, maxCount: 2))
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hintTextContainsActualNumbers() {
+        let start = makeDate(2026, 3, 30)
+        let days = (0..<7).map {
+            PendingViewModel.WeekOutlookDay(date: start.addingDays($0), taskCount: 0, deadlineCount: 0)
+        }
+        let text = WeekOutlookText.hint(
+            .startDeadlinesEarly(deadlineDays: [2, 3], deadlineCount: 6, lightDay: 1, lightDayTaskCount: 2),
+            days: days
+        )
+
+        XCTAssertTrue(text.contains("6"))
+        XCTAssertTrue(text.contains("2"))
+        XCTAssertTrue(text.contains(PendingViewModel.weekdayLabel(for: days[1].date)))
+        XCTAssertFalse(text.contains("%"), "every placeholder must be filled")
+        XCTAssertFalse(WeekOutlookText.hint(.noTasks, days: days).isEmpty)
+    }
+
     private func makeTemporaryStoreURL() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

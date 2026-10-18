@@ -4455,13 +4455,322 @@
         }
       }
     },
-    "pending.week.outlook.title" : {
-      "extractionState" : "extracted_with_value",
+    "pending.week.outlook.days.pair" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@–%2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、%2$@"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing planned yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有安排任务"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.busiest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is busiest (%2$lld); %3$@ has only %4$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@最满（%2$lld 项），%3$@只有 %4$lld 项"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.deadlineCluster" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDL cluster on %1$@ (%2$lld)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDL 集中在%1$@（共 %2$lld 个）"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.even" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld–%2$lld a day, evenly spread"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %1$lld–%2$lld 项，分布较均匀"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.evenSame" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld a day, evenly spread"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %lld 项，分布均匀"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.noTasks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set one main goal first"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先定一个主目标"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.hint.startEarly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$lld DDL; %3$@ has only %4$lld — start early"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@有 %2$lld 个 DDL，%3$@只有 %4$lld 项，可以提前处理"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.more.deadlines" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld more DDL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另有 %lld 个 DDL"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.more.keyTasks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld more"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另有 %lld 项重点任务"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.noKeyTasks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No DDL or project tasks this week"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一周没有 DDL 或项目任务"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.reason.projectDue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project due"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目截止"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.reason.steps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld steps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 步"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Week outlook"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "周预报"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.deadlineRush" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deadline rush"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "临期冲刺"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.frontLooseBackTight" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back-loaded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前松后紧"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.midweekCongestion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Midweek crunch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周中拥堵"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.overloadWarning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overload"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过载预警"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.relaxed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light week"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻松推进"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.tone.steady" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steady"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平稳推进"
           }
         }
       }
