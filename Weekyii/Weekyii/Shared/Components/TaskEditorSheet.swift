@@ -498,6 +498,7 @@ struct TaskEditorSheet: View {
 struct AttachmentThumbnail: View {
     let data: Data
     @State private var image: UIImage?
+    @State private var didFail = false
 
     var body: some View {
         Group {
@@ -506,6 +507,13 @@ struct AttachmentThumbnail: View {
                     .resizable()
                     .scaledToFill()
                     .clipped()
+            } else if didFail {
+                ZStack {
+                    Color.accentOrangeLight.opacity(0.12)
+                    Image(systemName: "photo")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.textTertiary)
+                }
             } else {
                 ZStack {
                     Color.accentOrangeLight.opacity(0.12)
@@ -515,13 +523,36 @@ struct AttachmentThumbnail: View {
             }
         }
         .task(id: data.count) {
-            image = await Task.detached(priority: .utility) {
-                downsampledImage(from: data, maxPixelSize: 320)
-            }.value
+            let decoded = await ImageDataDecoder.thumbnail(from: data, maxPixelSize: 320, priority: .utility)
+            image = decoded
+            didFail = decoded == nil
         }
     }
+}
 
-    private nonisolated func downsampledImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+/// Decodes stored image data off the main thread for display. Only the
+/// in-memory image is scaled; the stored data itself is never changed.
+enum ImageDataDecoder {
+    /// A decoded copy whose longer side is at most `maxPixelSize` pixels,
+    /// with EXIF orientation applied.
+    static func thumbnail(
+        from data: Data,
+        maxPixelSize: CGFloat,
+        priority: TaskPriority = .userInitiated
+    ) async -> UIImage? {
+        await Task.detached(priority: priority) {
+            decodeThumbnail(from: data, maxPixelSize: maxPixelSize)
+        }.value
+    }
+
+    /// The full-resolution image, decoded ahead of display (for the full-screen viewer).
+    static func fullImage(from data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(data: data)?.preparingForDisplay()
+        }.value
+    }
+
+    private nonisolated static func decodeThumbnail(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,

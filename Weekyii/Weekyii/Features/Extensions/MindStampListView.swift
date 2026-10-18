@@ -89,17 +89,12 @@ struct MindStampListView: View {
     private func stampCard(_ stamp: MindStampItem, index: Int) -> some View {
         WeekCard {
             HStack(alignment: .center, spacing: WeekSpacing.md) {
-                if let blob = stamp.imageBlob, let uiImage = UIImage(data: blob) {
+                if let blob = stamp.imageBlob {
                     Button {
-                        imagePreviewItem = ImagePreviewItem(image: uiImage)
+                        openImagePreview(blob)
                     } label: {
-                        ZStack {
-                            Color.accentPink.opacity(0.08)
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .padding(WeekSpacing.xs)
-                        }
+                        // 缩略图裁剪铺满方块；点开看完整原图
+                        AttachmentThumbnail(data: blob)
                             .frame(width: 72, height: 72)
                             .clipShape(.rect(cornerRadius: WeekRadius.small))
                             .overlay {
@@ -163,6 +158,15 @@ struct MindStampListView: View {
                 ) {
                     deletingItem = stamp
                 }
+            }
+        }
+    }
+
+    // 看大图时才在后台解码原图
+    private func openImagePreview(_ data: Data) {
+        Task {
+            if let image = await ImageDataDecoder.fullImage(from: data) {
+                imagePreviewItem = ImagePreviewItem(image: image)
             }
         }
     }

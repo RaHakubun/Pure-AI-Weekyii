@@ -874,7 +874,7 @@ private struct WeekyiiLaunchOverlay: View {
                         Rectangle().frame(width: max(logoWidth * writeProgress, 0.001))
                     }
 
-                Text("以周为核心管理你的每一天")
+                Text(String(localized: "launch.subtitle", defaultValue: "周粒度Todo事项管理"))
                     .font(.system(size: 16))
                     .foregroundColor(WeekyiiLaunchStyle.brandInk.opacity(0.78))
                     .opacity(subtitleOpacity)

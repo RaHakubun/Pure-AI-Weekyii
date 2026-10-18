@@ -22,6 +22,12 @@ struct AutoStartDailyPlan: Codable, Equatable {
     var activationDeferredUntilTomorrow: Bool
 }
 
+/// Week list or month calendar on the Pending and Past tabs.
+enum WeekBrowseMode: String {
+    case weekList
+    case month
+}
+
 final class UserSettings: ObservableObject {
     private static let cloudSyncRequestedKey = "cloudSyncRequested"
     private static let legacyCloudSyncEnabledKey = "cloudSyncEnabled"
@@ -29,6 +35,8 @@ final class UserSettings: ObservableObject {
     private static let autoStartConfigurationKey = "weekyii.autoStart.configuration"
     private static let autoStartDailyPlanKey = "weekyii.autoStart.dailyPlan"
     private static let autoStartWasEverEnabledKey = "weekyii.autoStart.wasEverEnabled"
+    static let pendingBrowseModeKey = "weekyii.pending.browseMode"
+    static let pastBrowseModeKey = "weekyii.past.browseMode"
 
     // Default Kill Time
     @Published var defaultKillTimeHour: Int {
@@ -180,6 +188,19 @@ final class UserSettings: ObservableObject {
     @Published var pastMonthShowExpiredFlame: Bool {
         didSet { save() }
     }
+
+    // Pending / Past browse mode: the last chosen view (week list or month
+    // calendar) is restored on launch. Device-local display preference only;
+    // intentionally not part of SwiftData, iCloud sync or data archives.
+    @Published var pendingBrowseModeRaw: String {
+        didSet { save() }
+    }
+    @Published var pastBrowseModeRaw: String {
+        didSet { save() }
+    }
+    /// False under UI tests, so every run starts from the week list and never
+    /// leaves a stored mode behind for the next run.
+    private let restoresBrowseModes: Bool
     
     // Theme Settings
     @Published var selectedThemeRaw: String {
@@ -228,8 +249,12 @@ final class UserSettings: ObservableObject {
     
     private let defaults: UserDefaults
     
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        restoresBrowseModes: Bool = !ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    ) {
         self.defaults = defaults
+        self.restoresBrowseModes = restoresBrowseModes
         // Load saved values or use defaults
         self.defaultKillTimeHour = defaults.object(forKey: "defaultKillTimeHour") as? Int ?? 23
         self.defaultKillTimeMinute = defaults.object(forKey: "defaultKillTimeMinute") as? Int ?? 45
@@ -296,6 +321,12 @@ final class UserSettings: ObservableObject {
         self.pastMonthShowCompletedCount = defaults.object(forKey: "pastMonthShowCompletedCount") as? Bool ?? pastMarkerDefaults.showsCompletedCount
         self.pastMonthShowRecordDot = defaults.object(forKey: "pastMonthShowRecordDot") as? Bool ?? pastMarkerDefaults.showsRecordDot
         self.pastMonthShowExpiredFlame = defaults.object(forKey: "pastMonthShowExpiredFlame") as? Bool ?? pastMarkerDefaults.showsExpiredFlame
+        self.pendingBrowseModeRaw = restoresBrowseModes
+            ? defaults.string(forKey: Self.pendingBrowseModeKey) ?? WeekBrowseMode.weekList.rawValue
+            : WeekBrowseMode.weekList.rawValue
+        self.pastBrowseModeRaw = restoresBrowseModes
+            ? defaults.string(forKey: Self.pastBrowseModeKey) ?? WeekBrowseMode.weekList.rawValue
+            : WeekBrowseMode.weekList.rawValue
         self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
@@ -474,6 +505,10 @@ final class UserSettings: ObservableObject {
         defaults.set(pastMonthShowCompletedCount, forKey: "pastMonthShowCompletedCount")
         defaults.set(pastMonthShowRecordDot, forKey: "pastMonthShowRecordDot")
         defaults.set(pastMonthShowExpiredFlame, forKey: "pastMonthShowExpiredFlame")
+        if restoresBrowseModes {
+            defaults.set(pendingBrowseModeRaw, forKey: Self.pendingBrowseModeKey)
+            defaults.set(pastBrowseModeRaw, forKey: Self.pastBrowseModeKey)
+        }
         defaults.set(selectedThemeRaw, forKey: "selectedTheme")
         defaults.set(appearanceModeRaw, forKey: "appearanceMode")
         defaults.set(premiumThemeUnlocked, forKey: "premiumThemeUnlocked")
@@ -524,6 +559,17 @@ final class UserSettings: ObservableObject {
     var appearanceMode: AppearanceMode {
         get { AppearanceMode(rawValue: appearanceModeRaw) ?? .system }
         set { appearanceModeRaw = newValue.rawValue }
+    }
+
+    /// Unknown stored values fall back to the week list.
+    var pendingBrowseMode: WeekBrowseMode {
+        get { WeekBrowseMode(rawValue: pendingBrowseModeRaw) ?? .weekList }
+        set { pendingBrowseModeRaw = newValue.rawValue }
+    }
+
+    var pastBrowseMode: WeekBrowseMode {
+        get { WeekBrowseMode(rawValue: pastBrowseModeRaw) ?? .weekList }
+        set { pastBrowseModeRaw = newValue.rawValue }
     }
 
     var pastMonthMarkerOptions: PastMonthMarkerOptions {

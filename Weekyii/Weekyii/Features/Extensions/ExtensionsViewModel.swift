@@ -631,19 +631,10 @@ final class ExtensionsViewModel {
         var next: [UUID: ProjectTileSnapshot] = [:]
         let today = calendar.startOfDay(for: Date())
         for project in projects {
-            let sortedPending = project.tasks
-                .filter { $0.zone != .complete }
-                .sorted { lhs, rhs in
-                    let lhsDate = lhs.day?.date ?? .distantFuture
-                    let rhsDate = rhs.day?.date ?? .distantFuture
-                    if lhsDate != rhsDate { return lhsDate < rhsDate }
-                    return lhs.order < rhs.order
-                }
-
-            let preferredTask = sortedPending.first(where: { task in
-                guard let date = task.day?.date else { return false }
-                return calendar.startOfDay(for: date) >= today
-            }) ?? sortedPending.first
+            // Overdue tasks are count-only (see ProjectTaskTimeline): they never
+            // become the next step and never appear by title in tile lists.
+            let actionableTasks = ProjectTaskTimeline.actionableTasks(in: project, today: today, calendar: calendar)
+            let preferredTask = actionableTasks.first
 
             // 坐标轴与待办列表共用一个时间域：窗口右端跟着最晚的待办日延伸，
             // 但最多到 today+13，避免远期任务把整段历史挤出窗口。
@@ -677,12 +668,12 @@ final class ExtensionsViewModel {
                     planned: plannedByDay[day] ?? 0
                 )
             }
-            let upcomingTasks = sortedPending.prefix(tileTaskRowLimit).map { task in
-                let taskDate = task.day?.date
-                return ProjectTileTaskEntry(
+            let upcomingTasks = actionableTasks.prefix(tileTaskRowLimit).map { task in
+                ProjectTileTaskEntry(
+                    taskID: task.id,
                     title: task.title,
-                    date: taskDate,
-                    isOverdue: taskDate.map { calendar.startOfDay(for: $0) < today } ?? false
+                    date: task.day?.date,
+                    isOverdue: false
                 )
             }
 
@@ -698,6 +689,7 @@ final class ExtensionsViewModel {
                 expiredCount: project.expiredTaskCount,
                 nextTaskTitle: preferredTask?.title,
                 nextTaskDate: preferredTask?.day?.date,
+                nextTaskID: preferredTask?.id,
                 trend: trend,
                 upcomingTasks: upcomingTasks
             )
@@ -713,6 +705,9 @@ struct ProjectTileTrendPoint: Equatable {
 }
 
 struct ProjectTileTaskEntry: Equatable {
+    /// Identity of the source task, so views can de-duplicate by task rather
+    /// than by title and date (two tasks may share both).
+    var taskID: UUID? = nil
     let title: String
     let date: Date?
     let isOverdue: Bool
@@ -730,14 +725,18 @@ struct ProjectTileSnapshot: Equatable {
     let expiredCount: Int
     let nextTaskTitle: String?
     let nextTaskDate: Date?
+    var nextTaskID: UUID? = nil
     var trend: [ProjectTileTrendPoint] = []
     var upcomingTasks: [ProjectTileTaskEntry] = []
 }
 
 struct ProjectTaskLedgerSection: Identifiable {
     let date: Date
+    /// Tasks shown with details: completed and still-actionable ones.
     let tasks: [TaskItem]
     let isExpandedByDefault: Bool
+    /// Overdue tasks on this day. Count only, never listed (see ProjectTaskTimeline).
+    var expiredCount: Int = 0
 
     var id: String {
         date.dayId
@@ -776,16 +775,19 @@ enum ProjectDetailComposer {
 
         return grouped
             .map { date, tasks in
-                let sortedTasks = tasks.sorted { lhs, rhs in
-                    if lhs.order != rhs.order {
-                        return lhs.order < rhs.order
+                let visibleTasks = tasks
+                    .filter { !ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar) }
+                    .sorted { lhs, rhs in
+                        if lhs.order != rhs.order {
+                            return lhs.order < rhs.order
+                        }
+                        return lhs.id.uuidString < rhs.id.uuidString
                     }
-                    return lhs.id.uuidString < rhs.id.uuidString
-                }
                 return ProjectTaskLedgerSection(
                     date: date,
-                    tasks: sortedTasks,
-                    isExpandedByDefault: date >= today
+                    tasks: visibleTasks,
+                    isExpandedByDefault: date >= today,
+                    expiredCount: tasks.count - visibleTasks.count
                 )
             }
             .sorted { $0.date < $1.date }
@@ -797,24 +799,10 @@ enum ProjectDetailComposer {
         referenceDate: Date
     ) -> ProjectDetailSnapshot {
         let today = calendar.startOfDay(for: referenceDate)
-        let pending = project.tasks
-            .filter { $0.zone != .complete }
-            .sorted { lhs, rhs in
-                let lhsDate = calendar.startOfDay(for: lhs.day?.date ?? .distantFuture)
-                let rhsDate = calendar.startOfDay(for: rhs.day?.date ?? .distantFuture)
-                if lhsDate != rhsDate {
-                    return lhsDate < rhsDate
-                }
-                if lhs.order != rhs.order {
-                    return lhs.order < rhs.order
-                }
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-
-        let nextTask = pending.first { task in
-            guard let taskDay = task.day?.date else { return false }
-            return calendar.startOfDay(for: taskDay) >= today
-        } ?? pending.first
+        let nextTask = ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar)
+        let expiredCount = project.tasks.filter {
+            ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar)
+        }.count
 
         return ProjectDetailSnapshot(
             projectID: project.id,
@@ -829,7 +817,7 @@ enum ProjectDetailComposer {
             totalCount: project.totalTaskCount,
             completedCount: project.completedTaskCount,
             remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
-            expiredCount: project.expiredTaskCount,
+            expiredCount: expiredCount,
             nextTaskTitle: nextTask?.title,
             nextTaskDate: nextTask?.day?.date,
             sections: projectTaskLedgerSections(project: project, calendar: calendar, referenceDate: referenceDate)

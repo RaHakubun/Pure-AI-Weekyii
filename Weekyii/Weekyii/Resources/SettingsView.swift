@@ -317,20 +317,11 @@ struct SettingsView: View {
 
             Section("应用") {
                 NavigationLink {
-                    usageHistorySettingsPage
+                    AboutWeekyiiPage()
                 } label: {
                     SettingsNavigationRow(
-                        title: String(localized: "settings.usage_history.title", defaultValue: "使用历程"),
-                        icon: "clock.arrow.circlepath",
-                        tint: .teal
-                    )
-                }
-
-                NavigationLink {
-                    aboutSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "关于 Weekyii",
+                        title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
+                        value: AboutWeekyiiPage.appVersion,
                         icon: "info.circle.fill",
                         tint: .mint
                     )
@@ -525,22 +516,6 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var usageHistorySettingsPage: some View {
-        Form {
-            pastSection
-        }
-        .navigationTitle(String(localized: "settings.usage_history.title", defaultValue: "使用历程"))
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var aboutSettingsPage: some View {
-        Form {
-            aboutSection
-        }
-        .navigationTitle("关于 Weekyii")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
     private var developerSettingsPage: some View {
         Form { developerSection }
             .navigationTitle("开发者与诊断")
@@ -648,33 +623,6 @@ struct SettingsView: View {
         }
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    // MARK: - Past
-    @ViewBuilder
-    private var pastSection: some View {
-        Section {
-            if let startDate = appState.systemStartDate {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "calendar", color: .blue)
-                    Text(String(localized: "settings.about.start_date"))
-                    Spacer()
-                    Text(startDate, format: Date.FormatStyle().year().month().day())
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "flag.fill", color: .orange)
-                Text(String(localized: "settings.about.days_started"))
-                Spacer()
-                Text("\(appState.daysStartedCount)")
-                    .foregroundStyle(.secondary)
-            }
-
-        } header: {
-            Text(String(localized: "settings.usage_history.overview", defaultValue: "概览"))
-        }
     }
 
     // MARK: - Past Month Markers
@@ -1336,23 +1284,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - About
-    @ViewBuilder
-    private var aboutSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "info.circle.fill", color: .teal)
-                Text(String(localized: "settings.about.version"))
-                Spacer()
-                Text("1.0.0")
-                    .foregroundStyle(.secondary)
-            }
-
-        } header: {
-            Text(String(localized: "settings.about.header"))
-        }
-    }
-    
     // MARK: - Execution Mode Settings
     @ViewBuilder
     private var executionModeSettings: some View {
@@ -3231,5 +3162,1018 @@ private struct RecoveryPointsView: View {
         } catch {
             message = "恢复失败：\(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - About Weekyii
+
+/// Snapshot of the lifetime numbers shown on the About page. Everything is
+/// derived from persisted records, never from the device-local
+/// `AppState.daysStartedCount` counter, so the page agrees with what sync and
+/// backup restore actually contain.
+private struct AboutWeekyiiStats {
+    struct WeekdayMark: Identifiable {
+        let id: Int
+        let label: String
+        let isStarted: Bool
+        let isToday: Bool
+        let isFuture: Bool
+    }
+
+    var startDate: Date?
+    var companionDays = 0
+    var startedDays = 0
+    var completedTasks = 0
+    var completionRate = 0.0
+    var focusHours = 0.0
+    var currentStreak = 0
+    var longestStreak = 0
+    var weekdayMarks: [WeekdayMark] = []
+    var weeksWithStarts = 0
+    /// Started days per week for the most recent weeks, oldest first.
+    var recentWeekCounts: [Int] = []
+    var completedProjects = 0
+    var mindStampCount = 0
+    var activeHabits = 0
+
+    static let recentWeekCount = 10
+
+    static func make(
+        days: [DayModel],
+        projects: [ProjectModel],
+        mindStampCount: Int,
+        habits: [HabitModel],
+        systemStartDate: Date?,
+        now: Date = Date()
+    ) -> AboutWeekyiiStats {
+        var stats = AboutWeekyiiStats()
+        let calendar = WeekyiiTimeZone.calendar
+        let today = now.startOfDay
+
+        // Task totals use the same algorithm as the Past tab.
+        let overview = PastAnalyticsService().getOverviewStats(days: days)
+        stats.completedTasks = overview.totalCompletedTasks
+        stats.completionRate = overview.completionRate
+        stats.focusHours = overview.totalFocusHours
+
+        // A day counts as started only when the user actually pressed start
+        // (`DayStartService` stamps `initiatedAt`). Draft or habit-only days
+        // that were closed at the deadline also end up `.expired`, but they
+        // were never started, so status alone is not enough.
+        let startedDayIds = Set(days.compactMap { day -> String? in
+            let started = day.initiatedAt != nil || day.status == .execute || day.status == .completed
+            return started ? day.dayId : nil
+        })
+        stats.startedDays = startedDayIds.count
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = WeekyiiTimeZone.timeZone
+        let startedDates = startedDayIds.compactMap { formatter.date(from: $0) }.sorted()
+
+        // Longest run of consecutive started days.
+        var longest = 0
+        var run = 0
+        var previous: Date?
+        for date in startedDates {
+            if let previous, calendar.dateComponents([.day], from: previous, to: date).day == 1 {
+                run += 1
+            } else {
+                run = 1
+            }
+            longest = max(longest, run)
+            previous = date
+        }
+        stats.longestStreak = longest
+
+        // Current run ends today, or yesterday when today has not been started yet.
+        var cursor = startedDayIds.contains(formatter.string(from: today)) ? today : today.addingDays(-1)
+        var current = 0
+        while startedDayIds.contains(formatter.string(from: cursor)) {
+            current += 1
+            cursor = cursor.addingDays(-1)
+        }
+        stats.currentStreak = current
+
+        // This week, Monday first, matching the app's week model.
+        let weekStart = today.startOfWeek
+        var symbolCalendar = calendar
+        symbolCalendar.locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+        let symbols = symbolCalendar.veryShortStandaloneWeekdaySymbols
+        stats.weekdayMarks = (0..<7).map { offset in
+            let date = weekStart.addingDays(offset)
+            // `veryShortStandaloneWeekdaySymbols` starts on Sunday; offset 0 is Monday.
+            let label = symbols.isEmpty ? "" : symbols[(offset + 1) % symbols.count]
+            return WeekdayMark(
+                id: offset,
+                label: label,
+                isStarted: startedDayIds.contains(formatter.string(from: date)),
+                isToday: date == today,
+                isFuture: date > today
+            )
+        }
+
+        var startsPerWeek: [String: Int] = [:]
+        for date in startedDates {
+            startsPerWeek[date.weekId, default: 0] += 1
+        }
+        stats.weeksWithStarts = startsPerWeek.count
+        stats.recentWeekCounts = (0..<recentWeekCount).reversed().map { weeksAgo in
+            startsPerWeek[weekStart.addingDays(-7 * weeksAgo).weekId] ?? 0
+        }
+
+        if let systemStartDate {
+            stats.startDate = systemStartDate
+            let elapsed = calendar.dateComponents([.day], from: systemStartDate.startOfDay, to: today).day ?? 0
+            stats.companionDays = max(1, elapsed + 1)
+        }
+
+        // `.archived` can only be reached from `.completed` (see ExtensionsViewModel.updateStatus).
+        stats.completedProjects = projects.filter { $0.status == .completed || $0.status == .archived }.count
+        stats.mindStampCount = mindStampCount
+        stats.activeHabits = habits.filter(\.isActive).count
+        return stats
+    }
+}
+
+private struct AboutWeekyiiPage: View {
+    @EnvironmentObject private var settings: UserSettings
+    @EnvironmentObject private var appState: AppState
+    @Query private var days: [DayModel]
+    @Query private var projects: [ProjectModel]
+    @Query private var mindStamps: [MindStampItem]
+    @Query private var habits: [HabitModel]
+
+    static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    static var buildNumber: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+    }
+
+    var body: some View {
+        let stats = AboutWeekyiiStats.make(
+            days: days,
+            projects: projects,
+            mindStampCount: mindStamps.count,
+            habits: habits,
+            systemStartDate: appState.systemStartDate
+        )
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: WeekSpacing.xl) {
+                heroCard(stats)
+
+                aboutSection(String(localized: "settings.about.streak.title", defaultValue: "连续启动")) {
+                    streakCard(stats)
+                    weeksCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.journey.title", defaultValue: "我们的旅程")) {
+                    journeyCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.stats.title", defaultValue: "我的成绩")) {
+                    statsGrid(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.seals.title", defaultValue: "收集的印章")) {
+                    sealsCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.guide.title", defaultValue: "Weekyii 怎么用")) {
+                    WeekCard {
+                        AboutGuidePath()
+                    }
+                }
+
+                footer
+            }
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.top, WeekSpacing.base)
+            .padding(.bottom, WeekSpacing.xxxl)
+        }
+        .background(Color.backgroundPrimary.ignoresSafeArea())
+        .navigationTitle(String(localized: "settings.about.title", defaultValue: "关于 Weekyii"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: Sections
+
+    private func aboutSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            Text(title)
+                .font(.system(size: 20, weight: .semibold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .padding(.horizontal, WeekSpacing.xs)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private func heroCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            // Same narrative artwork as the Today status card, so the page follows
+            // the selected theme. Kept static like the theme preview in Settings.
+            ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
+                .frame(maxWidth: .infinity)
+                .frame(height: 168)
+                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+                )
+
+            VStack(spacing: WeekSpacing.xs) {
+                Text(verbatim: "Weekyii")
+                    .font(.custom("SnellRoundhand-Bold", size: 40))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                Text(String(localized: "launch.subtitle"))
+                    .font(.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+
+                AboutOrnament()
+                    .padding(.vertical, WeekSpacing.xs)
+
+                if stats.companionDays > 0 {
+                    HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.xs) {
+                        Text(String(localized: "settings.about.companion_prefix", defaultValue: "我们已经一起走过"))
+                            .font(.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
+                        Text(verbatim: "\(stats.companionDays)")
+                            .font(.system(size: 26, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.weekyiiPrimary)
+                        Text(String(localized: "settings.about.unit.days", defaultValue: "天"))
+                            .font(.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func streakCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(alignment: .top, spacing: WeekSpacing.base) {
+                AboutCandleVignette()
+                    .frame(width: 88, height: 104)
+
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    AboutNumber(
+                        value: "\(stats.currentStreak)",
+                        unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                        size: 38,
+                        color: .weekyiiPrimary,
+                        unitColor: .weekyiiPrimary
+                    )
+                    Text(String(localized: "settings.about.streak.current", defaultValue: "当前连续启动"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    Label {
+                        Text(String(localized: "settings.about.streak.best \(stats.longestStreak)"))
+                    } icon: {
+                        Image(systemName: "trophy")
+                    }
+                    .font(.captionBold)
+                    .foregroundStyle(Color.weekyiiPrimary)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.vertical, WeekSpacing.xs + 1)
+                    .background(Capsule().fill(Color.backgroundTertiary))
+                    .padding(.top, WeekSpacing.xs)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 0) {
+                ForEach(stats.weekdayMarks) { mark in
+                    VStack(spacing: WeekSpacing.sm) {
+                        Text(mark.label)
+                            .font(.captionSmall)
+                            .foregroundStyle(Color.textTertiary)
+                        AboutDayDot(mark: mark)
+                        Text(String(localized: "settings.about.today", defaultValue: "今天"))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.weekyiiPrimary)
+                            .opacity(mark.isToday ? 1 : 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func weeksCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(spacing: WeekSpacing.md) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.taskRegularBg)
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: "calendar")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.taskRegular)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(
+                        value: "\(stats.weeksWithStarts)",
+                        unit: String(localized: "settings.about.unit.weeks", defaultValue: "周"),
+                        size: 24
+                    )
+                    Text(String(localized: "settings.about.weeks.caption", defaultValue: "留下过启动记录"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .accessibilityElement(children: .combine)
+
+                Spacer(minLength: WeekSpacing.sm)
+
+                VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
+                    HStack(alignment: .bottom, spacing: 5) {
+                        ForEach(Array(stats.recentWeekCounts.enumerated()), id: \.offset) { _, count in
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(Color.weekyiiPrimaryLight.opacity(count == 0 ? 0.22 : 0.35 + 0.65 * Double(min(count, 7)) / 7))
+                                .frame(width: 7, height: 4 + CGFloat(min(count, 7)) * 5)
+                        }
+                    }
+                    .frame(height: 39, alignment: .bottom)
+                    Text(String(localized: "settings.about.weeks.recent", defaultValue: "近 10 周"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func journeyCard(_ stats: AboutWeekyiiStats) -> some View {
+        let startLabel: String? = stats.startDate.map { date in
+            let text = date.formatted(.dateTime.year().month(.defaultDigits).day())
+            return String(localized: "settings.about.journey.start \(text)")
+        }
+
+        return WeekCard {
+            AboutJourneyScene(
+                startLabel: startLabel,
+                endLabel: String(localized: "settings.about.today", defaultValue: "今天")
+            )
+            .frame(height: 148)
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(
+                        value: "\(stats.companionDays)",
+                        unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                        size: 34
+                    )
+                    Text(String(localized: "settings.about.journey.together", defaultValue: "已陪伴"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .padding(WeekSpacing.base)
+                .accessibilityElement(children: .combine)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+            )
+        }
+    }
+
+    private func statsGrid(_ stats: AboutWeekyiiStats) -> some View {
+        let columns = [GridItem(.flexible(), spacing: WeekSpacing.md), GridItem(.flexible(), spacing: WeekSpacing.md)]
+        let hours = stats.focusHours >= 10 || stats.focusHours == 0
+            ? "\(Int(stats.focusHours.rounded()))"
+            : stats.focusHours.formatted(.number.precision(.fractionLength(1)))
+
+        return VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            LazyVGrid(columns: columns, spacing: WeekSpacing.md) {
+                AboutStatTile(
+                    value: "\(stats.startedDays)",
+                    unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                    label: String(localized: "settings.about.days_started"),
+                    tint: .accentOrange
+                ) {
+                    Image(systemName: "sun.max")
+                }
+                AboutStatTile(
+                    value: stats.completedTasks.formatted(),
+                    unit: String(localized: "settings.about.unit.tasks", defaultValue: "项"),
+                    label: String(localized: "settings.about.stats.completed", defaultValue: "完成任务"),
+                    tint: .accentGreen
+                ) {
+                    Image(systemName: "checkmark.circle")
+                }
+                AboutStatTile(
+                    value: "\(Int((stats.completionRate * 100).rounded()))",
+                    unit: "%",
+                    label: String(localized: "stats.completion_rate"),
+                    tint: .weekyiiPrimary,
+                    progress: stats.completionRate
+                ) {
+                    EmptyView()
+                }
+                AboutStatTile(
+                    value: hours,
+                    unit: String(localized: "settings.about.unit.hours", defaultValue: "小时"),
+                    label: String(localized: "stats.focus_hours"),
+                    tint: .taskLeisure
+                ) {
+                    Image(systemName: "clock")
+                }
+            }
+
+            Text(String(localized: "settings.about.stats.note", defaultValue: "完成任务、完成率与专注时长按「过去」页同一算法统计"))
+                .font(.captionSmall)
+                .foregroundStyle(Color.textTertiary)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private func sealsCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                AboutSealItem(
+                    count: stats.completedProjects,
+                    label: String(localized: "settings.about.seals.projects", defaultValue: "完成项目"),
+                    symbol: "trophy",
+                    light: .weekyiiPrimaryLight,
+                    dark: .weekyiiPrimary
+                )
+                AboutSealItem(
+                    count: stats.mindStampCount,
+                    label: String(localized: "extensions.module.mindstamps.title"),
+                    symbol: "note.text",
+                    light: Color.accentPink.opacity(0.62),
+                    dark: .accentPink
+                )
+                AboutSealItem(
+                    count: stats.activeHabits,
+                    label: String(localized: "settings.about.seals.habits", defaultValue: "进行中的习惯"),
+                    symbol: "leaf",
+                    light: .accentGreenLight,
+                    dark: .accentGreen
+                )
+            }
+            .padding(.vertical, WeekSpacing.xs)
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: WeekSpacing.md) {
+            HStack(spacing: WeekSpacing.sm) {
+                AboutOrnament(lineWidth: 40, showsCenter: false)
+                Text(String(localized: "settings.about.motto", defaultValue: "一周一周，慢慢变好"))
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                AboutOrnament(lineWidth: 40, showsCenter: false, mirrored: true)
+            }
+            .padding(.bottom, WeekSpacing.md)
+
+            AboutAppIcon()
+                .frame(width: 52, height: 52)
+
+            Text(verbatim: "Weekyii")
+                .font(.custom("SnellRoundhand-Bold", size: 24))
+                .foregroundStyle(Color.weekyiiPrimary)
+
+            Text(String(localized: "settings.about.version_build \(Self.appVersion) \(Self.buildNumber)"))
+                .font(.caption)
+                .foregroundStyle(Color.weekyiiPrimary)
+                .padding(.horizontal, WeekSpacing.base)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color.weekyiiPrimaryLight, lineWidth: 1))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, WeekSpacing.sm)
+    }
+}
+
+// MARK: About building blocks
+
+private struct AboutNumber: View {
+    let value: String
+    let unit: String
+    var size: CGFloat = 24
+    var color: Color = .textPrimary
+    var unitColor: Color = .textSecondary
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.system(size: size, weight: .bold, design: .serif))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(unit)
+                .font(.system(size: max(11, size * 0.4)))
+                .foregroundStyle(unitColor)
+        }
+    }
+}
+
+/// Thin line – diamond – thin line, the small rule used between hero lines and around the motto.
+private struct AboutOrnament: View {
+    var lineWidth: CGFloat = 38
+    var showsCenter = true
+    var mirrored = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if showsCenter {
+                rule
+                diamond
+                rule
+            } else if mirrored {
+                diamond
+                rule
+            } else {
+                rule
+                diamond
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var rule: some View {
+        Rectangle()
+            .fill(Color.weekyiiPrimaryLight)
+            .frame(width: lineWidth, height: 0.8)
+    }
+
+    private var diamond: some View {
+        Rectangle()
+            .fill(Color.weekyiiPrimaryLight)
+            .frame(width: 5, height: 5)
+            .rotationEffect(.degrees(45))
+    }
+}
+
+private struct AboutDayDot: View {
+    let mark: AboutWeekyiiStats.WeekdayMark
+
+    var body: some View {
+        ZStack {
+            if mark.isStarted {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentOrangeLight, Color.weekyiiPrimary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 30, height: 30)
+                    .shadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white)
+            } else {
+                Circle()
+                    .stroke(Color.textTertiary.opacity(mark.isFuture ? 0.55 : 0.3), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+            }
+            if mark.isToday {
+                Circle()
+                    .stroke(Color.weekyiiPrimary, lineWidth: 1.4)
+                    .frame(width: 38, height: 38)
+            }
+        }
+        .frame(width: 40, height: 40)
+    }
+}
+
+private struct AboutStatTile<Icon: View>: View {
+    let value: String
+    let unit: String
+    let label: String
+    let tint: Color
+    var progress: Double? = nil
+    @ViewBuilder let icon: () -> Icon
+
+    var body: some View {
+        WeekCard {
+            HStack(spacing: WeekSpacing.md) {
+                Group {
+                    if let progress {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.backgroundTertiary, lineWidth: 4.5)
+                            Circle()
+                                .trim(from: 0, to: max(0, min(1, progress)))
+                                .stroke(tint, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .frame(width: 32, height: 32)
+                        .frame(width: 40, height: 40)
+                    } else {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(tint.opacity(0.14))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                icon()
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(tint)
+                            )
+                    }
+                }
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(value: value, unit: unit, size: 24, unitColor: .textTertiary)
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+private struct AboutSealItem: View {
+    let count: Int
+    let label: String
+    let symbol: String
+    let light: Color
+    let dark: Color
+
+    var body: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            ZStack {
+                AboutSealShape()
+                    .fill(LinearGradient(colors: [light, dark], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .shadow(color: dark.opacity(0.28), radius: 5, x: 0, y: 3)
+                Circle()
+                    .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                    .padding(11)
+                Ellipse()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(width: 26, height: 16)
+                    .blur(radius: 3)
+                    .offset(x: -10, y: -16)
+                Image(systemName: symbol)
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 72, height: 72)
+            .accessibilityHidden(true)
+
+            Text(verbatim: "\(count)")
+                .font(.system(size: 20, weight: .bold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Wax-seal outline: a circle with a soft scalloped rim.
+private struct AboutSealShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2 / 1.045
+        var path = Path()
+        let steps = 120
+        for index in 0...steps {
+            let angle = Double(index) / Double(steps) * 2 * .pi
+            let r = radius * CGFloat(1 + 0.045 * sin(angle * 14))
+            let point = CGPoint(x: center.x + CGFloat(cos(angle)) * r, y: center.y + CGFloat(sin(angle)) * r)
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct AboutFlameShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addCurve(
+            to: CGPoint(x: rect.midX, y: rect.maxY),
+            control1: CGPoint(x: rect.maxX + rect.width * 0.15, y: rect.midY),
+            control2: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.midX, y: rect.minY),
+            control1: CGPoint(x: rect.minX, y: rect.maxY),
+            control2: CGPoint(x: rect.minX - rect.width * 0.15, y: rect.midY)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Small framed candle in the same palette family as `AmberWindowScene`.
+private struct AboutCandleVignette: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let deskY = height * 0.80
+            let candleHeight: CGFloat = 40
+
+            ZStack {
+                LinearGradient(
+                    colors: [Color.weekyiiPrimaryLight.opacity(0.32), Color.weekyiiPrimaryLight.opacity(0.85)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Rectangle()
+                    .fill(Color.weekyiiPrimaryDark.opacity(0.38))
+                    .frame(height: height - deskY)
+                    .position(x: width / 2, y: deskY + (height - deskY) / 2)
+
+                Circle()
+                    .fill(Color(hex: "#FFBE62").opacity(0.45))
+                    .frame(width: 50, height: 50)
+                    .blur(radius: 10)
+                    .position(x: width / 2, y: deskY - candleHeight - 12)
+
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(hex: "#FFF6E2"), Color(hex: "#F1D9B0")], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 16, height: candleHeight)
+                    .position(x: width / 2, y: deskY - candleHeight / 2)
+
+                Capsule()
+                    .fill(Color(hex: "#5A3516"))
+                    .frame(width: 1.4, height: 5)
+                    .position(x: width / 2, y: deskY - candleHeight - 2)
+
+                AboutFlameShape()
+                    .fill(LinearGradient(colors: [Color(hex: "#FFC66B"), Color(hex: "#FFF3C4")], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 12, height: 24)
+                    .position(x: width / 2, y: deskY - candleHeight - 16)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                .stroke(Color.white.opacity(0.4), lineWidth: 0.8)
+        )
+        .accessibilityHidden(true)
+    }
+}
+
+/// Dusk hills with a dashed path from the first day (pennant) to today (lantern).
+private struct AboutJourneyScene: View {
+    let startLabel: String?
+    let endLabel: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let start = CGPoint(x: width * 0.12, y: height * 0.80)
+            let end = CGPoint(x: width * 0.84, y: height * 0.56)
+
+            ZStack {
+                LinearGradient(
+                    colors: [Color.backgroundSecondary, Color.weekyiiPrimaryLight.opacity(0.6)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Circle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: 56, height: 56)
+                    .blur(radius: 14)
+                    .position(x: width * 0.78, y: height * 0.28)
+                Circle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 18, height: 18)
+                    .position(x: width * 0.78, y: height * 0.28)
+
+                Ellipse()
+                    .fill(Color.weekyiiPrimaryLight.opacity(0.55))
+                    .frame(width: width * 0.9, height: height * 0.9)
+                    .position(x: width * 0.25, y: height * 0.98)
+                Ellipse()
+                    .fill(Color.weekyiiPrimary.opacity(0.42))
+                    .frame(width: width, height: height)
+                    .position(x: width * 0.82, y: height * 1.02)
+                Ellipse()
+                    .fill(Color.weekyiiPrimaryDark.opacity(0.5))
+                    .frame(width: width * 1.5, height: height * 0.8)
+                    .position(x: width * 0.45, y: height * 1.24)
+
+                Path { path in
+                    path.move(to: start)
+                    path.addCurve(
+                        to: end,
+                        control1: CGPoint(x: width * 0.36, y: height * 0.98),
+                        control2: CGPoint(x: width * 0.56, y: height * 0.48)
+                    )
+                }
+                .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [3, 5]))
+
+                // Pennant at the first day.
+                Rectangle()
+                    .fill(Color.textPrimary.opacity(0.7))
+                    .frame(width: 1.4, height: 26)
+                    .position(x: start.x, y: start.y - 13)
+                Path { path in
+                    path.move(to: CGPoint(x: start.x + 0.7, y: start.y - 26))
+                    path.addLine(to: CGPoint(x: start.x + 15, y: start.y - 21))
+                    path.addLine(to: CGPoint(x: start.x + 0.7, y: start.y - 16))
+                    path.closeSubpath()
+                }
+                .fill(Color.white.opacity(0.92))
+
+                // Lantern for today.
+                Circle()
+                    .fill(Color.accentOrangeLight.opacity(0.75))
+                    .frame(width: 34, height: 34)
+                    .blur(radius: 9)
+                    .position(x: end.x, y: end.y - 9)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.white.opacity(0.92))
+                    .frame(width: 9, height: 13)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .stroke(Color.weekyiiPrimaryDark, lineWidth: 1)
+                    )
+                    .position(x: end.x, y: end.y - 9)
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        if let startLabel {
+                            Text(startLabel)
+                        }
+                        Spacer()
+                        Text(endLabel)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 1)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.bottom, WeekSpacing.sm)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The four stages as a gently winding path of nodes.
+private struct AboutGuidePath: View {
+    private struct Step {
+        let title: String
+        let detail: String
+        let symbol: String
+        let tint: Color
+    }
+
+    private let rowHeight: CGFloat = 112
+    private let nodeSize: CGFloat = 60
+    private let swing: CGFloat = 62
+
+    private var steps: [Step] {
+        [
+            Step(
+                title: String(localized: "tab.pending"),
+                detail: String(localized: "settings.about.guide.future", defaultValue: "提前把事排进一周"),
+                symbol: "calendar",
+                tint: .taskRegular
+            ),
+            Step(
+                title: String(localized: "tab.today"),
+                detail: String(localized: "settings.about.guide.present", defaultValue: "开始今天，一件件完成"),
+                symbol: "sunrise",
+                tint: .accentOrange
+            ),
+            Step(
+                title: String(localized: "settings.about.guide.deadline", defaultValue: "截止"),
+                detail: String(localized: "settings.about.guide.deadline_detail", defaultValue: "到点只留完成记录与过期数"),
+                symbol: "hourglass",
+                tint: .taskDDL
+            ),
+            Step(
+                title: String(localized: "tab.past"),
+                detail: String(localized: "settings.about.guide.past", defaultValue: "回看每一天的足迹"),
+                symbol: "book",
+                tint: .taskLeisure
+            )
+        ]
+    }
+
+    var body: some View {
+        let steps = self.steps
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let centers = steps.indices.map { index in
+                CGPoint(
+                    x: width / 2 + (index.isMultiple(of: 2) ? -swing : swing),
+                    y: rowHeight * CGFloat(index) + rowHeight / 2
+                )
+            }
+            let labelGap = nodeSize / 2 + 12
+
+            ZStack(alignment: .topLeading) {
+                Path { path in
+                    for index in 0..<(centers.count - 1) {
+                        let from = centers[index]
+                        let to = centers[index + 1]
+                        let midY = (from.y + to.y) / 2
+                        path.move(to: from)
+                        path.addCurve(
+                            to: to,
+                            control1: CGPoint(x: from.x, y: midY),
+                            control2: CGPoint(x: to.x, y: midY)
+                        )
+                    }
+                }
+                .stroke(Color.weekyiiPrimaryLight, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, dash: [4, 5]))
+
+                ForEach(steps.indices, id: \.self) { index in
+                    let step = steps[index]
+                    let center = centers[index]
+                    let isLeftNode = index.isMultiple(of: 2)
+                    let labelWidth = max(0, isLeftNode ? width - center.x - labelGap : center.x - labelGap)
+
+                    Circle()
+                        .fill(LinearGradient(colors: [step.tint.opacity(0.55), step.tint], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1).padding(5))
+                        .overlay(
+                            Image(systemName: step.symbol)
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white)
+                        )
+                        .shadow(color: step.tint.opacity(0.25), radius: 6, x: 0, y: 3)
+                        .frame(width: nodeSize, height: nodeSize)
+                        .position(center)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: isLeftNode ? .leading : .trailing, spacing: 4) {
+                        Text(verbatim: "\(index + 1) · \(step.title)")
+                            .font(.system(size: 18, weight: .semibold, design: .serif))
+                            .foregroundStyle(step.tint)
+                        Text(step.detail)
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(isLeftNode ? .leading : .trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(width: labelWidth, alignment: isLeftNode ? .leading : .trailing)
+                    .position(x: isLeftNode ? center.x + labelGap + labelWidth / 2 : labelWidth / 2, y: center.y)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+        .frame(height: rowHeight * CGFloat(steps.count))
+    }
+}
+
+/// The real app icon, read from the compiled bundle so the page never ships a
+/// second copy of the artwork. Falls back to a themed glyph if it cannot be read.
+private struct AboutAppIcon: View {
+    private static let image: UIImage? = {
+        guard let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
+              let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+              let files = primary["CFBundleIconFiles"] as? [String],
+              let name = files.last else { return nil }
+        return UIImage(named: name)
+    }()
+
+    var body: some View {
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                LinearGradient(colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .overlay(
+                        Image(systemName: "scroll")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                    )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: Color.dynamic(lightHex: "#3A2A22", darkHex: "#000000").opacity(0.15), radius: 6, x: 0, y: 3)
+        .accessibilityHidden(true)
     }
 }

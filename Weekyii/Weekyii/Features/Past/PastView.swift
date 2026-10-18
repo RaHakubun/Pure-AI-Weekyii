@@ -1,11 +1,6 @@
 import SwiftUI
 import SwiftData
 
-private enum PastDisplayMode {
-    case weekList
-    case month
-}
-
 /// Per-day facts the Past month calendar can mark. Derived on read from
 /// existing `DayModel` fields; never written back.
 struct PastMonthDaySummary: Equatable {
@@ -120,10 +115,16 @@ struct PastView: View {
     @Query(sort: \DayModel.date, order: .reverse) private var allDays: [DayModel]
     @State private var selectedMonth = Date()
     @State private var selectedDate = Date()
-    @State private var displayMode: PastDisplayMode = .weekList
     @State private var showsMonthAnalytics = false
     private let analyticsService = PastAnalyticsService()
     private let calendar = Calendar(identifier: .iso8601)
+
+    /// Week list or month calendar. Stored in `UserSettings` (device-local), so
+    /// the last chosen view is restored after the app restarts.
+    private var displayMode: WeekBrowseMode {
+        get { userSettings.pastBrowseMode }
+        nonmutating set { userSettings.pastBrowseMode = newValue }
+    }
 
     var body: some View {
         NavigationStack {

@@ -53,10 +53,11 @@ final class KillTimeFireTests: XCTestCase {
         let calendar = Calendar(identifier: .iso8601)
         let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
         let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        // Current curve: exp(-t / 120)², i.e. exp(-t / 60).
         let samples: [(minutesBefore: Double, expectedIntensity: Double)] = [
-            (12 * 60, exp(-4)),
-            (3 * 60, exp(-1)),
-            (15, exp(-15.0 / 180.0)),
+            (12 * 60, exp(-12)),
+            (3 * 60, exp(-3)),
+            (15, exp(-15.0 / 60.0)),
             (0, 1)
         ]
 
@@ -75,6 +76,60 @@ final class KillTimeFireTests: XCTestCase {
         let remainingAfter = KillTimeDeadline.remainingMinutes(until: deadline, at: after)
         XCTAssertEqual(remainingAfter, -2, accuracy: 0.000_001)
         XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: remainingAfter), 1)
+    }
+
+    func testKillTimeVisualIntensityIsLinearBetweenSliderEnds() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let now = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 10, minute: 0))
+        let earliest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 11, minute: 0))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let range = earliest...latest
+        let minimum = KillTimeFlameBackground.minimumVisualIntensity
+        let midpoint = earliest.addingTimeInterval(latest.timeIntervalSince(earliest) / 2)
+        let quarter = earliest.addingTimeInterval(latest.timeIntervalSince(earliest) / 4)
+
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: earliest, at: now, selectableRange: range), 1, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: now, selectableRange: range), minimum, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: midpoint, at: now, selectableRange: range), (1 + minimum) / 2, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: quarter, at: now, selectableRange: range), minimum + (1 - minimum) * 0.75, accuracy: 0.000_001)
+        XCTAssertGreaterThan(minimum, 0.005, "23:59 must still draw a small flame")
+    }
+
+    func testKillTimeVisualIntensityGrowsAsTheRangeShrinksWithTheClock() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 22, minute: 0))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+
+        let morning = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 10, minute: 0))
+        let evening = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 18, minute: 0))
+        let late = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 21, minute: 30))
+
+        let morningPressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: morning, selectableRange: morning.addingTimeInterval(3600)...latest
+        )
+        let eveningPressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: evening, selectableRange: evening.addingTimeInterval(3600)...latest
+        )
+        let latePressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: late, selectableRange: late.addingTimeInterval(3600)...latest
+        )
+
+        XCTAssertLessThan(morningPressure, eveningPressure)
+        XCTAssertLessThan(eveningPressure, latePressure)
+        // Left end (now + 1h) has passed the cutoff: full fire.
+        XCTAssertEqual(latePressure, 1, accuracy: 0.000_001)
+    }
+
+    func testKillTimeVisualIntensityBurnsFullyWhenRangeCollapsesOrCutoffPassed() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let lastHour = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 10))
+
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: lastHour, selectableRange: latest...latest), 1)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: latest.addingTimeInterval(60), selectableRange: lastHour...latest), 1)
     }
 
     func testKillTimeDeadlineRemainsOverdueAcrossMidnight() throws {
@@ -4192,6 +4247,163 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(sections[2].isExpandedByDefault)
     }
 
+    // MARK: - Project overdue rules (count only, never a next step)
+
+    func test_projectTaskTimeline_isOverdueMatrix() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let pastDraftDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .draft)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+        let todayDraftDay = DayModel(dayId: today.dayId, date: today, status: .draft)
+        let todayExecuteDay = DayModel(dayId: today.dayId, date: today, status: .execute)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        func task(_ zone: TaskZone, on day: DayModel?) -> TaskItem {
+            let item = TaskItem(title: "T", order: 1, zone: zone)
+            item.day = day
+            return item
+        }
+
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.draft, on: pastDay), today: today, calendar: calendar))
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.draft, on: pastDraftDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.complete, on: pastDay), today: today, calendar: calendar))
+        XCTAssertTrue(ProjectTaskTimeline.isOverdue(task(.focus, on: todayExpiredDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.complete, on: todayExpiredDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: todayDraftDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.focus, on: todayExecuteDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: futureDay), today: today, calendar: calendar))
+        XCTAssertFalse(ProjectTaskTimeline.isOverdue(task(.draft, on: nil), today: today, calendar: calendar))
+    }
+
+    func test_projectTaskTimeline_nextTaskSkipsOverdueAndTodayExpired() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+        let project = ProjectModel(name: "Next", startDate: yesterday, endDate: tomorrow.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+
+        let pastTask = TaskItem(title: "Past", order: 1, zone: .draft)
+        pastTask.day = pastDay
+        let todayTask = TaskItem(title: "Today expired", order: 1, zone: .focus)
+        todayTask.day = todayExpiredDay
+        let futureSecond = TaskItem(title: "Future B", order: 2, zone: .draft)
+        futureSecond.day = futureDay
+        let futureFirst = TaskItem(title: "Future A", order: 1, zone: .draft)
+        futureFirst.day = futureDay
+        let unscheduled = TaskItem(title: "No day", order: 0, zone: .draft)
+
+        project.tasks = [pastTask, todayTask, futureSecond, futureFirst, unscheduled]
+
+        let actionable = ProjectTaskTimeline.actionableTasks(in: project, today: today, calendar: calendar)
+        XCTAssertEqual(actionable.map(\.title), ["Future A", "Future B"])
+        XCTAssertEqual(ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar)?.title, "Future A")
+        XCTAssertEqual(project.expiredTaskCount, 2)
+    }
+
+    func test_projectTaskTimeline_noNextTaskWhenOnlyOverdueRemains() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let project = ProjectModel(name: "Stalled", startDate: yesterday.addingDays(-3), endDate: today.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let overdue = TaskItem(title: "Overdue", order: 1, zone: .draft)
+        overdue.day = pastDay
+        project.tasks = [overdue]
+
+        XCTAssertNil(ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar))
+
+        let snapshot = ProjectDetailComposer.projectDetailSnapshot(
+            project: project,
+            calendar: calendar,
+            referenceDate: today
+        )
+        XCTAssertNil(snapshot.nextTaskTitle)
+        XCTAssertNil(snapshot.nextTaskDate)
+        XCTAssertEqual(snapshot.expiredCount, 1)
+        XCTAssertEqual(snapshot.remainingCount, 1)
+    }
+
+    func test_projectTaskLedgerSections_hideOverdueTasksButKeepCount() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let project = ProjectModel(name: "Ledger overdue", startDate: yesterday, endDate: today.addingDays(5))
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let todayExpiredDay = DayModel(dayId: today.dayId, date: today, status: .expired)
+
+        let pastDone = TaskItem(title: "Past done", order: 1, zone: .complete)
+        pastDone.day = pastDay
+        let pastOverdue = TaskItem(title: "Past overdue", order: 2, zone: .draft)
+        pastOverdue.day = pastDay
+        let todayOverdue = TaskItem(title: "Today overdue", order: 1, zone: .focus)
+        todayOverdue.day = todayExpiredDay
+
+        project.tasks = [pastDone, pastOverdue, todayOverdue]
+
+        let sections = ProjectDetailComposer.projectTaskLedgerSections(
+            project: project,
+            calendar: calendar,
+            referenceDate: today
+        )
+
+        XCTAssertEqual(sections.count, 2)
+        XCTAssertEqual(sections[0].tasks.map(\.title), ["Past done"])
+        XCTAssertEqual(sections[0].expiredCount, 1)
+        XCTAssertTrue(sections[1].tasks.isEmpty)
+        XCTAssertEqual(sections[1].expiredCount, 1)
+        XCTAssertFalse(sections.flatMap(\.tasks).contains { $0.zone != .complete && $0.day?.status == .expired })
+    }
+
+    @MainActor
+    func test_projectTileSnapshot_nextStepIsNotDuplicatedAndOverdueIsHidden() throws {
+        let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = today.addingDays(-1)
+        let tomorrow = today.addingDays(1)
+
+        let project = ProjectModel(name: "Tile", startDate: yesterday, endDate: tomorrow.addingDays(5))
+        context.insert(project)
+
+        let pastDay = DayModel(dayId: yesterday.dayId, date: yesterday, status: .expired)
+        let futureDay = DayModel(dayId: tomorrow.dayId, date: tomorrow, status: .draft)
+        context.insert(pastDay)
+        context.insert(futureDay)
+
+        let overdue = TaskItem(title: "Overdue", order: 1, zone: .draft)
+        // Two tasks share title and day: identity must come from the task id.
+        let first = TaskItem(title: "Same", order: 1, zone: .draft)
+        let second = TaskItem(title: "Same", order: 2, zone: .draft)
+        for (item, day) in [(overdue, pastDay), (first, futureDay), (second, futureDay)] {
+            item.project = project
+            day.tasks.append(item)
+        }
+        try context.save()
+
+        let viewModel = ExtensionsViewModel(modelContext: context)
+        viewModel.refresh()
+
+        let snapshot = try XCTUnwrap(viewModel.tileSnapshotsByProjectID[project.id])
+        XCTAssertEqual(snapshot.nextTaskID, first.id)
+        XCTAssertEqual(snapshot.expiredCount, 1)
+        XCTAssertEqual(snapshot.upcomingTasks.map(\.taskID), [first.id, second.id])
+        XCTAssertFalse(snapshot.upcomingTasks.contains { $0.title == "Overdue" || $0.isOverdue })
+
+        let laterTasks = snapshot.upcomingTasks.filter { $0.taskID != snapshot.nextTaskID }
+        XCTAssertEqual(laterTasks.map(\.taskID), [second.id])
+    }
+
     func test_widgetSnapshotComposer_buildsPriorityOrderedPreviewAndTheme() {
         let now = makeDate(2026, 3, 16, 9, 30)
         let day = DayModel(dayId: "2026-03-16", date: now, status: .execute)
@@ -4444,6 +4656,180 @@ final class ModelTests: XCTestCase {
         let outlook = PendingViewModel.buildWeekOutlook(for: week)
 
         XCTAssertEqual(outlook.tone, .frontLooseBackTight)
+    }
+
+    // MARK: - Week outlook key tasks and hint
+
+    @MainActor
+    func test_pendingWeekOutlook_keyTasksRankDeadlinesThenProjectDueThenOtherKeyWork() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+        let days = week.days.sorted { $0.date < $1.date }
+        let start = days[0].date
+
+        let multiStep = TaskItem(title: "Steps", taskType: .regular, order: 1, zone: .draft)
+        multiStep.steps = (1...3).map { TaskStep(title: "S\($0)", sortOrder: $0) }
+        days[0].tasks.append(multiStep)
+
+        let dueProject = ProjectModel(name: "Due", startDate: start, endDate: start.addingDays(3))
+        let projectDue = TaskItem(title: "Project due", taskType: .regular, order: 1, zone: .draft)
+        projectDue.project = dueProject
+        days[1].tasks.append(projectDue)
+
+        let firstDeadline = TaskItem(title: "DDL A", taskType: .ddl, order: 1, zone: .draft)
+        days[2].tasks.append(firstDeadline)
+        let secondDeadline = TaskItem(title: "DDL B", taskType: .ddl, order: 1, zone: .draft)
+        days[4].tasks.append(secondDeadline)
+
+        let laterProject = ProjectModel(name: "Later", startDate: start, endDate: start.addingDays(30))
+        let projectTask = TaskItem(title: "Project later", taskType: .regular, order: 1, zone: .draft)
+        projectTask.project = laterProject
+        days[3].tasks.append(projectTask)
+
+        days[5].tasks.append(TaskItem(title: "Plain", taskType: .regular, order: 1, zone: .draft))
+        days[6].tasks.append(TaskItem(title: "Done DDL", taskType: .ddl, order: 1, zone: .complete))
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.keyTasks.map(\.title), ["DDL A", "DDL B", "Project due"])
+        XCTAssertEqual(outlook.keyTasks.map(\.reason), [.deadline(typeName: nil), .deadline(typeName: nil), .projectDue])
+        XCTAssertEqual(outlook.hiddenKeyTaskCount, 2, "project task ending later + multi-step task")
+        XCTAssertEqual(outlook.hiddenDeadlineCount, 0)
+        XCTAssertFalse(outlook.keyTasks.contains { $0.title == "Plain" || $0.title == "Done DDL" })
+        XCTAssertEqual(outlook.days.count, 7)
+        XCTAssertEqual(outlook.days.map(\.taskCount), [1, 1, 1, 1, 1, 1, 1])
+        XCTAssertEqual(outlook.days.map(\.deadlineCount), [0, 0, 1, 0, 1, 0, 1])
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hiddenKeyTasksAreSummarisedAsDeadlines() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [2, 0, 1, 0, 2, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertEqual(outlook.keyTasks.count, PendingViewModel.keyTaskLimit)
+        XCTAssertEqual(outlook.hiddenKeyTaskCount, 2)
+        XCTAssertEqual(outlook.hiddenDeadlineCount, 2)
+        XCTAssertNotNil(WeekOutlookText.hiddenKeyTasks(total: 2, deadlines: 2))
+        XCTAssertNil(WeekOutlookText.hiddenKeyTasks(total: 0, deadlines: 0))
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_emptyWeekHasNoKeyTasksAndNoTasksHint() {
+        let week = makeOutlookWeek(
+            regular: [0, 0, 0, 0, 0, 0, 0],
+            ddl: [0, 0, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 0]
+        )
+
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+
+        XCTAssertFalse(outlook.hasTasks)
+        XCTAssertTrue(outlook.keyTasks.isEmpty)
+        XCTAssertEqual(outlook.hint, .noTasks)
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hintFollowsActualDayCounts() {
+        func hint(_ counts: [Int], _ deadlines: [Int]) -> PendingViewModel.WeekOutlookHint {
+            let start = makeDate(2026, 3, 30)
+            let days = (0..<7).map {
+                PendingViewModel.WeekOutlookDay(date: start.addingDays($0), taskCount: counts[$0], deadlineCount: deadlines[$0])
+            }
+            return PendingViewModel.weekHint(for: days)
+        }
+
+        XCTAssertEqual(hint([0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]), .noTasks)
+        // DDL on Wed/Thu, Tue is light: start them early.
+        XCTAssertEqual(
+            hint([7, 2, 8, 9, 6, 6, 4], [1, 0, 3, 3, 1, 0, 0]),
+            .startDeadlinesEarly(deadlineDays: [2, 3], deadlineCount: 6, lightDay: 1, lightDayTaskCount: 2)
+        )
+        // DDL cluster at the start of the week: nothing earlier to use.
+        XCTAssertEqual(
+            hint([4, 4, 0, 0, 0, 0, 0], [2, 2, 0, 0, 0, 0, 0]),
+            .deadlineCluster(deadlineDays: [0, 1], deadlineCount: 4)
+        )
+        // Single day with 2 DDL; the lightest earlier day is picked.
+        XCTAssertEqual(
+            hint([3, 1, 6, 0, 0, 0, 0], [0, 0, 2, 0, 0, 0, 0]),
+            .startDeadlinesEarly(deadlineDays: [2], deadlineCount: 2, lightDay: 1, lightDayTaskCount: 1)
+        )
+        // One clearly busiest day, no DDL pattern.
+        XCTAssertEqual(
+            hint([9, 2, 3, 3, 3, 3, 2], [0, 0, 0, 0, 0, 0, 0]),
+            .busiestDay(day: 0, taskCount: 9, lightDay: 1, lightDayTaskCount: 2)
+        )
+        // Evenly filled week: no "peak" is invented.
+        XCTAssertEqual(hint([5, 6, 5, 6, 5, 6, 5], [0, 0, 0, 0, 0, 0, 0]), .evenlySpread(minCount: 5, maxCount: 6))
+        XCTAssertEqual(hint([2, 2, 2, 2, 2, 2, 2], [0, 1, 0, 0, 1, 0, 0]), .evenlySpread(minCount: 2, maxCount: 2))
+    }
+
+    @MainActor
+    func test_pendingWeekOutlook_hintTextContainsActualNumbers() {
+        let start = makeDate(2026, 3, 30)
+        let days = (0..<7).map {
+            PendingViewModel.WeekOutlookDay(date: start.addingDays($0), taskCount: 0, deadlineCount: 0)
+        }
+        let text = WeekOutlookText.hint(
+            .startDeadlinesEarly(deadlineDays: [2, 3], deadlineCount: 6, lightDay: 1, lightDayTaskCount: 2),
+            days: days
+        )
+
+        XCTAssertTrue(text.contains("6"))
+        XCTAssertTrue(text.contains("2"))
+        XCTAssertTrue(text.contains(PendingViewModel.weekdayLabel(for: days[1].date)))
+        XCTAssertFalse(text.contains("%"), "every placeholder must be filled")
+        XCTAssertFalse(WeekOutlookText.hint(.noTasks, days: days).isEmpty)
+    }
+
+    // MARK: - Pending / Past browse mode
+
+    @MainActor
+    func test_browseModesDefaultToWeekListAndPersistAcrossRelaunch() {
+        let defaults = makeSuiteDefaults()
+        let settings = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.pendingBrowseMode, .weekList)
+        XCTAssertEqual(settings.pastBrowseMode, .weekList)
+
+        settings.pendingBrowseMode = .month
+        let relaunched = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(relaunched)
+        XCTAssertEqual(relaunched.pendingBrowseMode, .month)
+        XCTAssertEqual(relaunched.pastBrowseMode, .weekList, "the two tabs are remembered separately")
+
+        relaunched.pendingBrowseMode = .weekList
+        relaunched.pastBrowseMode = .month
+        let relaunchedAgain = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(relaunchedAgain)
+        XCTAssertEqual(relaunchedAgain.pendingBrowseMode, .weekList)
+        XCTAssertEqual(relaunchedAgain.pastBrowseMode, .month)
+    }
+
+    @MainActor
+    func test_browseModesIgnoreUnknownValuesAndAreNotRestoredUnderUITests() {
+        let defaults = makeSuiteDefaults()
+        defaults.set("timeline", forKey: UserSettings.pendingBrowseModeKey)
+        defaults.set(WeekBrowseMode.month.rawValue, forKey: UserSettings.pastBrowseModeKey)
+
+        let settings = UserSettings(defaults: defaults, restoresBrowseModes: true)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.pendingBrowseMode, .weekList)
+        XCTAssertEqual(settings.pastBrowseMode, .month)
+
+        let uiTestSettings = UserSettings(defaults: defaults, restoresBrowseModes: false)
+        Self.retainedUserSettings.append(uiTestSettings)
+        XCTAssertEqual(uiTestSettings.pastBrowseMode, .weekList)
+        uiTestSettings.pendingBrowseMode = .month
+        XCTAssertEqual(defaults.string(forKey: UserSettings.pendingBrowseModeKey), "timeline", "UI test runs must not store a mode")
     }
 
     private func makeTemporaryStoreURL() throws -> URL {

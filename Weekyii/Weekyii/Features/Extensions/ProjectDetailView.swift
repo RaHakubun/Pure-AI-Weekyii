@@ -410,6 +410,8 @@ struct ProjectDetailView: View {
                     WeekCard {
                         VStack(alignment: .leading, spacing: WeekSpacing.md) {
                             Button {
+                                // Overdue-only days have nothing to expand.
+                                guard !section.tasks.isEmpty else { return }
                                 toggleSection(section.id)
                             } label: {
                                 HStack {
@@ -417,17 +419,25 @@ struct ProjectDetailView: View {
                                         .font(.titleSmall)
                                         .foregroundStyle(Color.textPrimary)
                                     Spacer()
-                                    Text("\(section.tasks.count)")
-                                        .font(.captionBold)
-                                        .foregroundStyle(Color.textSecondary)
-                                    Image(systemName: expandedSectionIDs.contains(section.id) ? "chevron.up" : "chevron.down")
-                                        .font(.captionBold)
-                                        .foregroundStyle(Color.textSecondary)
+                                    // Overdue tasks are count-only: no rows, no details.
+                                    if section.expiredCount > 0 {
+                                        Text(expiredCountText(section.expiredCount))
+                                            .font(.caption)
+                                            .foregroundStyle(Color.textTertiary)
+                                    }
+                                    if !section.tasks.isEmpty {
+                                        Text("\(section.tasks.count)")
+                                            .font(.captionBold)
+                                            .foregroundStyle(Color.textSecondary)
+                                        Image(systemName: expandedSectionIDs.contains(section.id) ? "chevron.up" : "chevron.down")
+                                            .font(.captionBold)
+                                            .foregroundStyle(Color.textSecondary)
+                                    }
                                 }
                             }
                             .buttonStyle(.plain)
 
-                            if expandedSectionIDs.contains(section.id) {
+                            if expandedSectionIDs.contains(section.id) && !section.tasks.isEmpty {
                                 VStack(spacing: WeekSpacing.sm) {
                                     ForEach(section.tasks) { task in
                                         taskRow(task)
@@ -442,9 +452,7 @@ struct ProjectDetailView: View {
     }
 
     private func taskRow(_ task: TaskItem) -> some View {
-        let isExpired = isTaskExpired(task)
-
-        return VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             HStack(alignment: .top, spacing: WeekSpacing.sm) {
                 Button {
                     toggleTaskExpansion(task.id)
@@ -481,16 +489,6 @@ struct ProjectDetailView: View {
                     Image(systemName: "flame.fill")
                         .font(.caption)
                         .foregroundStyle(Color.taskDDL)
-                }
-
-                if isExpired {
-                    Text(String(localized: "status.expired"))
-                        .font(.caption2)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, WeekSpacing.xs)
-                        .padding(.vertical, 2)
-                        .background(Color.taskDDL)
-                        .clipShape(Capsule())
                 }
 
                 Spacer()
@@ -571,9 +569,11 @@ struct ProjectDetailView: View {
         }
     }
 
-    private func isTaskExpired(_ task: TaskItem) -> Bool {
-        guard let taskDate = task.day?.date else { return false }
-        let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
-        return Calendar(identifier: .iso8601).startOfDay(for: taskDate) < today && task.zone != .complete
+    private func expiredCountText(_ count: Int) -> String {
+        String(
+            format: String(localized: "extensions.hub.projects.status.overdue", defaultValue: "%lld 项已逾期"),
+            locale: Locale.current,
+            Int64(count)
+        )
     }
 }
