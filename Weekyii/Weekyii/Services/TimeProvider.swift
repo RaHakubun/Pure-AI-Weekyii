@@ -11,6 +11,12 @@ protocol TimeProviding {
 final class TimeProvider: TimeProviding {
     private let iso8601Calendar = Calendar(identifier: .iso8601)
 
+    // Work around swiftlang/swift#88036: with default MainActor isolation,
+    // implicit deinit can enter deinitOnExecutor and trigger an invalid free
+    // on iOS 26.2 and earlier runtimes. Fixed in iOS 26.4; keep this explicit
+    // empty deinit for older supported runtimes.
+    deinit {}
+
     var now: Date { Date() }
 
     var today: Date {
