@@ -3042,6 +3042,22 @@
         }
       }
     },
+    "launch.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Weekyii weekly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周粒度Todo事项管理"
+          }
+        }
+      }
+    },
     "loading" : {
       "localizations" : {
         "en" : {
@@ -10440,9 +10456,6 @@
 
     },
     "从归档恢复" : {
-
-    },
-    "以周为核心管理你的每一天" : {
 
     },
     "任务已遗忘" : {
