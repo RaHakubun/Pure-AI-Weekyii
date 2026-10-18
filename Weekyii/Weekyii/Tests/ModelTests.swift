@@ -53,10 +53,11 @@ final class KillTimeFireTests: XCTestCase {
         let calendar = Calendar(identifier: .iso8601)
         let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
         let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        // Current curve: exp(-t / 120)², i.e. exp(-t / 60).
         let samples: [(minutesBefore: Double, expectedIntensity: Double)] = [
-            (12 * 60, exp(-4)),
-            (3 * 60, exp(-1)),
-            (15, exp(-15.0 / 180.0)),
+            (12 * 60, exp(-12)),
+            (3 * 60, exp(-3)),
+            (15, exp(-15.0 / 60.0)),
             (0, 1)
         ]
 
@@ -75,6 +76,60 @@ final class KillTimeFireTests: XCTestCase {
         let remainingAfter = KillTimeDeadline.remainingMinutes(until: deadline, at: after)
         XCTAssertEqual(remainingAfter, -2, accuracy: 0.000_001)
         XCTAssertEqual(KillTimeFlameBackground.intensity(remainingMinutes: remainingAfter), 1)
+    }
+
+    func testKillTimeVisualIntensityIsLinearBetweenSliderEnds() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let now = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 10, minute: 0))
+        let earliest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 11, minute: 0))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let range = earliest...latest
+        let minimum = KillTimeFlameBackground.minimumVisualIntensity
+        let midpoint = earliest.addingTimeInterval(latest.timeIntervalSince(earliest) / 2)
+        let quarter = earliest.addingTimeInterval(latest.timeIntervalSince(earliest) / 4)
+
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: earliest, at: now, selectableRange: range), 1, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: now, selectableRange: range), minimum, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: midpoint, at: now, selectableRange: range), (1 + minimum) / 2, accuracy: 0.000_001)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: quarter, at: now, selectableRange: range), minimum + (1 - minimum) * 0.75, accuracy: 0.000_001)
+        XCTAssertGreaterThan(minimum, 0.005, "23:59 must still draw a small flame")
+    }
+
+    func testKillTimeVisualIntensityGrowsAsTheRangeShrinksWithTheClock() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let deadline = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 22, minute: 0))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+
+        let morning = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 10, minute: 0))
+        let evening = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 18, minute: 0))
+        let late = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 21, minute: 30))
+
+        let morningPressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: morning, selectableRange: morning.addingTimeInterval(3600)...latest
+        )
+        let eveningPressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: evening, selectableRange: evening.addingTimeInterval(3600)...latest
+        )
+        let latePressure = KillTimeFlameBackground.visualIntensity(
+            deadline: deadline, at: late, selectableRange: late.addingTimeInterval(3600)...latest
+        )
+
+        XCTAssertLessThan(morningPressure, eveningPressure)
+        XCTAssertLessThan(eveningPressure, latePressure)
+        // Left end (now + 1h) has passed the cutoff: full fire.
+        XCTAssertEqual(latePressure, 1, accuracy: 0.000_001)
+    }
+
+    func testKillTimeVisualIntensityBurnsFullyWhenRangeCollapsesOrCutoffPassed() throws {
+        let calendar = Calendar(identifier: .iso8601)
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 16)))
+        let latest = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 59))
+        let lastHour = try XCTUnwrap(KillTimeDeadline.date(for: day, hour: 23, minute: 10))
+
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: lastHour, selectableRange: latest...latest), 1)
+        XCTAssertEqual(KillTimeFlameBackground.visualIntensity(deadline: latest, at: latest.addingTimeInterval(60), selectableRange: lastHour...latest), 1)
     }
 
     func testKillTimeDeadlineRemainsOverdueAcrossMidnight() throws {

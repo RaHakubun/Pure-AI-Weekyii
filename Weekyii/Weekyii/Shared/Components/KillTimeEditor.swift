@@ -48,8 +48,8 @@ struct KillTimeEditor: View {
     // MARK: - Computed Properties
 
     /// 当前时间 + 1 小时，作为滑动条可选下界（最大不超过 23:59）
-    private var minTimeInMinutes: Int {
-        let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
+    private func minTimeInMinutes(at now: Date) -> Int {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: now)
         return min((c.hour ?? 0) * 60 + (c.minute ?? 0) + 60, endOfDayInMinutes)
     }
 
@@ -60,14 +60,23 @@ struct KillTimeEditor: View {
     }
 
     /// 允许历史旧值低于当前 minTime，避免已设定的时间在展示时被强制上移
-    private var sliderLowerBound: Double {
-        Double(min(minTimeInMinutes, min(rangeAnchorMinutes ?? clampedSelectedTimeInMinutes, clampedSelectedTimeInMinutes)))
+    private func sliderLowerBound(at now: Date) -> Double {
+        Double(min(minTimeInMinutes(at: now), min(rangeAnchorMinutes ?? clampedSelectedTimeInMinutes, clampedSelectedTimeInMinutes)))
     }
 
     // MARK: - Body
 
     var body: some View {
-        let sliderBounds = sliderLowerBound...Double(endOfDayInMinutes)
+        // 左端点 = 手机当前时间 + 1 小时，需要随时间前进；每分钟重算一次，
+        // 滑动条下界与火焰使用的区间因此保持实时。拖动中滑动条自己会冻结下界。
+        TimelineView(.everyMinute) { context in
+            content(now: context.date)
+        }
+    }
+
+    @ViewBuilder
+    private func content(now: Date) -> some View {
+        let sliderBounds = sliderLowerBound(at: now)...Double(endOfDayInMinutes)
         let selectableRange = deadlineRange(for: sliderBounds)
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             // 时间显示：点按大号时间即可用系统选择器精确输入
@@ -77,7 +86,9 @@ struct KillTimeEditor: View {
                 .monospacedDigit()
                 .accessibilityIdentifier("killTimeDisplay")
                 .anchorPreference(key: KillTimeLayoutAnchorKey.self, value: .bounds) {
-                    KillTimeLayoutAnchors(slider: nil, time: $0)
+                    // The range rides on the always-present time text, so the
+                    // flames still know it when the slider collapses to 23:59.
+                    KillTimeLayoutAnchors(slider: nil, time: $0, selectableRange: isEditable ? selectableRange : nil)
                 }
                 .overlay {
                     if isEditable {
@@ -115,7 +126,7 @@ struct KillTimeEditor: View {
                         onEditingChanged: onEditingChanged
                     )
                     .anchorPreference(key: KillTimeLayoutAnchorKey.self, value: .bounds) {
-                        KillTimeLayoutAnchors(slider: $0, time: nil, selectableRange: selectableRange)
+                        KillTimeLayoutAnchors(slider: $0, time: nil)
                     }
                     // Room under the track for the flames to rise into.
                     .padding(.bottom, 28)
@@ -130,12 +141,14 @@ struct KillTimeEditor: View {
 
     // MARK: - Helpers
 
+    /// Absolute dates of the slider's two ends. A collapsed range (both ends at
+    /// 23:59) is still returned, so the flames can burn fully in the last hour.
     private func deadlineRange(for minutes: ClosedRange<Double>) -> ClosedRange<Date>? {
         let lower = Int(minutes.lowerBound)
         let upper = Int(minutes.upperBound)
         guard let start = KillTimeDeadline.date(for: dayDate, hour: lower / 60, minute: lower % 60),
               let end = KillTimeDeadline.date(for: dayDate, hour: upper / 60, minute: upper % 60),
-              start < end else { return nil }
+              start <= end else { return nil }
         return start...end
     }
 
@@ -192,24 +205,31 @@ struct KillTimeFlameBackground: View {
         return linear * linear   // squaring steepens the onset dramatically
     }
 
-    /// Consume the editor's actual absolute bounds, including an earlier saved
-    /// anchor. The right endpoint extinguishes; the nearest endpoint burns fully.
-    /// Actual remaining time still supplies the absolute deadline pressure.
+    /// Fire shown at the latest selectable cutoff (23:59): small but visible.
+    nonisolated static let minimumVisualIntensity = 0.15
+
+    /// Fire strength follows the cutoff's position between the slider's two
+    /// ends, not an absolute countdown:
+    /// - the earliest end (now + 1 hour, or an earlier saved cutoff) burns fully;
+    /// - the latest end (23:59) keeps a small flame (`minimumVisualIntensity`);
+    /// - everything in between changes uniformly (linear).
+    /// The editor refreshes the earliest end as the phone's clock moves, so the
+    /// range keeps shrinking through the day and the same cutoff burns harder.
     static func visualIntensity(deadline: Date, at now: Date, selectableRange: ClosedRange<Date>? = nil) -> Double {
-        let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: now)
-        let absolutePressure = intensity(remainingMinutes: remaining)
-        // Normalise against 90-minute reference so the "full" fire is reached
-        // when 90 minutes remain — a real urgency threshold, not an hour.
-        let reference = intensity(remainingMinutes: 90)
-        let nearestFull = min(absolutePressure / max(reference, 1e-9), 1)
-        guard let selectableRange else { return nearestFull }
-        let latestRemaining = KillTimeDeadline.remainingMinutes(until: selectableRange.upperBound, at: now)
-        let earliestRemaining = KillTimeDeadline.remainingMinutes(until: selectableRange.lowerBound, at: now)
-        let selectableSpan = latestRemaining - earliestRemaining
-        guard selectableSpan > 0 else { return nearestFull }
-        let fraction = min(max((latestRemaining - remaining) / selectableSpan, 0), 1)
-        let eased = fraction * fraction * (3 - 2 * fraction)
-        return eased * nearestFull
+        guard let selectableRange else {
+            // No range from the editor: fall back to the countdown curve,
+            // normalised so 90 minutes or less burns fully.
+            let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: now)
+            let reference = intensity(remainingMinutes: 90)
+            return min(intensity(remainingMinutes: remaining) / max(reference, 1e-9), 1)
+        }
+        // Already past the cutoff: full fire.
+        guard deadline > now else { return 1 }
+        let span = selectableRange.upperBound.timeIntervalSince(selectableRange.lowerBound)
+        // Collapsed range (last hour of the day): nothing later to choose, full fire.
+        guard span > 0 else { return 1 }
+        let position = min(max(deadline.timeIntervalSince(selectableRange.lowerBound) / span, 0), 1)
+        return minimumVisualIntensity + (1 - minimumVisualIntensity) * (1 - position)
     }
 
     var body: some View {
