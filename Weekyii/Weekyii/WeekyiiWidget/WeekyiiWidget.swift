@@ -3,6 +3,9 @@ import SwiftUI
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
+#if canImport(AppIntents)
+import AppIntents
+#endif
 
 private enum WeekyiiWidgetKind {
     static let main = "WeekyiiWidget"
@@ -52,54 +55,399 @@ struct WeekyiiWidget: Widget {
 }
 
 #if canImport(ActivityKit)
-@available(iOS 16.1, *)
 struct WeekyiiLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TodayActivityAttributes.self) { context in
-            LockScreenLiveActivityView(state: context.state)
+            LockScreenLiveActivityView(model: Self.presentation(for: context))
                 .widgetURL(LiveActivityAction.openToday.url())
                 .modifier(LiveActivityLockStylingModifier(theme: context.state.liveTheme))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    IslandExpandedLeading(state: context.state)
+                    IslandExpandedLeading(model: Self.presentation(for: context))
+                        .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    IslandExpandedTrailing(state: context.state)
-                }
-                DynamicIslandExpandedRegion(.center) {
-                    IslandExpandedCenter(state: context.state)
+                    IslandExpandedTrailing(model: Self.presentation(for: context))
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    IslandExpandedActions(state: context.state)
+                    IslandExpandedBottom(model: Self.presentation(for: context))
                 }
             } compactLeading: {
-                IslandCompactLeading(state: context.state)
+                IslandCompactLeading(model: Self.presentation(for: context))
             } compactTrailing: {
-                IslandCompactTrailing(state: context.state)
+                IslandCompactTrailing(model: Self.presentation(for: context))
             } minimal: {
-                IslandMinimal(state: context.state)
+                IslandMinimal(model: Self.presentation(for: context))
             }
             .widgetURL(LiveActivityAction.openToday.url())
             .keylineTint(Color(widgetHex: context.state.liveTheme.islandKeylineHex))
         }
     }
+
+    private static func presentation(
+        for context: ActivityViewContext<TodayActivityAttributes>
+    ) -> LiveActivityPresentation {
+        LiveActivityPresentation(state: context.state, isStale: context.isStale)
+    }
 }
 
-@available(iOS 16.1, *)
-private struct LockScreenLiveActivityView: View {
+// MARK: - Presentation
+
+/// Everything the Live Activity views derive from a content state: phase,
+/// localized copy, task-type styling and the time window.
+private struct LiveActivityPresentation {
+    enum Phase {
+        /// More than an hour left.
+        case normal
+        /// One hour or less left. Switches on the next content update from the app.
+        case urgent
+        /// Past the deadline. The system switches here by itself at the stale date.
+        case overdue
+    }
+
+    static let urgentThreshold: TimeInterval = 3600
+    static let overdueLightHex = "#C9372C"
+    static let overdueDarkHex = "#FF6B5E"
+
     let state: TodayActivityAttributes.ContentState
+    let phase: Phase
+    let bundle: Bundle
+
+    init(state: TodayActivityAttributes.ContentState, isStale: Bool, now: Date = Date()) {
+        self.state = state
+        if isStale || state.killTime <= now {
+            phase = .overdue
+        } else if state.killTime.timeIntervalSince(now) <= Self.urgentThreshold {
+            phase = .urgent
+        } else {
+            phase = .normal
+        }
+        bundle = Self.localizationBundle(for: state.languageCode)
+    }
+
+    var theme: LiveActivityThemeSnapshot { state.liveTheme }
+    var isOverdue: Bool { phase == .overdue }
+
+    /// Start of today's window (when the user started the day) up to the deadline.
+    var timeWindow: ClosedRange<Date>? {
+        let start = state.dayStartedAt ?? Calendar.current.startOfDay(for: state.killTime)
+        guard start < state.killTime else { return nil }
+        return start...state.killTime
+    }
+
+    // MARK: Type styling
+
+    var typeColorHex: String {
+        if let hex = state.typeColorHex, !hex.isEmpty { return hex }
+        switch state.taskTypeRaw {
+        case "ddl": return "#C46A1A"
+        case "leisure": return "#8B5A83"
+        default: return "#4A90A4"
+        }
+    }
+
+    var typeIconName: String {
+        if let icon = state.typeIconName, !icon.isEmpty { return icon }
+        switch state.taskTypeRaw {
+        case "ddl": return "exclamationmark.triangle.fill"
+        case "leisure": return "sparkles"
+        default: return "checkmark.circle.fill"
+        }
+    }
+
+    var typeName: String {
+        if let name = state.typeName, !name.isEmpty { return name }
+        switch state.taskTypeRaw {
+        case "ddl": return String(localized: "live.type.ddl", defaultValue: "DDL", bundle: bundle)
+        case "leisure": return String(localized: "live.type.leisure", defaultValue: "休闲", bundle: bundle)
+        default: return String(localized: "live.type.regular", defaultValue: "常规", bundle: bundle)
+        }
+    }
+
+    /// Type icon normally; a flame when the deadline is close; a warning sign once overdue.
+    var glyphSymbol: String {
+        switch phase {
+        case .normal: return typeIconName
+        case .urgent: return "flame.fill"
+        case .overdue: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    // MARK: Copy
+
+    var statusText: String {
+        switch phase {
+        case .normal: return String(localized: "live.status.focus", defaultValue: "专注中", bundle: bundle)
+        case .urgent: return String(localized: "live.status.urgent", defaultValue: "即将截止", bundle: bundle)
+        case .overdue: return String(localized: "live.status.overdue", defaultValue: "已超时", bundle: bundle)
+        }
+    }
+
+    var statusWithTypeText: String {
+        "\(statusText) · \(typeName)"
+    }
+
+    var deadlineText: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        let time = formatter.string(from: state.killTime)
+        return String(localized: "live.deadline", defaultValue: "截止 \(time)", bundle: bundle)
+    }
+
+    var timerCaption: String {
+        if isOverdue {
+            return String(localized: "live.over_by", defaultValue: "已超出", bundle: bundle)
+        }
+        return String(localized: "live.remaining", defaultValue: "剩余时间", bundle: bundle)
+    }
+
+    /// Compact leading label: the task title, or 已超时 once overdue.
+    var compactLabel: String {
+        isOverdue ? statusText : state.focusTitle
+    }
+
+    var metaText: String {
+        var parts: [String] = []
+        if let next = state.nextTitle, !next.isEmpty {
+            parts.append(String(localized: "live.meta.next", defaultValue: "下一项 \(next)", bundle: bundle))
+        }
+        let pending = state.frozenCount
+        parts.append(String(localized: "live.meta.pending", defaultValue: "待办 \(pending)", bundle: bundle))
+        let completed = state.completedCount
+        let total = state.totalCount
+        parts.append(String(localized: "live.meta.done", defaultValue: "已完成 \(completed)/\(total)", bundle: bundle))
+        return parts.joined(separator: " · ")
+    }
+
+    var doneTitle: String { String(localized: "live.action.done", defaultValue: "完成", bundle: bundle) }
+    var postponeTitle: String { String(localized: "live.action.postpone", defaultValue: "推迟到明天", bundle: bundle) }
+    var confirmDoneTitle: String { String(localized: "live.action.confirm_done", defaultValue: "确认完成", bundle: bundle) }
+    var confirmPostponeTitle: String { String(localized: "live.action.confirm_postpone", defaultValue: "确认推迟", bundle: bundle) }
+    var cancelTitle: String { String(localized: "live.action.cancel", defaultValue: "取消", bundle: bundle) }
+
+    // MARK: Island colors (always rendered on the black island)
+
+    var islandPrimary: Color { Color(widgetHex: theme.islandTextPrimaryHex) }
+    var islandSecondary: Color { Color(widgetHex: theme.islandTextSecondaryHex) }
+
+    var islandTint: Color {
+        switch phase {
+        case .normal: return Color(widgetHex: theme.islandAccentHex)
+        case .urgent: return Color(widgetHex: theme.islandWarningHex)
+        case .overdue: return Color(widgetHex: Self.overdueDarkHex)
+        }
+    }
+
+    /// Glyph color on a dark background: the type color lifted for contrast.
+    var islandGlyphColor: Color {
+        switch phase {
+        case .normal: return Color(widgetHex: typeColorHex).mix(with: .white, by: 0.3)
+        case .urgent, .overdue: return islandTint
+        }
+    }
+
+    // MARK: Helpers
+
+    private static func localizationBundle(for languageCode: String?) -> Bundle {
+        guard let languageCode,
+              let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
+              let bundle = Bundle(path: path)
+        else {
+            return .main
+        }
+        return bundle
+    }
+}
+
+// MARK: - Shared pieces
+
+/// Self-updating countdown to the deadline; after the deadline the same system
+/// timer counts up, prefixed with "+".
+private struct LiveCountdownText: View {
+    let model: LiveActivityPresentation
+
+    var body: some View {
+        (model.isOverdue ? Text(verbatim: "+") + Text(model.state.killTime, style: .timer) : Text(model.state.killTime, style: .timer))
+            .monospacedDigit()
+            .lineLimit(1)
+            .multilineTextAlignment(.trailing)
+    }
+}
+
+private struct LiveGlyph: View {
+    let symbol: String
+    let color: Color
+    var size: CGFloat
+    var cornerRadius: CGFloat? = nil
+
+    var body: some View {
+        let background = color.opacity(0.22)
+        Group {
+            if let cornerRadius {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(background)
+            } else {
+                Circle().fill(background)
+            }
+        }
+        .frame(width: size, height: size)
+        .overlay {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.5, weight: .bold))
+                .foregroundStyle(color)
+        }
+    }
+}
+
+/// Time bar from "day started" to the deadline, animated by the system.
+private struct LiveTimeBar: View {
+    let model: LiveActivityPresentation
+    let tint: Color
+    let overdueColor: Color
+    let track: Color
+
+    var body: some View {
+        if model.isOverdue {
+            Capsule()
+                .fill(overdueColor)
+                .frame(height: 5)
+        } else if let window = model.timeWindow {
+            ProgressView(timerInterval: window, countsDown: false) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }
+            .progressViewStyle(.linear)
+            .tint(tint)
+        } else {
+            Capsule()
+                .fill(track)
+                .frame(height: 5)
+        }
+    }
+}
+
+private struct LiveActionButtonLabel: View {
+    let title: String
+    var icon: String?
+    let fill: Color
+    let foreground: Color
+    var height: CGFloat = 36
+    var expands = true
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon)
+            }
+            Text(title)
+        }
+        .font(.subheadline.weight(.bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: expands ? .infinity : nil)
+        .frame(height: height)
+        .foregroundStyle(foreground)
+        .background(fill, in: Capsule())
+        .contentShape(Capsule())
+    }
+}
+
+private struct LiveActionButtonColors {
+    var doneFill: Color
+    var doneForeground: Color
+    var secondaryFill: Color
+    var secondaryForeground: Color
+    var confirmDoneFill: Color
+    var confirmPostponeFill: Color
+    var confirmForeground: Color
+}
+
+/// 完成 / 推迟到明天 → second tap 确认完成 / 确认推迟, or 取消. Runs as App Intents, so
+/// the app is not brought to the foreground.
+private struct LiveActionRow: View {
+    let model: LiveActivityPresentation
+    let colors: LiveActionButtonColors
+    var height: CGFloat = 36
+
+    var body: some View {
+        HStack(spacing: 10) {
+            switch model.state.pendingAction {
+            case .doneFocus:
+                confirmButtons(
+                    action: .doneFocus,
+                    title: model.confirmDoneTitle,
+                    icon: "checkmark",
+                    fill: colors.confirmDoneFill
+                )
+            case .postponeFocus:
+                confirmButtons(
+                    action: .postponeFocus,
+                    title: model.confirmPostponeTitle,
+                    icon: "arrow.right",
+                    fill: colors.confirmPostponeFill
+                )
+            case .openToday, nil:
+                Button(intent: LiveActivityRequestConfirmIntent(action: .doneFocus)) {
+                    LiveActionButtonLabel(
+                        title: model.doneTitle,
+                        icon: "checkmark",
+                        fill: colors.doneFill,
+                        foreground: colors.doneForeground,
+                        height: height
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button(intent: LiveActivityRequestConfirmIntent(action: .postponeFocus)) {
+                    LiveActionButtonLabel(
+                        title: model.postponeTitle,
+                        icon: "arrow.right",
+                        fill: colors.secondaryFill,
+                        foreground: colors.secondaryForeground,
+                        height: height
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func confirmButtons(action: LiveActivityAction, title: String, icon: String, fill: Color) -> some View {
+        Button(intent: LiveActivityPerformActionIntent(action: action)) {
+            LiveActionButtonLabel(
+                title: title,
+                icon: icon,
+                fill: fill,
+                foreground: colors.confirmForeground,
+                height: height
+            )
+        }
+        .buttonStyle(.plain)
+
+        Button(intent: LiveActivityCancelConfirmIntent()) {
+            LiveActionButtonLabel(
+                title: model.cancelTitle,
+                fill: colors.secondaryFill,
+                foreground: colors.secondaryForeground,
+                height: height,
+                expands: false
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Lock screen / notification banner
+
+private struct LockScreenLiveActivityView: View {
+    let model: LiveActivityPresentation
 
     private var palette: LiveActivityLockPalette {
-        state.liveTheme.resolvedLockPalette(prefersDarkLock: state.liveTheme.usesExplicitDarkLockPalette)
-    }
-
-    private var progress: CGFloat {
-        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
-    }
-
-    private var remainingLabel: String {
-        liveActivityCompactDurationText(seconds: state.remainingSeconds)
+        model.theme.resolvedLockPalette(prefersDarkLock: model.theme.usesExplicitDarkLockPalette)
     }
 
     private var usesLightBackground: Bool {
@@ -114,253 +462,255 @@ private struct LockScreenLiveActivityView: View {
         usesLightBackground ? Color(widgetHex: "#6E584A") : Color(widgetHex: palette.textSecondaryHex)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 11) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(widgetHex: palette.surfaceHex))
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Color(widgetHex: palette.accentHex))
-                    }
+    private var overdueColor: Color {
+        Color(widgetHex: usesLightBackground ? LiveActivityPresentation.overdueLightHex : LiveActivityPresentation.overdueDarkHex)
+    }
 
+    private var tint: Color {
+        switch model.phase {
+        case .normal:
+            return Color(widgetHex: palette.accentHex)
+        case .urgent:
+            let warning = Color(widgetHex: model.theme.islandWarningHex)
+            return usesLightBackground ? warning.mix(with: .black, by: 0.25) : warning
+        case .overdue:
+            return overdueColor
+        }
+    }
+
+    private var glyphColor: Color {
+        switch model.phase {
+        case .normal:
+            let typeColor = Color(widgetHex: model.typeColorHex)
+            return usesLightBackground ? typeColor : typeColor.mix(with: .white, by: 0.3)
+        case .urgent, .overdue:
+            return tint
+        }
+    }
+
+    /// Header/status color: neutral normally, phase color when urgent or overdue.
+    private var statusColor: Color {
+        model.phase == .normal ? secondaryTextColor : tint
+    }
+
+    private var buttonColors: LiveActionButtonColors {
+        let success = Color(widgetHex: model.theme.islandSuccessHex)
+        let doneFill = usesLightBackground ? success.mix(with: .black, by: 0.3) : success
+        let doneForeground: Color = usesLightBackground || !liveActivityPrefersDarkForeground(model.theme.islandSuccessHex)
+            ? .white
+            : Color(widgetHex: "#0F2624")
+        return LiveActionButtonColors(
+            doneFill: doneFill,
+            doneForeground: doneForeground,
+            secondaryFill: Color(widgetHex: palette.surfaceHex),
+            secondaryForeground: primaryTextColor,
+            confirmDoneFill: Color(widgetHex: "#3FA67A"),
+            confirmPostponeFill: Color(widgetHex: usesLightBackground ? "#B4561A" : model.theme.islandChipSecondaryHex),
+            confirmForeground: .white
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                LiveGlyph(symbol: model.glyphSymbol, color: glyphColor, size: 20)
+                Text(verbatim: "Weekyii · \(model.statusText)")
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(model.deadlineText)
+                    .lineLimit(1)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(statusColor)
+
+            HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(state.focusTitle)
-                        .font(.headline.weight(.semibold))
+                    Text(model.state.focusTitle)
+                        .font(.headline.weight(.bold))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.85)
                         .foregroundStyle(primaryTextColor)
-                    Text("完成 \(state.completedCount)/\(state.totalCount) · 剩余 \(state.frozenCount) · \(deadlineLabel(for: state.killTime))")
+                    Text(model.metaText)
                         .font(.caption.weight(.medium))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(secondaryTextColor)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
 
-                Spacer(minLength: 6)
-
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("剩余")
+                    Text(model.timerCaption)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(secondaryTextColor)
-                    Text(remainingLabel)
-                        .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
-                        .lineLimit(1)
-                        .foregroundStyle(Color(widgetHex: palette.accentHex))
+                        .foregroundStyle(model.isOverdue ? tint : secondaryTextColor)
+                    LiveCountdownText(model: model)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundStyle(tint)
+                        .frame(maxWidth: 120, alignment: .trailing)
                 }
-                .fixedSize(horizontal: true, vertical: false)
             }
 
-            LiveLinearProgress(
-                progress: progress,
-                fill: Color(widgetHex: palette.accentHex),
+            LiveTimeBar(
+                model: model,
+                tint: tint,
+                overdueColor: overdueColor,
                 track: Color(widgetHex: palette.progressTrackHex).opacity(0.2)
             )
-            .frame(height: 7)
 
-            HStack(spacing: 10) {
-                Link(destination: LiveActivityAction.doneFocus.url()) {
-                    LiveActionCapsule(
-                        title: "完成",
-                        icon: "checkmark.circle.fill",
-                        fill: Color(widgetHex: palette.accentHex).opacity(0.16),
-                        foreground: primaryTextColor,
-                        horizontalPadding: 10,
-                        verticalPadding: 8
-                    )
-                }
-
-                Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
-                    LiveActionCapsule(
-                        title: "+1天",
-                        icon: "calendar.badge.clock",
-                        fill: Color(widgetHex: palette.surfaceHex),
-                        foreground: primaryTextColor,
-                        horizontalPadding: 10,
-                        verticalPadding: 8
-                    )
-                }
-            }
+            LiveActionRow(model: model, colors: buttonColors, height: 34)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 }
 
-@available(iOS 16.1, *)
+// MARK: - Dynamic Island
+
+private func islandButtonColors(for model: LiveActivityPresentation) -> LiveActionButtonColors {
+    let successHex = model.theme.islandSuccessHex
+    return LiveActionButtonColors(
+        doneFill: Color(widgetHex: successHex),
+        doneForeground: liveActivityPrefersDarkForeground(successHex) ? Color(widgetHex: "#0F2624") : .white,
+        secondaryFill: Color.white.opacity(0.14),
+        secondaryForeground: model.islandPrimary,
+        confirmDoneFill: Color(widgetHex: "#3FA67A"),
+        confirmPostponeFill: Color(widgetHex: model.theme.islandChipSecondaryHex),
+        confirmForeground: .white
+    )
+}
+
 private struct IslandExpandedLeading: View {
-    let state: TodayActivityAttributes.ContentState
+    let model: LiveActivityPresentation
 
     var body: some View {
-        Circle()
-            .fill(Color(widgetHex: state.liveTheme.islandChipSecondaryHex).opacity(0.26))
-            .frame(width: 22, height: 22)
-            .overlay {
-                Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+        HStack(spacing: 8) {
+            LiveGlyph(symbol: model.glyphSymbol, color: model.islandGlyphColor, size: 34, cornerRadius: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.statusWithTypeText)
+                    .foregroundStyle(model.phase == .normal ? model.islandSecondary : model.islandTint)
+                Text(model.deadlineText)
+                    .foregroundStyle(model.isOverdue ? model.islandTint : model.islandPrimary)
             }
-            .frame(width: 24, height: 24, alignment: .center)
-            .accessibilityLabel(liveActivityTaskTypeLabel(raw: state.taskTypeRaw))
-    }
-}
-
-@available(iOS 16.1, *)
-private struct IslandExpandedTrailing: View {
-    let state: TodayActivityAttributes.ContentState
-
-    private var remainingLabel: String {
-        liveActivityCompactDurationText(seconds: state.remainingSeconds)
-    }
-
-    var body: some View {
-        Text(remainingLabel)
-            .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
-            .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-        .fixedSize(horizontal: true, vertical: false)
-    }
-}
-
-@available(iOS 16.1, *)
-private struct IslandExpandedCenter: View {
-    let state: TodayActivityAttributes.ContentState
-
-    private var progress: CGFloat {
-        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(state.focusTitle)
-                .font(.headline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            LiveLinearProgress(
-                progress: progress,
-                fill: Color(widgetHex: state.liveTheme.islandAccentHex),
-                track: Color.white.opacity(0.16)
-            )
-            .frame(height: 6)
-
-            HStack(spacing: 8) {
-                Text("完成 \(state.completedCount)/\(state.totalCount)")
-                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
-                Spacer(minLength: 4)
-                Text("剩余 \(state.frozenCount)")
-                    .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextSecondaryHex))
-            }
-            .font(.caption2.weight(.semibold))
+            .font(.caption.weight(.semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
         }
+        .padding(.leading, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-@available(iOS 16.1, *)
-private struct IslandExpandedActions: View {
-    let state: TodayActivityAttributes.ContentState
+private struct IslandExpandedTrailing: View {
+    let model: LiveActivityPresentation
 
     var body: some View {
-        HStack(spacing: 10) {
-            Link(destination: LiveActivityAction.doneFocus.url()) {
-                LiveActionCapsule(
-                    title: "完成",
-                    icon: "checkmark.circle.fill",
-                    fill: Color(widgetHex: state.liveTheme.islandSuccessHex),
-                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex),
-                    horizontalPadding: 10,
-                    verticalPadding: 6
-                )
-            }
-
-            Link(destination: LiveActivityAction.postponeFocus.url(days: 1)) {
-                LiveActionCapsule(
-                    title: "+1天",
-                    icon: "calendar.badge.clock",
-                    fill: Color(widgetHex: state.liveTheme.islandChipSecondaryHex),
-                    foreground: Color(widgetHex: state.liveTheme.islandTextPrimaryHex),
-                    horizontalPadding: 10,
-                    verticalPadding: 6
-                )
-            }
+        VStack(alignment: .trailing, spacing: 0) {
+            Text(model.timerCaption)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(model.isOverdue ? model.islandTint : model.islandSecondary)
+                .lineLimit(1)
+            LiveCountdownText(model: model)
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(model.islandTint)
+                .frame(maxWidth: 116, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, 4)
     }
 }
 
-@available(iOS 16.1, *)
+private struct IslandExpandedBottom: View {
+    let model: LiveActivityPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.state.focusTitle)
+                    .font(.headline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .foregroundStyle(model.islandPrimary)
+                Text(model.metaText)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(model.islandSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            LiveTimeBar(
+                model: model,
+                tint: model.islandTint,
+                overdueColor: model.islandTint,
+                track: Color.white.opacity(0.14)
+            )
+
+            LiveActionRow(model: model, colors: islandButtonColors(for: model), height: 36)
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
 private struct IslandCompactLeading: View {
-    let state: TodayActivityAttributes.ContentState
+    let model: LiveActivityPresentation
 
     var body: some View {
-        Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(Color(widgetHex: state.liveTheme.islandAccentHex))
-            .frame(width: 14, height: 14)
-            .accessibilityLabel(liveActivityTaskTypeLabel(raw: state.taskTypeRaw))
-    }
-}
-
-@available(iOS 16.1, *)
-private struct IslandCompactTrailing: View {
-    let state: TodayActivityAttributes.ContentState
-
-    private var iconColor: Color {
-        if state.remainingSeconds <= 3600 {
-            return Color(widgetHex: state.liveTheme.islandWarningHex)
+        HStack(spacing: 5) {
+            LiveGlyph(symbol: model.glyphSymbol, color: model.islandGlyphColor, size: 20)
+            Text(model.compactLabel)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .foregroundStyle(model.isOverdue ? model.islandTint : model.islandPrimary)
+                .frame(maxWidth: 58, alignment: .leading)
         }
-        return Color(widgetHex: state.liveTheme.islandAccentHex)
-    }
-
-    var body: some View {
-        Image(systemName: "timer")
-            .font(.system(size: 10, weight: .semibold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(iconColor)
-            .frame(width: 14, height: 14)
-            .accessibilityLabel("剩余时间")
     }
 }
 
-@available(iOS 16.1, *)
-private struct IslandMinimal: View {
-    let state: TodayActivityAttributes.ContentState
+private struct IslandCompactTrailing: View {
+    let model: LiveActivityPresentation
 
-    private var progress: CGFloat {
-        CGFloat(max(min(state.completionPercent, 100), 0)) / 100
+    /// `Text(_, style: .timer)` reports a flexible width, so it gets an explicit
+    /// cap sized for its longest expected form.
+    private var maxWidth: CGFloat {
+        if model.isOverdue { return 64 }
+        return model.state.killTime.timeIntervalSinceNow >= 3600 ? 56 : 44
     }
+
+    var body: some View {
+        LiveCountdownText(model: model)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(model.islandTint)
+            .frame(maxWidth: maxWidth, alignment: .trailing)
+    }
+}
+
+private struct IslandMinimal: View {
+    let model: LiveActivityPresentation
 
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.16), lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    Color(widgetHex: state.liveTheme.islandAccentHex),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-            Image(systemName: liveActivityTaskTypeIcon(raw: state.taskTypeRaw))
+            if !model.isOverdue, let window = model.timeWindow {
+                // Ring empties from "day started" to the deadline, driven by the system.
+                ProgressView(timerInterval: window, countsDown: true) {
+                    EmptyView()
+                } currentValueLabel: {
+                    EmptyView()
+                }
+                .progressViewStyle(.circular)
+                .tint(model.islandTint)
+            } else {
+                Circle()
+                    .stroke(model.isOverdue ? model.islandTint : Color.white.opacity(0.18), lineWidth: 2.5)
+            }
+            Image(systemName: model.glyphSymbol)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(widgetHex: state.liveTheme.islandTextPrimaryHex))
+                .foregroundStyle(model.islandGlyphColor)
         }
-        .padding(3)
-        .frame(width: 24, height: 24)
-        .accessibilityLabel("今日进度 \(state.completionPercent)%")
+        .padding(2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(model.statusText) · \(model.state.focusTitle)"))
     }
 }
 
-@available(iOS 16.1, *)
 private struct LiveActivityLockStylingModifier: ViewModifier {
     let theme: LiveActivityThemeSnapshot
 
@@ -924,88 +1274,6 @@ private struct WidgetLinearProgress: View {
     }
 }
 
-private struct LiveActionCapsule: View {
-    let title: String
-    let icon: String
-    let fill: Color
-    let foreground: Color
-    var horizontalPadding: CGFloat = 12
-    var verticalPadding: CGFloat = 9
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-            Text(title)
-        }
-        .font(.caption.weight(.semibold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.82)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 36)
-        .padding(.horizontal, horizontalPadding)
-        .padding(.vertical, verticalPadding)
-        .foregroundStyle(foreground)
-        .background(fill, in: Capsule())
-    }
-}
-
-private struct LiveLinearProgress: View {
-    let progress: CGFloat
-    let fill: Color
-    let track: Color
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = max(min(progress, 1), 0) * proxy.size.width
-            ZStack(alignment: .leading) {
-                Capsule().fill(track)
-                Capsule().fill(fill).frame(width: width)
-            }
-        }
-    }
-}
-
-private func liveActivityTaskTypeIcon(raw: String) -> String {
-    switch raw {
-    case "ddl":
-        return "exclamationmark.triangle.fill"
-    case "leisure":
-        return "sparkles"
-    default:
-        return "checkmark.circle.fill"
-    }
-}
-
-private func liveActivityTaskTypeLabel(raw: String) -> String {
-    switch raw {
-    case "ddl":
-        return "DDL"
-    case "leisure":
-        return "休闲"
-    default:
-        return "常规"
-    }
-}
-
-private func liveActivityDurationText(seconds: Int) -> String {
-    let safe = max(0, seconds)
-    let hours = safe / 3600
-    let minutes = (safe % 3600) / 60
-    let secs = safe % 60
-    return String(format: "%02d:%02d:%02d", hours, minutes, secs)
-}
-
-private func liveActivityCompactDurationText(seconds: Int) -> String {
-    let safe = max(0, seconds)
-    let hours = safe / 3600
-    let minutes = (safe % 3600) / 60
-    let secs = safe % 60
-    if hours > 0 {
-        return String(format: "%d:%02d", hours, minutes)
-    }
-    return String(format: "%02d:%02d", minutes, secs)
-}
-
 private func statusIcon(raw: String) -> String {
     switch raw {
     case "execute":
@@ -1034,10 +1302,17 @@ private func isHexColorLight(_ hex: String) -> Bool {
     return luma > 0.72
 }
 
-private func deadlineLabel(for date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "截止 HH:mm"
-    return formatter.string(from: date)
+/// Whether text on top of `hex` should be dark for legibility.
+private func liveActivityPrefersDarkForeground(_ hex: String) -> Bool {
+    var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+    if sanitized.hasPrefix("#") { sanitized.removeFirst() }
+    guard sanitized.count == 6, let value = Int(sanitized, radix: 16) else {
+        return false
+    }
+    let r = Double((value >> 16) & 0xFF) / 255.0
+    let g = Double((value >> 8) & 0xFF) / 255.0
+    let b = Double(value & 0xFF) / 255.0
+    return 0.299 * r + 0.587 * g + 0.114 * b > 0.55
 }
 
 private extension View {

@@ -2,6 +2,9 @@ import Foundation
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
+#if canImport(AppIntents)
+import AppIntents
+#endif
 
 enum AppearanceMode: String, CaseIterable, Codable, Identifiable {
     case system
@@ -28,7 +31,7 @@ enum LanguageOverride: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
+nonisolated enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
     case doneFocus = "done-focus"
     case postponeFocus = "postpone-focus"
     case openToday = "open-today"
@@ -75,9 +78,122 @@ struct TodayActivityAttributes: ActivityAttributes {
         var totalCount: Int
         var frozenCount: Int
         var liveTheme: LiveActivityThemeSnapshot
+        // Fields below were added after the first release. They are optional so a
+        // content state encoded by an older build still decodes.
+        /// Display name of the focus task's type (custom types included).
+        var typeName: String?
+        /// SF Symbol name of the focus task's type.
+        var typeIconName: String?
+        /// Hex color of the focus task's type.
+        var typeColorHex: String?
+        /// When the user started today; drives the time ring / time bar.
+        var dayStartedAt: Date?
+        /// Title of the first task waiting in the frozen zone.
+        var nextTitle: String?
+        /// `LiveActivityAction.rawValue` awaiting a second tap to confirm.
+        var pendingActionRaw: String?
+        /// Localization the app is running in, e.g. "zh-Hans" / "en".
+        var languageCode: String?
+
+        var pendingAction: LiveActivityAction? {
+            pendingActionRaw.flatMap(LiveActivityAction.init(rawValue:))
+        }
     }
 
     var dayId: String
+}
+#endif
+
+#if canImport(ActivityKit) && canImport(AppIntents)
+/// Lets Live Activity buttons run inside the app process without opening the app.
+/// The app registers `performAction` at launch (see `WeekyiiApp.init`).
+@MainActor
+enum LiveActivityIntentBridge {
+    static var performAction: (@MainActor (LiveActivityAction, Int) async -> Bool)?
+}
+
+@MainActor
+enum LiveActivityStateEditor {
+    /// Switches every running Today activity into (or out of) the confirm state,
+    /// keeping all other content and the stale date untouched.
+    static func setPendingAction(_ action: LiveActivityAction?) async {
+        for activity in Activity<TodayActivityAttributes>.activities {
+            var state = activity.content.state
+            guard state.pendingActionRaw != action?.rawValue else { continue }
+            state.pendingActionRaw = action?.rawValue
+            await activity.update(
+                ActivityContent(state: state, staleDate: activity.content.staleDate)
+            )
+        }
+    }
+}
+
+/// First tap on 完成 / 推迟到明天: only shows the confirm buttons.
+nonisolated struct LiveActivityRequestConfirmIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Confirm Live Activity Action"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Action")
+    var actionRaw: String
+
+    init() {}
+
+    init(action: LiveActivityAction) {
+        self.actionRaw = action.rawValue
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let action = LiveActivityAction(rawValue: actionRaw), action != .openToday else {
+            return .result()
+        }
+        await LiveActivityStateEditor.setPendingAction(action)
+        return .result()
+    }
+}
+
+/// 取消: leaves the confirm state without changing any data.
+nonisolated struct LiveActivityCancelConfirmIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Cancel Live Activity Action"
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await LiveActivityStateEditor.setPendingAction(nil)
+        return .result()
+    }
+}
+
+/// Second tap (确认完成 / 确认推迟): runs the action in the app process.
+nonisolated struct LiveActivityPerformActionIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Perform Live Activity Action"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Action")
+    var actionRaw: String
+
+    init() {}
+
+    init(action: LiveActivityAction) {
+        self.actionRaw = action.rawValue
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let action = LiveActivityAction(rawValue: actionRaw), action != .openToday,
+              let performAction = LiveActivityIntentBridge.performAction
+        else {
+            await LiveActivityStateEditor.setPendingAction(nil)
+            return .result()
+        }
+        _ = await performAction(action, 1)
+        // On success the app has already pushed fresh content; on failure this
+        // simply returns the activity to its normal buttons.
+        await LiveActivityStateEditor.setPendingAction(nil)
+        return .result()
+    }
 }
 #endif
 
