@@ -722,10 +722,15 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             let frozenTasks = day.tasks
                 .filter { $0.zone == .frozen }
                 .sorted { $0.order < $1.order }
-            for frozen in frozenTasks where frozen.order != sequence {
-                frozen.order = sequence
+            // Advance the sequence for every queued task, including ones whose
+            // order is already correct; otherwise the next task is renumbered onto
+            // an order that is already taken and the queue order becomes unstable.
+            for frozen in frozenTasks {
+                if frozen.order != sequence {
+                    frozen.order = sequence
+                    changed = true
+                }
                 sequence += 1
-                changed = true
             }
         }
 

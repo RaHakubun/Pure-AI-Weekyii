@@ -231,6 +231,10 @@ final class TodayViewModel {
         if let next = day.frozenTasks.first {
             next.zone = .focus
             next.startedAt = now
+            // Renumber the promoted focus and the remaining queue to 1, 2, 3…
+            // so a later queue reorder (which starts at 2) cannot collide with it.
+            next.order = 1
+            taskMutationService.normalizeOrder(in: day, zone: .frozen)
         } else {
             day.isDraftZoneUnlocked = false
             day.status = .completed
