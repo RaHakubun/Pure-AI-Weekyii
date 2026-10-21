@@ -131,6 +131,8 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             darkBackgroundHex: palettePair.dark.backgroundSecondary,
             darkTextPrimaryHex: palettePair.dark.textPrimary,
             darkTextSecondaryHex: palettePair.dark.textSecondary,
+            successHex: palettePair.light.accentGreen,
+            darkSuccessHex: palettePair.dark.accentGreen,
             appearanceModeRaw: appearanceMode.rawValue
         )
     }

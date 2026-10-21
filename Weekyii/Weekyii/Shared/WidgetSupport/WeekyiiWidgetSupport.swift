@@ -233,7 +233,12 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
     var darkBackgroundHex: String
     var darkTextPrimaryHex: String
     var darkTextSecondaryHex: String
+    var successHex: String
+    var darkSuccessHex: String
     var appearanceModeRaw: String
+
+    /// Used when a snapshot written by an older build has no success color.
+    static let fallbackSuccessHex = "#3E9B6A"
 
     init(
         primaryHex: String,
@@ -248,6 +253,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         darkBackgroundHex: String? = nil,
         darkTextPrimaryHex: String? = nil,
         darkTextSecondaryHex: String? = nil,
+        successHex: String? = nil,
+        darkSuccessHex: String? = nil,
         appearanceModeRaw: String = AppearanceMode.system.rawValue
     ) {
         self.primaryHex = primaryHex
@@ -262,6 +269,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         self.darkBackgroundHex = darkBackgroundHex ?? backgroundHex
         self.darkTextPrimaryHex = darkTextPrimaryHex ?? textPrimaryHex
         self.darkTextSecondaryHex = darkTextSecondaryHex ?? textSecondaryHex
+        self.successHex = successHex ?? Self.fallbackSuccessHex
+        self.darkSuccessHex = darkSuccessHex ?? successHex ?? Self.fallbackSuccessHex
         self.appearanceModeRaw = appearanceModeRaw
     }
 
@@ -287,7 +296,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
                 accentHex: darkAccentHex,
                 backgroundHex: darkBackgroundHex,
                 textPrimaryHex: darkTextPrimaryHex,
-                textSecondaryHex: darkTextSecondaryHex
+                textSecondaryHex: darkTextSecondaryHex,
+                successHex: darkSuccessHex
             )
         }
 
@@ -297,7 +307,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
             accentHex: accentHex,
             backgroundHex: backgroundHex,
             textPrimaryHex: textPrimaryHex,
-            textSecondaryHex: textSecondaryHex
+            textSecondaryHex: textSecondaryHex,
+            successHex: successHex
         )
     }
 
@@ -314,6 +325,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         case darkBackgroundHex
         case darkTextPrimaryHex
         case darkTextSecondaryHex
+        case successHex
+        case darkSuccessHex
         case appearanceModeRaw
     }
 
@@ -333,6 +346,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         darkBackgroundHex = try container.decodeIfPresent(String.self, forKey: .darkBackgroundHex) ?? backgroundHex
         darkTextPrimaryHex = try container.decodeIfPresent(String.self, forKey: .darkTextPrimaryHex) ?? textPrimaryHex
         darkTextSecondaryHex = try container.decodeIfPresent(String.self, forKey: .darkTextSecondaryHex) ?? textSecondaryHex
+        successHex = try container.decodeIfPresent(String.self, forKey: .successHex) ?? Self.fallbackSuccessHex
+        darkSuccessHex = try container.decodeIfPresent(String.self, forKey: .darkSuccessHex) ?? successHex
         appearanceModeRaw = try container.decodeIfPresent(String.self, forKey: .appearanceModeRaw) ?? AppearanceMode.system.rawValue
     }
 }
@@ -344,6 +359,7 @@ struct WidgetThemePalette: Equatable, Hashable {
     var backgroundHex: String
     var textPrimaryHex: String
     var textSecondaryHex: String
+    var successHex: String
 }
 
 // Live Activities do not share widget semantics directly.
@@ -513,6 +529,8 @@ struct WidgetTaskPreview: Codable, Equatable, Identifiable {
     var title: String
     var taskTypeRaw: String
     var zoneRaw: String
+    /// Color of the task's type (built-in or custom), so the widget can mark it.
+    var typeColorHex: String? = nil
 }
 
 struct WidgetTodaySnapshot: Codable, Equatable {
@@ -527,6 +545,20 @@ struct WidgetTodaySnapshot: Codable, Equatable {
     var frozenCount: Int
     var completionPercent: Int
     var previewTasks: [WidgetTaskPreview]
+
+    // Fields below were added for the redesigned widgets. They are optional so a
+    // snapshot written by an older build still decodes.
+
+    /// Today's deadline as an absolute date; drives the live countdown.
+    var killTime: Date? = nil
+    /// Start of the next day. After this moment the snapshot describes yesterday.
+    var dayEndsAt: Date? = nil
+    var focusTypeName: String? = nil
+    var focusTypeColorHex: String? = nil
+    /// Tasks still to do after the focus task: frozen first, then draft. Never includes the focus task.
+    var upcomingTasks: [WidgetTaskPreview]? = nil
+    /// Language the app UI runs in, so widget copy can match it.
+    var languageCode: String? = nil
 }
 
 struct WidgetWeekDaySnapshot: Codable, Equatable, Identifiable {
@@ -558,10 +590,10 @@ struct WidgetSnapshot: Codable, Equatable {
         ),
         today: WidgetTodaySnapshot(
             dayId: Date().description,
-            weekdaySymbol: "Today",
-            statusRaw: "draft",
-            killTimeText: "23:45",
-            focusTitle: "Open Weekyii",
+            weekdaySymbol: "",
+            statusRaw: "empty",
+            killTimeText: "--:--",
+            focusTitle: nil,
             totalCount: 0,
             completedCount: 0,
             draftCount: 0,

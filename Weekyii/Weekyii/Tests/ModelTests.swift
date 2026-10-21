@@ -4463,6 +4463,17 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(snapshot.theme.primaryHex, WeekTheme.rose.primaryThemeHex)
         XCTAssertEqual(snapshot.theme.appearanceMode, .dark)
         XCTAssertEqual(snapshot.weekDays.count, 7)
+
+        // Redesigned widget fields: the upcoming list never repeats the focus task,
+        // and the deadline / day boundary are absolute dates.
+        XCTAssertEqual(snapshot.today.upcomingTasks?.map(\.title), ["Frozen task", "Draft task"])
+        let killTime = try? XCTUnwrap(snapshot.today.killTime)
+        XCTAssertEqual(killTime, KillTimeDeadline.date(for: day.date, hour: 23, minute: 45))
+        if let killTime, let dayEndsAt = snapshot.today.dayEndsAt {
+            XCTAssertGreaterThan(dayEndsAt, killTime)
+        } else {
+            XCTFail("dayEndsAt missing")
+        }
     }
 
     func test_widgetThemeSnapshot_decodesLegacyPayloadWithoutDarkFields() throws {
