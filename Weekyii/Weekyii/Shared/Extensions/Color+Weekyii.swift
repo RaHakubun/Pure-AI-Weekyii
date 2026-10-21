@@ -494,6 +494,16 @@ enum ThemeBackdrop: Equatable {
     case scanlines(ThemeHexPair)
 }
 
+/// The `WeekRadius` scale for a skin. Every page reads its corner radii through
+/// `WeekRadius`, so a square-cornered theme squares chips, cells and inset panels
+/// too, not only the shared cards.
+struct ThemeRadii: Equatable {
+    var small: CGFloat
+    var medium: CGFloat
+    var large: CGFloat
+    var xlarge: CGFloat
+}
+
 struct ThemeTypography: Equatable {
     var titleDesign: Font.Design
     /// `nil` keeps each role's own weight.
@@ -519,6 +529,8 @@ struct ThemeTypography: Equatable {
 /// every token is `nil` and each component keeps its original code path.
 struct ThemeSkin: Equatable {
     var typography: ThemeTypography = .classic
+    /// `nil` keeps the original 8 / 12 / 16 / 24 scale.
+    var radii: ThemeRadii? = nil
     var card: ThemeSurfaceSkin? = nil
     var row: ThemeRowSkin? = nil
     var feature: ThemeFeatureSkin? = nil
@@ -529,6 +541,9 @@ struct ThemeSkin: Equatable {
     /// Text/icons on an `accentGreen` fill. `nil` keeps white.
     var onSuccess: ThemeHexPair? = nil
     var backdrop: ThemeBackdrop = .none
+    /// Decorative blurred drop shadows (buttons, tiles, floating panels). Flat
+    /// and hard-shadow skins turn them off; see `weekSoftShadow`.
+    var softShadows: Bool = true
 
     static let classic = ThemeSkin()
 
@@ -556,6 +571,7 @@ extension ThemeSkin {
         let hardShadow = ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 4, y: 4)
         return ThemeSkin(
             typography: ThemeTypography(titleDesign: .default, titleWeight: .black, bodyDesign: .default),
+            radii: ThemeRadii(small: 2, medium: 3, large: 4, xlarge: 4),
             card: ThemeSurfaceSkin(cornerRadius: 4, borderWidth: 2.5, border: ink, shadow: hardShadow),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(
@@ -599,7 +615,8 @@ extension ThemeSkin {
             badge: ThemeBadgeSkin(kind: .block, border: ink),
             section: ThemeSectionSkin(count: .block),
             onPrimary: ThemeHexPair("#FFFFFF", "#111111"),
-            onSuccess: ThemeHexPair("#111111")
+            onSuccess: ThemeHexPair("#111111"),
+            softShadows: false
         )
     }()
 
@@ -607,6 +624,7 @@ extension ThemeSkin {
         let line = ThemeHexPair("#9FD9E3", "#00A8B8")
         return ThemeSkin(
             typography: ThemeTypography(titleDesign: .default, titleWeight: .bold, bodyDesign: .default),
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 18),
             card: ThemeSurfaceSkin(
                 cornerRadius: 14,
                 borderWidth: 1.5,
@@ -659,6 +677,7 @@ extension ThemeSkin {
         let stack = ThemeHexPair("#E9DFCC", "#3A352C")
         return ThemeSkin(
             typography: ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .serif),
+            radii: ThemeRadii(small: 1, medium: 2, large: 2, xlarge: 2),
             card: ThemeSurfaceSkin(cornerRadius: 2, borderWidth: 0.75, border: rule, stackLine: stack),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(cornerRadius: 1, borderWidth: 0.75, border: ThemeHexPair("#E6DBC7", "#3A352C")),
@@ -678,7 +697,8 @@ extension ThemeSkin {
             section: ThemeSectionSkin(count: .italic, rule: ink),
             onPrimary: ThemeHexPair("#FFFFFF", "#1B1917"),
             onSuccess: ThemeHexPair("#FFFFFF", "#1B1917"),
-            backdrop: .paperGrain(ThemeHexPair("#0A785A32", "#08F0EADF"))
+            backdrop: .paperGrain(ThemeHexPair("#0A785A32", "#08F0EADF")),
+            softShadows: false
         )
     }()
 
@@ -686,6 +706,7 @@ extension ThemeSkin {
         let line = ThemeHexPair("#2F7A3F", "#1E9442")
         return ThemeSkin(
             typography: ThemeTypography(titleDesign: .monospaced, titleWeight: nil, bodyDesign: .monospaced),
+            radii: ThemeRadii(small: 0, medium: 0, large: 0, xlarge: 0),
             card: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: line),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: ThemeHexPair("#C9D6CB", "#12291A")),
@@ -710,7 +731,8 @@ extension ThemeSkin {
             section: ThemeSectionSkin(titlePrefix: "## ", count: .bracket),
             onPrimary: ThemeHexPair("#FFFFFF", "#05100A"),
             onSuccess: ThemeHexPair("#FFFFFF", "#05100A"),
-            backdrop: .scanlines(ThemeHexPair("#00000000", "#0D33FF66"))
+            backdrop: .scanlines(ThemeHexPair("#00000000", "#0D33FF66")),
+            softShadows: false
         )
     }()
 }

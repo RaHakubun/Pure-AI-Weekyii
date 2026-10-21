@@ -4023,6 +4023,7 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(ThemeSkin.classic.onPrimary)
         // The root `.fontDesign` must be a no-op for classic themes.
         XCTAssertNil(ThemeSkin.classic.typography.environmentDesign)
+        XCTAssertNil(ThemeSkin.classic.radii, "classic themes keep the 8 / 12 / 16 / 24 radius scale")
     }
 
     func test_themeSkin_personalisedThemesRestyleSharedComponents() {
@@ -4042,6 +4043,8 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(WeekTheme.terminal.skin.typography.environmentDesign, .monospaced)
         XCTAssertNil(WeekTheme.brutal.skin.typography.environmentDesign)
         XCTAssertEqual(WeekTheme.brutal.skin.row?.barFlush, true)
+        XCTAssertEqual(WeekTheme.terminal.skin.radii?.medium, 0)
+        XCTAssertNotNil(WeekTheme.neon.skin.radii)
     }
 
     func test_themeVisualStyle_personalisedThemesOverrideTheForm() {

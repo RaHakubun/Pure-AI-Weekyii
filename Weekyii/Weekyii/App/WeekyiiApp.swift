@@ -654,6 +654,8 @@ struct WeekyiiApp: App {
                     // System text styles (`.caption2`, Form rows …) follow the theme's body face;
                     // `nil` for every theme on the default face, so they are left untouched.
                     .fontDesign(userSettings.selectedTheme.skin.typography.environmentDesign)
+                    // Applied outside `.environment(\.themeSkin, …)`, so the backdrop is passed in.
+                    .overlay { ThemeBackdropOverlay(backdrop: userSettings.selectedTheme.skin.backdrop) }
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)
