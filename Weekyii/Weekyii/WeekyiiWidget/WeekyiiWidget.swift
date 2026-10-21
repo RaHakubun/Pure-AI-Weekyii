@@ -30,9 +30,26 @@ struct WeekyiiWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeekyiiWidgetEntry>) -> Void) {
         let snapshot = store.load() ?? .placeholder
-        let entry = WeekyiiWidgetEntry(date: Date(), snapshot: snapshot)
-        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
-        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+        let now = Date()
+        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 15, to: now) ?? now.addingTimeInterval(900)
+        let entries = Self.entryDates(for: snapshot.today, now: now)
+            .map { WeekyiiWidgetEntry(date: $0, snapshot: snapshot) }
+        completion(Timeline(entries: entries, policy: .after(nextRefresh)))
+    }
+
+    /// Now, plus the moments the widget's state changes on its own: one hour
+    /// before the deadline (due soon), the deadline (overdue) and the day boundary.
+    /// The countdown itself is a system timer and needs no entries.
+    static func entryDates(for today: WidgetTodaySnapshot, now: Date) -> [Date] {
+        var dates: [Date] = [now]
+        if today.statusRaw == "execute", let killTime = today.killTime {
+            dates.append(killTime.addingTimeInterval(-WidgetSemanticData.urgentThreshold))
+            dates.append(killTime)
+        }
+        if let dayEndsAt = today.dayEndsAt {
+            dates.append(dayEndsAt)
+        }
+        return Array(Set(dates.filter { $0 >= now })).sorted()
     }
 }
 
@@ -42,7 +59,7 @@ struct WeekyiiWidget: Widget {
             WeekyiiWidgetRoot(entry: entry)
         }
         .configurationDisplayName("Weekyii")
-        .description("快速查看今日任务进度与本周概览。")
+        .description(String(localized: "widget.description", defaultValue: "查看今天的焦点任务、截止倒计时和本周进度。"))
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
@@ -251,13 +268,7 @@ private struct LiveActivityPresentation {
     // MARK: Helpers
 
     private static func localizationBundle(for languageCode: String?) -> Bundle {
-        guard let languageCode,
-              let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
-              let bundle = Bundle(path: path)
-        else {
-            return .main
-        }
-        return bundle
+        weekyiiLocalizationBundle(for: languageCode)
     }
 }
 
@@ -732,290 +743,595 @@ struct WeekyiiLiveActivityWidget: Widget {
 }
 #endif
 
+// MARK: - Home & lock screen widgets
+
+/// What the widget says about today at a given timeline moment.
+private enum WidgetDayPhase {
+    /// Executing, more than an hour left.
+    case focus
+    /// Executing, one hour or less left.
+    case urgent
+    /// Executing, deadline passed, the app has not closed the day yet.
+    case overdue
+    case completed
+    /// The day expired.
+    case ended
+    /// Planned (draft) or nothing planned yet.
+    case notStarted
+    /// The snapshot still describes a previous day.
+    case newDay
+
+    var showsCountdown: Bool {
+        switch self {
+        case .focus, .urgent, .overdue: return true
+        default: return false
+        }
+    }
+}
+
 private struct WeekyiiWidgetRoot: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var colorScheme
     let entry: WeekyiiWidgetEntry
 
-    private var palette: WidgetThemePalette {
-        entry.snapshot.theme.resolvedPalette(isDarkSystem: colorScheme == .dark)
+    private var isDark: Bool {
+        switch entry.snapshot.theme.appearanceMode {
+        case .system: return colorScheme == .dark
+        case .light: return false
+        case .dark: return true
+        }
     }
 
     private var tokens: WidgetVisualTokens {
-        WidgetVisualTokens(palette: palette)
+        WidgetVisualTokens(
+            palette: entry.snapshot.theme.resolvedPalette(isDarkSystem: colorScheme == .dark),
+            isDark: isDark
+        )
     }
 
     private var semantic: WidgetSemanticData {
-        WidgetSemanticData(snapshot: entry.snapshot)
+        WidgetSemanticData(snapshot: entry.snapshot, now: entry.date)
     }
 
     private var familyBackground: Color {
         switch family {
         case .accessoryInline, .accessoryRectangular, .accessoryCircular:
-            return tokens.accessoryBackground
+            // The lock screen draws its own material; theme colors are not used there.
+            return .clear
         default:
             return tokens.background
         }
     }
 
     var body: some View {
+        let semantic = self.semantic
+        let tokens = self.tokens
         Group {
             switch family {
             case .systemSmall:
-                systemSmallView
+                WidgetSmallView(semantic: semantic, tokens: tokens)
             case .systemMedium:
-                systemMediumView
+                WidgetMediumView(semantic: semantic, tokens: tokens)
             case .systemLarge:
-                systemLargeView
+                WidgetLargeView(semantic: semantic, tokens: tokens)
             case .accessoryInline:
-                accessoryInlineView
+                WidgetInlineView(semantic: semantic)
             case .accessoryRectangular:
-                accessoryRectangularView
+                WidgetRectangularView(semantic: semantic)
             case .accessoryCircular:
-                accessoryCircularView
+                WidgetCircularView(semantic: semantic)
             default:
-                systemSmallView
+                WidgetSmallView(semantic: semantic, tokens: tokens)
             }
         }
         .weekyiiWidgetContainerBackground(familyBackground)
         .widgetURL(LiveActivityAction.openToday.url())
     }
+}
 
-    private var systemSmallView: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack {
-                Text("当下")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(tokens.textSecondary)
-                    .lineLimit(1)
-                Spacer()
-                WidgetStatusPill(text: semantic.stateLabel, tokens: tokens)
-            }
+// MARK: System families
 
-            HStack(alignment: .center, spacing: 10) {
-                WidgetProgressRing(
-                    progress: semantic.progress,
-                    lineWidth: 7,
-                    tint: tokens.primary,
-                    track: tokens.ringTrack,
-                    centerText: semantic.totalCount == 0 ? "--" : "\(semantic.progressPercent)",
-                    centerTextColor: tokens.textPrimary
-                )
-                .frame(width: 54, height: 54)
+private struct WidgetSmallView: View {
+    let semantic: WidgetSemanticData
+    let tokens: WidgetVisualTokens
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(semantic.keyline)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(tokens.textPrimary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                    Text("完成 \(semantic.completedCount)/\(semantic.totalCount)")
-                        .font(.caption2)
-                        .lineLimit(1)
-                        .foregroundStyle(tokens.textSecondary)
-                }
-                .layoutPriority(1)
-                Spacer(minLength: 0)
-            }
-
-            WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
-                .frame(height: 6)
-        }
-        .padding(12)
-    }
-
-    private var systemMediumView: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(semantic.progressPercent)")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundStyle(tokens.primary)
-                    Text("%")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(tokens.textSecondary)
-                }
-                .lineLimit(1)
-
-                Text("\(semantic.stateLabel) · 完成 \(semantic.completedCount)/\(semantic.totalCount)")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(tokens.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-            .frame(width: 86, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 6) {
-                    Text(semantic.keyline)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(tokens.textPrimary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                    Spacer(minLength: 0)
-                    Text("截止 \(semantic.killTimeText)")
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                WidgetStateLabel(text: semantic.stateLabel, tint: tokens.tint(for: semantic.phase))
+                Spacer(minLength: 4)
+                if semantic.showsCounts {
+                    Text(verbatim: "\(semantic.completedCount)/\(semantic.totalCount)")
                         .font(.caption2.weight(.medium))
+                        .monospacedDigit()
                         .foregroundStyle(tokens.textSecondary)
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
                 }
-
-                WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
-                    .frame(height: 6)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    ForEach(semantic.previewRows.prefix(2)) { row in
-                        WidgetTaskPreviewLine(row: row, color: zoneColor(raw: row.zoneRaw), textColor: tokens.textSecondary)
-                    }
-                }
-                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(14)
-    }
 
-    private var systemLargeView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Weekyii · 当下")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(tokens.primary)
-                    Spacer()
-                    Text("截止 \(semantic.killTimeText)")
+            Text(semantic.keyline)
+                .font(.headline)
+                .foregroundStyle(tokens.textPrimary)
+                .lineLimit(3)
+                .minimumScaleFactor(0.85)
+                .padding(.top, 6)
+
+            Spacer(minLength: 4)
+
+            VStack(alignment: .leading, spacing: 0) {
+                if semantic.phase.showsCountdown, let killTime = semantic.killTime {
+                    WidgetCountdownText(killTime: killTime, overdue: semantic.phase == .overdue)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(tokens.tint(for: semantic.phase))
+                        .widgetAccentable()
+                    Text(semantic.deadlineText)
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                } else if let caption = semantic.summaryCaption {
+                    Text(caption)
                         .font(.caption)
                         .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(2)
                 }
 
-                Text(semantic.keyline)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(tokens.textPrimary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.86)
-
-                WidgetStatsStrip(semantic: semantic, tokens: tokens)
-
-                WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
-                    .frame(height: 7)
-            }
-            .padding(12)
-            .background(tokens.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(tokens.stroke, lineWidth: 1)
-            }
-
-            Text("本周条带")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tokens.textSecondary)
-                .padding(.leading, 2)
-
-            HStack(spacing: 6) {
-                ForEach(semantic.weekDays.prefix(7)) { day in
-                    WidgetWeekStripCell(day: day, tokens: tokens)
+                if semantic.showsCounts {
+                    WidgetLinearProgress(progress: semantic.progress, fill: tokens.tint(for: semantic.phase), track: tokens.ringTrack)
+                        .frame(height: 4)
+                        .padding(.top, 7)
                 }
             }
+            .layoutPriority(1)
         }
-        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+}
 
-    private var accessoryInlineView: some View {
-        HStack(spacing: 4) {
-            Image(systemName: statusIcon(raw: semantic.statusRaw))
-                .foregroundStyle(tokens.primary)
-            Text("当下 \(semantic.completedCount)/\(semantic.totalCount) · \(semantic.stateLabel)")
-                .lineLimit(1)
-                .foregroundStyle(tokens.textPrimary)
-        }
-    }
+private struct WidgetMediumView: View {
+    let semantic: WidgetSemanticData
+    let tokens: WidgetVisualTokens
 
-    private var accessoryRectangularView: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(semantic.stateLabel)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .foregroundStyle(tokens.textPrimary)
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 0) {
+                WidgetStateLabel(text: semantic.stateLabel, tint: tokens.tint(for: semantic.phase))
+                Spacer(minLength: 6)
+                if semantic.phase.showsCountdown, let killTime = semantic.killTime {
+                    WidgetCountdownText(killTime: killTime, overdue: semantic.phase == .overdue)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.7)
+                        .foregroundStyle(tokens.tint(for: semantic.phase))
+                        .widgetAccentable()
+                    Text(semantic.deadlineText)
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                } else if semantic.showsCounts {
+                    Text(verbatim: "\(semantic.progressPercent)%")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(tokens.tint(for: semantic.phase))
+                        .lineLimit(1)
+                        .widgetAccentable()
+                }
+                if semantic.showsCounts {
+                    WidgetLinearProgress(progress: semantic.progress, fill: tokens.tint(for: semantic.phase), track: tokens.ringTrack)
+                        .frame(height: 4)
+                        .padding(.top, 8)
+                    Text(semantic.doneText)
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                        .padding(.top, 4)
+                }
+            }
+            .frame(width: 118, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+
+            Rectangle()
+                .fill(tokens.stroke)
+                .frame(width: 1)
+
+            VStack(alignment: .leading, spacing: 0) {
+                WidgetKeylineRow(semantic: semantic, tokens: tokens, font: .subheadline.weight(.semibold), lineLimit: 2)
+
+                let rows = Array(semantic.listRows.prefix(2))
+                if !rows.isEmpty {
+                    WidgetSectionTitle(text: semantic.upNextTitle, tokens: tokens)
+                        .padding(.top, 10)
+                    ForEach(rows) { row in
+                        WidgetTaskRow(row: row, tokens: tokens)
+                            .padding(.top, 5)
+                    }
+                }
+
                 Spacer(minLength: 0)
-                Text("\(semantic.progressPercent)%")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(tokens.primary)
+
+                if let more = semantic.moreText(afterShowing: rows.count) {
+                    Text(more)
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                }
             }
-
-            WidgetLinearProgress(progress: semantic.progress, fill: tokens.primary, track: tokens.ringTrack)
-                .frame(height: 5)
-
-            Text("完成 \(semantic.completedCount)/\(semantic.totalCount) · 剩余 \(semantic.remainingCount)")
-            .font(.caption2)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .foregroundStyle(tokens.textSecondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
+}
 
-    private var accessoryCircularView: some View {
-        WidgetProgressRing(
-            progress: semantic.progress,
-            lineWidth: 4,
-            tint: tokens.primary,
-            track: tokens.ringTrack,
-            centerText: semantic.totalCount == 0 ? "--" : "\(semantic.progressPercent)",
-            centerTextColor: tokens.textPrimary
-        )
-        .padding(2)
+private struct WidgetLargeView: View {
+    let semantic: WidgetSemanticData
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text(semantic.dateHeader)
+                    .font(.headline)
+                    .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                WidgetStatusPill(text: semantic.stateLabel, tint: tokens.tint(for: semantic.phase), tokens: tokens)
+            }
+
+            focusCard
+                .padding(.top, 10)
+
+            let rows = Array(semantic.listRows.prefix(3))
+            if !rows.isEmpty {
+                WidgetSectionTitle(text: semantic.upNextTitle, tokens: tokens)
+                    .padding(.top, 12)
+                ForEach(rows) { row in
+                    WidgetTaskRow(row: row, tokens: tokens)
+                        .padding(.top, 6)
+                }
+                if let more = semantic.moreText(afterShowing: rows.count) {
+                    Text(more)
+                        .font(.caption2)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                        .padding(.top, 5)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if !semantic.weekDays.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(semantic.weekDays.prefix(7)) { day in
+                        WidgetWeekStripCell(day: day, isToday: day.id == semantic.todayId && semantic.phase != .newDay, tokens: tokens)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func zoneColor(raw: String) -> Color {
-        switch raw {
-        case "focus":
-            return tokens.primary
-        case "frozen":
-            return tokens.warning
-        case "draft":
-            return tokens.accent
+    private var focusCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if semantic.hasFocusTask {
+                Text(semantic.focusTypeName)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color(widgetHex: semantic.focusTypeColorHex))
+                    .lineLimit(1)
+                    .padding(.bottom, 3)
+            }
+
+            Text(semantic.keyline)
+                .font(.headline)
+                .foregroundStyle(tokens.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+
+            if semantic.phase.showsCountdown, let killTime = semantic.killTime {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    WidgetCountdownText(killTime: killTime, overdue: semantic.phase == .overdue)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(tokens.tint(for: semantic.phase))
+                        .widgetAccentable()
+                    Spacer(minLength: 4)
+                    Text(semantic.deadlineText)
+                        .font(.caption)
+                        .foregroundStyle(tokens.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.top, 8)
+            } else if let caption = semantic.summaryCaption {
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(tokens.textSecondary)
+                    .lineLimit(2)
+                    .padding(.top, 6)
+            }
+
+            if semantic.showsCounts {
+                WidgetLinearProgress(progress: semantic.progress, fill: tokens.tint(for: semantic.phase), track: tokens.ringTrack)
+                    .frame(height: 6)
+                    .padding(.top, 8)
+                Text(semantic.doneAndRemainingText)
+                    .font(.caption2)
+                    .foregroundStyle(tokens.textSecondary)
+                    .lineLimit(1)
+                    .padding(.top, 4)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+// MARK: Accessory families (lock screen)
+// These render in the system's vibrant style, so they use semantic foreground
+// styles instead of theme colors.
+
+private struct WidgetInlineView: View {
+    let semantic: WidgetSemanticData
+
+    var body: some View {
+        if semantic.phase.showsCountdown, let killTime = semantic.killTime {
+            // Timer first so it survives truncation of a long title.
+            (WidgetCountdownText.text(killTime: killTime, overdue: semantic.phase == .overdue)
+                + Text(verbatim: " · ")
+                + Text(semantic.keyline))
+                .lineLimit(1)
+        } else {
+            Text(semantic.inlineSummary)
+                .lineLimit(1)
+        }
+    }
+}
+
+private struct WidgetRectangularView: View {
+    let semantic: WidgetSemanticData
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Group {
+                if semantic.phase.showsCountdown, let killTime = semantic.killTime {
+                    Text(semantic.stateLabel)
+                        + Text(verbatim: " · ")
+                        + WidgetCountdownText.text(killTime: killTime, overdue: semantic.phase == .overdue)
+                } else {
+                    Text(semantic.stateLabel)
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .widgetAccentable()
+
+            Text(semantic.keyline)
+                .font(.headline)
+                .lineLimit(1)
+
+            Text(semantic.rectangularFooter)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct WidgetCircularView: View {
+    let semantic: WidgetSemanticData
+
+    var body: some View {
+        Gauge(value: Double(semantic.progress)) {
+            EmptyView()
+        } currentValueLabel: {
+            VStack(spacing: 0) {
+                Text(verbatim: semantic.totalCount == 0 ? "--" : "\(semantic.completedCount)/\(semantic.totalCount)")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text(semantic.doneShortTitle)
+                    .font(.system(size: 9, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+        .widgetAccentable()
+    }
+}
+
+// MARK: Pieces
+
+/// Self-updating countdown to the deadline; past the deadline the system timer counts up, prefixed with "+".
+private struct WidgetCountdownText: View {
+    let killTime: Date
+    let overdue: Bool
+
+    static func text(killTime: Date, overdue: Bool) -> Text {
+        overdue ? Text(verbatim: "+") + Text(killTime, style: .timer) : Text(killTime, style: .timer)
+    }
+
+    var body: some View {
+        Self.text(killTime: killTime, overdue: overdue)
+            .monospacedDigit()
+            .lineLimit(1)
+            .multilineTextAlignment(.leading)
+    }
+}
+
+private struct WidgetStateLabel: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(tint)
+                .frame(width: 6, height: 6)
+            Text(text)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+        }
+        .widgetAccentable()
+    }
+}
+
+private struct WidgetStatusPill: View {
+    let text: String
+    let tint: Color
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.14), in: Capsule())
+            .widgetAccentable()
+    }
+}
+
+private struct WidgetSectionTitle: View {
+    let text: String
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(tokens.textSecondary)
+            .lineLimit(1)
+    }
+}
+
+/// Focus title with a thin bar in the task-type color (medium widget).
+private struct WidgetKeylineRow: View {
+    let semantic: WidgetSemanticData
+    let tokens: WidgetVisualTokens
+    let font: Font
+    let lineLimit: Int
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            if semantic.hasFocusTask {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(Color(widgetHex: semantic.focusTypeColorHex))
+                    .frame(width: 3)
+            }
+            Text(semantic.keyline)
+                .font(font)
+                .foregroundStyle(tokens.textPrimary)
+                .lineLimit(lineLimit)
+                .minimumScaleFactor(0.85)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct WidgetTaskRow: View {
+    let row: WidgetTaskPreview
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(Color(widgetHex: row.typeColorHex ?? widgetBuiltInTypeColorHex(raw: row.taskTypeRaw)))
+                .frame(width: 7, height: 7)
+            Text(row.title)
+                .font(.footnote)
+                .foregroundStyle(tokens.textPrimary)
+                .lineLimit(1)
+        }
+    }
+}
+
+private struct WidgetWeekStripCell: View {
+    let day: WidgetWeekDaySemantic
+    let isToday: Bool
+    let tokens: WidgetVisualTokens
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(day.weekday)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(isToday ? tokens.onPrimary : tokens.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(verbatim: "\(day.number)")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(isToday ? tokens.onPrimary : tokens.textPrimary)
+                .lineLimit(1)
+
+            WidgetLinearProgress(
+                progress: day.progress,
+                fill: isToday ? tokens.onPrimary : progressFill,
+                track: isToday ? tokens.onPrimary.opacity(0.35) : tokens.ringTrack
+            )
+            .frame(height: 3)
+            .padding(.horizontal, 3)
+            .padding(.top, 2)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 3)
+        .frame(maxWidth: .infinity)
+        .background(isToday ? tokens.primary : tokens.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var progressFill: Color {
+        switch day.statusRaw {
         case "completed":
             return tokens.success
         case "expired":
-            return tokens.danger
+            return tokens.textSecondary
         default:
             return tokens.primary
         }
     }
 }
 
+// MARK: Data
+
 private struct WidgetVisualTokens {
+    static let overdueLightHex = "#C9372C"
+    static let overdueDarkHex = "#FF6B5E"
+
     let primary: Color
     let accent: Color
     let background: Color
-    let accessoryBackground: Color
     let surface: Color
     let textPrimary: Color
     let textSecondary: Color
     let ringTrack: Color
     let stroke: Color
     let success: Color
-    let warning: Color
     let danger: Color
+    /// Text drawn on a `primary` fill.
+    let onPrimary: Color
 
-    init(palette: WidgetThemePalette) {
-        let primaryColor = Color(widgetHex: palette.primaryHex)
-        let accentColor = Color(widgetHex: palette.accentHex)
-        let baseBackground = Color(widgetHex: palette.backgroundHex)
+    init(palette: WidgetThemePalette, isDark: Bool) {
         let textMain = Color(widgetHex: palette.textPrimaryHex)
-
-        primary = primaryColor
-        accent = accentColor
-        background = baseBackground
-        accessoryBackground = baseBackground.opacity(0.75)
+        primary = Color(widgetHex: palette.primaryHex)
+        accent = Color(widgetHex: palette.accentHex)
+        background = Color(widgetHex: palette.backgroundHex)
         surface = Color(widgetHex: palette.primaryLightHex).opacity(0.14)
         textPrimary = textMain
         textSecondary = Color(widgetHex: palette.textSecondaryHex)
         ringTrack = Color(widgetHex: palette.primaryLightHex).opacity(0.3)
         stroke = textMain.opacity(0.08)
-        success = Color.green
-        warning = Color.orange
-        danger = Color.red
+        success = Color(widgetHex: palette.successHex)
+        danger = Color(widgetHex: isDark ? Self.overdueDarkHex : Self.overdueLightHex)
+        onPrimary = liveActivityPrefersDarkForeground(palette.primaryHex) ? Color(widgetHex: "#1F1A17") : .white
+    }
+
+    func tint(for phase: WidgetDayPhase) -> Color {
+        switch phase {
+        case .focus, .newDay: return primary
+        case .urgent: return accent
+        case .overdue: return danger
+        case .completed: return success
+        case .ended, .notStarted: return textSecondary
+        }
     }
 }
 
@@ -1028,9 +1344,9 @@ private struct WidgetWeekDaySemantic: Identifiable {
     let total: Int
     let statusRaw: String
 
-    init(snapshot: WidgetWeekDaySnapshot) {
+    init(snapshot: WidgetWeekDaySnapshot, weekday: String) {
         id = snapshot.dayId
-        weekday = snapshot.weekdaySymbol
+        self.weekday = weekday
         number = snapshot.dayNumber
         completed = snapshot.completedCount
         total = snapshot.totalCount
@@ -1045,217 +1361,244 @@ private struct WidgetWeekDaySemantic: Identifiable {
 }
 
 private struct WidgetSemanticData {
-    let statusRaw: String
-    let todayTitle: String
+    static let urgentThreshold: TimeInterval = 3600
+
+    let phase: WidgetDayPhase
+    let bundle: Bundle
+    let todayId: String
+    let killTime: Date?
     let killTimeText: String
     let keyline: String
+    let hasFocusTask: Bool
+    let focusTypeName: String
+    let focusTypeColorHex: String
     let progressPercent: Int
     let progress: CGFloat
     let completedCount: Int
     let totalCount: Int
     let remainingCount: Int
-    let stateLabel: String
-    let previewRows: [WidgetTaskPreview]
+    /// Upcoming rows to list, never repeating the keyline task.
+    let listRows: [WidgetTaskPreview]
+    /// Upcoming tasks not yet accounted for by the keyline (frozen + draft, minus the keyline task).
+    let listTotal: Int
     let weekDays: [WidgetWeekDaySemantic]
+    let dateHeader: String
 
-    init(snapshot: WidgetSnapshot) {
+    init(snapshot: WidgetSnapshot, now: Date) {
         let today = snapshot.today
-        let boundedPercent = min(max(today.completionPercent, 0), 100)
+        let bundle = weekyiiLocalizationBundle(for: today.languageCode)
+        let locale = today.languageCode.map { Locale(identifier: $0) } ?? .current
+        self.bundle = bundle
 
-        statusRaw = today.statusRaw
-        todayTitle = today.weekdaySymbol
+        if let dayEndsAt = today.dayEndsAt, now >= dayEndsAt {
+            phase = .newDay
+        } else {
+            switch today.statusRaw {
+            case "execute":
+                if let killTime = today.killTime {
+                    if now >= killTime {
+                        phase = .overdue
+                    } else if killTime.timeIntervalSince(now) <= Self.urgentThreshold {
+                        phase = .urgent
+                    } else {
+                        phase = .focus
+                    }
+                } else {
+                    phase = .focus
+                }
+            case "completed":
+                phase = .completed
+            case "expired":
+                phase = .ended
+            default:
+                phase = .notStarted
+            }
+        }
+
+        let boundedPercent = min(max(today.completionPercent, 0), 100)
+        todayId = today.dayId
+        killTime = today.killTime
         killTimeText = today.killTimeText
         progressPercent = boundedPercent
         progress = CGFloat(boundedPercent) / 100
         completedCount = today.completedCount
         totalCount = today.totalCount
         remainingCount = max(today.totalCount - today.completedCount, 0)
-        previewRows = today.previewTasks
-        weekDays = snapshot.weekDays.map(WidgetWeekDaySemantic.init)
 
-        if let focus = today.focusTitle, !focus.isEmpty {
-            keyline = focus
-        } else if let first = today.previewTasks.first {
-            keyline = first.title
+        // Older snapshots have no upcoming list; derive it from the preview rows.
+        let upcoming = today.upcomingTasks
+            ?? today.previewTasks.filter { $0.zoneRaw == "frozen" || $0.zoneRaw == "draft" }
+        let pendingCount = max(today.frozenCount + today.draftCount, upcoming.count)
+
+        let focusTitle = today.focusTitle.flatMap { $0.isEmpty ? nil : $0 }
+        let focusPreview = today.previewTasks.first { $0.zoneRaw == "focus" }
+        hasFocusTask = focusTitle != nil && phase != .newDay
+        let focusTypeRaw = focusPreview?.taskTypeRaw ?? "regular"
+        focusTypeColorHex = today.focusTypeColorHex ?? focusPreview?.typeColorHex ?? widgetBuiltInTypeColorHex(raw: focusTypeRaw)
+        if let name = today.focusTypeName, !name.isEmpty {
+            focusTypeName = name
         } else {
-            keyline = "今天没有待办"
+            switch focusTypeRaw {
+            case "ddl": focusTypeName = String(localized: "live.type.ddl", defaultValue: "DDL", bundle: bundle)
+            case "leisure": focusTypeName = String(localized: "live.type.leisure", defaultValue: "休闲", bundle: bundle)
+            default: focusTypeName = String(localized: "live.type.regular", defaultValue: "常规", bundle: bundle)
+            }
         }
 
-        switch today.statusRaw {
-        case "execute":
-            stateLabel = "专注"
-        case "draft":
-            stateLabel = "草稿"
-        case "completed":
-            stateLabel = "完成"
-        case "expired":
-            stateLabel = "过期"
-        default:
-            stateLabel = "待开始"
+        var consumedByKeyline = 0
+        switch phase {
+        case .newDay:
+            keyline = String(localized: "widget.keyline.new_day", defaultValue: "打开 Weekyii 开始今天", bundle: bundle)
+        case .completed:
+            keyline = String(localized: "widget.keyline.all_done", defaultValue: "今天的任务都完成了", bundle: bundle)
+        case .ended:
+            keyline = String(localized: "widget.keyline.ended", defaultValue: "今天已结束", bundle: bundle)
+        case .focus, .urgent, .overdue, .notStarted:
+            if let focusTitle {
+                keyline = focusTitle
+            } else if let first = upcoming.first {
+                keyline = first.title
+                consumedByKeyline = 1
+            } else {
+                keyline = String(localized: "widget.keyline.no_tasks", defaultValue: "今天还没有任务", bundle: bundle)
+            }
         }
+
+        if phase == .newDay {
+            listRows = []
+            listTotal = 0
+        } else {
+            listRows = Array(upcoming.dropFirst(consumedByKeyline))
+            listTotal = max(pendingCount - consumedByKeyline, 0)
+        }
+
+        let dayFormatter = DateFormatter()
+        dayFormatter.calendar = Calendar(identifier: .gregorian)
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.calendar = Calendar(identifier: .gregorian)
+        weekdayFormatter.locale = locale
+        weekdayFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        weekdayFormatter.setLocalizedDateFormatFromTemplate("EEE")
+
+        weekDays = snapshot.weekDays.map { day in
+            let weekday = dayFormatter.date(from: day.dayId).map { weekdayFormatter.string(from: $0) } ?? day.weekdaySymbol
+            return WidgetWeekDaySemantic(snapshot: day, weekday: weekday)
+        }
+
+        if phase != .newDay, let date = dayFormatter.date(from: today.dayId) {
+            let headerFormatter = DateFormatter()
+            headerFormatter.calendar = Calendar(identifier: .gregorian)
+            headerFormatter.locale = locale
+            headerFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            headerFormatter.setLocalizedDateFormatFromTemplate("MMMdEEEE")
+            dateHeader = headerFormatter.string(from: date)
+        } else {
+            dateHeader = "Weekyii"
+        }
+    }
+
+    /// Counts and progress only make sense once there is a plan for a current day.
+    var showsCounts: Bool {
+        phase != .newDay && totalCount > 0
+    }
+
+    var stateLabel: String {
+        switch phase {
+        case .focus: return String(localized: "live.status.focus", defaultValue: "专注中", bundle: bundle)
+        case .urgent: return String(localized: "live.status.urgent", defaultValue: "即将截止", bundle: bundle)
+        case .overdue: return String(localized: "live.status.overdue", defaultValue: "已超时", bundle: bundle)
+        case .completed: return String(localized: "widget.status.completed", defaultValue: "今日完成", bundle: bundle)
+        case .ended: return String(localized: "widget.status.ended", defaultValue: "已结束", bundle: bundle)
+        case .notStarted: return String(localized: "widget.status.not_started", defaultValue: "未开始", bundle: bundle)
+        case .newDay: return String(localized: "widget.status.new_day", defaultValue: "新的一天", bundle: bundle)
+        }
+    }
+
+    var deadlineText: String {
+        let time = killTimeText
+        return String(localized: "live.deadline", defaultValue: "截止 \(time)", bundle: bundle)
+    }
+
+    var doneText: String {
+        let completed = completedCount
+        let total = totalCount
+        return String(localized: "widget.done", defaultValue: "完成 \(completed)/\(total)", bundle: bundle)
+    }
+
+    var doneAndRemainingText: String {
+        let remaining = remainingCount
+        let remainingText = String(localized: "widget.remaining", defaultValue: "剩余 \(remaining)", bundle: bundle)
+        return "\(doneText) · \(remainingText)"
+    }
+
+    var doneShortTitle: String {
+        String(localized: "widget.done_short", defaultValue: "完成", bundle: bundle)
+    }
+
+    var upNextTitle: String {
+        String(localized: "widget.up_next", defaultValue: "接下来", bundle: bundle)
+    }
+
+    func moreText(afterShowing shown: Int) -> String? {
+        let more = listTotal - shown
+        guard more > 0 else { return nil }
+        return String(localized: "widget.more", defaultValue: "还有 \(more) 项", bundle: bundle)
+    }
+
+    /// Secondary line when there is no countdown to show.
+    var summaryCaption: String? {
+        switch phase {
+        case .completed, .ended:
+            return totalCount > 0 ? doneText : nil
+        case .notStarted:
+            guard totalCount > 0 else { return nil }
+            let planned = totalCount
+            return String(localized: "widget.planned", defaultValue: "已规划 \(planned) 项", bundle: bundle)
+        case .newDay, .focus, .urgent, .overdue:
+            return nil
+        }
+    }
+
+    var inlineSummary: String {
+        if showsCounts {
+            return "\(stateLabel) · \(doneText)"
+        }
+        return "\(stateLabel) · \(keyline)"
+    }
+
+    var rectangularFooter: String {
+        if let next = listRows.first?.title {
+            return String(localized: "live.meta.next", defaultValue: "下一项 \(next)", bundle: bundle)
+        }
+        if showsCounts {
+            return doneText
+        }
+        return "Weekyii"
     }
 }
 
-private struct WidgetStatusPill: View {
-    let text: String
-    let tokens: WidgetVisualTokens
-
-    var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(tokens.primary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(tokens.surface, in: Capsule())
+private func widgetBuiltInTypeColorHex(raw: String) -> String {
+    switch raw {
+    case "ddl": return "#C46A1A"
+    case "leisure": return "#8B5A83"
+    default: return "#4A90A4"
     }
 }
 
-private struct WidgetMetricPill: View {
-    let title: String
-    let valueText: String
-    let tokens: WidgetVisualTokens
-
-    init(title: String, value: Int, tokens: WidgetVisualTokens) {
-        self.title = title
-        self.valueText = "\(value)"
-        self.tokens = tokens
+/// The `.lproj` bundle for the language the app runs in, so widget copy follows
+/// the in-app language rather than only the system language.
+private func weekyiiLocalizationBundle(for languageCode: String?) -> Bundle {
+    guard let languageCode,
+          let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
+          let bundle = Bundle(path: path)
+    else {
+        return .main
     }
-
-    init(title: String, valueText: String, tokens: WidgetVisualTokens) {
-        self.title = title
-        self.valueText = valueText
-        self.tokens = tokens
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(tokens.textSecondary)
-            Text(valueText)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tokens.textPrimary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-    }
-}
-
-private struct WidgetStatsStrip: View {
-    let semantic: WidgetSemanticData
-    let tokens: WidgetVisualTokens
-
-    var body: some View {
-        HStack(spacing: 8) {
-            stat("进度", "\(semantic.progressPercent)%")
-            Divider()
-                .frame(height: 16)
-                .overlay(tokens.stroke)
-            stat("完成", "\(semantic.completedCount)/\(semantic.totalCount)")
-            Divider()
-                .frame(height: 16)
-                .overlay(tokens.stroke)
-            stat("剩余", "\(semantic.remainingCount)")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func stat(_ title: String, _ value: String) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-                .foregroundStyle(tokens.textSecondary)
-            Text(value)
-                .fontWeight(.semibold)
-                .foregroundStyle(tokens.textPrimary)
-                .monospacedDigit()
-        }
-        .font(.caption2)
-        .lineLimit(1)
-        .minimumScaleFactor(0.82)
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private struct WidgetTaskPreviewLine: View {
-    let row: WidgetTaskPreview
-    let color: Color
-    let textColor: Color
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(row.title)
-                .font(.caption2)
-                .lineLimit(1)
-                .foregroundStyle(textColor)
-        }
-    }
-}
-
-private struct WidgetWeekStripCell: View {
-    let day: WidgetWeekDaySemantic
-    let tokens: WidgetVisualTokens
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(day.weekday.uppercased())
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(tokens.textSecondary)
-            Text("\(day.number)")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tokens.textPrimary)
-
-            WidgetLinearProgress(
-                progress: day.progress,
-                fill: progressFill,
-                track: tokens.ringTrack
-            )
-            .frame(height: 4)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
-        .frame(maxWidth: .infinity)
-        .background(tokens.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private var progressFill: Color {
-        switch day.statusRaw {
-        case "completed":
-            return tokens.success
-        case "expired":
-            return tokens.danger
-        default:
-            return tokens.primary
-        }
-    }
-}
-
-private struct WidgetProgressRing: View {
-    let progress: CGFloat
-    let lineWidth: CGFloat
-    let tint: Color
-    let track: Color
-    let centerText: String
-    let centerTextColor: Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(track, lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: max(min(progress, 1), 0))
-                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(centerText)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(centerTextColor)
-        }
-    }
+    return bundle
 }
 
 private struct WidgetLinearProgress: View {
@@ -1269,23 +1612,9 @@ private struct WidgetLinearProgress: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(track)
                 Capsule().fill(fill).frame(width: width)
+                    .widgetAccentable()
             }
         }
-    }
-}
-
-private func statusIcon(raw: String) -> String {
-    switch raw {
-    case "execute":
-        return "bolt.fill"
-    case "completed":
-        return "checkmark.seal.fill"
-    case "expired":
-        return "xmark.seal.fill"
-    case "draft":
-        return "square.and.pencil"
-    default:
-        return "circle.dotted"
     }
 }
 
