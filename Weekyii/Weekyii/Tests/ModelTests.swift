@@ -4021,6 +4021,8 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(ThemeSkin.classic.card)
         XCTAssertNil(ThemeSkin.classic.feature)
         XCTAssertNil(ThemeSkin.classic.onPrimary)
+        // The root `.fontDesign` must be a no-op for classic themes.
+        XCTAssertNil(ThemeSkin.classic.typography.environmentDesign)
     }
 
     func test_themeSkin_personalisedThemesRestyleSharedComponents() {
@@ -4037,6 +4039,9 @@ final class ModelTests: XCTestCase {
         }
         XCTAssertEqual(WeekTheme.terminal.skin.typography.bodyDesign, .monospaced)
         XCTAssertEqual(WeekTheme.paper.skin.typography.bodyDesign, .serif)
+        XCTAssertEqual(WeekTheme.terminal.skin.typography.environmentDesign, .monospaced)
+        XCTAssertNil(WeekTheme.brutal.skin.typography.environmentDesign)
+        XCTAssertEqual(WeekTheme.brutal.skin.row?.barFlush, true)
     }
 
     func test_themeVisualStyle_personalisedThemesOverrideTheForm() {

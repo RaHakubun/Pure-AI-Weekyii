@@ -61,7 +61,7 @@ struct MindStampRitualView: View {
                 } label: {
                     Text(String(localized: "mindstamp.ritual.dismiss"))
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.weekyiiOnPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, WeekSpacing.md)
                         .background(Color.weekyiiGradient)

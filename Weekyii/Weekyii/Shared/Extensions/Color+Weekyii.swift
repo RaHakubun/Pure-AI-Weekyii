@@ -396,6 +396,9 @@ struct ThemeRowSkin: Equatable {
     var barWidth: CGFloat
     var barCornerRadius: CGFloat
     var barGlows: Bool = false
+    /// Bar runs edge to edge down the leading side with a divider in the border
+    /// colour, instead of floating inside the padding (brutalist).
+    var barFlush: Bool = false
 }
 
 enum ThemeLabelKind: Equatable {
@@ -499,6 +502,13 @@ struct ThemeTypography: Equatable {
 
     /// Serif titles over system body text: the original Weekyii typography.
     static let classic = ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .default)
+
+    /// Design published through `.fontDesign(_:)` at the app root, so system text
+    /// styles (`.caption2`, `.subheadline`, Form rows …) follow the theme too.
+    /// `nil` for the default design, which leaves the environment untouched.
+    var environmentDesign: Font.Design? {
+        bodyDesign == .default ? nil : bodyDesign
+    }
 }
 
 /// Everything a shared component needs to draw itself for a theme.
@@ -555,7 +565,8 @@ extension ThemeSkin {
                     shadow: ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 3, y: 3)
                 ),
                 barWidth: 8,
-                barCornerRadius: 0
+                barCornerRadius: 0,
+                barFlush: true
             ),
             feature: ThemeFeatureSkin(
                 surface: ThemeSurfaceSkin(
@@ -1369,7 +1380,7 @@ private struct WeekThemePalettePair {
                     primary: "#1B7F3B",
                     primaryLight: "#3FA35C",
                     primaryDark: "#0F5A28",
-                    accentOrange: "#B26A00",
+                    accentOrange: "#8F5600", // #B26A00 was 4.15:1 on the card; #8F5600 is 5.9:1
                     accentOrangeLight: "#D18F2E",
                     accentGreen: "#1B7F3B",
                     accentGreenLight: "#3FA35C",
@@ -1474,6 +1485,9 @@ extension Color {
 
     /// 特色面板（经典主题的主色渐变卡）上的文字和图标。经典主题保持白色。
     static var weekyiiOnFeature: Color { ThemeSkin.active.feature?.ink.color ?? .white }
+
+    /// 特色面板上的次要文字（时间、说明）。经典主题保持白色 90%。
+    static var weekyiiOnFeatureSecondary: Color { ThemeSkin.active.feature?.secondaryInk.color ?? .white.opacity(0.9) }
 
     /// 亮琥珀 - 主品牌色(浅色)
     static var weekyiiPrimaryLight: Color { WeekThemeRuntime.semanticColor(\.primaryLight) }

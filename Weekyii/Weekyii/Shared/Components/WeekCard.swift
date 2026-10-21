@@ -4,6 +4,7 @@ import SwiftUI
 
 struct WeekCard<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.themeSkin) private var skin
     let content: Content
     let useGradient: Bool
     let accentColor: Color?
@@ -22,21 +23,81 @@ struct WeekCard<Content: View>: View {
     }
     
     var body: some View {
-        let isPremiumTheme = WeekTheme.activeTheme.isPremiumTheme
+        if useGradient, let feature = skin.feature {
+            featureBody(feature)
+        } else if !useGradient, let card = skin.card {
+            stack
+                .themedSurface(card)
+                .overlay(themedAccentBar(card), alignment: .top)
+        } else {
+            classicBody
+        }
+    }
 
+    private var stack: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.base) {
             content
         }
         .weekPadding(WeekSpacing.lg)
-        .background(backgroundView)
-        .clipShape(.rect(cornerRadius: WeekRadius.large))
-        .overlay(
-            RoundedRectangle(cornerRadius: WeekRadius.large)
-                .stroke(borderColor(isPremiumTheme: isPremiumTheme), lineWidth: 1)
-                .allowsHitTesting(false)
-        )
-        .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
-        .overlay(accentBar(isPremiumTheme: isPremiumTheme), alignment: .top)
+    }
+
+    // MARK: Themed (personalised skins)
+
+    /// Leading inset that makes room for the notebook margin rule.
+    private static var marginInset: CGFloat { 12 }
+
+    private func featureBody(_ feature: ThemeFeatureSkin) -> some View {
+        stack
+            .padding(.leading, feature.marginRule == nil ? 0 : Self.marginInset)
+            .overlay(alignment: .leading) { marginRule(feature.marginRule) }
+            .themedSurface(feature.surface)
+            .overlay(themedAccentBar(feature.surface), alignment: .top)
+    }
+
+    @ViewBuilder
+    private func marginRule(_ rule: ThemeHexPair?) -> some View {
+        if let rule {
+            HStack(spacing: 2) {
+                Rectangle().frame(width: 1)
+                Rectangle().frame(width: 1)
+            }
+            .foregroundStyle(rule.color.opacity(0.7))
+            .padding(.leading, Self.marginInset)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder
+    private func themedAccentBar(_ surface: ThemeSurfaceSkin) -> some View {
+        if let color = accentColor {
+            VStack {
+                RoundedRectangle(cornerRadius: min(2, surface.cornerRadius))
+                    .fill(color)
+                    .frame(width: 40, height: 4)
+                    .padding(.top, WeekSpacing.md)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: Classic
+
+    /// The original WeekCard drawing, unchanged for the ten classic themes.
+    private var classicBody: some View {
+        let isPremiumTheme = WeekTheme.activeTheme.isPremiumTheme
+
+        return stack
+            .background(backgroundView)
+            .clipShape(.rect(cornerRadius: WeekRadius.large))
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.large)
+                    .stroke(borderColor(isPremiumTheme: isPremiumTheme), lineWidth: 1)
+                    .allowsHitTesting(false)
+            )
+            .shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
+            .overlay(accentBar(isPremiumTheme: isPremiumTheme), alignment: .top)
     }
     
     @ViewBuilder
@@ -112,6 +173,221 @@ struct WeekCard<Content: View>: View {
                 Spacer()
             }
             .allowsHitTesting(false)
+        }
+    }
+}
+
+// MARK: - Feature panel parts
+
+/// Heading of a feature panel ("专注任务"). Classic themes keep the white
+/// icon + serif title; personalised skins draw their own label.
+struct WeekFeatureLabel: View {
+    let systemImage: String
+    let title: String
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let label = skin.feature?.label {
+            themed(label)
+        } else {
+            HStack {
+                Image(systemName: systemImage)
+                    .foregroundColor(.white)
+                Text(title)
+                    .font(.titleSmall)
+                    .foregroundColor(.white)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func themed(_ label: ThemeLabelSkin) -> some View {
+        switch label.kind {
+        case .plain:
+            Text(title)
+                .font(.titleSmall)
+                .foregroundColor(label.ink.color)
+        case .block:
+            Text(title)
+                .font(.captionSmall.weight(.black))
+                .foregroundColor(label.ink.color)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(label.fill?.color ?? .clear)
+        case .spaced:
+            Text(title)
+                .font(.captionSmall.weight(.bold))
+                .tracking(2)
+                .foregroundColor(label.ink.color)
+        case .prompt:
+            Text(verbatim: "> " + title)
+                .font(.captionSmall.weight(.semibold))
+                .foregroundColor(label.ink.color)
+        }
+    }
+}
+
+/// Block cursor drawn after the feature title (terminal). Nothing for other skins.
+struct WeekFeatureCursor: View {
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let cursor = skin.feature?.cursor {
+            Rectangle()
+                .fill(cursor.color)
+                .frame(width: 9, height: 17)
+                .shadow(color: cursor.color.opacity(0.8), radius: 3)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Button chrome on the feature panel. Classic themes keep the white label on
+/// a 20 % white capsule exactly as before.
+struct WeekFeatureActionModifier: ViewModifier {
+    let isPrimary: Bool
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let feature = skin.feature {
+            themed(content, look: isPrimary ? feature.primaryAction : feature.action)
+        } else {
+            content
+                .foregroundColor(.white)
+                .background(.white.opacity(0.2), in: Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private func themed(_ content: Content, look: ThemeActionLook) -> some View {
+        let ink = look.ink.color
+        let fill = look.fill?.color ?? .clear
+        let border = look.border?.color ?? .clear
+        switch look.kind {
+        case .capsule:
+            content
+                .foregroundColor(ink)
+                .background(fill, in: Capsule())
+                .overlay(Capsule().strokeBorder(border, lineWidth: look.borderWidth))
+                .shadow(color: look.fill == nil ? .clear : fill.opacity(0.7), radius: look.fill == nil ? 0 : 5)
+        case .rect:
+            content
+                .foregroundColor(ink)
+                .background(fill)
+                .overlay(Rectangle().strokeBorder(border, lineWidth: look.borderWidth))
+                .background(
+                    Rectangle()
+                        .fill(look.hardShadow?.color ?? .clear)
+                        .offset(x: 2, y: 2)
+                )
+        case .underline:
+            content
+                .foregroundColor(ink)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(border)
+                        .frame(height: look.borderWidth)
+                        .padding(.horizontal, WeekSpacing.sm)
+                }
+        case .stamp:
+            content
+                .foregroundColor(ink)
+                .background(fill)
+                .overlay(Rectangle().strokeBorder(border, lineWidth: look.borderWidth))
+                .rotationEffect(.degrees(-4))
+        case .bracket:
+            HStack(spacing: 0) {
+                Text(verbatim: "[")
+                content
+                Text(verbatim: "]")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundColor(ink)
+            .background(fill)
+        }
+    }
+}
+
+extension View {
+    /// Styles a button that sits on a `WeekCard(useGradient: true)` feature panel.
+    func weekyiiFeatureAction(isPrimary: Bool = false) -> some View {
+        modifier(WeekFeatureActionModifier(isPrimary: isPrimary))
+    }
+}
+
+// MARK: - Section header
+
+/// Card section header: icon, title and count ("冻结任务 3"). Classic themes keep
+/// the original row; personalised skins drop the icon and restyle the count.
+struct WeekSectionHeader: View {
+    let systemImage: String
+    let title: String
+    let count: Int
+    let tint: Color
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let section = skin.section {
+            themed(section)
+        } else {
+            HStack {
+                Image(systemName: systemImage)
+                    .foregroundColor(tint)
+                Text(title)
+                    .font(.titleSmall)
+                    .foregroundColor(.textPrimary)
+
+                Spacer()
+
+                Text("\(count)")
+                    .font(.titleSmall)
+                    .foregroundColor(tint)
+            }
+        }
+    }
+
+    private func themed(_ section: ThemeSectionSkin) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+                Text(verbatim: (section.titlePrefix ?? "") + title)
+                    .font(.titleSmall)
+                    .foregroundColor(.textPrimary)
+
+                Spacer(minLength: WeekSpacing.sm)
+
+                countView(section.count)
+            }
+            if let rule = section.rule {
+                Rectangle()
+                    .fill(rule.color)
+                    .frame(height: 1.5)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func countView(_ kind: ThemeCountKind) -> some View {
+        switch kind {
+        case .plain:
+            Text(verbatim: "\(count)")
+                .font(.titleSmall)
+                .foregroundColor(tint)
+        case .block:
+            Text(verbatim: "\(count)")
+                .font(.titleSmall)
+                .foregroundColor(.backgroundSecondary)
+                .padding(.horizontal, 7)
+                .background(Color.textPrimary)
+        case .bracket:
+            Text(verbatim: "[\(count)]")
+                .font(.titleSmall)
+                .foregroundColor(tint)
+        case .italic:
+            Text(verbatim: "\(count)")
+                .font(.titleSmall)
+                .italic()
+                .foregroundColor(tint)
         }
     }
 }

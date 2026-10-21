@@ -192,7 +192,7 @@ struct ExtensionsView: View {
                                 Text(String(localized: "project.add"))
                                     .font(.system(size: 14, weight: .semibold))
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(.weekyiiOnPrimary)
                             .padding(.horizontal, WeekSpacing.xl)
                             .padding(.vertical, WeekSpacing.md)
                             .background(Color.weekyiiGradient)
@@ -255,7 +255,7 @@ struct ExtensionsView: View {
                         Text(String(localized: "project.add"))
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnPrimary)
                     .padding(.horizontal, WeekSpacing.xl)
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.weekyiiGradient)

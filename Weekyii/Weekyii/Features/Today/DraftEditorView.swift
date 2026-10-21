@@ -279,7 +279,7 @@ struct DraftEditorView: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(isEnabled ? Color.weekyiiOnPrimary : Color.white)
                 .frame(width: 36, height: 36)
                 .background(
                     Circle()

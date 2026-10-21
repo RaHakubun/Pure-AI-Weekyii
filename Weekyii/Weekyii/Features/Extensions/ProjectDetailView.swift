@@ -177,17 +177,17 @@ struct ProjectDetailView: View {
             HStack(alignment: .top, spacing: WeekSpacing.md) {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.2))
+                        .fill(Color.weekyiiOnFeature.opacity(0.2))
                         .frame(width: 54, height: 54)
                     Image(systemName: snapshot.icon)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.weekyiiOnFeature)
                 }
 
                 VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                     Text(snapshot.name)
                         .font(.titleLarge)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.weekyiiOnFeature)
                         .lineLimit(2)
 
                     HStack(spacing: WeekSpacing.sm) {
@@ -200,13 +200,13 @@ struct ProjectDetailView: View {
 
                         Text(dateRangeText)
                             .font(.caption)
-                            .foregroundStyle(.white.opacity(0.88))
+                            .foregroundStyle(Color.weekyiiOnFeature.opacity(0.88))
                     }
 
                     if !snapshot.projectDescription.isEmpty {
                         Text(snapshot.projectDescription)
                             .font(.bodyMedium)
-                            .foregroundStyle(.white.opacity(0.86))
+                            .foregroundStyle(Color.weekyiiOnFeature.opacity(0.86))
                             .lineLimit(3)
                     }
                 }

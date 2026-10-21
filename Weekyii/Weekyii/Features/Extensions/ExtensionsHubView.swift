@@ -2338,7 +2338,7 @@ private struct ProjectsFullView: View {
                         Text(String(localized: "project.add"))
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnPrimary)
                     .padding(.horizontal, WeekSpacing.xl)
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.weekyiiGradient)

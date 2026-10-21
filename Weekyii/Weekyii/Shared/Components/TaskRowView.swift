@@ -136,6 +136,33 @@ struct TaskRowView: View {
     }
 }
 
+/// Shared chrome of the origin badges. `isOnDarkBackground` marks a badge on the
+/// feature panel: classic themes draw it white on the primary gradient, while a
+/// personalised skin takes the panel's own ink, which may be dark (brutalist yellow).
+private struct TaskOriginBadgeChrome: ViewModifier {
+    let isOnDarkBackground: Bool
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isOnDarkBackground, let feature = skin.feature {
+            let shape = RoundedRectangle(cornerRadius: min(feature.surface.cornerRadius, 8))
+            content
+                .foregroundStyle(feature.secondaryInk.color)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 8)
+                .background(feature.ink.color.opacity(0.10), in: shape)
+                .overlay(shape.strokeBorder(feature.secondaryInk.color.opacity(0.5), lineWidth: 1))
+        } else {
+            content
+                .foregroundStyle(isOnDarkBackground ? Color.white.opacity(0.95) : Color.textSecondary)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 8)
+                .background(isOnDarkBackground ? Color.white.opacity(0.16) : Color.backgroundTertiary, in: Capsule())
+        }
+    }
+}
+
 struct TaskProjectOriginBadge: View {
     let project: ProjectModel?
     var isOnDarkBackground: Bool = false
@@ -154,10 +181,7 @@ struct TaskProjectOriginBadge: View {
                 .lineLimit(1)
             }
             .font(.caption2)
-            .foregroundStyle(isOnDarkBackground ? Color.white.opacity(0.95) : Color.textSecondary)
-            .padding(.vertical, 3)
-            .padding(.horizontal, 8)
-            .background(isOnDarkBackground ? Color.white.opacity(0.16) : Color.backgroundTertiary, in: Capsule())
+            .modifier(TaskOriginBadgeChrome(isOnDarkBackground: isOnDarkBackground))
             .accessibilityIdentifier("taskProjectOriginBadge")
         }
     }
@@ -181,10 +205,7 @@ struct TaskHabitOriginBadge: View {
                 .lineLimit(1)
             }
             .font(.caption2)
-            .foregroundStyle(isOnDarkBackground ? Color.white.opacity(0.95) : Color.textSecondary)
-            .padding(.vertical, 3)
-            .padding(.horizontal, 8)
-            .background(isOnDarkBackground ? Color.white.opacity(0.16) : Color.backgroundTertiary, in: Capsule())
+            .modifier(TaskOriginBadgeChrome(isOnDarkBackground: isOnDarkBackground))
             .accessibilityIdentifier("taskHabitOriginBadge")
         }
     }

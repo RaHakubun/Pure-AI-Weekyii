@@ -651,6 +651,9 @@ struct WeekyiiApp: App {
                     // Shared components draw from this skin; publishing it here means a theme
                     // switch re-renders every reader, including Settings and presented sheets.
                     .environment(\.themeSkin, userSettings.selectedTheme.skin)
+                    // System text styles (`.caption2`, Form rows …) follow the theme's body face;
+                    // `nil` for every theme on the default face, so they are left untouched.
+                    .fontDesign(userSettings.selectedTheme.skin.typography.environmentDesign)
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)

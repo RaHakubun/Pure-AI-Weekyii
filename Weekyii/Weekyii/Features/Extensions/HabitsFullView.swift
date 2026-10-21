@@ -263,7 +263,7 @@ struct HabitsFullView: View {
                         Text(String(localized: "habits.empty.action", defaultValue: "新建习惯"))
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnSuccess)
                     .padding(.horizontal, WeekSpacing.xl)
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.accentGreen)

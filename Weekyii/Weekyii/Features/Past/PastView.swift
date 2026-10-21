@@ -883,7 +883,7 @@ struct PastCompletedCountBadge: View {
     var body: some View {
         Text(count > 99 ? "99+" : "\(count)")
             .font(.system(size: 9, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(.weekyiiOnSuccess)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
             .background(Color.accentGreen, in: Capsule())
