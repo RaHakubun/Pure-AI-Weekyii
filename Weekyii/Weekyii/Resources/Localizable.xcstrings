@@ -11234,7 +11234,20 @@
 
     },
     "交换" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交换"
+          }
+        }
+      }
     },
     "仅对明日以后生效" : {
 
@@ -11360,7 +11373,20 @@
 
     },
     "后移" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Postpone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后移"
+          }
+        }
+      }
     },
     "后移 %lld 天" : {
 
