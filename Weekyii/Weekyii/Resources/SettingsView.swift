@@ -2474,8 +2474,6 @@ private struct SettingsNavigationRow: View {
 private struct ThemePaletteMark: View {
     let theme: WeekTheme
 
-    @Environment(\.colorScheme) private var colorScheme
-
     /// The mark mirrors the theme's *form*, not just its colours, so a squared-off
     /// Brutalist swatch is instantly distinguishable from a rounded classic one.
     /// Card metrics are scaled down to the 30pt mark, and both factors are picked
@@ -2493,27 +2491,18 @@ private struct ThemePaletteMark: View {
         return Color.primary.opacity(0.08)
     }
 
-    private var paletteBackground: Color {
-        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).backgroundSecondary)
-    }
-
-    private var paletteBackgroundPrimary: Color {
-        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).backgroundPrimary)
-    }
-
-    private var palettePrimary: Color {
-        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).primary)
-    }
-
-    private var palettePrimaryLight: Color {
-        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).primaryLight)
-    }
-
-    private var paletteAccent: Color {
-        Color(hex: theme.palette(for: .system, systemIsDark: colorScheme == .dark).accentOrange)
-    }
-
     var body: some View {
+        if theme == .paper {
+            // Paper cuts its bottom-right corner off (outline included) so the row
+            // background shows through behind the folded flap.
+            framedMark
+                .mask { DogEarCutShape(fold: 10) }
+        } else {
+            framedMark
+        }
+    }
+
+    private var framedMark: some View {
         markArtwork
         .frame(width: 30, height: 30)
         .clipShape(RoundedRectangle(cornerRadius: markRadius, style: .continuous))
@@ -2541,123 +2530,145 @@ private struct ThemePaletteMark: View {
         }
     }
 
-    private var classicMark: some View {
+    // All personality marks are drawn in the mark's own 30×30pt space (origin top-left).
+    // Fixed hex values are intentional: they are taken from each theme's signature
+    // surfaces so the mark reads the same in light and dark mode.
+
+    private func splitBase(_ leading: Color, _ trailing: Color) -> some View {
         HStack(spacing: 0) {
-            Rectangle().fill(theme.primaryColor)
-            Rectangle().fill(theme.accentColor)
+            Rectangle().fill(leading)
+            Rectangle().fill(trailing)
         }
     }
 
+    private var classicMark: some View {
+        splitBase(theme.primaryColor, theme.accentColor)
+    }
+
+    /// Antique gold | shadow black, with a small gold ring in the lower-right.
     private var lotrMark: some View {
         ZStack {
-            LinearGradient(
-                colors: [paletteBackgroundPrimary, paletteBackground],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            splitBase(Color(hex: "#B79863"), Color(hex: "#101411"))
 
-            Circle()
-                .stroke(palettePrimary, lineWidth: 2.2)
-                .padding(4)
-
-            Circle()
-                .stroke(paletteAccent.opacity(0.76), lineWidth: 1)
-                .padding(8)
-
-            Capsule()
-                .fill(paletteAccent)
-                .frame(width: 13, height: 2.5)
-                .rotationEffect(.degrees(-24))
-
-            Circle()
-                .fill(palettePrimaryLight)
-                .frame(width: 3, height: 3)
-                .offset(x: 7, y: -7)
+            Path { path in
+                path.addEllipse(in: CGRect(x: 21.6 - 4.9, y: 21.6 - 4.9, width: 9.8, height: 9.8))
+            }
+            .stroke(Color(hex: "#E9C979"), lineWidth: 1.6)
         }
     }
 
+    /// Two hard-edged squares: an outlined white block over a solid offset shadow.
     private var brutalMark: some View {
         ZStack {
-            paletteBackground
+            splitBase(theme.primaryColor, theme.accentColor)
 
-            Rectangle()
-                .fill(palettePrimary)
-                .frame(width: 19, height: 19)
-                .offset(x: -3, y: -3)
-
-            Rectangle()
-                .fill(paletteAccent)
-                .frame(width: 13, height: 13)
-                .offset(x: 6, y: 6)
-        }
-    }
-
-    private var neonMark: some View {
-        ZStack {
-            paletteBackgroundPrimary
-
-            Circle()
-                .fill(paletteAccent.opacity(0.38))
-                .frame(width: 12, height: 12)
-                .blur(radius: 3)
-                .offset(x: 7, y: -6)
-
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(palettePrimary, lineWidth: 1.8)
-                .padding(4)
-
-            Circle()
-                .stroke(paletteAccent, lineWidth: 1.4)
-                .frame(width: 9, height: 9)
-                .offset(x: 6, y: 5)
-
-            Capsule()
-                .fill(palettePrimaryLight)
-                .frame(width: 14, height: 2)
-                .rotationEffect(.degrees(-18))
-                .offset(x: -2, y: 6)
-        }
-    }
-
-    private var paperMark: some View {
-        ZStack {
-            paletteBackground
-
-            Rectangle()
-                .fill(palettePrimary.opacity(0.92))
-                .frame(width: 9, height: 21)
-                .offset(x: -6, y: -1)
-
-            Rectangle()
-                .fill(paletteAccent.opacity(0.82))
-                .frame(width: 8, height: 15)
-                .offset(x: 5, y: 3)
-
-            Circle()
-                .stroke(palettePrimary.opacity(0.62), lineWidth: 1)
-                .frame(width: 11, height: 11)
-                .offset(x: 2, y: -5)
-        }
-    }
-
-    private var terminalMark: some View {
-        ZStack {
-            paletteBackgroundPrimary
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(">_")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                Rectangle()
-                    .fill(palettePrimary)
-                    .frame(width: 9, height: 1.5)
+            Path { path in
+                path.addRect(CGRect(x: 17.75, y: 17.75, width: 9, height: 9))
             }
-            .foregroundStyle(palettePrimary)
-            .offset(x: -2, y: -1)
+            .fill(Color(hex: "#111111"))
 
-            Rectangle()
-                .fill(palettePrimaryLight.opacity(0.58))
-                .frame(height: 1)
-                .offset(y: 9)
+            Path { path in
+                path.addRect(CGRect(x: 15.75, y: 15.75, width: 9, height: 9))
+            }
+            .fill(Color.white)
+
+            Path { path in
+                path.addRect(CGRect(x: 15.75, y: 15.75, width: 9, height: 9))
+            }
+            .stroke(Color(hex: "#111111"), lineWidth: 1.25)
+        }
+    }
+
+    /// A single glowing tube stroke across the lower-right corner.
+    private var neonMark: some View {
+        let tube = Path { path in
+            path.move(to: CGPoint(x: 17.5, y: 26.5))
+            path.addLine(to: CGPoint(x: 26.5, y: 17.5))
+        }
+
+        return ZStack {
+            splitBase(theme.primaryColor, theme.accentColor)
+
+            tube
+                .stroke(Color(hex: "#7DF5FF"), style: StrokeStyle(lineWidth: 3.2, lineCap: .round))
+                .opacity(0.9)
+                .blur(radius: 1.1)
+
+            tube
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+        }
+    }
+
+    /// A dog-eared page: the corner is folded back over the swatch.
+    private var paperMark: some View {
+        let flap = Path { path in
+            path.move(to: CGPoint(x: 20, y: 30))
+            path.addLine(to: CGPoint(x: 30, y: 20))
+            path.addLine(to: CGPoint(x: 20, y: 20))
+            path.closeSubpath()
+        }
+
+        return ZStack {
+            splitBase(theme.primaryColor, theme.accentColor)
+
+            flap
+                .fill(Color(hex: "#3A2A1A").opacity(0.18))
+                .offset(x: -0.6, y: -0.6)
+
+            flap
+                .fill(Color(hex: "#FBF6EC"))
+
+            Path { path in
+                path.move(to: CGPoint(x: 20, y: 30))
+                path.addLine(to: CGPoint(x: 30, y: 20))
+            }
+            .stroke(Color(hex: "#D6C9B4"), lineWidth: 0.6)
+        }
+    }
+
+    /// Phosphor green | CRT black, with scanlines and a glowing block cursor.
+    private var terminalMark: some View {
+        let cursor = CGRect(x: 20.5, y: 16.5, width: 5, height: 9.5)
+
+        return ZStack {
+            splitBase(Color(hex: "#1B7F3B"), Color(hex: "#05100A"))
+
+            Path { path in
+                for y in stride(from: CGFloat(1), to: 30, by: 2) {
+                    path.addRect(CGRect(x: 15, y: y, width: 15, height: 0.6))
+                }
+            }
+            .fill(Color(hex: "#33FF66").opacity(0.14))
+
+            Path { path in
+                path.addRect(cursor)
+            }
+            .fill(Color(hex: "#33FF66").opacity(0.7))
+            .blur(radius: 1.5)
+
+            Path { path in
+                path.addRect(cursor)
+            }
+            .fill(Color(hex: "#8CFFA8"))
+        }
+    }
+}
+
+/// Rectangle with its bottom-right corner cut off along a 45° diagonal running
+/// from (maxX, maxY - fold) to (maxX - fold, maxY). The other edges sit `outset`
+/// points outside `rect` so the outer half of the mark's outline is not clipped.
+private struct DogEarCutShape: Shape {
+    let fold: CGFloat
+    var outset: CGFloat = 1
+
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.minX - outset, y: rect.minY - outset))
+            path.addLine(to: CGPoint(x: rect.maxX + outset, y: rect.minY - outset))
+            path.addLine(to: CGPoint(x: rect.maxX + outset, y: rect.maxY - fold - outset))
+            path.addLine(to: CGPoint(x: rect.maxX - fold - outset, y: rect.maxY + outset))
+            path.addLine(to: CGPoint(x: rect.minX - outset, y: rect.maxY + outset))
+            path.closeSubpath()
         }
     }
 }
