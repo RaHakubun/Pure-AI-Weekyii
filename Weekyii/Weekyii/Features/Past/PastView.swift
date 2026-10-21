@@ -1176,13 +1176,13 @@ private struct PastWeekDetailView: View {
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(hasCompleted ? (isSelected ? .weekyiiOnPrimary : .accentGreen) : .clear)
+                        .fill(hasCompleted ? (isSelected ? Color.weekyiiOnPrimary : .accentGreen) : .clear)
                         .frame(width: 6, height: 6)
 
                     if day.expiredCount > 0 {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 8))
-                            .foregroundStyle(isSelected ? .weekyiiOnPrimary : .taskDDL)
+                            .foregroundStyle(isSelected ? Color.weekyiiOnPrimary : .taskDDL)
                     }
                 }
                 .frame(height: 10)

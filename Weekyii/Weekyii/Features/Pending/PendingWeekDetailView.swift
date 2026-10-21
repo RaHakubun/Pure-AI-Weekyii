@@ -284,7 +284,7 @@ struct PendingWeekDetailView: View {
                     .foregroundColor(isSelected ? .weekyiiOnPrimary : .textSecondary)
 
                 Circle()
-                    .fill(hasAnyTasks ? (isSelected ? .weekyiiOnPrimary : .taskDDL) : .clear)
+                    .fill(hasAnyTasks ? (isSelected ? Color.weekyiiOnPrimary : .taskDDL) : .clear)
                     .frame(width: 6, height: 6)
             }
             .frame(width: 60, height: 70)
