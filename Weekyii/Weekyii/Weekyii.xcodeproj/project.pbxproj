@@ -62,6 +62,7 @@
 		944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 944E582D2F2B593A00DB2DEE /* Assets.xcassets */; };
 		D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
 		D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
+		D5A100132F7A100100AAA001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */; };
 		9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945022892F433A83000D67FF /* MindStampItem.swift */; };
 		9450228E2F433AA7000D67FF /* MindStampListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228C2F433AA7000D67FF /* MindStampListView.swift */; };
 		9450228F2F433AA7000D67FF /* MindStampViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228D2F433AA7000D67FF /* MindStampViewModel.swift */; };
@@ -882,6 +883,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,
+				D5A100132F7A100100AAA001 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

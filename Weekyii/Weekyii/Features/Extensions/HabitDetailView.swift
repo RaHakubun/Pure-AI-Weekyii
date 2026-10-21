@@ -159,7 +159,7 @@ struct HabitDetailView: View {
                     Text(String(localized: "habit.detail.add_today", defaultValue: "加入今日"))
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(.white)
+                .foregroundColor(.weekyiiOnSuccess)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, WeekSpacing.md)
                 .background(Color.accentGreen)

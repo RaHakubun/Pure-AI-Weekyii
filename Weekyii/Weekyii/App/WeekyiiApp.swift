@@ -53,6 +53,12 @@ struct TodayActivitySnapshot: Equatable {
     var totalCount: Int
     var frozenCount: Int
     var liveTheme: LiveActivityThemeSnapshot
+    var typeName: String? = nil
+    var typeIconName: String? = nil
+    var typeColorHex: String? = nil
+    var dayStartedAt: Date? = nil
+    var nextTitle: String? = nil
+    var languageCode: String? = nil
 }
 
 enum TodayActivitySnapshotBuilder {
@@ -80,6 +86,8 @@ enum TodayActivitySnapshotBuilder {
 
         let theme = WeekTheme.resolvedTheme(rawValue: selectedThemeRaw, premiumThemeUnlocked: premiumThemeUnlocked)
         let appearanceMode = AppearanceMode(rawValue: appearanceModeRaw) ?? .system
+        let typeDefinition = (try? TaskTypeCatalog.load(in: modelContext))?
+            .definition(for: focus.taskTypeIdRaw.isEmpty ? focus.taskType.rawValue : focus.taskTypeIdRaw)
 
         return TodayActivitySnapshot(
             dayId: day.dayId,
@@ -91,7 +99,15 @@ enum TodayActivitySnapshotBuilder {
             completedCount: completedCount,
             totalCount: totalCount,
             frozenCount: frozenCount,
-            liveTheme: theme.liveActivityThemeSnapshot(appearanceMode: appearanceMode)
+            liveTheme: theme.liveActivityThemeSnapshot(appearanceMode: appearanceMode),
+            typeName: typeDefinition?.name,
+            typeIconName: typeDefinition?.iconName,
+            typeColorHex: typeDefinition?.colorHex,
+            dayStartedAt: day.initiatedAt,
+            nextTitle: day.frozenTasks.first?.title,
+            // The language the app UI is actually running in (honours the in-app
+            // language override), so the widget extension can match it.
+            languageCode: Bundle.main.preferredLocalizations.first
         )
     }
 
@@ -197,13 +213,28 @@ private extension TodayLiveActivityService {
             completedCount: snapshot.completedCount,
             totalCount: snapshot.totalCount,
             frozenCount: snapshot.frozenCount,
-            liveTheme: snapshot.liveTheme
+            liveTheme: snapshot.liveTheme,
+            typeName: snapshot.typeName,
+            typeIconName: snapshot.typeIconName,
+            typeColorHex: snapshot.typeColorHex,
+            dayStartedAt: snapshot.dayStartedAt,
+            nextTitle: snapshot.nextTitle,
+            pendingActionRaw: nil,
+            languageCode: snapshot.languageCode
         )
-        let content = ActivityContent(state: contentState, staleDate: snapshot.killTime.addingTimeInterval(60))
+        // The activity turns stale exactly at the deadline, so the system re-renders
+        // it into the overdue layout even while the app is suspended.
         let activities = Activity<TodayActivityAttributes>.activities
 
         if let existing = activities.first(where: { $0.attributes.dayId == snapshot.dayId }) {
-            await existing.update(content)
+            var carriedState = contentState
+            // Keep a pending 确认 prompt alive across routine refreshes as long as it
+            // still refers to the same focus task.
+            let previous = existing.content.state
+            if previous.dayId == snapshot.dayId, previous.focusTitle == snapshot.focusTitle {
+                carriedState.pendingActionRaw = previous.pendingActionRaw
+            }
+            await existing.update(ActivityContent(state: carriedState, staleDate: snapshot.killTime))
             for activity in activities where activity.id != existing.id {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
@@ -217,7 +248,7 @@ private extension TodayLiveActivityService {
         let attributes = TodayActivityAttributes(dayId: snapshot.dayId)
         _ = try? Activity<TodayActivityAttributes>.request(
             attributes: attributes,
-            content: content,
+            content: ActivityContent(state: contentState, staleDate: snapshot.killTime),
             pushType: nil
         )
     }
@@ -228,13 +259,15 @@ private extension TodayLiveActivityService {
 enum LiveActivityActionRouter {
     private static var retainedViewModels: [TodayViewModel] = []
 
+    /// - Returns: `true` when the action was applied (or was `openToday`).
+    @discardableResult
     static func handle(
         url: URL,
         modelContext: ModelContext,
         appState: AppState,
         userSettings: UserSettings,
         timeProvider: (any TimeProviding)? = nil
-    ) {
+    ) -> Bool {
         handle(
             url: url,
             modelContext: modelContext,
@@ -246,6 +279,7 @@ enum LiveActivityActionRouter {
         )
     }
 
+    @discardableResult
     static func handle(
         url: URL,
         modelContext: ModelContext,
@@ -254,8 +288,8 @@ enum LiveActivityActionRouter {
         notificationService: any NotificationScheduling,
         liveActivityService: any LiveActivityManaging,
         timeProvider: (any TimeProviding)? = nil
-    ) {
-        guard let request = LiveActivityAction.parse(url: url) else { return }
+    ) -> Bool {
+        guard let request = LiveActivityAction.parse(url: url) else { return false }
         let resolvedTimeProvider = timeProvider ?? TimeProvider()
         let viewModel = TodayViewModel(
             modelContext: modelContext,
@@ -276,7 +310,7 @@ enum LiveActivityActionRouter {
             case .doneFocus:
                 try viewModel.doneFocus()
             case .postponeFocus:
-                guard let focus = viewModel.today?.focusTask else { return }
+                guard let focus = viewModel.today?.focusTask else { return false }
                 let targetDate = resolvedTimeProvider.today.addingDays(request.days)
                 let preview = try viewModel.previewPostpone(
                     taskID: focus.id,
@@ -303,8 +337,10 @@ enum LiveActivityActionRouter {
                 timeProvider: resolvedTimeProvider,
                 userSettings: userSettings
             )
+            return true
         } catch {
             appState.runtimeErrorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -551,7 +587,7 @@ struct WeekyiiApp: App {
     @UIApplicationDelegateAdaptor(WeekyiiAppDelegate.self) private var appDelegate
     @State private var launchState: WeekyiiPersistence.LaunchState
     @State private var showLaunchOverlay = !WeekyiiApp.isUITesting && !WeekyiiApp.isRunningTests
-    @StateObject private var appState = AppState()
+    @StateObject private var appState: AppState
     @StateObject private var userSettings: UserSettings
     @State private var appHealthCoordinator: AppHealthCoordinator?
     @State private var cloudSyncCoordinator: CloudSyncCoordinator
@@ -563,9 +599,14 @@ struct WeekyiiApp: App {
     private static let isUITesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
 
     init() {
+        let appState = AppState()
+        _appState = StateObject(wrappedValue: appState)
         let userSettings = UserSettings()
         _userSettings = StateObject(wrappedValue: userSettings)
         _cloudSyncCoordinator = State(initialValue: CloudSyncCoordinator(settings: userSettings))
+        if !Self.isUITesting && !Self.isRunningTests {
+            Self.registerLiveActivityIntentBridge(appState: appState, userSettings: userSettings)
+        }
 
         if Self.isUITesting && ProcessInfo.processInfo.arguments.contains("-testPersistenceResolving") {
             _launchState = State(initialValue: .resolving)
@@ -607,6 +648,14 @@ struct WeekyiiApp: App {
                     // Personalised themes restyle every SF Symbol at once via the
                     // environment, so no individual `Image(systemName:)` call needs editing.
                     .symbolVariant(userSettings.selectedTheme.visualStyle.symbolVariant.symbolVariants)
+                    // Shared components draw from this skin; publishing it here means a theme
+                    // switch re-renders every reader, including Settings and presented sheets.
+                    .environment(\.themeSkin, userSettings.selectedTheme.skin)
+                    // System text styles (`.caption2`, Form rows …) follow the theme's body face;
+                    // `nil` for every theme on the default face, so they are left untouched.
+                    .fontDesign(userSettings.selectedTheme.skin.typography.environmentDesign)
+                    // Applied outside `.environment(\.themeSkin, …)`, so the backdrop is passed in.
+                    .overlay { ThemeBackdropOverlay(backdrop: userSettings.selectedTheme.skin.backdrop) }
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)
@@ -694,7 +743,39 @@ struct WeekyiiApp: App {
     }
 
     private func retryPersistentStore() {
-        launchState = WeekyiiPersistence.bootstrapPersistentContainer()
+        launchState = WeekyiiPersistence.bootstrapSharedPersistentContainer()
+    }
+
+    /// Live Activity buttons (`LiveActivityPerformActionIntent`) run in this process,
+    /// possibly after a background launch where no scene has bootstrapped
+    /// persistence yet. Both paths share one container via
+    /// `WeekyiiPersistence.bootstrapSharedPersistentContainer()`.
+    private static func registerLiveActivityIntentBridge(appState: AppState, userSettings: UserSettings) {
+        #if canImport(ActivityKit) && canImport(AppIntents)
+        LiveActivityIntentBridge.performAction = { action, days in
+            guard case .ready(let container, _) = WeekyiiPersistence.bootstrapSharedPersistentContainer() else {
+                return false
+            }
+            let modelContext = container.mainContext
+            let handled = LiveActivityActionRouter.handle(
+                url: action.url(days: days),
+                modelContext: modelContext,
+                appState: appState,
+                userSettings: userSettings
+            )
+            guard handled else { return false }
+            // Push the new content before the intent returns; the process may be
+            // suspended right afterwards.
+            await TodayLiveActivityService.shared.reconcileImmediately(
+                modelContext: modelContext,
+                now: Date(),
+                selectedThemeRaw: userSettings.selectedThemeRaw,
+                appearanceModeRaw: userSettings.appearanceModeRaw,
+                premiumThemeUnlocked: userSettings.premiumThemeUnlocked
+            )
+            return true
+        }
+        #endif
     }
 
     private func restoreLatestPersistentStoreSnapshot() {
@@ -704,9 +785,11 @@ struct WeekyiiApp: App {
                 launchState = .failed("没有找到可用的本地恢复点。")
                 return
             }
-            launchState = WeekyiiPersistence.bootstrapPersistentContainer(
+            let restoredState = WeekyiiPersistence.bootstrapPersistentContainer(
                 storeURL: storeURL
             )
+            WeekyiiPersistence.replaceSharedLaunchState(restoredState)
+            launchState = restoredState
         } catch {
             launchState = .failed("恢复本地数据库失败：\(error.localizedDescription)")
         }
@@ -718,7 +801,7 @@ struct WeekyiiApp: App {
             return
         }
 
-        switch WeekyiiPersistence.bootstrapPersistentContainer() {
+        switch WeekyiiPersistence.bootstrapSharedPersistentContainer() {
         case .ready(let container, let diagnostics):
             if diagnostics.invariantRepair.totalRepairs > 0 || !diagnostics.consistency.isConsistent {
                 print(

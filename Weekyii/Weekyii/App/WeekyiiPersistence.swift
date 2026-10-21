@@ -37,6 +37,36 @@ enum WeekyiiPersistence {
 
     static let currentSchema = Schema(versionedSchema: WeekyiiSchemaV8.self)
 
+    /// The production container opened during this process lifetime. The UI launch
+    /// path and the Live Activity intent bridge (which can run after a background
+    /// launch, before any scene exists) must share it instead of each opening the
+    /// store again.
+    @MainActor private static var sharedLaunchState: LaunchState?
+
+    /// Opens the production store once per process and returns the cached result
+    /// afterwards. Failed attempts are not cached, so a later call retries.
+    @MainActor
+    static func bootstrapSharedPersistentContainer() -> LaunchState {
+        if let cached = sharedLaunchState, case .ready = cached {
+            return cached
+        }
+        let state = bootstrapPersistentContainer()
+        if case .ready = state {
+            sharedLaunchState = state
+        }
+        return state
+    }
+
+    /// Used after restoring a snapshot, which opens the store explicitly.
+    @MainActor
+    static func replaceSharedLaunchState(_ state: LaunchState) {
+        if case .ready = state {
+            sharedLaunchState = state
+        } else {
+            sharedLaunchState = nil
+        }
+    }
+
     static func bootstrapPersistentContainer(
         storeURL: URL? = nil,
         storeMode: StoreMode = .persistent,

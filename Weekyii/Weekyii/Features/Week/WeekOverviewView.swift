@@ -523,7 +523,7 @@ private struct WeekOverviewModeSwitcher: View {
                         Text(mode.title)
                             .font(.callout.weight(.semibold))
                     }
-                    .foregroundStyle(displayMode == mode ? Color.white : Color.textSecondary)
+                    .foregroundStyle(displayMode == mode ? Color.weekyiiOnPrimary : Color.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, WeekSpacing.md)
                     .background(

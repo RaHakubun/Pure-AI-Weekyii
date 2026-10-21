@@ -384,11 +384,7 @@ struct TodayView: View {
                 ThemeStatusArtwork(theme: userSettings.selectedTheme)
                     .frame(maxWidth: .infinity)
                     .frame(height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
-                    )
+                    .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
                 Text(formatDate(day.dayId))
@@ -500,7 +496,7 @@ struct TodayView: View {
             } label: {
                 Text(String(localized: "killtime.pending.confirm", defaultValue: "确认"))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
                     .background(Color.weekyiiPrimary, in: Capsule())
@@ -667,21 +663,17 @@ struct TodayView: View {
         if let focusTask = day.focusTask {
             WeekCard(useGradient: true) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "target")
-                            .foregroundColor(.white)
-                        Text(String(localized: "focus.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.white)
-                    }
+                    WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
                     
                     HStack(alignment: .firstTextBaseline) {
                         Text(focusTask.title)
                             .font(.titleMedium)
-                            .foregroundColor(.white)
+                            .foregroundColor(.weekyiiOnFeature)
                             .onTapGesture {
                                 selectedTaskForDetail = focusTask
                             }
+
+                        WeekFeatureCursor()
 
                         if focusTask.project != nil {
                             Spacer(minLength: WeekSpacing.sm)
@@ -708,7 +700,7 @@ struct TodayView: View {
                                 Text(formatTime(startedAt))
                                     .font(.caption)
                             }
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.weekyiiOnFeatureSecondary)
                         }
                         
                         Spacer()
@@ -724,8 +716,7 @@ struct TodayView: View {
                             .padding(.vertical, WeekSpacing.xs)
                             .padding(.horizontal, WeekSpacing.sm)
                         }
-                        .foregroundColor(.white)
-                        .background(.white.opacity(0.2), in: Capsule())
+                        .weekyiiFeatureAction()
                         .buttonStyle(.plain)
 
                         if day.executionMode == .flexible {
@@ -744,8 +735,7 @@ struct TodayView: View {
                                 .padding(.vertical, WeekSpacing.xs)
                                 .padding(.horizontal, WeekSpacing.sm)
                             }
-                            .foregroundColor(.white)
-                            .background(.white.opacity(0.2), in: Capsule())
+                            .weekyiiFeatureAction()
                         .buttonStyle(.plain)
                         .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
                         .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
@@ -767,8 +757,7 @@ struct TodayView: View {
                             .padding(.vertical, WeekSpacing.xs)
                             .padding(.horizontal, WeekSpacing.sm)
                         }
-                        .foregroundColor(.white)
-                        .background(.white.opacity(0.2), in: Capsule())
+                        .weekyiiFeatureAction(isPrimary: true)
                         .buttonStyle(.plain)
                     }
                 }
@@ -803,19 +792,12 @@ struct TodayView: View {
         } else if !day.frozenTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "snowflake")
-                            .foregroundColor(.weekyiiPrimary)
-                        Text(String(localized: "frozen.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.frozenTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.weekyiiPrimary)
-                    }
+                    WeekSectionHeader(
+                        systemImage: "snowflake",
+                        title: String(localized: "frozen.title"),
+                        count: day.frozenTasks.count,
+                        tint: .weekyiiPrimary
+                    )
                     
                     FrozenZoneView(
                         tasks: day.frozenTasks,
@@ -836,19 +818,12 @@ struct TodayView: View {
         if !day.completedTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.accentGreen)
-                        Text(String(localized: "complete.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.completedTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.accentGreen)
-                    }
+                    WeekSectionHeader(
+                        systemImage: "checkmark.circle.fill",
+                        title: String(localized: "complete.title"),
+                        count: day.completedTasks.count,
+                        tint: .accentGreen
+                    )
                     
                     CompleteZoneView(tasks: day.completedTasks, onTapTask: { task in
                         selectedTaskForDetail = task
@@ -868,15 +843,15 @@ struct TodayView: View {
             VStack(spacing: WeekSpacing.lg) {
                 Image(systemName: "party.popper.fill")
                     .font(.system(size: 50))
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnFeature)
                 
                 Text(String(localized: "completed.congratulations"))
                     .font(.titleMedium)
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnFeature)
                 
                 Text(String(localized: "completed.message"))
                     .font(.bodyMedium)
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.weekyiiOnFeatureSecondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -886,19 +861,12 @@ struct TodayView: View {
         // 完成任务列表
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentGreen)
-                    Text(String(localized: "complete.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-                    
-                    Spacer()
-                    
-                    Text("\(day.completedTasks.count)")
-                        .font(.titleSmall)
-                        .foregroundColor(.accentGreen)
-                }
+                WeekSectionHeader(
+                    systemImage: "checkmark.circle.fill",
+                    title: String(localized: "complete.title"),
+                    count: day.completedTasks.count,
+                    tint: .accentGreen
+                )
                 
                 CompleteZoneView(tasks: day.completedTasks)
             }
@@ -1622,7 +1590,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .today ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .today ? .weekyiiOnPrimary : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1640,7 +1608,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .week ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .week ? .weekyiiOnPrimary : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1692,8 +1660,8 @@ private struct SectionToggleView: View {
                             .offset(x: indicatorX + 2, y: 3)
                     )
                     // 阴影
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
             }
         )
         .background(

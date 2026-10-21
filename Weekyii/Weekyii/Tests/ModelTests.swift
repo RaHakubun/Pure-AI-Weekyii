@@ -4008,6 +4008,45 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_themeSkin_classicThemesKeepEveryOriginalDrawing() {
+        // A classic skin has no tokens, so every shared component keeps its original code path.
+        let originals: [WeekTheme] = [
+            .amber, .ocean, .forest, .rose, .lavender,
+            .graphite, .sunset, .mint, .midnight, .lotr
+        ]
+        for theme in originals {
+            XCTAssertEqual(theme.skin, .classic, "\(theme.rawValue) must keep the classic skin")
+        }
+        XCTAssertEqual(ThemeSkin.classic.typography, .classic)
+        XCTAssertNil(ThemeSkin.classic.card)
+        XCTAssertNil(ThemeSkin.classic.feature)
+        XCTAssertNil(ThemeSkin.classic.onPrimary)
+        // The root `.fontDesign` must be a no-op for classic themes.
+        XCTAssertNil(ThemeSkin.classic.typography.environmentDesign)
+        XCTAssertNil(ThemeSkin.classic.radii, "classic themes keep the 8 / 12 / 16 / 24 radius scale")
+    }
+
+    func test_themeSkin_personalisedThemesRestyleSharedComponents() {
+        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal]
+        for theme in personalised {
+            let skin = theme.skin
+            XCTAssertNotEqual(skin, .classic, "\(theme.rawValue) must ship its own skin")
+            XCTAssertNotEqual(skin.typography, .classic, "\(theme.rawValue) must change typography")
+            XCTAssertNotNil(skin.card, "\(theme.rawValue) must restyle cards")
+            XCTAssertNotNil(skin.row, "\(theme.rawValue) must restyle task rows")
+            XCTAssertNotNil(skin.feature, "\(theme.rawValue) must replace the white-on-gradient panel")
+            XCTAssertNotNil(skin.badge, "\(theme.rawValue) must restyle status badges")
+            XCTAssertNotNil(skin.onPrimary, "\(theme.rawValue) must pick a readable ink for primary fills")
+        }
+        XCTAssertEqual(WeekTheme.terminal.skin.typography.bodyDesign, .monospaced)
+        XCTAssertEqual(WeekTheme.paper.skin.typography.bodyDesign, .serif)
+        XCTAssertEqual(WeekTheme.terminal.skin.typography.environmentDesign, .monospaced)
+        XCTAssertNil(WeekTheme.brutal.skin.typography.environmentDesign)
+        XCTAssertEqual(WeekTheme.brutal.skin.row?.barFlush, true)
+        XCTAssertEqual(WeekTheme.terminal.skin.radii?.medium, 0)
+        XCTAssertNotNil(WeekTheme.neon.skin.radii)
+    }
+
     func test_themeVisualStyle_personalisedThemesOverrideTheForm() {
         XCTAssertEqual(WeekTheme.brutal.visualStyle, .brutalist)
         XCTAssertEqual(WeekTheme.neon.visualStyle, .neon)
@@ -4463,6 +4502,17 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(snapshot.theme.primaryHex, WeekTheme.rose.primaryThemeHex)
         XCTAssertEqual(snapshot.theme.appearanceMode, .dark)
         XCTAssertEqual(snapshot.weekDays.count, 7)
+
+        // Redesigned widget fields: the upcoming list never repeats the focus task,
+        // and the deadline / day boundary are absolute dates.
+        XCTAssertEqual(snapshot.today.upcomingTasks?.map(\.title), ["Frozen task", "Draft task"])
+        let killTime = try? XCTUnwrap(snapshot.today.killTime)
+        XCTAssertEqual(killTime, KillTimeDeadline.date(for: day.date, hour: 23, minute: 45))
+        if let killTime, let dayEndsAt = snapshot.today.dayEndsAt {
+            XCTAssertGreaterThan(dayEndsAt, killTime)
+        } else {
+            XCTFail("dayEndsAt missing")
+        }
     }
 
     func test_widgetThemeSnapshot_decodesLegacyPayloadWithoutDarkFields() throws {

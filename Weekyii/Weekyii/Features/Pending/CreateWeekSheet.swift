@@ -436,7 +436,7 @@ private struct CustomCalendarView: View {
             return .textTertiary.opacity(0.3)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary

@@ -123,7 +123,7 @@ struct PostponeTaskSheet: View {
                                     } label: {
                                         Text(value == 1 ? "明天" : "+\(value)天")
                                             .font(.bodySmall.weight(.semibold))
-                                            .foregroundColor(relativeDays == value ? .white : .weekyiiPrimary)
+                                            .foregroundColor(relativeDays == value ? .weekyiiOnPrimary : .weekyiiPrimary)
                                             .padding(.vertical, WeekSpacing.sm)
                                             .padding(.horizontal, WeekSpacing.md)
                                             .background(
@@ -228,7 +228,7 @@ struct CenteredSquareModal<Content: View>: View {
 
                 content()
                     .frame(width: side, height: side)
-                    .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 10)
+                    .weekSoftShadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 10)
             }
         }
     }

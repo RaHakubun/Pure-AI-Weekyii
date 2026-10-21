@@ -47,7 +47,7 @@ struct WeekButton: View {
             .overlay(outlineOverlay)
         }
         .buttonStyle(ScaleButtonStyle())
-        .shadow(color: shadowForStyle.color, radius: shadowForStyle.radius, x: shadowForStyle.x, y: shadowForStyle.y)
+        .weekSoftShadow(color: shadowForStyle.color, radius: shadowForStyle.radius, x: shadowForStyle.x, y: shadowForStyle.y)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -67,7 +67,7 @@ struct WeekButton: View {
     private var foregroundForStyle: Color {
         switch style {
         case .primary:
-            return .white
+            return .weekyiiOnPrimary
         case .secondary:
             return .weekyiiPrimary
         case .outline:

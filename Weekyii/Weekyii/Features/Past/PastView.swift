@@ -500,14 +500,7 @@ struct PastView: View {
     private func pastSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(WeekSpacing.base)
-            .background(Color.backgroundSecondary)
-            .clipShape(.rect(cornerRadius: WeekRadius.xlarge))
-            .overlay {
-                RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous)
-                    .stroke(Color.backgroundTertiary.opacity(0.55), lineWidth: 0.75)
-                    .allowsHitTesting(false)
-            }
-            .shadow(color: WeekShadow.light.color, radius: 14, x: 0, y: 5)
+            .weekPageSurface()
     }
 
     private var emptyStateView: some View {
@@ -786,7 +779,7 @@ private struct PastMonthCalendarView: View {
             return .textTertiary.opacity(0.55)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary
@@ -883,7 +876,7 @@ struct PastCompletedCountBadge: View {
     var body: some View {
         Text(count > 99 ? "99+" : "\(count)")
             .font(.system(size: 9, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(.weekyiiOnSuccess)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
             .background(Color.accentGreen, in: Capsule())
@@ -1175,21 +1168,21 @@ private struct PastWeekDetailView: View {
             VStack(spacing: WeekSpacing.xxs) {
                 Text(weekdaySymbol(for: day.date))
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .textPrimary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textPrimary)
 
                 Text(Self.monthDayFormatter.string(from: day.date))
                     .font(.caption)
-                    .foregroundColor(isSelected ? .white : .textSecondary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textSecondary)
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(hasCompleted ? (isSelected ? .white : .accentGreen) : .clear)
+                        .fill(hasCompleted ? (isSelected ? Color.weekyiiOnPrimary : .accentGreen) : .clear)
                         .frame(width: 6, height: 6)
 
                     if day.expiredCount > 0 {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 8))
-                            .foregroundStyle(isSelected ? .white : .taskDDL)
+                            .foregroundStyle(isSelected ? Color.weekyiiOnPrimary : .taskDDL)
                     }
                 }
                 .frame(height: 10)

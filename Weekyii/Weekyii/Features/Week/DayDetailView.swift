@@ -271,7 +271,7 @@ struct DayDetailView: View {
                     RoundedRectangle(cornerRadius: WeekRadius.large)
                         .stroke(Color.backgroundTertiary, lineWidth: 1)
                 )
-                .shadow(
+                .weekSoftShadow(
                     color: WeekShadow.light.color,
                     radius: WeekShadow.light.radius,
                     x: WeekShadow.light.x,

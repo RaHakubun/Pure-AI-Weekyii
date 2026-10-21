@@ -2,6 +2,9 @@ import Foundation
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
+#if canImport(AppIntents)
+import AppIntents
+#endif
 
 enum AppearanceMode: String, CaseIterable, Codable, Identifiable {
     case system
@@ -28,7 +31,7 @@ enum LanguageOverride: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
+nonisolated enum LiveActivityAction: String, Codable, CaseIterable, Identifiable {
     case doneFocus = "done-focus"
     case postponeFocus = "postpone-focus"
     case openToday = "open-today"
@@ -75,9 +78,122 @@ struct TodayActivityAttributes: ActivityAttributes {
         var totalCount: Int
         var frozenCount: Int
         var liveTheme: LiveActivityThemeSnapshot
+        // Fields below were added after the first release. They are optional so a
+        // content state encoded by an older build still decodes.
+        /// Display name of the focus task's type (custom types included).
+        var typeName: String?
+        /// SF Symbol name of the focus task's type.
+        var typeIconName: String?
+        /// Hex color of the focus task's type.
+        var typeColorHex: String?
+        /// When the user started today; drives the time ring / time bar.
+        var dayStartedAt: Date?
+        /// Title of the first task waiting in the frozen zone.
+        var nextTitle: String?
+        /// `LiveActivityAction.rawValue` awaiting a second tap to confirm.
+        var pendingActionRaw: String?
+        /// Localization the app is running in, e.g. "zh-Hans" / "en".
+        var languageCode: String?
+
+        var pendingAction: LiveActivityAction? {
+            pendingActionRaw.flatMap(LiveActivityAction.init(rawValue:))
+        }
     }
 
     var dayId: String
+}
+#endif
+
+#if canImport(ActivityKit) && canImport(AppIntents)
+/// Lets Live Activity buttons run inside the app process without opening the app.
+/// The app registers `performAction` at launch (see `WeekyiiApp.init`).
+@MainActor
+enum LiveActivityIntentBridge {
+    static var performAction: (@MainActor (LiveActivityAction, Int) async -> Bool)?
+}
+
+@MainActor
+enum LiveActivityStateEditor {
+    /// Switches every running Today activity into (or out of) the confirm state,
+    /// keeping all other content and the stale date untouched.
+    static func setPendingAction(_ action: LiveActivityAction?) async {
+        for activity in Activity<TodayActivityAttributes>.activities {
+            var state = activity.content.state
+            guard state.pendingActionRaw != action?.rawValue else { continue }
+            state.pendingActionRaw = action?.rawValue
+            await activity.update(
+                ActivityContent(state: state, staleDate: activity.content.staleDate)
+            )
+        }
+    }
+}
+
+/// First tap on 完成 / 推迟到明天: only shows the confirm buttons.
+nonisolated struct LiveActivityRequestConfirmIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Confirm Live Activity Action"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Action")
+    var actionRaw: String
+
+    init() {}
+
+    init(action: LiveActivityAction) {
+        self.actionRaw = action.rawValue
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let action = LiveActivityAction(rawValue: actionRaw), action != .openToday else {
+            return .result()
+        }
+        await LiveActivityStateEditor.setPendingAction(action)
+        return .result()
+    }
+}
+
+/// 取消: leaves the confirm state without changing any data.
+nonisolated struct LiveActivityCancelConfirmIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Cancel Live Activity Action"
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await LiveActivityStateEditor.setPendingAction(nil)
+        return .result()
+    }
+}
+
+/// Second tap (确认完成 / 确认推迟): runs the action in the app process.
+nonisolated struct LiveActivityPerformActionIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Perform Live Activity Action"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Action")
+    var actionRaw: String
+
+    init() {}
+
+    init(action: LiveActivityAction) {
+        self.actionRaw = action.rawValue
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let action = LiveActivityAction(rawValue: actionRaw), action != .openToday,
+              let performAction = LiveActivityIntentBridge.performAction
+        else {
+            await LiveActivityStateEditor.setPendingAction(nil)
+            return .result()
+        }
+        _ = await performAction(action, 1)
+        // On success the app has already pushed fresh content; on failure this
+        // simply returns the activity to its normal buttons.
+        await LiveActivityStateEditor.setPendingAction(nil)
+        return .result()
+    }
 }
 #endif
 
@@ -117,7 +233,12 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
     var darkBackgroundHex: String
     var darkTextPrimaryHex: String
     var darkTextSecondaryHex: String
+    var successHex: String
+    var darkSuccessHex: String
     var appearanceModeRaw: String
+
+    /// Used when a snapshot written by an older build has no success color.
+    static let fallbackSuccessHex = "#3E9B6A"
 
     init(
         primaryHex: String,
@@ -132,6 +253,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         darkBackgroundHex: String? = nil,
         darkTextPrimaryHex: String? = nil,
         darkTextSecondaryHex: String? = nil,
+        successHex: String? = nil,
+        darkSuccessHex: String? = nil,
         appearanceModeRaw: String = AppearanceMode.system.rawValue
     ) {
         self.primaryHex = primaryHex
@@ -146,6 +269,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         self.darkBackgroundHex = darkBackgroundHex ?? backgroundHex
         self.darkTextPrimaryHex = darkTextPrimaryHex ?? textPrimaryHex
         self.darkTextSecondaryHex = darkTextSecondaryHex ?? textSecondaryHex
+        self.successHex = successHex ?? Self.fallbackSuccessHex
+        self.darkSuccessHex = darkSuccessHex ?? successHex ?? Self.fallbackSuccessHex
         self.appearanceModeRaw = appearanceModeRaw
     }
 
@@ -171,7 +296,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
                 accentHex: darkAccentHex,
                 backgroundHex: darkBackgroundHex,
                 textPrimaryHex: darkTextPrimaryHex,
-                textSecondaryHex: darkTextSecondaryHex
+                textSecondaryHex: darkTextSecondaryHex,
+                successHex: darkSuccessHex
             )
         }
 
@@ -181,7 +307,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
             accentHex: accentHex,
             backgroundHex: backgroundHex,
             textPrimaryHex: textPrimaryHex,
-            textSecondaryHex: textSecondaryHex
+            textSecondaryHex: textSecondaryHex,
+            successHex: successHex
         )
     }
 
@@ -198,6 +325,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         case darkBackgroundHex
         case darkTextPrimaryHex
         case darkTextSecondaryHex
+        case successHex
+        case darkSuccessHex
         case appearanceModeRaw
     }
 
@@ -217,6 +346,8 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         darkBackgroundHex = try container.decodeIfPresent(String.self, forKey: .darkBackgroundHex) ?? backgroundHex
         darkTextPrimaryHex = try container.decodeIfPresent(String.self, forKey: .darkTextPrimaryHex) ?? textPrimaryHex
         darkTextSecondaryHex = try container.decodeIfPresent(String.self, forKey: .darkTextSecondaryHex) ?? textSecondaryHex
+        successHex = try container.decodeIfPresent(String.self, forKey: .successHex) ?? Self.fallbackSuccessHex
+        darkSuccessHex = try container.decodeIfPresent(String.self, forKey: .darkSuccessHex) ?? successHex
         appearanceModeRaw = try container.decodeIfPresent(String.self, forKey: .appearanceModeRaw) ?? AppearanceMode.system.rawValue
     }
 }
@@ -228,6 +359,7 @@ struct WidgetThemePalette: Equatable, Hashable {
     var backgroundHex: String
     var textPrimaryHex: String
     var textSecondaryHex: String
+    var successHex: String
 }
 
 // Live Activities do not share widget semantics directly.
@@ -397,6 +529,8 @@ struct WidgetTaskPreview: Codable, Equatable, Identifiable {
     var title: String
     var taskTypeRaw: String
     var zoneRaw: String
+    /// Color of the task's type (built-in or custom), so the widget can mark it.
+    var typeColorHex: String? = nil
 }
 
 struct WidgetTodaySnapshot: Codable, Equatable {
@@ -411,6 +545,20 @@ struct WidgetTodaySnapshot: Codable, Equatable {
     var frozenCount: Int
     var completionPercent: Int
     var previewTasks: [WidgetTaskPreview]
+
+    // Fields below were added for the redesigned widgets. They are optional so a
+    // snapshot written by an older build still decodes.
+
+    /// Today's deadline as an absolute date; drives the live countdown.
+    var killTime: Date? = nil
+    /// Start of the next day. After this moment the snapshot describes yesterday.
+    var dayEndsAt: Date? = nil
+    var focusTypeName: String? = nil
+    var focusTypeColorHex: String? = nil
+    /// Tasks still to do after the focus task: frozen first, then draft. Never includes the focus task.
+    var upcomingTasks: [WidgetTaskPreview]? = nil
+    /// Language the app UI runs in, so widget copy can match it.
+    var languageCode: String? = nil
 }
 
 struct WidgetWeekDaySnapshot: Codable, Equatable, Identifiable {
@@ -442,10 +590,10 @@ struct WidgetSnapshot: Codable, Equatable {
         ),
         today: WidgetTodaySnapshot(
             dayId: Date().description,
-            weekdaySymbol: "Today",
-            statusRaw: "draft",
-            killTimeText: "23:45",
-            focusTitle: "Open Weekyii",
+            weekdaySymbol: "",
+            statusRaw: "empty",
+            killTimeText: "--:--",
+            focusTitle: nil,
             totalCount: 0,
             completedCount: 0,
             draftCount: 0,

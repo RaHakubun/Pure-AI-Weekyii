@@ -293,7 +293,7 @@ struct CreateProjectSheet: View {
             RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                 .stroke(accentColor.opacity(0.2), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .weekSoftShadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         .animation(.easeInOut(duration: 0.2), value: selectedColor)
         .animation(.easeInOut(duration: 0.2), value: selectedIcon)
     }

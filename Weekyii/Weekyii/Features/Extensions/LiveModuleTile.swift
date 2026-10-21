@@ -61,7 +61,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
                 RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                     .stroke(currentTint.opacity(0.16), lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+            .weekSoftShadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
             .contentShape(Rectangle())
             .overlay { naturalHeightProbe }
             .accessibilityIdentifier(accessibilityIdentifier)

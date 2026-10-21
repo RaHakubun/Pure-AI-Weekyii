@@ -120,9 +120,9 @@ struct PendingWeekCard: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 9)
-                    .background(forecastPanelFill, in: .rect(cornerRadius: 10))
+                    .background(forecastPanelFill, in: .rect(cornerRadius: WeekRadius.scaled(10)))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: WeekRadius.scaled(10))
                             .stroke(forecastPanelBorder, lineWidth: 1)
                     )
                 }
