@@ -346,6 +346,378 @@ enum ThemeSymbolVariant: Equatable {
     }
 }
 
+// MARK: - Theme skin (how shared components draw themselves)
+
+/// A light/dark hex pair. Resolves through the same appearance rules as the
+/// palette colours, so an explicit 浅色/深色 setting wins over the system trait.
+struct ThemeHexPair: Equatable {
+    var light: String
+    var dark: String
+
+    init(_ light: String, _ dark: String) {
+        self.light = light
+        self.dark = dark
+    }
+
+    init(_ both: String) {
+        self.init(both, both)
+    }
+
+    var color: Color {
+        WeekThemeRuntime.color(lightHex: light, darkHex: dark)
+    }
+}
+
+struct ThemeShadowSkin: Equatable {
+    /// ARGB hex is allowed, so a glow can be visible in dark mode only.
+    var color: ThemeHexPair
+    var radius: CGFloat
+    var x: CGFloat
+    var y: CGFloat
+}
+
+/// A framed surface: cards, task rows and the feature panel.
+struct ThemeSurfaceSkin: Equatable {
+    var cornerRadius: CGFloat
+    var borderWidth: CGFloat
+    var border: ThemeHexPair
+    /// `nil` keeps `backgroundSecondary`.
+    var fill: ThemeHexPair? = nil
+    var shadow: ThemeShadowSkin? = nil
+    /// Drawn instead of `border` when set (neon sign tube).
+    var borderGradient: [String]? = nil
+    /// A second sheet peeking out under the bottom edge (paper).
+    var stackLine: ThemeHexPair? = nil
+}
+
+/// Task rows: a surface plus the task-type bar on the leading edge.
+struct ThemeRowSkin: Equatable {
+    var surface: ThemeSurfaceSkin
+    var barWidth: CGFloat
+    var barCornerRadius: CGFloat
+    var barGlows: Bool = false
+}
+
+enum ThemeLabelKind: Equatable {
+    /// Plain text in the label colour.
+    case plain
+    /// Inverted block behind the text (brutalist).
+    case block
+    /// Small letter-spaced caps (neon, paper).
+    case spaced
+    /// `> ` prompt in front of the text (terminal).
+    case prompt
+}
+
+struct ThemeLabelSkin: Equatable {
+    var kind: ThemeLabelKind
+    var ink: ThemeHexPair
+    var fill: ThemeHexPair? = nil
+}
+
+enum ThemeActionKind: Equatable {
+    case capsule
+    case rect
+    case underline
+    case stamp
+    case bracket
+}
+
+/// One button look on the feature panel (secondary or primary action).
+struct ThemeActionLook: Equatable {
+    var kind: ThemeActionKind
+    var ink: ThemeHexPair
+    var fill: ThemeHexPair? = nil
+    var border: ThemeHexPair? = nil
+    var borderWidth: CGFloat = 0
+    var hardShadow: ThemeHexPair? = nil
+}
+
+/// The emphasised surface that classic themes draw as a primary gradient with
+/// white text (focus task, day completed, project hero).
+struct ThemeFeatureSkin: Equatable {
+    var surface: ThemeSurfaceSkin
+    var ink: ThemeHexPair
+    var secondaryInk: ThemeHexPair
+    var label: ThemeLabelSkin
+    var action: ThemeActionLook
+    var primaryAction: ThemeActionLook
+    /// Double rule down the leading edge (paper notebook margin).
+    var marginRule: ThemeHexPair? = nil
+    /// Block cursor after the title (terminal).
+    var cursor: ThemeHexPair? = nil
+}
+
+enum ThemeBadgeKind: Equatable {
+    /// Square tag: tinted fill, ink border, heavy text.
+    case block
+    /// Capsule outline in the status colour.
+    case outline
+    /// Rotated rubber stamp in the status colour.
+    case stamp
+    /// `[执行中]` in the status colour.
+    case bracket
+}
+
+struct ThemeBadgeSkin: Equatable {
+    var kind: ThemeBadgeKind
+    /// Border for `.block`; other kinds use the status colour.
+    var border: ThemeHexPair? = nil
+}
+
+enum ThemeCountKind: Equatable {
+    case plain
+    /// Count on an inverted block (brutalist).
+    case block
+    /// `[3]` (terminal).
+    case bracket
+    /// Italic serif numeral (paper).
+    case italic
+}
+
+struct ThemeSectionSkin: Equatable {
+    /// Text drawn before the title, e.g. `## `.
+    var titlePrefix: String? = nil
+    var count: ThemeCountKind = .plain
+    /// Rule under the header row.
+    var rule: ThemeHexPair? = nil
+}
+
+enum ThemeBackdrop: Equatable {
+    case none
+    /// Faint horizontal paper fibres.
+    case paperGrain(ThemeHexPair)
+    /// CRT scanlines.
+    case scanlines(ThemeHexPair)
+}
+
+struct ThemeTypography: Equatable {
+    var titleDesign: Font.Design
+    /// `nil` keeps each role's own weight.
+    var titleWeight: Font.Weight?
+    var bodyDesign: Font.Design
+
+    /// Serif titles over system body text: the original Weekyii typography.
+    static let classic = ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .default)
+}
+
+/// Everything a shared component needs to draw itself for a theme.
+///
+/// Components read these tokens and never switch on `WeekTheme`, so a theme's
+/// look lives entirely in `WeekTheme.skin`. A `nil` token means "draw the
+/// classic Weekyii way": the ten classic themes resolve to `.classic`, where
+/// every token is `nil` and each component keeps its original code path.
+struct ThemeSkin: Equatable {
+    var typography: ThemeTypography = .classic
+    var card: ThemeSurfaceSkin? = nil
+    var row: ThemeRowSkin? = nil
+    var feature: ThemeFeatureSkin? = nil
+    var badge: ThemeBadgeSkin? = nil
+    var section: ThemeSectionSkin? = nil
+    /// Text/icons on a `weekyiiPrimary` fill. `nil` keeps white.
+    var onPrimary: ThemeHexPair? = nil
+    /// Text/icons on an `accentGreen` fill. `nil` keeps white.
+    var onSuccess: ThemeHexPair? = nil
+    var backdrop: ThemeBackdrop = .none
+
+    static let classic = ThemeSkin()
+
+    /// Skin of the theme currently stored in shared defaults. Views should prefer
+    /// `@Environment(\.themeSkin)`, which re-renders them when the theme changes.
+    static var active: ThemeSkin { WeekTheme.activeTheme.skin }
+}
+
+extension WeekTheme {
+    var skin: ThemeSkin {
+        switch self {
+        case .brutal: return .brutalist
+        case .neon: return .neon
+        case .paper: return .paper
+        case .terminal: return .terminal
+        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr:
+            return .classic
+        }
+    }
+}
+
+extension ThemeSkin {
+    static let brutalist: ThemeSkin = {
+        let ink = ThemeHexPair("#111111", "#F2F2F2")
+        let hardShadow = ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 4, y: 4)
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .black, bodyDesign: .default),
+            card: ThemeSurfaceSkin(cornerRadius: 4, borderWidth: 2.5, border: ink, shadow: hardShadow),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 2,
+                    borderWidth: 2,
+                    border: ink,
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 3, y: 3)
+                ),
+                barWidth: 8,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 4,
+                    borderWidth: 2.5,
+                    border: ink,
+                    fill: ThemeHexPair("#FFD43B"),
+                    shadow: hardShadow
+                ),
+                ink: ThemeHexPair("#111111"),
+                secondaryInk: ThemeHexPair("#111111"),
+                label: ThemeLabelSkin(kind: .block, ink: ThemeHexPair("#FFD43B"), fill: ThemeHexPair("#111111")),
+                action: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#111111"),
+                    fill: ThemeHexPair("#FFFFFF"),
+                    border: ThemeHexPair("#111111"),
+                    borderWidth: 2,
+                    hardShadow: ThemeHexPair("#111111")
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#FFD43B"),
+                    fill: ThemeHexPair("#111111"),
+                    border: ThemeHexPair("#111111"),
+                    borderWidth: 2,
+                    hardShadow: ThemeHexPair("#111111")
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .block, border: ink),
+            section: ThemeSectionSkin(count: .block),
+            onPrimary: ThemeHexPair("#FFFFFF", "#111111"),
+            onSuccess: ThemeHexPair("#111111")
+        )
+    }()
+
+    static let neon: ThemeSkin = {
+        let line = ThemeHexPair("#9FD9E3", "#00A8B8")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .bold, bodyDesign: .default),
+            card: ThemeSurfaceSkin(
+                cornerRadius: 14,
+                borderWidth: 1.5,
+                border: line,
+                shadow: ThemeShadowSkin(color: ThemeHexPair("#0000F0FF", "#3300F0FF"), radius: 14, x: 0, y: 0)
+            ),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 10, borderWidth: 1, border: ThemeHexPair("#DDEEF2", "#1C2436")),
+                barWidth: 3,
+                barCornerRadius: 1.5,
+                barGlows: true
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 14,
+                    borderWidth: 1.5,
+                    border: ThemeHexPair("#00F0FF"),
+                    fill: ThemeHexPair("#0E1426"),
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#40FF4DA6", "#59FF4DA6"), radius: 16, x: 0, y: 0),
+                    borderGradient: ["#FF4DA6", "#00F0FF"]
+                ),
+                ink: ThemeHexPair("#E8FDFF"),
+                secondaryInk: ThemeHexPair("#A8C4CC"),
+                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#FF85C2")),
+                action: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#7DF5FF"),
+                    border: ThemeHexPair("#7DF5FF"),
+                    borderWidth: 1.5
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#04121A"),
+                    fill: ThemeHexPair("#00F0FF"),
+                    border: ThemeHexPair("#00F0FF"),
+                    borderWidth: 1.5
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .outline),
+            section: ThemeSectionSkin(),
+            onPrimary: ThemeHexPair("#04121A"),
+            onSuccess: ThemeHexPair("#04121A")
+        )
+    }()
+
+    static let paper: ThemeSkin = {
+        let rule = ThemeHexPair("#D6C9B4", "#4A453D")
+        let red = ThemeHexPair("#B23A2E", "#E0705F")
+        let ink = ThemeHexPair("#2C2A26", "#F0EADF")
+        let stack = ThemeHexPair("#E9DFCC", "#3A352C")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .serif),
+            card: ThemeSurfaceSkin(cornerRadius: 2, borderWidth: 0.75, border: rule, stackLine: stack),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 1, borderWidth: 0.75, border: ThemeHexPair("#E6DBC7", "#3A352C")),
+                barWidth: 2,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 2, borderWidth: 0.75, border: rule, stackLine: stack),
+                ink: ink,
+                secondaryInk: ThemeHexPair("#5F594F", "#B8AFA1"),
+                label: ThemeLabelSkin(kind: .spaced, ink: red),
+                action: ThemeActionLook(kind: .underline, ink: ink, border: rule, borderWidth: 1),
+                primaryAction: ThemeActionLook(kind: .stamp, ink: red, border: red, borderWidth: 1.5),
+                marginRule: red
+            ),
+            badge: ThemeBadgeSkin(kind: .stamp),
+            section: ThemeSectionSkin(count: .italic, rule: ink),
+            onPrimary: ThemeHexPair("#FFFFFF", "#1B1917"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#1B1917"),
+            backdrop: .paperGrain(ThemeHexPair("#0A785A32", "#08F0EADF"))
+        )
+    }()
+
+    static let terminal: ThemeSkin = {
+        let line = ThemeHexPair("#2F7A3F", "#1E9442")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .monospaced, titleWeight: nil, bodyDesign: .monospaced),
+            card: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: line),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: ThemeHexPair("#C9D6CB", "#12291A")),
+                barWidth: 2,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 0,
+                    borderWidth: 1,
+                    border: ThemeHexPair("#33FF66"),
+                    fill: ThemeHexPair("#05100A")
+                ),
+                ink: ThemeHexPair("#D6FFE1"),
+                secondaryInk: ThemeHexPair("#7FB892"),
+                label: ThemeLabelSkin(kind: .prompt, ink: ThemeHexPair("#33FF66")),
+                action: ThemeActionLook(kind: .bracket, ink: ThemeHexPair("#8CFFA8")),
+                primaryAction: ThemeActionLook(kind: .bracket, ink: ThemeHexPair("#05100A"), fill: ThemeHexPair("#33FF66")),
+                cursor: ThemeHexPair("#33FF66")
+            ),
+            badge: ThemeBadgeSkin(kind: .bracket),
+            section: ThemeSectionSkin(titlePrefix: "## ", count: .bracket),
+            onPrimary: ThemeHexPair("#FFFFFF", "#05100A"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#05100A"),
+            backdrop: .scanlines(ThemeHexPair("#00000000", "#0D33FF66"))
+        )
+    }()
+}
+
+private struct ThemeSkinKey: EnvironmentKey {
+    static let defaultValue = ThemeSkin.classic
+}
+
+extension EnvironmentValues {
+    /// The active theme's skin, published once at the app root. Reading it from
+    /// the environment (rather than `ThemeSkin.active`) makes a view re-render the
+    /// moment the theme changes, so nothing keeps the previous theme's look.
+    var themeSkin: ThemeSkin {
+        get { self[ThemeSkinKey.self] }
+        set { self[ThemeSkinKey.self] = newValue }
+    }
+}
+
 struct SemanticModulePalette: Equatable {
     let tintHex: String
     let tintLightHex: String
@@ -1069,9 +1441,12 @@ private enum WeekThemeRuntime {
     }
 
     static func semanticColor(_ keyPath: KeyPath<WeekThemePalette, String>) -> Color {
-        let lightHex = palettePair.light[keyPath: keyPath]
-        let darkHex = palettePair.dark[keyPath: keyPath]
+        color(lightHex: palettePair.light[keyPath: keyPath], darkHex: palettePair.dark[keyPath: keyPath])
+    }
 
+    /// Resolves a light/dark pair the way palette colours do: an explicit
+    /// appearance setting wins, `.system` follows the trait collection.
+    static func color(lightHex: String, darkHex: String) -> Color {
         switch appearanceMode {
         case .light:
             return Color(hex: lightHex)
@@ -1090,6 +1465,15 @@ extension Color {
 
     /// 深琥珀 - 主品牌色
     static var weekyiiPrimary: Color { WeekThemeRuntime.semanticColor(\.primary) }
+
+    /// 主色填充上的文字和图标。经典主题保持白色；个性主题按对比度换成深色墨（例如霓虹、终端的深色模式）。
+    static var weekyiiOnPrimary: Color { ThemeSkin.active.onPrimary?.color ?? .white }
+
+    /// `accentGreen` 填充上的文字和图标，规则同 `weekyiiOnPrimary`。
+    static var weekyiiOnSuccess: Color { ThemeSkin.active.onSuccess?.color ?? .white }
+
+    /// 特色面板（经典主题的主色渐变卡）上的文字和图标。经典主题保持白色。
+    static var weekyiiOnFeature: Color { ThemeSkin.active.feature?.ink.color ?? .white }
 
     /// 亮琥珀 - 主品牌色(浅色)
     static var weekyiiPrimaryLight: Color { WeekThemeRuntime.semanticColor(\.primaryLight) }

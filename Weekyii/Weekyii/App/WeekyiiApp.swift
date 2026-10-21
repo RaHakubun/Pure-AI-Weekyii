@@ -648,6 +648,9 @@ struct WeekyiiApp: App {
                     // Personalised themes restyle every SF Symbol at once via the
                     // environment, so no individual `Image(systemName:)` call needs editing.
                     .symbolVariant(userSettings.selectedTheme.visualStyle.symbolVariant.symbolVariants)
+                    // Shared components draw from this skin; publishing it here means a theme
+                    // switch re-renders every reader, including Settings and presented sheets.
+                    .environment(\.themeSkin, userSettings.selectedTheme.skin)
                     .onAppear {
                         guard !Self.isRunningTests else { return }
                         initializeAppHealthCoordinator(modelContainer: modelContainer)

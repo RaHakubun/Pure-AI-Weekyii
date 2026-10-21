@@ -4008,6 +4008,37 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_themeSkin_classicThemesKeepEveryOriginalDrawing() {
+        // A classic skin has no tokens, so every shared component keeps its original code path.
+        let originals: [WeekTheme] = [
+            .amber, .ocean, .forest, .rose, .lavender,
+            .graphite, .sunset, .mint, .midnight, .lotr
+        ]
+        for theme in originals {
+            XCTAssertEqual(theme.skin, .classic, "\(theme.rawValue) must keep the classic skin")
+        }
+        XCTAssertEqual(ThemeSkin.classic.typography, .classic)
+        XCTAssertNil(ThemeSkin.classic.card)
+        XCTAssertNil(ThemeSkin.classic.feature)
+        XCTAssertNil(ThemeSkin.classic.onPrimary)
+    }
+
+    func test_themeSkin_personalisedThemesRestyleSharedComponents() {
+        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal]
+        for theme in personalised {
+            let skin = theme.skin
+            XCTAssertNotEqual(skin, .classic, "\(theme.rawValue) must ship its own skin")
+            XCTAssertNotEqual(skin.typography, .classic, "\(theme.rawValue) must change typography")
+            XCTAssertNotNil(skin.card, "\(theme.rawValue) must restyle cards")
+            XCTAssertNotNil(skin.row, "\(theme.rawValue) must restyle task rows")
+            XCTAssertNotNil(skin.feature, "\(theme.rawValue) must replace the white-on-gradient panel")
+            XCTAssertNotNil(skin.badge, "\(theme.rawValue) must restyle status badges")
+            XCTAssertNotNil(skin.onPrimary, "\(theme.rawValue) must pick a readable ink for primary fills")
+        }
+        XCTAssertEqual(WeekTheme.terminal.skin.typography.bodyDesign, .monospaced)
+        XCTAssertEqual(WeekTheme.paper.skin.typography.bodyDesign, .serif)
+    }
+
     func test_themeVisualStyle_personalisedThemesOverrideTheForm() {
         XCTAssertEqual(WeekTheme.brutal.visualStyle, .brutalist)
         XCTAssertEqual(WeekTheme.neon.visualStyle, .neon)
