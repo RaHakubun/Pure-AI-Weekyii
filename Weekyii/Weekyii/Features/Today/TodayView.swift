@@ -384,11 +384,7 @@ struct TodayView: View {
                 ThemeStatusArtwork(theme: userSettings.selectedTheme)
                     .frame(maxWidth: .infinity)
                     .frame(height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
-                    )
+                    .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
                 Text(formatDate(day.dayId))

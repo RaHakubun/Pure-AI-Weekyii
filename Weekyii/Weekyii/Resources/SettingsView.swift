@@ -542,7 +542,7 @@ struct SettingsView: View {
             Section {
                 ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
                     .frame(height: 112)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .themeArtworkFrame(cornerRadius: 14, hairline: false)
             } header: {
                 Text("当前主题")
             } footer: {
@@ -3391,11 +3391,7 @@ private struct AboutWeekyiiPage: View {
             ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
                 .frame(maxWidth: .infinity)
                 .frame(height: 168)
-                .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                        .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
-                )
+                .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
             VStack(spacing: WeekSpacing.xs) {
                 Text(verbatim: "Weekyii")
