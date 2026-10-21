@@ -1590,7 +1590,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .today ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .today ? .weekyiiOnPrimary : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1608,7 +1608,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .week ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .week ? .weekyiiOnPrimary : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1660,8 +1660,8 @@ private struct SectionToggleView: View {
                             .offset(x: indicatorX + 2, y: 3)
                     )
                     // 阴影
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
             }
         )
         .background(

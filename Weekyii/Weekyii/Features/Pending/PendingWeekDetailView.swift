@@ -277,14 +277,14 @@ struct PendingWeekDetailView: View {
             VStack(spacing: WeekSpacing.xxs) {
                 Text(weekdaySymbol(for: day.date))
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .textPrimary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textPrimary)
 
                 Text(Self.monthDayFormatter.string(from: day.date))
                     .font(.caption)
-                    .foregroundColor(isSelected ? .white : .textSecondary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textSecondary)
 
                 Circle()
-                    .fill(hasAnyTasks ? (isSelected ? .white : .taskDDL) : .clear)
+                    .fill(hasAnyTasks ? (isSelected ? .weekyiiOnPrimary : .taskDDL) : .clear)
                     .frame(width: 6, height: 6)
             }
             .frame(width: 60, height: 70)

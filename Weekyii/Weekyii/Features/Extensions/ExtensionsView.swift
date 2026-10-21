@@ -139,7 +139,7 @@ struct ExtensionsView: View {
                 Text(tab.title)
                     .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundColor(selectedTab == tab ? .white : .textSecondary)
+            .foregroundColor(selectedTab == tab ? .weekyiiOnPrimary : .textSecondary)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(
@@ -197,7 +197,7 @@ struct ExtensionsView: View {
                             .padding(.vertical, WeekSpacing.md)
                             .background(Color.weekyiiGradient)
                             .clipShape(Capsule())
-                            .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
+                            .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .padding(.bottom, WeekSpacing.lg)
@@ -260,7 +260,7 @@ struct ExtensionsView: View {
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.weekyiiGradient)
                     .clipShape(Capsule())
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -328,7 +328,7 @@ private struct ProjectInlineCard: View {
                     }
             }
         }
-        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .weekSoftShadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         // Entry animation
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 12)

@@ -615,7 +615,7 @@ private struct SuspendedTasksFullView: View {
         .padding(.vertical, WeekSpacing.md)
         .background(Color.suspendedModuleGradient)
         .clipShape(Capsule())
-        .shadow(color: Color.suspendedModuleTint.opacity(0.25), radius: 6, x: 0, y: 3)
+        .weekSoftShadow(color: Color.suspendedModuleTint.opacity(0.25), radius: 6, x: 0, y: 3)
         .accessibilityIdentifier("suspendedFooterCreateButton")
         .padding(.top, WeekSpacing.md)
         .padding(.bottom, WeekSpacing.xl)
@@ -2343,7 +2343,7 @@ private struct ProjectsFullView: View {
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.weekyiiGradient)
                     .clipShape(Capsule())
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .accessibilityIdentifier("projectsEmptyCreateButton")
                 .buttonStyle(ScaleButtonStyle())
@@ -2404,7 +2404,7 @@ private struct ProjectMetroTileView: View {
             RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                 .stroke(isEditing ? tileInk.opacity(0.18) : tileInk.opacity(0.10), lineWidth: isEditing ? 1.5 : 1)
         )
-        .shadow(
+        .weekSoftShadow(
             color: .black.opacity(isDragging ? 0.16 : 0.10),
             radius: isDragging ? 8 : 5,
             x: 0,

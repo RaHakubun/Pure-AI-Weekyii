@@ -268,7 +268,7 @@ struct HabitsFullView: View {
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.accentGreen)
                     .clipShape(Capsule())
-                    .shadow(color: Color.accentGreen.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.accentGreen.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .accessibilityIdentifier("habitsEmptyCreateButton")
                 .buttonStyle(ScaleButtonStyle())

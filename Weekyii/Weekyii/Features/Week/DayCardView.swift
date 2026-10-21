@@ -15,6 +15,6 @@ struct DayCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.scaled(12), style: .continuous))
     }
 }

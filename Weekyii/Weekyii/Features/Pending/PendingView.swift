@@ -323,19 +323,7 @@ struct PendingView: View {
     private func pendingMonthSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(WeekSpacing.base)
-            .background(Color.backgroundSecondary)
-            .clipShape(.rect(cornerRadius: WeekRadius.xlarge))
-            .overlay {
-                RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous)
-                    .stroke(Color.backgroundTertiary.opacity(0.55), lineWidth: 0.75)
-                    .allowsHitTesting(false)
-            }
-            .shadow(
-                color: WeekShadow.light.color,
-                radius: 14,
-                x: 0,
-                y: 5
-            )
+            .weekPageSurface()
     }
 
     private var selectedDayDetailCard: some View {
@@ -884,7 +872,7 @@ private struct PendingMonthCalendarView: View {
                 .opacity(hasVisibleMarker ? 1 : 0)
             }
             .frame(maxWidth: .infinity)
-            .shadow(
+            .weekSoftShadow(
                 color: isSelected ? Color.weekyiiPrimary.opacity(0.18) : Color.clear,
                 radius: 6,
                 y: 3
@@ -1000,7 +988,7 @@ private struct PendingMonthCalendarView: View {
             return .textTertiary.opacity(0.55)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary

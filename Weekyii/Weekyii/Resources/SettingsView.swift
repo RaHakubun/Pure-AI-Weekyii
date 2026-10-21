@@ -759,7 +759,7 @@ struct SettingsView: View {
                 // The icon is the real calendar glyph, so users recognise it on sight.
                 mark()
                     .frame(width: 28, height: 28)
-                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(7), style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                     Text(subtitle)
@@ -1324,7 +1324,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.weekyiiPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color.weekyiiPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(10)))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("两种模式都遵守")
@@ -1486,7 +1486,7 @@ struct SettingsView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(definition.color, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(definition.color, in: RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(definition.name)
@@ -2339,7 +2339,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 54, height: 54)
-                            .background(Color(hex: colorHex), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .background(Color(hex: colorHex), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(15), style: .continuous))
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(normalizedName.isEmpty ? "新任务类型" : normalizedName)
@@ -2746,7 +2746,7 @@ private struct ProjectSettingsView: View {
                             .frame(width: 38, height: 38)
                             .background(
                                 isSelected ? defaultColorSwatch : defaultColorAccent.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: WeekRadius.scaled(10), style: .continuous)
                             )
                     }
                     .buttonStyle(.plain)
@@ -3003,13 +3003,13 @@ private struct ExecutionModeOptionCard: View {
         .frame(maxWidth: .infinity, minHeight: 246, alignment: .topLeading)
         .background(
             isSelected ? accentColor.opacity(0.12) : Color.backgroundSecondary,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            in: RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous)
                 .stroke(isSelected ? accentColor : Color.backgroundTertiary, lineWidth: isSelected ? 2 : 1)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous))
     }
 }
 
@@ -3097,7 +3097,7 @@ struct SettingsIcon: View {
             .foregroundColor(.white)
             .frame(width: 28, height: 28)
             .background(color)
-            .cornerRadius(7)
+            .cornerRadius(WeekRadius.scaled(7))
     }
 }
 
@@ -3478,7 +3478,7 @@ private struct AboutWeekyiiPage: View {
     private func weeksCard(_ stats: AboutWeekyiiStats) -> some View {
         WeekCard {
             HStack(spacing: WeekSpacing.md) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(12), style: .continuous)
                     .fill(Color.taskRegularBg)
                     .frame(width: 44, height: 44)
                     .overlay(
@@ -3738,7 +3738,7 @@ private struct AboutDayDot: View {
                         )
                     )
                     .frame(width: 30, height: 30)
-                    .shadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
+                    .weekSoftShadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
                 Image(systemName: "flame.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(.white)
@@ -3781,7 +3781,7 @@ private struct AboutStatTile<Icon: View>: View {
                         .frame(width: 32, height: 32)
                         .frame(width: 40, height: 40)
                     } else {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        RoundedRectangle(cornerRadius: WeekRadius.scaled(11), style: .continuous)
                             .fill(tint.opacity(0.14))
                             .frame(width: 40, height: 40)
                             .overlay(
@@ -3820,7 +3820,7 @@ private struct AboutSealItem: View {
             ZStack {
                 AboutSealShape()
                     .fill(LinearGradient(colors: [light, dark], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: dark.opacity(0.28), radius: 5, x: 0, y: 3)
+                    .weekSoftShadow(color: dark.opacity(0.28), radius: 5, x: 0, y: 3)
                 Circle()
                     .stroke(Color.white.opacity(0.45), lineWidth: 1)
                     .padding(11)
@@ -4128,7 +4128,7 @@ private struct AboutGuidePath: View {
                                 .font(.system(size: 24))
                                 .foregroundStyle(.white)
                         )
-                        .shadow(color: step.tint.opacity(0.25), radius: 6, x: 0, y: 3)
+                        .weekSoftShadow(color: step.tint.opacity(0.25), radius: 6, x: 0, y: 3)
                         .frame(width: nodeSize, height: nodeSize)
                         .position(center)
                         .accessibilityHidden(true)

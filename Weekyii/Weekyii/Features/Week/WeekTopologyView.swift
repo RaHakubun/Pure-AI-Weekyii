@@ -433,9 +433,9 @@ struct WeekTopologyView: View {
                 height: WeekTopologyMetrics.groupCardHeight,
                 alignment: .leading
             )
-            .background(kind.color.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(kind.color.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(10), style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(10), style: .continuous)
                     .stroke(kind.color.opacity(selected ? 0.95 : 0.45), lineWidth: selected ? 2 : 1)
             )
         }
@@ -467,9 +467,9 @@ struct WeekTopologyView: View {
                 height: WeekTopologyMetrics.taskCardHeight,
                 alignment: .leading
             )
-            .background(taskType.color.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(taskType.color.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous)
                     .stroke(selected ? Color.weekyiiPrimary : taskType.color.opacity(0.52), lineWidth: selected ? 2 : 1)
             )
         }
@@ -496,9 +496,9 @@ struct WeekTopologyView: View {
                 width: WeekTopologyMetrics.forgottenCardWidth,
                 height: WeekTopologyMetrics.forgottenCardHeight
             )
-            .background(Color.taskDDL.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(Color.taskDDL.opacity(selected ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous)
                     .stroke(Color.taskDDL.opacity(selected ? 0.95 : 0.52), lineWidth: selected ? 2 : 1)
             )
         }
@@ -912,9 +912,9 @@ private struct WeekTopologyRootNode: View {
                 ? WeekTopologyMetrics.rootNodeCompactHeight
                 : WeekTopologyMetrics.rootNodeExpandedHeight
         )
-        .background(Color.textPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.textPrimary, in: RoundedRectangle(cornerRadius: WeekRadius.scaled(12), style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: WeekRadius.scaled(12), style: .continuous)
                 .stroke(isSelected ? Color.weekyiiPrimary : Color.textPrimary.opacity(0.6), lineWidth: isSelected ? 3 : 1)
         )
         .overlay(alignment: .top) {
@@ -939,7 +939,7 @@ private struct WeekTopologyDayNode: View {
     var body: some View {
         ZStack {
             if day.focusTask != nil {
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(13), style: .continuous)
                     .stroke(Color.weekyiiPrimary.opacity(0.28), lineWidth: 2)
                     .frame(width: cardWidth + 8, height: cardHeight + 8)
                     .scaleEffect(pulse ? 1.14 : 0.94)
@@ -991,15 +991,15 @@ private struct WeekTopologyDayNode: View {
             }
             .background(
                 day.totalCount > 0 ? day.status.color.opacity(0.09) : Color.backgroundPrimary,
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                in: RoundedRectangle(cornerRadius: WeekRadius.scaled(11), style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(11), style: .continuous)
                     .stroke(isSelected ? Color.weekyiiPrimary : day.status.color.opacity(0.42), lineWidth: isSelected ? 2.5 : 1)
             )
             .overlay {
                 if isToday {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    RoundedRectangle(cornerRadius: WeekRadius.scaled(11), style: .continuous)
                         .stroke(Color.accentOrange.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
                 }
             }

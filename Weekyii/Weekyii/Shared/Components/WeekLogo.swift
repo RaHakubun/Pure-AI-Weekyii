@@ -36,7 +36,7 @@ struct WeekLogo: View {
                     endPoint: .trailing
                 )
             )
-            .shadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
+            .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
                 animated ? .easeInOut(duration: 2.0).repeatForever(autoreverses: true) : .default,

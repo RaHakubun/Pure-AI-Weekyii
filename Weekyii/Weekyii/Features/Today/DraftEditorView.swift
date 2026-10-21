@@ -107,7 +107,7 @@ struct DraftEditorView: View {
                 Circle()
                     .fill(stateColor)
                     .frame(width: 36, height: 36)
-                    .shadow(
+                    .weekSoftShadow(
                         color: stateColor.opacity(0.28),
                         radius: 4,
                         y: 2
@@ -285,7 +285,7 @@ struct DraftEditorView: View {
                     Circle()
                         .fill(isEnabled ? Color.weekyiiPrimary : Color.textSecondary.opacity(0.55))
                 )
-                .shadow(
+                .weekSoftShadow(
                     color: (isEnabled ? Color.weekyiiPrimary : Color.textSecondary).opacity(0.22),
                     radius: 4,
                     y: 2
