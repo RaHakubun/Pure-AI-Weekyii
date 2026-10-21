@@ -1457,6 +1457,49 @@ final class StateMachineTests: XCTestCase {
     }
 
     @MainActor
+    func test_repairKeepsQueueOrderWhenFirstQueuedTaskAlreadyMatches() throws {
+        let (day, _) = try makeExecutingToday(mode: .flexible, frozenTitles: ["Second", "Third", "Fourth"])
+        // Stale focus order (2) plus a queue numbered from 2 is what a reorder right
+        // after completing the focus used to leave behind.
+        let focus = try XCTUnwrap(day.focusTask)
+        focus.order = 2
+        let queue = day.frozenTasks
+        queue[0].order = 2
+        queue[1].order = 3
+        queue[2].order = 5
+        try container.mainContext.save()
+
+        _ = DataInvariantRepairService(modelContainer: container).repair(referenceDate: Date())
+
+        XCTAssertEqual(day.focusTask?.order, 1)
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Second", "Third", "Fourth"])
+        XCTAssertEqual(day.frozenTasks.map(\.order), [2, 3, 4])
+    }
+
+    @MainActor
+    func test_reorderAfterDoneFocusSurvivesRepeatedRepair() throws {
+        let (day, viewModel) = try makeExecutingToday(mode: .flexible, frozenTitles: ["Second", "Third", "Fourth"])
+        try viewModel.setDraftZoneUnlocked(true)
+
+        try viewModel.doneFocus()
+        XCTAssertEqual(day.focusTask?.title, "Second")
+        XCTAssertEqual(day.focusTask?.order, 1)
+        XCTAssertEqual(day.frozenTasks.map(\.order), [2, 3])
+
+        try viewModel.moveExecutionTasks(from: IndexSet(integer: 1), to: 0)
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Fourth", "Third"])
+
+        let repair = DataInvariantRepairService(modelContainer: container)
+        _ = repair.repair(referenceDate: Date())
+        _ = repair.repair(referenceDate: Date())
+
+        XCTAssertEqual(day.focusTask?.title, "Second")
+        XCTAssertEqual(day.focusTask?.order, 1)
+        XCTAssertEqual(day.frozenTasks.map(\.title), ["Fourth", "Third"])
+        XCTAssertEqual(day.frozenTasks.map(\.order), [2, 3])
+    }
+
+    @MainActor
     func test_exchangeFocusWithFirstDraftResetsTimingAndPreservesUnlock() throws {
         let now = Date().startOfDay.addingTimeInterval(12 * 60 * 60)
         let timeProvider = MutableTimeProvider(mockDate: now)
