@@ -99,7 +99,7 @@ struct VIPServiceView: View {
         case .lifetime:
             return String(localized: "vip.status.lifetime", defaultValue: "VIP 永久版 · 已开通")
         case .subscription:
-            let plan = access.product.map(Self.planName) ?? ""
+            let plan = access.product.map { Self.planName($0) } ?? ""
             return String(format: String(localized: "vip.status.subscription", defaultValue: "%@ VIP · 已开通"), plan)
         case .none:
             return access.hasExpiredSubscription
@@ -143,7 +143,7 @@ struct VIPServiceView: View {
                     if purchases.purchasingProduct == WeekyiiProduct.trialProduct {
                         ProgressView().tint(.white)
                     } else {
-                        Text(String(format: String(localized: "vip.trial.cta", defaultValue: "免费试用 %d 天"), WeekyiiProduct.trialDays))
+                        Text(String(format: String(localized: "vip.trial.cta", defaultValue: "免费试用 %d 天"), trialDays))
                             .font(.headline)
                     }
                     Spacer()
@@ -160,17 +160,18 @@ struct VIPServiceView: View {
         }
     }
 
+    /// Only read while `showsTrialOffer` is true, which guarantees StoreKit's value.
+    private var trialDays: Int {
+        purchases.trialDays ?? WeekyiiProduct.trialDays
+    }
+
     private var trialFooter: String {
-        if let yearly = purchases.products[.yearly] {
-            return String(
-                format: String(localized: "vip.trial.footer", defaultValue: "试用 %1$d 天，结束后按 %2$@/年 自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"),
-                WeekyiiProduct.trialDays,
-                yearly.displayPrice
-            )
-        }
+        // `showsTrialOffer` guarantees the yearly product is loaded.
+        let price = purchases.products[.yearly]?.displayPrice ?? ""
         return String(
-            format: String(localized: "vip.trial.footer.noprice", defaultValue: "试用 %d 天，结束后按年度订阅自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"),
-            WeekyiiProduct.trialDays
+            format: String(localized: "vip.trial.footer", defaultValue: "试用 %1$d 天，结束后按 %2$@/年 自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"),
+            trialDays,
+            price
         )
     }
 
@@ -189,7 +190,7 @@ struct VIPServiceView: View {
                 .flexibleMode,
                 icon: "arrow.triangle.2.circlepath",
                 tint: .weekyiiPrimary,
-                title: ExecutionMode.flexible.displayName,
+                title: String(localized: "vip.feature.flexible.title", defaultValue: "灵动模式"),
                 detail: String(localized: "vip.feature.flexible.detail", defaultValue: "开始后仍只专注一件事，但可以主动解冻今日队列，增改、排序和交换任务。")
             )
             featureRow(
@@ -199,7 +200,7 @@ struct VIPServiceView: View {
                 title: String(localized: "vip.feature.themes.title", defaultValue: "VIP 主题"),
                 detail: String(
                     format: String(localized: "vip.feature.themes.detail", defaultValue: "%@，每套主题都有独立的色彩、形态与印象画，小组件和灵动岛同步生效。"),
-                    WeekTheme.vipThemes.map(\.displayName).joined(separator: "、")
+                    ListFormatter.localizedString(byJoining: WeekTheme.vipThemes.map(\.displayName))
                 )
             )
         } header: {
@@ -329,7 +330,7 @@ struct VIPServiceView: View {
         case .monthly:
             parts.append(String(localized: "vip.plan.monthly.detail", defaultValue: "随用随停，最灵活"))
         case .yearly where purchases.showsTrialOffer:
-            parts.append(String(format: String(localized: "vip.plan.yearly.trial", defaultValue: "含 %d 天免费试用"), WeekyiiProduct.trialDays))
+            parts.append(String(format: String(localized: "vip.plan.yearly.trial", defaultValue: "含 %d 天免费试用"), trialDays))
         case .lifetime:
             parts.append(String(localized: "vip.plan.lifetime.detail", defaultValue: "一次买断，永久使用，不自动续费"))
         default:
@@ -361,9 +362,9 @@ struct VIPServiceView: View {
         }
         var notes: [String] = []
         if let yearly = pricing(.yearly), let perMonth = yearly.perMonthText, let savings = yearly.savingsPercent {
-            notes.append(String(format: String(localized: "vip.pricing.yearly", defaultValue: "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。首次订阅可先免费试用 14 天。"), yearly.displayPrice, perMonth, savings))
+            notes.append(String(format: String(localized: "vip.pricing.yearly", defaultValue: "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。"), yearly.displayPrice, perMonth, savings))
         } else {
-            notes.append(String(localized: "vip.pricing.yearly.noprice", defaultValue: "年度：最划算的订阅，首次订阅可先免费试用 14 天。"))
+            notes.append(String(localized: "vip.pricing.yearly.noprice", defaultValue: "年度：最划算的订阅。"))
         }
         if let quarterly = pricing(.quarterly), let perMonth = quarterly.perMonthText, let savings = quarterly.savingsPercent {
             notes.append(String(format: String(localized: "vip.pricing.quarterly", defaultValue: "季度 %1$@：折合每月 %2$@，比按月付省 %3$d%%，适合想先用一段时间再决定的人。"), quarterly.displayPrice, perMonth, savings))
@@ -385,7 +386,9 @@ struct VIPServiceView: View {
             notes.append(String(localized: "vip.pricing.lifetime.noprice", defaultValue: "永久：一次付费，永久使用全部 VIP 功能，之后不再扣费。"))
         }
         notes.append(String(localized: "vip.pricing.same_features", defaultValue: "四种方案包含的功能完全相同，区别只在付费方式。"))
-        notes.append(String(localized: "vip.pricing.trial_rule", defaultValue: "免费试用只适用于订阅，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后自动转为年度订阅。永久版不提供试用。"))
+        if let days = purchases.trialDays, let yearly = products[.yearly] {
+            notes.append(String(format: String(localized: "vip.pricing.trial_rule", defaultValue: "首次订阅年度可免费试用 %1$d 天，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后按 %2$@/年 自动续费。永久版不提供试用。"), days, yearly.displayPrice))
+        }
         notes.append(String(localized: "vip.pricing.switch", defaultValue: "订阅期间更换方案，由 App Store 按剩余时间自动处理，不会重复扣费。"))
         return notes
     }

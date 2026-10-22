@@ -37,9 +37,9 @@ enum ExecutionMode: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .strict:
-            return "严格模式"
+            return String(localized: "execution.mode.strict", defaultValue: "严格模式")
         case .flexible:
-            return "灵动模式"
+            return String(localized: "execution.mode.flexible", defaultValue: "灵动模式")
         }
     }
 }

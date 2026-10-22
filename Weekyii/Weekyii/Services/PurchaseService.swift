@@ -202,13 +202,16 @@ final class PurchaseService {
     private(set) var products: [WeekyiiProduct: Product] = [:]
     private(set) var isLoadingProducts = false
     private(set) var productLoadFailed = false
-    private(set) var isTrialEligible = true
+    /// Unknown until StoreKit answers; the paywall never promises a trial before that.
+    private(set) var isTrialEligible = false
     private(set) var purchasingProduct: WeekyiiProduct?
     private(set) var isRestoring = false
     var lastErrorMessage: String?
 
     @ObservationIgnored private weak var settings: UserSettings?
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
+    @ObservationIgnored private var expiryTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshGeneration = 0
     @ObservationIgnored var onAccessChanged: (@MainActor (VIPAccess) async -> Void)?
 
     private init() {}
@@ -222,9 +225,27 @@ final class PurchaseService {
         !theme.requiresVIP || hasVIP
     }
 
-    /// Whether the paywall should lead with "14 days free".
+    /// The free-trial length configured in App Store Connect for the trial plan,
+    /// read from StoreKit; `nil` when the product has no free-trial offer.
+    var trialDays: Int? {
+        guard let offer = products[WeekyiiProduct.trialProduct]?.subscription?.introductoryOffer,
+              offer.paymentMode == .freeTrial else { return nil }
+        let period = offer.period
+        let unitDays: Int
+        switch period.unit {
+        case .day: unitDays = 1
+        case .week: unitDays = 7
+        case .month: unitDays = 30
+        case .year: unitDays = 365
+        @unknown default: return nil
+        }
+        return period.value * unitDays * max(offer.periodCount, 1)
+    }
+
+    /// Only true when every fact is known: access resolved, the trial product loaded
+    /// with a free-trial offer, and StoreKit confirmed this Apple ID is eligible.
     var showsTrialOffer: Bool {
-        !hasVIP && isTrialEligible
+        hasResolvedAccess && !hasVIP && isTrialEligible && trialDays != nil
     }
 
     func start(settings: UserSettings) {
@@ -245,16 +266,42 @@ final class PurchaseService {
     }
 
     func refreshAccess() async {
+        // Concurrent refreshes interleave at `await`; only the newest one may publish,
+        // so a slow, older read can never overwrite a fresh purchase or restore.
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         let resolved = await VIPEntitlementResolver.resolve()
+        guard generation == refreshGeneration else { return }
+
         let changed = resolved != access || !hasResolvedAccess
         access = resolved
         hasResolvedAccess = true
-        if let settings, settings.premiumThemeUnlocked != resolved.isActive {
-            settings.premiumThemeUnlocked = resolved.isActive
+        if let settings {
+            if settings.premiumThemeUnlocked != resolved.isActive {
+                settings.premiumThemeUnlocked = resolved.isActive
+            }
+            if !settings.vipAccessResolved {
+                settings.vipAccessResolved = true
+            }
         }
+        scheduleExpiryCheck(for: resolved)
         await refreshTrialEligibility()
         if changed {
             await onAccessChanged?(resolved)
+        }
+    }
+
+    /// `Transaction.updates` is not guaranteed to fire when a subscription simply
+    /// lapses, so re-check shortly after the known expiration while the app stays open.
+    private func scheduleExpiryCheck(for access: VIPAccess) {
+        expiryTask?.cancel()
+        expiryTask = nil
+        guard access.source == .subscription, let expiration = access.expirationDate else { return }
+        let delay = max(expiration.timeIntervalSinceNow, 0) + 30
+        expiryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.refreshAccess()
         }
     }
 
@@ -337,7 +384,10 @@ final class PurchaseService {
     #endif
 
     private func refreshTrialEligibility() async {
-        guard let subscription = products[WeekyiiProduct.trialProduct]?.subscription else { return }
+        guard let subscription = products[WeekyiiProduct.trialProduct]?.subscription else {
+            isTrialEligible = false
+            return
+        }
         isTrialEligible = await subscription.isEligibleForIntroOffer
     }
 }

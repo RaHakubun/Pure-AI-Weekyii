@@ -1862,7 +1862,7 @@ struct SettingsView: View {
         switch purchaseService.access.source {
         case .none:
             return purchaseService.showsTrialOffer
-                ? String(format: String(localized: "vip.summary.trial", defaultValue: "免费试用 %d 天"), WeekyiiProduct.trialDays)
+                ? String(format: String(localized: "vip.summary.trial", defaultValue: "免费试用 %d 天"), purchaseService.trialDays ?? WeekyiiProduct.trialDays)
                 : String(localized: "vip.summary.inactive", defaultValue: "未开通")
         case .betaTester:
             return String(localized: "vip.summary.beta", defaultValue: "测试版已开通")

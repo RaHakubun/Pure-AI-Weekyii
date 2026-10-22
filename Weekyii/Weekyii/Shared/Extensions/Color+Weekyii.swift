@@ -33,7 +33,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .sunset: return "落日"
         case .mint: return "薄荷"
         case .midnight: return "极夜"
-        case .lotr: return "魔戒"
+        case .lotr: return String(localized: "theme.lotr.name", defaultValue: "魔戒")
         case .brutal: return String(localized: "theme.brutal.name", defaultValue: "粗野")
         case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")

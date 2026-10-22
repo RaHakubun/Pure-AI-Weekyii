@@ -471,6 +471,9 @@ final class AppHealthCoordinator: AppHealthCoordinating {
     private func attemptAutomaticStartIfEligible(canMarkNoTasksAsSkipped: Bool) {
         guard let settings = autoStartSettings,
               settings.autoStartConfiguration.isEnabled else { return }
+        // Flexible mode is VIP: wait for this launch's StoreKit resolution instead of
+        // trusting the persisted mirror. The minute tick retries shortly after.
+        if settings.defaultExecutionMode == .flexible, !settings.vipAccessResolved { return }
 
         let now = timeProvider.now
         let today = WeekyiiTimeZone.calendar.startOfDay(for: now)

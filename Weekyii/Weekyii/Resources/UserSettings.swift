@@ -216,6 +216,10 @@ final class UserSettings: ObservableObject {
     @Published var premiumThemeUnlocked: Bool {
         didSet { save() }
     }
+    /// In-memory only: true once `PurchaseService` has resolved StoreKit at least once
+    /// in this process. Until then the persisted mirror above may be stale, so it may
+    /// only drive theme display (to avoid a launch flicker), never feature decisions.
+    @Published var vipAccessResolved = false
     
     // Developer Settings
     @Published var developerSettingsEnabled: Bool {
@@ -600,7 +604,9 @@ final class UserSettings: ObservableObject {
         set { defaultExecutionModeRaw = newValue.rawValue }
     }
 
-    var hasVIPAccess: Bool { premiumThemeUnlocked }
+    /// VIP access for feature decisions (flexible mode, selecting VIP themes).
+    /// Requires a StoreKit resolution in this launch, not just the persisted mirror.
+    var hasVIPAccess: Bool { premiumThemeUnlocked && vipAccessResolved }
 
     /// The mode a newly started day actually uses. Flexible mode is VIP: without
     /// access the day starts strict, while the stored preference is kept so it
