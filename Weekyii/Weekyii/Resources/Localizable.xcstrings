@@ -1,6 +1,70 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "execution.mode.strict" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strict mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "严格模式"
+          }
+        }
+      }
+    },
+    "execution.mode.flexible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexible mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动模式"
+          }
+        }
+      }
+    },
+    "theme.lotr.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ringbearer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "魔戒"
+          }
+        }
+      }
+    },
+    "vip.feature.flexible.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexible Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动模式"
+          }
+        }
+      }
+    },
     "settings.developer.simulate_vip" : {
       "localizations" : {
         "en" : {
@@ -886,13 +950,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The free trial applies to subscriptions only, once per Apple ID. Cancel during the trial and you won't be charged; otherwise it becomes a yearly subscription. Lifetime has no trial."
+            "value" : "First-time yearly subscribers can try it free for %1$d days, once per Apple ID. Cancel during the trial and you won't be charged; otherwise it renews at %2$@/year. Lifetime has no trial."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "免费试用只适用于订阅，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后自动转为年度订阅。永久版不提供试用。"
+            "value" : "首次订阅年度可免费试用 %1$d 天，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后按 %2$@/年 自动续费。永久版不提供试用。"
           }
         }
       }
@@ -902,13 +966,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yearly %1$@: the best-value subscription, %2$@ per month, %3$d%% less than paying monthly. First-time subscribers get a 14-day free trial."
+            "value" : "Yearly %1$@: the best-value subscription, %2$@ per month, %3$d%% less than paying monthly."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。首次订阅可先免费试用 14 天。"
+            "value" : "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。"
           }
         }
       }
@@ -918,13 +982,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yearly: the best-value subscription. First-time subscribers get a 14-day free trial."
+            "value" : "Yearly: the best-value subscription."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年度：最划算的订阅，首次订阅可先免费试用 14 天。"
+            "value" : "年度：最划算的订阅。"
           }
         }
       }
@@ -1341,22 +1405,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "试用 %1$d 天，结束后按 %2$@/年 自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"
-          }
-        }
-      }
-    },
-    "vip.trial.footer.noprice" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Free for %d days, then renews as a yearly subscription. Cancel anytime during the trial and you won't be charged. One trial per Apple ID."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "试用 %d 天，结束后按年度订阅自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"
           }
         }
       }

@@ -2694,6 +2694,7 @@ final class ModelTests: XCTestCase {
         Self.retainedUserSettings.append(settings)
         settings.defaultExecutionMode = .flexible
         settings.premiumThemeUnlocked = false
+        settings.vipAccessResolved = true
         XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
         XCTAssertEqual(settings.defaultExecutionMode, .flexible)
         settings.premiumThemeUnlocked = true
@@ -2701,6 +2702,20 @@ final class ModelTests: XCTestCase {
         settings.defaultExecutionMode = .strict
         settings.premiumThemeUnlocked = false
         XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+    }
+
+    @MainActor
+    func test_persistedVIPMirrorIsNotTrustedBeforeStoreKitResolves() {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.defaultExecutionMode = .flexible
+        settings.premiumThemeUnlocked = true
+        XCTAssertFalse(settings.vipAccessResolved)
+        XCTAssertFalse(settings.hasVIPAccess)
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+        settings.vipAccessResolved = true
+        XCTAssertTrue(settings.hasVIPAccess)
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .flexible)
     }
 
     @MainActor
