@@ -209,6 +209,10 @@ final class UserSettings: ObservableObject {
     @Published var appearanceModeRaw: String {
         didSet { save() }
     }
+    /// Local display mirror of the resolved VIP access, written only by
+    /// `PurchaseService` (and DEBUG overrides). It unlocks VIP themes and flexible
+    /// mode for display/start decisions and is mirrored to widgets via the App Group.
+    /// It is never an entitlement for iCloud sync and is not restored from archives.
     @Published var premiumThemeUnlocked: Bool {
         didSet { save() }
     }
@@ -594,6 +598,15 @@ final class UserSettings: ObservableObject {
     var defaultExecutionMode: ExecutionMode {
         get { ExecutionMode(rawValue: defaultExecutionModeRaw) ?? .strict }
         set { defaultExecutionModeRaw = newValue.rawValue }
+    }
+
+    var hasVIPAccess: Bool { premiumThemeUnlocked }
+
+    /// The mode a newly started day actually uses. Flexible mode is VIP: without
+    /// access the day starts strict, while the stored preference is kept so it
+    /// returns as soon as VIP is active again. A day already running is never changed.
+    var effectiveDefaultExecutionMode: ExecutionMode {
+        defaultExecutionMode == .flexible && !hasVIPAccess ? .strict : defaultExecutionMode
     }
 
     var defaultProjectTileSize: ProjectTileSize {

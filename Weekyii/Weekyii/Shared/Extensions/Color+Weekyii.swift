@@ -167,9 +167,12 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         WeekThemePalettePair.forTheme(self)
     }
 
+    /// `premiumThemeUnlocked` mirrors the resolved VIP access (written only by
+    /// `PurchaseService`). A locked VIP theme falls back to amber for display while
+    /// the user's stored choice is kept, so renewing restores it automatically.
     static func resolvedTheme(rawValue: String?, premiumThemeUnlocked: Bool) -> WeekTheme {
         let requestedTheme = WeekTheme(rawValue: rawValue ?? "") ?? .amber
-        guard requestedTheme.isPremiumTheme, !premiumThemeUnlocked else {
+        guard requestedTheme.requiresVIP, !premiumThemeUnlocked else {
             return requestedTheme
         }
         return .amber

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E1F000012FA0000100AAA001 /* PurchaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000022FA0000100AAA001 /* PurchaseService.swift */; };
+		E1F000032FA0000100AAA001 /* VIPServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000042FA0000100AAA001 /* VIPServiceView.swift */; };
 		DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */; };
 		C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */; };
 		C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */; };
@@ -193,6 +195,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		E1F000022FA0000100AAA001 /* PurchaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseService.swift; sourceTree = "<group>"; };
+		E1F000042FA0000100AAA001 /* VIPServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VIPServiceView.swift; sourceTree = "<group>"; };
+		E1F000052FA0000100AAA001 /* Weekyii.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Weekyii.storekit; sourceTree = "<group>"; };
 		DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncD1Tests.swift; sourceTree = "<group>"; };
 		C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEntitlementService.swift; sourceTree = "<group>"; };
 		C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncTypes.swift; sourceTree = "<group>"; };
@@ -530,6 +535,8 @@
 				D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */,
 				94982D702F2BB70700CE8621 /* UserSettings.swift */,
 				94982D722F2BB71F00CE8621 /* SettingsView.swift */,
+				E1F000042FA0000100AAA001 /* VIPServiceView.swift */,
+				E1F000052FA0000100AAA001 /* Weekyii.storekit */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -538,6 +545,7 @@
 			isa = PBXGroup;
 			children = (
 				C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */,
+				E1F000022FA0000100AAA001 /* PurchaseService.swift */,
 				C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
 				F8A100022F80000100AAA001 /* DayStartService.swift */,
@@ -898,6 +906,7 @@
 				A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */,
 				A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */,
 				C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */,
+				E1F000012FA0000100AAA001 /* PurchaseService.swift in Sources */,
 				C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */,
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
@@ -917,6 +926,7 @@
 				944E585F2F2B593A00DB2DEE /* NotificationService.swift in Sources */,
 				944E58602F2B593A00DB2DEE /* WeekyiiError.swift in Sources */,
 				94982D732F2BB71F00CE8621 /* SettingsView.swift in Sources */,
+				E1F000032FA0000100AAA001 /* VIPServiceView.swift in Sources */,
 				944E58612F2B593A00DB2DEE /* AppState.swift in Sources */,
 				944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */,
 				944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */,
@@ -1414,6 +1424,173 @@
 			};
 			name = Release;
 		};
+		E1F000102FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WEEKYII_BETA $(inherited)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Beta;
+		};
+		E1F000112FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii App Store CloudKit";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Beta;
+		};
+		E1F000122FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Weekyii.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Weekyii";
+			};
+			name = Beta;
+		};
+		E1F000132FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Weekyii;
+			};
+			name = Beta;
+		};
+		E1F000142FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii Widget App Store";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Beta;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1422,6 +1599,7 @@
 			buildConfigurations = (
 				944E57F02F2B397E00DB2DEE /* Debug */,
 				944E57F12F2B397E00DB2DEE /* Release */,
+				E1F000102FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1431,6 +1609,7 @@
 			buildConfigurations = (
 				944E57F32F2B397E00DB2DEE /* Debug */,
 				944E57F42F2B397E00DB2DEE /* Release */,
+				E1F000112FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1440,6 +1619,7 @@
 			buildConfigurations = (
 				944E57F62F2B397E00DB2DEE /* Debug */,
 				944E57F72F2B397E00DB2DEE /* Release */,
+				E1F000122FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1449,6 +1629,7 @@
 			buildConfigurations = (
 				944E57F92F2B397E00DB2DEE /* Debug */,
 				944E57FA2F2B397E00DB2DEE /* Release */,
+				E1F000132FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1458,6 +1639,7 @@
 			buildConfigurations = (
 				B70000012F90000000AAA001 /* Debug */,
 				B70000022F90000000AAA001 /* Release */,
+				E1F000142FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

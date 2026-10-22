@@ -462,6 +462,25 @@ final class CloudSyncCoordinator {
         await handle(.initialEnable)
     }
 
+    /// Called when the VIP access changes (purchase, renewal, expiry, refund).
+    /// Losing access pauses the session but keeps `cloudSyncRequested`, local data and
+    /// cloud data untouched; regaining it resumes through `.entitlementRestored`.
+    func entitlementDidChange() async {
+        let entitlement = await entitlementProvider.currentState()
+        let wasEntitled = entitlementState == .entitled
+        entitlementState = entitlement
+        guard settings.cloudSyncRequested, localStore != nil else { return }
+        if entitlement == .entitled {
+            var isLocked = false
+            if case .locked = status { isLocked = true }
+            if !wasEntitled || isLocked {
+                await handle(.entitlementRestored)
+            }
+        } else {
+            invalidateSession(status: .locked(entitlement))
+        }
+    }
+
     func syncNow() async {
         guard diagnosticsSnapshot.manualSyncAllowed else { return }
         await handle(.manual)

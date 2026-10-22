@@ -16,6 +16,8 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(CloudSyncCoordinator.self) private var cloudSyncCoordinator
+    @Environment(PurchaseService.self) private var purchaseService
+    @State private var paywallFeature: VIPFeature?
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -52,6 +54,12 @@ struct SettingsView: View {
         }
         .onChange(of: cloudSyncCoordinator.status) { _, _ in
             if isInitialCloudSyncDecisionRequired { showingInitialCloudSyncDecision = true }
+        }
+        .sheet(item: $paywallFeature) { feature in
+            NavigationStack {
+                VIPServiceView(highlightedFeature: feature, showsCloseButton: true)
+            }
+            .environment(purchaseService)
         }
         .onChange(of: reminderSignature) { _, _ in
             rescheduleTodayKillTimeReminderIfNeeded()
@@ -222,6 +230,20 @@ struct SettingsView: View {
 
     private var settingsHome: some View {
         List {
+            Section {
+                NavigationLink {
+                    VIPServiceView()
+                } label: {
+                    SettingsNavigationRow(
+                        title: String(localized: "vip.title", defaultValue: "VIP 服务"),
+                        value: vipStatusSummary,
+                        icon: "crown.fill",
+                        tint: .orange
+                    )
+                }
+                .accessibilityIdentifier("settings.vip")
+            }
+
             Section("个性化") {
                 NavigationLink {
                     appearanceSettingsPage
@@ -550,39 +572,28 @@ struct SettingsView: View {
             }
 
             Section {
-                ForEach(WeekTheme.allCases) { theme in
-                    let isLocked = theme.isPremiumTheme && !settings.premiumThemeUnlocked
-                    Button {
-                        guard canSelect(theme) else { return }
-                        settings.selectedThemeRaw = theme.rawValue
-                    } label: {
-                        HStack(spacing: 12) {
-                            ThemePaletteMark(theme: theme)
-
-                            Text(theme.displayName)
-                                .foregroundStyle(isLocked ? .secondary : .primary)
-
-                            Spacer()
-
-                            if isLocked {
-                                Image(systemName: "lock.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if settings.selectedTheme == theme {
-                                Image(systemName: "checkmark")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLocked)
+                ForEach(WeekTheme.freeThemes) { theme in
+                    themeRow(theme)
                 }
             } header: {
                 Text("主题")
             } footer: {
                 Text("每套主题仍保留独立的色彩与印象画。")
+            }
+
+            Section {
+                ForEach(WeekTheme.vipThemes) { theme in
+                    themeRow(theme)
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Text(String(localized: "settings.theme.vip.header", defaultValue: "VIP 主题"))
+                    VIPBadge()
+                }
+            } footer: {
+                Text(settings.hasVIPAccess
+                     ? String(localized: "settings.theme.vip.footer.unlocked", defaultValue: "VIP 主题拥有独立的视觉语言，小组件和灵动岛同步生效。")
+                     : String(localized: "settings.theme.vip.footer.locked", defaultValue: "开通 VIP 即可使用。到期后会切回琥珀主题，并保留你的选择，续费后自动恢复。"))
             }
 
             Section {
@@ -908,7 +919,13 @@ struct SettingsView: View {
 
             Toggle(isOn: Binding(
                 get: { settings.cloudSyncRequested },
-                set: { requested in Task { await cloudSyncCoordinator.setRequested(requested) } }
+                set: { requested in
+                    if requested, !purchaseService.hasVIP {
+                        paywallFeature = .cloudSync
+                        return
+                    }
+                    Task { await cloudSyncCoordinator.setRequested(requested) }
+                }
             )) {
                 HStack(spacing: 12) {
                     SettingsIcon(icon: "arrow.triangle.2.circlepath.icloud", color: .blue)
@@ -1143,17 +1160,19 @@ struct SettingsView: View {
             }
 
             if settings.developerSettingsEnabled {
+                #if DEBUG
                 Toggle(isOn: Binding(
-                    get: { settings.premiumThemeUnlocked },
-                    set: { settings.premiumThemeUnlocked = $0 }
+                    get: { purchaseService.developerOverrideEnabled },
+                    set: { purchaseService.developerOverrideEnabled = $0 }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
-                        Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
+                        Text(String(localized: "settings.developer.simulate_vip", defaultValue: "模拟 VIP"))
+                        Text(String(localized: "settings.developer.simulate_vip.subtitle", defaultValue: "仅开发版本可见，不代表真实购买状态"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
+                #endif
 
                 Stepper(value: Binding(
                     get: { settings.seedPastWeeks },
@@ -1305,7 +1324,8 @@ struct SettingsView: View {
                     } label: {
                         ExecutionModeOptionCard(
                             mode: mode,
-                            isSelected: displayedExecutionMode == mode
+                            isSelected: displayedExecutionMode == mode,
+                            requiresVIP: mode == .flexible && !settings.hasVIPAccess
                         )
                     }
                     .buttonStyle(.plain)
@@ -1341,6 +1361,9 @@ struct SettingsView: View {
     }
 
     private var executionModeApplicationDescription: String {
+        if settings.defaultExecutionMode == .flexible, !settings.hasVIPAccess {
+            return String(localized: "settings.execution.vip_expired", defaultValue: "VIP 未开通或已到期：今天已开始的任务流不受影响，之后启动的日子使用严格模式。续费后自动恢复灵动模式。")
+        }
         guard let today = todayDayModel() else {
             return "此选择会用于以后每一次启动任务流。"
         }
@@ -1369,6 +1392,10 @@ struct SettingsView: View {
     }
 
     private func applyExecutionMode(_ mode: ExecutionMode) {
+        if mode == .flexible, !settings.hasVIPAccess {
+            paywallFeature = .flexibleMode
+            return
+        }
         // Resolve the clock boundary before deciding whether "today" is still mutable.
         // This prevents a mode tap just after the daily deadline from reviving an expired day.
         _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
@@ -1796,7 +1823,52 @@ struct SettingsView: View {
     }
 
     private func canSelect(_ theme: WeekTheme) -> Bool {
-        !theme.isPremiumTheme || settings.premiumThemeUnlocked
+        !theme.requiresVIP || settings.hasVIPAccess
+    }
+
+    private func themeRow(_ theme: WeekTheme) -> some View {
+        let isLocked = !canSelect(theme)
+        return Button {
+            guard canSelect(theme) else {
+                paywallFeature = .themes
+                return
+            }
+            settings.selectedThemeRaw = theme.rawValue
+        } label: {
+            HStack(spacing: 12) {
+                ThemePaletteMark(theme: theme)
+
+                Text(theme.displayName)
+                    .foregroundStyle(isLocked ? .secondary : .primary)
+
+                Spacer()
+
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if settings.selectedTheme == theme {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var vipStatusSummary: String {
+        switch purchaseService.access.source {
+        case .none:
+            return purchaseService.showsTrialOffer
+                ? String(format: String(localized: "vip.summary.trial", defaultValue: "免费试用 %d 天"), WeekyiiProduct.trialDays)
+                : String(localized: "vip.summary.inactive", defaultValue: "未开通")
+        case .betaTester:
+            return String(localized: "vip.summary.beta", defaultValue: "测试版已开通")
+        default:
+            return String(localized: "vip.summary.active", defaultValue: "已开通")
+        }
     }
 
     private func appearanceDisplayName(for mode: AppearanceMode) -> String {
@@ -2932,6 +3004,7 @@ private struct ProjectSettingsView: View {
 private struct ExecutionModeOptionCard: View {
     let mode: ExecutionMode
     let isSelected: Bool
+    var requiresVIP = false
 
     private var accentColor: Color {
         mode == .strict ? .accentOrange : .weekyiiPrimary
@@ -2976,6 +3049,10 @@ private struct ExecutionModeOptionCard: View {
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+
+                if requiresVIP {
+                    VIPBadge()
+                }
             }
 
             Text(summary)

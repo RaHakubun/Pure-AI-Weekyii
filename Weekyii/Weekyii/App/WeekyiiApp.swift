@@ -514,7 +514,7 @@ final class AppHealthCoordinator: AppHealthCoordinating {
 
         do {
             try DayStartService(modelContext: modelContainer.mainContext, appState: appState)
-                .start(day: day, at: startTime, executionMode: settings.defaultExecutionMode)
+                .start(day: day, at: startTime, executionMode: settings.effectiveDefaultExecutionMode)
         } catch {
             recordAutoStartFailure("启动托管未能启动今日任务：\(error.localizedDescription)")
         }
@@ -603,7 +603,18 @@ struct WeekyiiApp: App {
         _appState = StateObject(wrappedValue: appState)
         let userSettings = UserSettings()
         _userSettings = StateObject(wrappedValue: userSettings)
-        _cloudSyncCoordinator = State(initialValue: CloudSyncCoordinator(settings: userSettings))
+        let cloudSyncCoordinator = CloudSyncCoordinator(
+            settings: userSettings,
+            entitlementProvider: StoreKitCloudSyncEntitlementProvider()
+        )
+        _cloudSyncCoordinator = State(initialValue: cloudSyncCoordinator)
+        if !Self.isRunningTests {
+            let purchaseService = PurchaseService.shared
+            purchaseService.onAccessChanged = { _ in
+                await cloudSyncCoordinator.entitlementDidChange()
+            }
+            purchaseService.start(settings: userSettings)
+        }
         if !Self.isUITesting && !Self.isRunningTests {
             Self.registerLiveActivityIntentBridge(appState: appState, userSettings: userSettings)
         }
@@ -643,6 +654,7 @@ struct WeekyiiApp: App {
                     .environmentObject(appState)
                     .environmentObject(userSettings)
                     .environment(cloudSyncCoordinator)
+                    .environment(PurchaseService.shared)
                     .modelContainer(modelContainer)
                     .preferredColorScheme(userSettings.effectiveColorScheme)
                     // Personalised themes restyle every SF Symbol at once via the
@@ -681,6 +693,7 @@ struct WeekyiiApp: App {
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
+                            Task { await PurchaseService.shared.refreshAccess() }
                             Task { await cloudSyncCoordinator.handle(.sceneActive) }
                             _ = appHealthCoordinator?.reconcile(trigger: .sceneActive, force: false)
                             refreshWidgetSnapshot(modelContainer: modelContainer)

@@ -207,6 +207,8 @@ final class StateMachineTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         let settings = UserSettings(defaults: defaults)
         settings.defaultExecutionMode = executionMode
+        // Flexible mode is VIP; these tests exercise the mode itself, so grant access.
+        settings.premiumThemeUnlocked = executionMode == .flexible
         return settings
     }
 

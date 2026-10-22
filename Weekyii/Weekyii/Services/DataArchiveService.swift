@@ -385,7 +385,8 @@ enum WeekyiiDataArchiveService {
         settings.fixedReminderEnabled = value.fixedReminderEnabled; settings.fixedReminderHour = value.fixedReminderHour; settings.fixedReminderMinute = value.fixedReminderMinute
         settings.weekStartsOnMonday = value.weekStartsOnMonday; settings.defaultProjectDurationDays = value.defaultProjectDurationDays; settings.defaultProjectTileSizeRaw = value.defaultProjectTileSizeRaw
         settings.pendingMonthShowRegular = value.pendingMonthShowRegular; settings.pendingMonthShowDDL = value.pendingMonthShowDDL; settings.pendingMonthShowLeisure = value.pendingMonthShowLeisure
-        settings.selectedThemeRaw = value.selectedThemeRaw; settings.appearanceModeRaw = value.appearanceModeRaw; settings.premiumThemeUnlocked = value.premiumThemeUnlocked
+        settings.selectedThemeRaw = value.selectedThemeRaw; settings.appearanceModeRaw = value.appearanceModeRaw
+        // `premiumThemeUnlocked` is deliberately not restored: VIP access comes only from StoreKit.
         settings.restoreAutoStartConfiguration(
             isEnabled: value.autoStartEnabled ?? false,
             hour: value.autoStartHour ?? 9,
