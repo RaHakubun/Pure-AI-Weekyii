@@ -1,6 +1,1366 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "settings.developer.simulate_vip" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simulate VIP"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模拟 VIP"
+          }
+        }
+      }
+    },
+    "settings.developer.simulate_vip.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Development builds only; not a real purchase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅开发版本可见，不代表真实购买状态"
+          }
+        }
+      }
+    },
+    "settings.execution.vip_expired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP is not active: a day already running is unaffected, and days you start later use Strict mode. Flexible mode comes back when you renew."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 未开通或已到期：今天已开始的任务流不受影响，之后启动的日子使用严格模式。续费后自动恢复灵动模式。"
+          }
+        }
+      }
+    },
+    "settings.theme.vip.footer.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available with VIP. When VIP ends, the app switches back to Amber and keeps your choice, restoring it when you renew."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通 VIP 即可使用。到期后会切回琥珀主题，并保留你的选择，续费后自动恢复。"
+          }
+        }
+      }
+    },
+    "settings.theme.vip.footer.unlocked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP themes have their own visual language, applied to widgets and the Dynamic Island too."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 主题拥有独立的视觉语言，小组件和灵动岛同步生效。"
+          }
+        }
+      }
+    },
+    "settings.theme.vip.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 主题"
+          }
+        }
+      }
+    },
+    "vip.close" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "vip.error.products_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't reach the App Store right now. Please try again later."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时无法连接 App Store，请稍后再试。"
+          }
+        }
+      }
+    },
+    "vip.error.verification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The purchase could not be verified, so VIP was not activated."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购买凭证校验失败，未开通 VIP。"
+          }
+        }
+      }
+    },
+    "vip.expiry.cloud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync: paused. Nothing on this device or in iCloud is deleted or changed, and syncing resumes where it stopped when you renew."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步：暂停同步。本机和 iCloud 中的数据都不会被删除或修改，续费后从暂停处继续同步。"
+          }
+        }
+      }
+    },
+    "vip.expiry.flexible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexible mode: a day already running is unaffected; days you start later use Strict mode, and your preference is kept."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动模式：当天已开始的任务流不受影响；之后启动的日子使用严格模式，你的偏好会保留。"
+          }
+        }
+      }
+    },
+    "vip.expiry.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When VIP Ends"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期后会怎样"
+          }
+        }
+      }
+    },
+    "vip.expiry.themes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP themes: the app, widgets and Dynamic Island switch back to Amber. Your chosen theme is kept and returns when you renew."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 主题：界面、小组件和灵动岛切回琥珀主题，你选的主题会保留，续费后自动恢复。"
+          }
+        }
+      }
+    },
+    "vip.feature.cloud.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync weeks, tasks, projects and habits between your iPhone and iPad. Your data stays in your own iCloud."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你的 iPhone 和 iPad 之间同步周计划、任务、项目与习惯。数据存放在你自己的 iCloud 中。"
+          }
+        }
+      }
+    },
+    "vip.feature.cloud.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步"
+          }
+        }
+      }
+    },
+    "vip.feature.flexible.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Still one focus at a time, but you can unfreeze today's queue to add, edit, reorder and swap tasks."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始后仍只专注一件事，但可以主动解冻今日队列，增改、排序和交换任务。"
+          }
+        }
+      }
+    },
+    "vip.feature.themes.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — each with its own colors, shapes and artwork, also applied to widgets and the Dynamic Island."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，每套主题都有独立的色彩、形态与印象画，小组件和灵动岛同步生效。"
+          }
+        }
+      }
+    },
+    "vip.feature.themes.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 主题"
+          }
+        }
+      }
+    },
+    "vip.features.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything else stays free forever: weekly plans and today's tasks, Strict mode, Dynamic Island and Live Activities, Home and Lock Screen widgets, data export and restore, and more."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其余功能永久免费：周计划与今日任务、严格模式、灵动岛与实时活动、桌面和锁屏小组件、数据导出与恢复等。"
+          }
+        }
+      }
+    },
+    "vip.features.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Includes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 包含"
+          }
+        }
+      }
+    },
+    "vip.legal.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coming soon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将提供"
+          }
+        }
+      }
+    },
+    "vip.legal.privacy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私政策"
+          }
+        }
+      }
+    },
+    "vip.legal.terms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terms of Use"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户协议"
+          }
+        }
+      }
+    },
+    "vip.locked.cloud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is a VIP feature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步是 VIP 功能"
+          }
+        }
+      }
+    },
+    "vip.locked.flexible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexible mode is a VIP feature"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动模式是 VIP 功能"
+          }
+        }
+      }
+    },
+    "vip.locked.themes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is a VIP theme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这套主题是 VIP 主题"
+          }
+        }
+      }
+    },
+    "vip.manage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Subscription"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理订阅"
+          }
+        }
+      }
+    },
+    "vip.period.month" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "per month"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月"
+          }
+        }
+      }
+    },
+    "vip.period.once" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "one-time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次性"
+          }
+        }
+      }
+    },
+    "vip.period.quarter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "every 3 months"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 3 个月"
+          }
+        }
+      }
+    },
+    "vip.period.year" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "per year"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每年"
+          }
+        }
+      }
+    },
+    "vip.plan.lifetime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifetime"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久"
+          }
+        }
+      }
+    },
+    "vip.plan.lifetime.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pay once, use forever, never renews"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次买断，永久使用，不自动续费"
+          }
+        }
+      }
+    },
+    "vip.plan.monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月度"
+          }
+        }
+      }
+    },
+    "vip.plan.monthly.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel anytime, most flexible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随用随停，最灵活"
+          }
+        }
+      }
+    },
+    "vip.plan.per_month" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ per month"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折合每月 %@"
+          }
+        }
+      }
+    },
+    "vip.plan.quarterly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarterly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "季度"
+          }
+        }
+      }
+    },
+    "vip.plan.recommended" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Best value"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
+          }
+        }
+      }
+    },
+    "vip.plan.savings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save %d%% vs monthly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比按月省 %d%%"
+          }
+        }
+      }
+    },
+    "vip.plan.yearly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yearly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年度"
+          }
+        }
+      }
+    },
+    "vip.plan.yearly.trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includes a %d-day free trial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含 %d 天免费试用"
+          }
+        }
+      }
+    },
+    "vip.plans.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prices are shown in your local App Store currency and may differ between countries and regions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "价格以 App Store 显示的当地货币为准，不同国家和地区的价格可能不同。"
+          }
+        }
+      }
+    },
+    "vip.plans.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a Plan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择方案"
+          }
+        }
+      }
+    },
+    "vip.plans.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading prices…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在获取价格…"
+          }
+        }
+      }
+    },
+    "vip.plans.retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload Prices"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新获取价格"
+          }
+        }
+      }
+    },
+    "vip.pricing.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About Pricing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定价说明"
+          }
+        }
+      }
+    },
+    "vip.pricing.lifetime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifetime %1$@: pay once and keep every VIP feature forever — about %2$@ years of the yearly plan, with no further charges."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久 %1$@：一次付费，永久使用全部 VIP 功能，约等于 %2$@ 年的年度订阅，之后不再扣费。"
+          }
+        }
+      }
+    },
+    "vip.pricing.lifetime.noprice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifetime: pay once and keep every VIP feature forever, with no further charges."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久：一次付费，永久使用全部 VIP 功能，之后不再扣费。"
+          }
+        }
+      }
+    },
+    "vip.pricing.lifetime.noyears" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifetime %@: pay once and keep every VIP feature forever, with no further charges."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久 %@：一次付费，永久使用全部 VIP 功能，之后不再扣费。"
+          }
+        }
+      }
+    },
+    "vip.pricing.monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly %@: billed every month, cancel anytime — the most flexible option."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月度 %@：随用随停，按月扣费，最灵活。"
+          }
+        }
+      }
+    },
+    "vip.pricing.monthly.noprice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly: billed every month, cancel anytime — the most flexible option."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月度：随用随停，按月扣费，最灵活。"
+          }
+        }
+      }
+    },
+    "vip.pricing.quarterly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarterly %1$@: %2$@ per month, %3$d%% less than paying monthly — good if you want to try it for a while first."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "季度 %1$@：折合每月 %2$@，比按月付省 %3$d%%，适合想先用一段时间再决定的人。"
+          }
+        }
+      }
+    },
+    "vip.pricing.quarterly.noprice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarterly: cheaper than paying monthly — good if you want to try it for a while first."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "季度：比按月付更省，适合想先用一段时间再决定的人。"
+          }
+        }
+      }
+    },
+    "vip.pricing.same_features" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All four plans include exactly the same features; only the way you pay differs."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "四种方案包含的功能完全相同，区别只在付费方式。"
+          }
+        }
+      }
+    },
+    "vip.pricing.switch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you change plans during a subscription, the App Store handles the remaining time automatically — you are never charged twice."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅期间更换方案，由 App Store 按剩余时间自动处理，不会重复扣费。"
+          }
+        }
+      }
+    },
+    "vip.pricing.trial_rule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The free trial applies to subscriptions only, once per Apple ID. Cancel during the trial and you won't be charged; otherwise it becomes a yearly subscription. Lifetime has no trial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用只适用于订阅，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后自动转为年度订阅。永久版不提供试用。"
+          }
+        }
+      }
+    },
+    "vip.pricing.yearly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yearly %1$@: the best-value subscription, %2$@ per month, %3$d%% less than paying monthly. First-time subscribers get a 14-day free trial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。首次订阅可先免费试用 14 天。"
+          }
+        }
+      }
+    },
+    "vip.pricing.yearly.noprice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yearly: the best-value subscription. First-time subscribers get a 14-day free trial."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年度：最划算的订阅，首次订阅可先免费试用 14 天。"
+          }
+        }
+      }
+    },
+    "vip.purchase.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your purchase is waiting for approval. VIP will turn on automatically once it's approved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购买正在等待批准，完成后会自动开通。"
+          }
+        }
+      }
+    },
+    "vip.renewal.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Renewal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动续费说明"
+          }
+        }
+      }
+    },
+    "vip.renewal.terms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment is charged to your Apple ID when you confirm the purchase. Subscriptions renew automatically unless auto-renew is turned off at least 24 hours before the end of the current period; renewal is charged within 24 hours before the period ends. You can manage or cancel anytime in iPhone Settings › Apple ID › Subscriptions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认购买后将从你的 Apple ID 账户扣款。订阅会自动续期，除非在当前周期结束前至少 24 小时关闭自动续期；续期费用会在周期结束前 24 小时内扣除。你可以随时在 iPhone 的「设置 › Apple ID › 订阅」中管理或取消订阅。"
+          }
+        }
+      }
+    },
+    "vip.restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Purchases"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复购买"
+          }
+        }
+      }
+    },
+    "vip.restore.none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No purchases to restore were found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有找到可恢复的购买记录。"
+          }
+        }
+      }
+    },
+    "vip.restore.success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP has been restored."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已恢复 VIP。"
+          }
+        }
+      }
+    },
+    "vip.status.beta" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta · VIP Included"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版 · 已自动开通 VIP"
+          }
+        }
+      }
+    },
+    "vip.status.beta.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TestFlight beta builds include every VIP feature at no cost. The App Store version requires a purchase."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TestFlight 测试版可免费使用全部 VIP 功能，不会产生任何费用。正式版需要购买。"
+          }
+        }
+      }
+    },
+    "vip.status.developer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Development · Simulated VIP"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发调试 · 模拟 VIP"
+          }
+        }
+      }
+    },
+    "vip.status.developer.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only appears in development builds and is not a real purchase."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在开发版本中出现，不代表真实购买状态。"
+          }
+        }
+      }
+    },
+    "vip.status.expired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Has Ended"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 已到期"
+          }
+        }
+      }
+    },
+    "vip.status.expired.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is paused and Flexible mode and VIP themes are off. Your data and choices are kept and come back when you renew."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步已暂停，灵动模式和 VIP 主题已停用。你的数据和选择都已保留，续费后自动恢复。"
+          }
+        }
+      }
+    },
+    "vip.status.lifetime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Lifetime · Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 永久版 · 已开通"
+          }
+        }
+      }
+    },
+    "vip.status.lifetime.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased once — every VIP feature is yours forever."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已一次买断，永久使用全部 VIP 功能。"
+          }
+        }
+      }
+    },
+    "vip.status.none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP Not Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未开通 VIP"
+          }
+        }
+      }
+    },
+    "vip.status.none.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get iCloud sync, Flexible mode and every VIP theme."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开通后即可使用 iCloud 同步、灵动模式和全部 VIP 主题。"
+          }
+        }
+      }
+    },
+    "vip.status.subscription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ VIP · Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ VIP · 已开通"
+          }
+        }
+      }
+    },
+    "vip.status.subscription.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current period ends %@ and renews automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前周期至 %@，到期自动续费。"
+          }
+        }
+      }
+    },
+    "vip.status.trial.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial ends %@, then renews automatically. Cancel anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用中，%@ 结束；之后自动续费，可随时取消。"
+          }
+        }
+      }
+    },
+    "vip.summary.active" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已开通"
+          }
+        }
+      }
+    },
+    "vip.summary.beta" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Included in beta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版已开通"
+          }
+        }
+      }
+    },
+    "vip.summary.inactive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未开通"
+          }
+        }
+      }
+    },
+    "vip.summary.trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d days free"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用 %d 天"
+          }
+        }
+      }
+    },
+    "vip.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VIP 服务"
+          }
+        }
+      }
+    },
+    "vip.trial.cta" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Free for %d Days"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用 %d 天"
+          }
+        }
+      }
+    },
+    "vip.trial.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free for %1$d days, then %2$@/year. Cancel anytime during the trial and you won't be charged. One trial per Apple ID."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试用 %1$d 天，结束后按 %2$@/年 自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"
+          }
+        }
+      }
+    },
+    "vip.trial.footer.noprice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free for %d days, then renews as a yearly subscription. Cancel anytime during the trial and you won't be charged. One trial per Apple ID."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试用 %d 天，结束后按年度订阅自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"
+          }
+        }
+      }
+    },
     "" : {
 
     },
@@ -778,13 +2138,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Currently unavailable"
+            "value" : "VIP not active"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前不可用"
+            "value" : "VIP 未开通"
           }
         }
       }
@@ -8270,13 +9630,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud sync is unavailable right now"
+            "value" : "Sync is paused: VIP is not active. Local data is unaffected."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前无法使用 iCloud 同步"
+            "value" : "同步已暂停：VIP 未开通或已到期，本地数据不受影响"
           }
         }
       }
@@ -8467,13 +9827,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud sync is available to everyone. Choose how this device's data should be initialized."
+            "value" : "VIP feature. When turning it on, choose how to initialize this device's data."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有用户均可使用 iCloud 同步。开启时，请选择如何初始化此设备的数据。"
+            "value" : "VIP 功能。开启时，请选择如何初始化此设备的数据。"
           }
         }
       }

@@ -2661,6 +2661,93 @@ final class ModelTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func test_vipThemesAreTheFiveDedicatedThemes() {
+        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .brutal, .neon, .paper, .terminal])
+        XCTAssertTrue(WeekTheme.freeThemes.allSatisfy { !$0.requiresVIP })
+        // The decorative LOTR styling stays tied to `isPremiumTheme` only.
+        XCTAssertEqual(WeekTheme.allCases.filter(\.isPremiumTheme), [.lotr])
+    }
+
+    @MainActor
+    func test_lockedVIPThemeFallsBackToAmberAndKeepsChoice() {
+        for theme in WeekTheme.vipThemes {
+            XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: theme.rawValue, premiumThemeUnlocked: false), .amber)
+            XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: theme.rawValue, premiumThemeUnlocked: true), theme)
+        }
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: WeekTheme.ocean.rawValue, premiumThemeUnlocked: false), .ocean)
+
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.premiumThemeUnlocked = true
+        settings.selectedThemeRaw = WeekTheme.neon.rawValue
+        settings.premiumThemeUnlocked = false
+        XCTAssertEqual(settings.selectedTheme, .amber)
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.neon.rawValue)
+        settings.premiumThemeUnlocked = true
+        XCTAssertEqual(settings.selectedTheme, .neon)
+    }
+
+    @MainActor
+    func test_flexibleModeStartsStrictWithoutVIPButKeepsPreference() {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.defaultExecutionMode = .flexible
+        settings.premiumThemeUnlocked = false
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+        XCTAssertEqual(settings.defaultExecutionMode, .flexible)
+        settings.premiumThemeUnlocked = true
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .flexible)
+        settings.defaultExecutionMode = .strict
+        settings.premiumThemeUnlocked = false
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+    }
+
+    @MainActor
+    func test_vipAccessMapsToCloudSyncEntitlement() {
+        XCTAssertEqual(VIPAccess(source: .subscription, product: .yearly).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess(source: .lifetime).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess(source: .betaTester).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess.inactive.cloudSyncState, .notPurchased)
+        XCTAssertEqual(VIPAccess(hasExpiredSubscription: true).cloudSyncState, .expired)
+        XCTAssertEqual(VIPAccess(verificationFailure: "bad").cloudSyncState, .verificationFailed("bad"))
+    }
+
+    @MainActor
+    func test_productCatalogIdentifiersAreStable() {
+        XCTAssertEqual(WeekyiiProduct.allIDs, [
+            "com.fluentdesign.Weekyii.vip.monthly",
+            "com.fluentdesign.Weekyii.vip.quarterly",
+            "com.fluentdesign.Weekyii.vip.yearly",
+            "com.fluentdesign.Weekyii.vip.lifetime",
+        ])
+        XCTAssertEqual(WeekyiiProduct.trialProduct, .yearly)
+        XCTAssertEqual(WeekyiiProduct.trialDays, 14)
+        XCTAssertFalse(WeekyiiProduct.lifetime.isSubscription)
+    }
+
+    @MainActor
+    func test_nonBetaBuildsNeverAutoGrantVIP() async {
+        // Unit tests build the Debug configuration, which must not carry WEEKYII_BETA.
+        XCTAssertFalse(VIPEntitlementResolver.isBetaConfiguration)
+        let granted = await VIPEntitlementResolver.isBetaTesterBuild()
+        XCTAssertFalse(granted)
+    }
+
+    @MainActor
+    func test_coordinatorRecordsEntitlementChangeWithoutTouchingPreference() async {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.setCloudSyncRequested(true)
+        let coordinator = CloudSyncCoordinator(
+            settings: settings,
+            entitlementProvider: FixedCloudSyncEntitlementProvider(state: .expired)
+        )
+        await coordinator.entitlementDidChange()
+        XCTAssertEqual(coordinator.entitlementState, .expired)
+        XCTAssertTrue(settings.cloudSyncRequested)
+    }
+
     func test_projectTilePresentation_miniEditingStaysCompact() {
         let snapshot = makeTileSnapshot(
             projectID: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
