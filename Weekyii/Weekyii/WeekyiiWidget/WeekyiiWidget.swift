@@ -276,6 +276,14 @@ private struct LiveActivityPresentation {
 
 /// Self-updating countdown to the deadline; after the deadline the same system
 /// timer counts up, prefixed with "+".
+private extension LiveActivityPresentation {
+    /// Width for the large expanded/lock-screen countdown (22pt rounded, monospaced).
+    var countdownColumnWidth: CGFloat {
+        if isOverdue { return 104 }
+        return state.killTime.timeIntervalSinceNow >= 3600 ? 92 : 68
+    }
+}
+
 private struct LiveCountdownText: View {
     let model: LiveActivityPresentation
 
@@ -344,20 +352,21 @@ private struct LiveActionButtonLabel: View {
     var icon: String?
     let fill: Color
     let foreground: Color
-    var height: CGFloat = 36
+    var height: CGFloat = 28
     var expands = true
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             if let icon {
                 Image(systemName: icon)
+                    .imageScale(.small)
             }
             Text(title)
         }
-        .font(.subheadline.weight(.bold))
+        .font(.caption.weight(.bold))
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .frame(maxWidth: expands ? .infinity : nil)
         .frame(height: height)
         .foregroundStyle(foreground)
@@ -381,10 +390,10 @@ private struct LiveActionButtonColors {
 private struct LiveActionRow: View {
     let model: LiveActivityPresentation
     let colors: LiveActionButtonColors
-    var height: CGFloat = 36
+    var height: CGFloat = 28
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             switch model.state.pendingAction {
             case .doneFocus:
                 confirmButtons(
@@ -548,17 +557,21 @@ private struct LockScreenLiveActivityView: View {
                         .foregroundStyle(secondaryTextColor)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .layoutPriority(1)
 
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(model.timerCaption)
                         .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
                         .foregroundStyle(model.isOverdue ? tint : secondaryTextColor)
                     LiveCountdownText(model: model)
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.7)
                         .foregroundStyle(tint)
-                        .frame(maxWidth: 120, alignment: .trailing)
                 }
+                // `Text(_, style: .timer)` reports a flexible width; give the column a
+                // fixed width so it is never pushed past the trailing edge.
+                .frame(width: model.countdownColumnWidth, alignment: .trailing)
+                .layoutPriority(1)
             }
 
             LiveTimeBar(
@@ -568,7 +581,7 @@ private struct LockScreenLiveActivityView: View {
                 track: Color(widgetHex: palette.progressTrackHex).opacity(0.2)
             )
 
-            LiveActionRow(model: model, colors: buttonColors, height: 34)
+            LiveActionRow(model: model, colors: buttonColors, height: 30)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -621,10 +634,11 @@ private struct IslandExpandedTrailing: View {
                 .foregroundStyle(model.isOverdue ? model.islandTint : model.islandSecondary)
                 .lineLimit(1)
             LiveCountdownText(model: model)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.7)
                 .foregroundStyle(model.islandTint)
-                .frame(maxWidth: 116, alignment: .trailing)
         }
+        .frame(width: model.countdownColumnWidth, alignment: .trailing)
         .padding(.trailing, 4)
     }
 }
@@ -633,10 +647,10 @@ private struct IslandExpandedBottom: View {
     let model: LiveActivityPresentation
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(model.state.focusTitle)
-                    .font(.headline.weight(.bold))
+                    .font(.subheadline.weight(.bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .foregroundStyle(model.islandPrimary)
@@ -655,9 +669,10 @@ private struct IslandExpandedBottom: View {
                 track: Color.white.opacity(0.14)
             )
 
-            LiveActionRow(model: model, colors: islandButtonColors(for: model), height: 36)
+            LiveActionRow(model: model, colors: islandButtonColors(for: model), height: 28)
         }
         .padding(.horizontal, 4)
+        .padding(.bottom, 2)
     }
 }
 
