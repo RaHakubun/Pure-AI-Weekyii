@@ -9,40 +9,75 @@ enum VIPLegalLinks {
 }
 
 /// Settings › VIP 服务. Also presented as the paywall sheet whenever a free user
-/// taps a paid feature (`highlightedFeature` tells which one).
+/// taps a paid feature (`highlightedFeature` moves that benefit to the front).
+///
+/// Layout, top to bottom: theme showcase → title → three benefit cards → plan
+/// picker (or the member card once VIP is active) → collapsed FAQ. The purchase
+/// button is pinned to the bottom edge together with the renewal line and the
+/// legal links that App Review expects next to it.
+///
+/// The page always uses the amber palette (light or dark, following the system)
+/// so it looks the same whichever theme the user currently has selected.
 struct VIPServiceView: View {
     var highlightedFeature: VIPFeature?
     var showsCloseButton = false
 
     @Environment(PurchaseService.self) private var purchases
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var selectedPlan: WeekyiiProduct = .yearly
+    @State private var showsFAQ = false
     @State private var showingManageSubscriptions = false
     @State private var alertMessage: String?
 
+    private var palette: VIPPagePalette { VIPPagePalette(isDark: colorScheme == .dark) }
+
     var body: some View {
-        List {
-            statusSection
-            if purchases.showsTrialOffer {
-                trialSection
-            }
-            featuresSection
-            plansSection
-            pricingNotesSection
-            afterExpirySection
-            renewalTermsSection
-            actionsSection
-            legalSection
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle(String(localized: "vip.title", defaultValue: "VIP 服务"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if showsCloseButton {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "vip.close", defaultValue: "关闭")) { dismiss() }
+        ScrollView {
+            VStack(spacing: 0) {
+                VIPThemeCarousel(palette: palette)
+                    .padding(.top, 4)
+                header
+                    .padding(.top, 14)
+                benefits
+                    .padding(.top, 20)
+                    .padding(.horizontal, 16)
+                if purchases.hasVIP {
+                    memberCard
+                        .padding(.top, 22)
+                        .padding(.horizontal, 16)
+                } else {
+                    if purchases.access.hasExpiredSubscription {
+                        expiredNotice
+                            .padding(.top, 22)
+                            .padding(.horizontal, 16)
+                    }
+                    plans
+                        .padding(.top, 22)
+                        .padding(.horizontal, 16)
+                }
+                faq
+                    .padding(.top, 16)
+                    .padding(.horizontal, 16)
+                if purchases.hasVIP {
+                    legalLinks
+                        .padding(.top, 16)
                 }
             }
+            .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
+        .background { pageBackground }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !purchases.hasVIP {
+                purchaseBar
+            }
+        }
+        .navigationTitle(String(localized: "vip.title", defaultValue: "VIP 服务"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar { toolbarContent }
+        .tint(palette.primary)
         .task {
             if purchases.products.isEmpty { await purchases.loadProducts() }
             await purchases.refreshAccess()
@@ -61,32 +96,423 @@ struct VIPServiceView: View {
         }
     }
 
+    // MARK: Chrome
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        // The hero title already names the page; keep the bar itself clean.
+        ToolbarItem(placement: .principal) {
+            Text(verbatim: "")
+                .accessibilityHidden(true)
+        }
+        if showsCloseButton {
+            ToolbarItem(placement: .cancellationAction) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(palette.textSecondary)
+                        .frame(width: 30, height: 30)
+                        .background(palette.textPrimary.opacity(0.07), in: Circle())
+                }
+                .accessibilityLabel(String(localized: "vip.close", defaultValue: "关闭"))
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            if purchases.isRestoring {
+                ProgressView()
+            } else {
+                Button(String(localized: "vip.restore", defaultValue: "恢复购买")) {
+                    Task { await restore() }
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(palette.primary)
+            }
+        }
+    }
+
+    private var pageBackground: some View {
+        ZStack(alignment: .top) {
+            palette.background
+            RadialGradient(
+                colors: [palette.glow, palette.glow.opacity(0)],
+                center: .top,
+                startRadius: 0,
+                endRadius: 340
+            )
+            .frame(height: 460)
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            Text(verbatim: "Weekyii VIP")
+                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(colors: palette.titleGradient, startPoint: .leading, endPoint: .trailing)
+                )
+                .accessibilityAddTraits(.isHeader)
+            Text(String(localized: "vip.hero.tagline", defaultValue: "让每一周，都有自己的样子"))
+                .font(.subheadline)
+                .foregroundStyle(palette.textSecondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: Benefits
+
+    private var orderedFeatures: [VIPFeature] {
+        let base: [VIPFeature] = [.themes, .flexibleMode, .cloudSync]
+        guard let highlightedFeature else { return base }
+        return [highlightedFeature] + base.filter { $0 != highlightedFeature }
+    }
+
+    private var benefits: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ForEach(orderedFeatures) { feature in
+                VIPBenefitCard(
+                    feature: feature,
+                    isHighlighted: feature == highlightedFeature && !purchases.hasVIP,
+                    isUnlocked: purchases.hasVIP,
+                    palette: palette
+                )
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: Plans
+
+    @ViewBuilder
+    private var plans: some View {
+        if purchases.products.isEmpty {
+            productsPlaceholder
+        } else {
+            VStack(spacing: 10) {
+                if let yearly = purchases.products[.yearly] {
+                    featuredPlanCard(product: yearly)
+                }
+                HStack(spacing: 10) {
+                    ForEach([WeekyiiProduct.quarterly, .monthly, .lifetime]) { item in
+                        if let product = purchases.products[item] {
+                            compactPlanCard(item, product: product)
+                        }
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .onAppear(perform: ensureSelectionIsAvailable)
+            .onChange(of: purchases.products.count) { _, _ in ensureSelectionIsAvailable() }
+        }
+    }
+
+    private var productsPlaceholder: some View {
+        VStack(spacing: 10) {
+            if purchases.isLoadingProducts {
+                ProgressView()
+                Text(String(localized: "vip.plans.loading", defaultValue: "正在获取价格…"))
+                    .font(.footnote)
+                    .foregroundStyle(palette.textSecondary)
+            } else {
+                Text(String(localized: "vip.error.products_unavailable", defaultValue: "暂时无法连接 App Store，请稍后再试。"))
+                    .font(.footnote)
+                    .foregroundStyle(palette.textSecondary)
+                    .multilineTextAlignment(.center)
+                Button(String(localized: "vip.plans.retry", defaultValue: "重新获取价格")) {
+                    Task { await purchases.loadProducts() }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(palette.primary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .vipCard(palette)
+    }
+
+    private func featuredPlanCard(product: Product) -> some View {
+        let pricing = VIPPlanPricing(item: .yearly, product: product, monthlyProduct: purchases.products[.monthly])
+        let isSelected = selectedPlan == .yearly
+        return Button {
+            selectedPlan = .yearly
+        } label: {
+            HStack(spacing: 12) {
+                selectionMark(isSelected)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(Self.planName(.yearly))
+                        .font(.headline)
+                        .foregroundStyle(palette.textPrimary)
+                    if let perMonth = pricing.perMonthText {
+                        Text(String(format: String(localized: "vip.plan.about_per_month", defaultValue: "约 %@ / 月"), perMonth))
+                            .font(.caption)
+                            .foregroundStyle(palette.primaryDark)
+                    }
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(pricing.displayPrice)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(palette.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(Self.periodLabel(.yearly))
+                        .font(.caption2)
+                        .foregroundStyle(palette.textTertiary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(palette.selectedFill) : AnyShapeStyle(palette.surface))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(isSelected ? palette.primary : palette.border, lineWidth: isSelected ? 2 : 1)
+            }
+            .overlay(alignment: .topTrailing) {
+                featuredBadge(pricing: pricing)
+                    .offset(x: -14, y: -11)
+            }
+            .shadow(color: palette.primary.opacity(isSelected ? 0.15 : 0), radius: 12, y: 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(purchases.purchasingProduct != nil)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func featuredBadge(pricing: VIPPlanPricing) -> some View {
+        var parts: [String] = []
+        if let savings = pricing.savingsPercent {
+            parts.append(String(format: String(localized: "vip.plan.badge.savings", defaultValue: "省 %d%%"), savings))
+        }
+        if purchases.showsTrialOffer {
+            parts.append(String(format: String(localized: "vip.plan.badge.trial", defaultValue: "试用 %d 天"), trialDays))
+        }
+        let text = parts.isEmpty
+            ? String(localized: "vip.plan.recommended", defaultValue: "推荐")
+            : parts.joined(separator: " · ")
+        return Text(text)
+            .font(.caption2.weight(.heavy))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .background(palette.primary, in: Capsule())
+    }
+
+    private func compactPlanCard(_ item: WeekyiiProduct, product: Product) -> some View {
+        let isSelected = selectedPlan == item
+        return Button {
+            selectedPlan = item
+        } label: {
+            VStack(spacing: 4) {
+                Text(Self.planName(item))
+                    .font(.footnote)
+                    .foregroundStyle(palette.textSecondary)
+                Text(product.displayPrice)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(palette.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text(item == .lifetime
+                     ? String(localized: "vip.plan.lifetime.short", defaultValue: "一次买断")
+                     : Self.periodLabel(item))
+                    .font(.caption2)
+                    .foregroundStyle(palette.textTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(palette.selectedFill) : AnyShapeStyle(palette.surface))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(isSelected ? palette.primary : palette.border, lineWidth: isSelected ? 2 : 1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(purchases.purchasingProduct != nil)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func selectionMark(_ isSelected: Bool) -> some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title2)
+            .foregroundStyle(isSelected ? palette.primary : palette.textTertiary)
+    }
+
+    /// Falls back to the first loaded plan when the selected one isn't sold here.
+    private func ensureSelectionIsAvailable() {
+        guard purchases.products[selectedPlan] == nil,
+              let first = WeekyiiProduct.displayOrder.first(where: { purchases.products[$0] != nil })
+        else { return }
+        selectedPlan = first
+    }
+
+    // MARK: Purchase bar
+
+    private var purchaseBar: some View {
+        VStack(spacing: 8) {
+            Button {
+                Task { await buy(selectedPlan) }
+            } label: {
+                ZStack {
+                    if purchases.purchasingProduct != nil {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text(ctaTitle)
+                            .font(.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .foregroundStyle(.white)
+                .background(
+                    LinearGradient(colors: [palette.accent, palette.primary], startPoint: .leading, endPoint: .trailing),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .shadow(color: palette.primary.opacity(0.30), radius: 12, y: 6)
+            }
+            .buttonStyle(.plain)
+            .disabled(purchases.purchasingProduct != nil || purchases.products[selectedPlan] == nil)
+
+            if let finePrint = ctaFinePrint {
+                Text(finePrint)
+                    .font(.caption2)
+                    .foregroundStyle(palette.textTertiary)
+                    .multilineTextAlignment(.center)
+            }
+            legalLinks
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 6)
+        .background {
+            LinearGradient(
+                stops: [
+                    .init(color: palette.background.opacity(0), location: 0),
+                    .init(color: palette.background, location: 0.28),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private var ctaTitle: String {
+        if selectedPlan == .yearly, purchases.showsTrialOffer {
+            return String(format: String(localized: "vip.trial.cta", defaultValue: "免费试用 %d 天"), trialDays)
+        }
+        return String(format: String(localized: "vip.cta.subscribe", defaultValue: "开通%@ VIP"), Self.planName(selectedPlan))
+    }
+
+    /// Price and renewal terms right under the button (guideline 3.1.2).
+    private var ctaFinePrint: String? {
+        guard let product = purchases.products[selectedPlan] else { return nil }
+        if selectedPlan == .lifetime {
+            return String(format: String(localized: "vip.cta.fine.lifetime", defaultValue: "%@ 一次性付费，不会自动续费"), product.displayPrice)
+        }
+        if selectedPlan == .yearly, purchases.showsTrialOffer {
+            return String(format: String(localized: "vip.cta.fine.trial", defaultValue: "试用结束后 %@/年 自动续费，可随时取消"), product.displayPrice)
+        }
+        return String(
+            format: String(localized: "vip.cta.fine.subscription", defaultValue: "%1$@ %2$@，自动续费，可随时取消"),
+            product.displayPrice,
+            Self.periodLabel(selectedPlan)
+        )
+    }
+
+    private var legalLinks: some View {
+        HStack(spacing: 6) {
+            legalLink(String(localized: "vip.legal.terms", defaultValue: "用户协议"), url: VIPLegalLinks.termsOfUse)
+            Text(verbatim: "·")
+            legalLink(String(localized: "vip.legal.privacy", defaultValue: "隐私政策"), url: VIPLegalLinks.privacyPolicy)
+        }
+        .font(.caption2)
+        .foregroundStyle(palette.textTertiary)
+    }
+
+    @ViewBuilder
+    private func legalLink(_ title: String, url: URL?) -> some View {
+        if let url {
+            Link(title, destination: url)
+                .foregroundStyle(palette.textSecondary)
+        } else {
+            Text(title)
+        }
+    }
+
     // MARK: Status
 
-    private var statusSection: some View {
-        Section {
-            if let highlightedFeature, !purchases.hasVIP {
-                Label {
-                    Text(Self.lockedMessage(for: highlightedFeature))
-                        .font(.subheadline.weight(.semibold))
-                } icon: {
-                    Image(systemName: "lock.fill")
-                        .foregroundStyle(Color.weekyiiPrimary)
-                }
-            }
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "crown.fill", color: purchases.hasVIP ? .orange : .gray)
-                VStack(alignment: .leading, spacing: 2) {
+    private var memberCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .background(
+                        LinearGradient(colors: [palette.accent, palette.primary], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: Circle()
+                    )
+                VStack(alignment: .leading, spacing: 3) {
                     Text(statusTitle)
                         .font(.headline)
+                        .foregroundStyle(palette.textPrimary)
                     Text(statusDetail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
+            if purchases.access.source == .subscription {
+                Button(String(localized: "vip.manage", defaultValue: "管理订阅")) {
+                    showingManageSubscriptions = true
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(palette.primary)
+            }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.selectedFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(palette.primary.opacity(0.5), lineWidth: 1.5)
+        }
+    }
+
+    private var expiredNotice: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(palette.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(statusTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(palette.textPrimary)
+                Text(statusDetail)
+                    .font(.caption)
+                    .foregroundStyle(palette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .vipCard(palette)
     }
 
     private var statusTitle: String {
@@ -131,349 +557,110 @@ struct VIPServiceView: View {
         }
     }
 
-    // MARK: Trial
+    // MARK: FAQ
 
-    private var trialSection: some View {
-        Section {
+    private struct FAQItem: Identifiable {
+        let question: String
+        let answer: String
+        var id: String { question }
+    }
+
+    private var faqItems: [FAQItem] {
+        var items: [FAQItem] = [
+            FAQItem(
+                question: String(localized: "vip.faq.plans.q", defaultValue: "四种方案有什么区别？"),
+                answer: String(localized: "vip.faq.plans.a", defaultValue: "功能完全相同，只是付费方式不同。")
+            ),
+        ]
+        if let days = purchases.trialDays {
+            items.append(FAQItem(
+                question: String(localized: "vip.faq.trial.q", defaultValue: "免费试用怎么算？"),
+                answer: String(format: String(localized: "vip.faq.trial.a", defaultValue: "首次订阅年度可免费试用 %d 天，每个 Apple ID 一次；试用期内取消不扣费。"), days)
+            ))
+        }
+        if let lifetime = purchases.products[.lifetime],
+           let years = VIPPlanPricing.lifetimeYears(lifetime: lifetime, yearly: purchases.products[.yearly]) {
+            items.append(FAQItem(
+                question: String(localized: "vip.faq.lifetime.q", defaultValue: "永久版划算吗？"),
+                answer: String(format: String(localized: "vip.faq.lifetime.a", defaultValue: "%1$@ 一次付费永久使用，约等于 %2$@ 年的年度订阅。"), lifetime.displayPrice, years)
+            ))
+        }
+        items.append(contentsOf: [
+            FAQItem(
+                question: String(localized: "vip.faq.expiry.q", defaultValue: "到期后会怎样？"),
+                answer: String(localized: "vip.faq.expiry.a", defaultValue: "iCloud 同步暂停，灵动模式和 VIP 主题停用；数据和你的选择都会保留，续费后自动恢复。")
+            ),
+            FAQItem(
+                question: String(localized: "vip.faq.cancel.q", defaultValue: "怎么取消自动续费？"),
+                answer: String(localized: "vip.faq.cancel.a", defaultValue: "在 iPhone「设置 › Apple ID › 订阅」中随时取消，需在周期结束前至少 24 小时操作。")
+            ),
+            FAQItem(
+                question: String(localized: "vip.faq.switch.q", defaultValue: "可以更换方案吗？"),
+                answer: String(localized: "vip.faq.switch.a", defaultValue: "可以，App Store 会按剩余时间自动处理，不会重复扣费。")
+            ),
+            FAQItem(
+                question: String(localized: "vip.faq.free.q", defaultValue: "哪些功能是免费的？"),
+                answer: String(localized: "vip.faq.free.a", defaultValue: "周计划与今日任务、严格模式、灵动岛、小组件和数据导出等都永久免费。")
+            ),
+        ])
+        return items
+    }
+
+    private var faq: some View {
+        VStack(alignment: .leading, spacing: 0) {
             Button {
-                Task { await buy(WeekyiiProduct.trialProduct) }
+                withAnimation(.snappy) { showsFAQ.toggle() }
             } label: {
                 HStack {
+                    Text(String(localized: "vip.faq.title", defaultValue: "常见问题"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(palette.textPrimary)
                     Spacer()
-                    if purchases.purchasingProduct == WeekyiiProduct.trialProduct {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(String(format: String(localized: "vip.trial.cta", defaultValue: "免费试用 %d 天"), trialDays))
-                            .font(.headline)
-                    }
-                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(palette.textTertiary)
+                        .rotationEffect(.degrees(showsFAQ ? 90 : 0))
                 }
-                .padding(.vertical, 10)
-                .foregroundStyle(.white)
-                .background(Color.weekyiiPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(purchases.purchasingProduct != nil)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-        } footer: {
-            Text(trialFooter)
+            .accessibilityAddTraits(showsFAQ ? .isSelected : [])
+
+            if showsFAQ {
+                Divider()
+                    .overlay(palette.border)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(faqItems) { item in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.question)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(palette.textPrimary)
+                            Text(item.answer)
+                                .font(.caption)
+                                .foregroundStyle(palette.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Text(String(localized: "vip.renewal.terms", defaultValue: "确认购买后将从你的 Apple ID 账户扣款。订阅会自动续期，除非在当前周期结束前至少 24 小时关闭自动续期；续期费用会在周期结束前 24 小时内扣除。你可以随时在 iPhone 的「设置 › Apple ID › 订阅」中管理或取消订阅。"))
+                        .font(.caption2)
+                        .foregroundStyle(palette.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+                .transition(.opacity)
+            }
         }
+        .vipCard(palette)
     }
+
+    // MARK: Actions
 
     /// Only read while `showsTrialOffer` is true, which guarantees StoreKit's value.
     private var trialDays: Int {
         purchases.trialDays ?? WeekyiiProduct.trialDays
     }
-
-    private var trialFooter: String {
-        // `showsTrialOffer` guarantees the yearly product is loaded.
-        let price = purchases.products[.yearly]?.displayPrice ?? ""
-        return String(
-            format: String(localized: "vip.trial.footer", defaultValue: "试用 %1$d 天，结束后按 %2$@/年 自动续费；试用期内随时取消不收费。每个 Apple ID 仅可试用一次。"),
-            trialDays,
-            price
-        )
-    }
-
-    // MARK: Features
-
-    private var featuresSection: some View {
-        Section {
-            featureRow(
-                .cloudSync,
-                icon: "arrow.triangle.2.circlepath.icloud",
-                tint: .blue,
-                title: String(localized: "vip.feature.cloud.title", defaultValue: "iCloud 同步"),
-                detail: String(localized: "vip.feature.cloud.detail", defaultValue: "在你的 iPhone 和 iPad 之间同步周计划、任务、项目与习惯。数据存放在你自己的 iCloud 中。")
-            )
-            featureRow(
-                .flexibleMode,
-                icon: "arrow.triangle.2.circlepath",
-                tint: .weekyiiPrimary,
-                title: String(localized: "vip.feature.flexible.title", defaultValue: "灵动模式"),
-                detail: String(localized: "vip.feature.flexible.detail", defaultValue: "开始后仍只专注一件事，但可以主动解冻今日队列，增改、排序和交换任务。")
-            )
-            featureRow(
-                .themes,
-                icon: "paintpalette.fill",
-                tint: .purple,
-                title: String(localized: "vip.feature.themes.title", defaultValue: "VIP 主题"),
-                detail: String(
-                    format: String(localized: "vip.feature.themes.detail", defaultValue: "%@，每套主题都有独立的色彩、形态与印象画，小组件和灵动岛同步生效。"),
-                    ListFormatter.localizedString(byJoining: WeekTheme.vipThemes.map(\.displayName))
-                )
-            )
-        } header: {
-            Text(String(localized: "vip.features.header", defaultValue: "VIP 包含"))
-        } footer: {
-            Text(String(localized: "vip.features.footer", defaultValue: "其余功能永久免费：周计划与今日任务、严格模式、灵动岛与实时活动、桌面和锁屏小组件、数据导出与恢复等。"))
-        }
-    }
-
-    private func featureRow(_ feature: VIPFeature, icon: String, tint: Color, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            SettingsIcon(icon: icon, color: tint)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            if purchases.hasVIP {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
-        }
-        .padding(.vertical, 2)
-        .listRowBackground(highlightedFeature == feature && !purchases.hasVIP ? Color.weekyiiPrimary.opacity(0.10) : nil)
-    }
-
-    // MARK: Plans
-
-    private var plansSection: some View {
-        Section {
-            if purchases.products.isEmpty {
-                if purchases.isLoadingProducts {
-                    HStack {
-                        ProgressView()
-                        Text(String(localized: "vip.plans.loading", defaultValue: "正在获取价格…"))
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "vip.error.products_unavailable", defaultValue: "暂时无法连接 App Store，请稍后再试。"))
-                            .font(.subheadline)
-                        Button(String(localized: "vip.plans.retry", defaultValue: "重新获取价格")) {
-                            Task { await purchases.loadProducts() }
-                        }
-                        .font(.subheadline.weight(.semibold))
-                    }
-                    .padding(.vertical, 4)
-                }
-            } else {
-                ForEach(WeekyiiProduct.displayOrder) { item in
-                    if let product = purchases.products[item] {
-                        planRow(item, product: product)
-                    }
-                }
-            }
-        } header: {
-            Text(String(localized: "vip.plans.header", defaultValue: "选择方案"))
-        } footer: {
-            Text(String(localized: "vip.plans.footer", defaultValue: "价格以 App Store 显示的当地货币为准，不同国家和地区的价格可能不同。"))
-        }
-    }
-
-    private func planRow(_ item: WeekyiiProduct, product: Product) -> some View {
-        let pricing = VIPPlanPricing(item: item, product: product, monthlyProduct: purchases.products[.monthly])
-        let isCurrent = purchases.access.product == item && purchases.access.isActive
-        let ownsLifetime = purchases.access.source == .lifetime
-        return Button {
-            Task { await buy(item) }
-        } label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(Self.planName(item))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        if item == .yearly {
-                            Text(String(localized: "vip.plan.recommended", defaultValue: "推荐"))
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .foregroundStyle(.white)
-                                .background(Color.orange, in: Capsule())
-                        }
-                    }
-                    Text(planDetail(item, pricing: pricing))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                if purchases.purchasingProduct == item {
-                    ProgressView()
-                } else if isCurrent {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text(pricing.displayPrice)
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(.primary)
-                        Text(Self.periodLabel(item))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isCurrent || ownsLifetime || purchases.purchasingProduct != nil)
-    }
-
-    private func planDetail(_ item: WeekyiiProduct, pricing: VIPPlanPricing) -> String {
-        var parts: [String] = []
-        if let perMonth = pricing.perMonthText {
-            parts.append(String(format: String(localized: "vip.plan.per_month", defaultValue: "折合每月 %@"), perMonth))
-        }
-        if let savings = pricing.savingsPercent {
-            parts.append(String(format: String(localized: "vip.plan.savings", defaultValue: "比按月省 %d%%"), savings))
-        }
-        switch item {
-        case .monthly:
-            parts.append(String(localized: "vip.plan.monthly.detail", defaultValue: "随用随停，最灵活"))
-        case .yearly where purchases.showsTrialOffer:
-            parts.append(String(format: String(localized: "vip.plan.yearly.trial", defaultValue: "含 %d 天免费试用"), trialDays))
-        case .lifetime:
-            parts.append(String(localized: "vip.plan.lifetime.detail", defaultValue: "一次买断，永久使用，不自动续费"))
-        default:
-            break
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    // MARK: Pricing notes
-
-    private var pricingNotesSection: some View {
-        Section {
-            ForEach(pricingNotes, id: \.self) { note in
-                Text(note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        } header: {
-            Text(String(localized: "vip.pricing.header", defaultValue: "定价说明"))
-        }
-    }
-
-    private var pricingNotes: [String] {
-        let products = purchases.products
-        let monthly = products[.monthly]
-        func pricing(_ item: WeekyiiProduct) -> VIPPlanPricing? {
-            products[item].map { VIPPlanPricing(item: item, product: $0, monthlyProduct: monthly) }
-        }
-        var notes: [String] = []
-        if let yearly = pricing(.yearly), let perMonth = yearly.perMonthText, let savings = yearly.savingsPercent {
-            notes.append(String(format: String(localized: "vip.pricing.yearly", defaultValue: "年度 %1$@：最划算的订阅，折合每月 %2$@，比按月付省 %3$d%%。"), yearly.displayPrice, perMonth, savings))
-        } else {
-            notes.append(String(localized: "vip.pricing.yearly.noprice", defaultValue: "年度：最划算的订阅。"))
-        }
-        if let quarterly = pricing(.quarterly), let perMonth = quarterly.perMonthText, let savings = quarterly.savingsPercent {
-            notes.append(String(format: String(localized: "vip.pricing.quarterly", defaultValue: "季度 %1$@：折合每月 %2$@，比按月付省 %3$d%%，适合想先用一段时间再决定的人。"), quarterly.displayPrice, perMonth, savings))
-        } else {
-            notes.append(String(localized: "vip.pricing.quarterly.noprice", defaultValue: "季度：比按月付更省，适合想先用一段时间再决定的人。"))
-        }
-        if let monthlyProduct = monthly {
-            notes.append(String(format: String(localized: "vip.pricing.monthly", defaultValue: "月度 %@：随用随停，按月扣费，最灵活。"), monthlyProduct.displayPrice))
-        } else {
-            notes.append(String(localized: "vip.pricing.monthly.noprice", defaultValue: "月度：随用随停，按月扣费，最灵活。"))
-        }
-        if let lifetime = products[.lifetime] {
-            if let years = VIPPlanPricing.lifetimeYears(lifetime: lifetime, yearly: products[.yearly]) {
-                notes.append(String(format: String(localized: "vip.pricing.lifetime", defaultValue: "永久 %1$@：一次付费，永久使用全部 VIP 功能，约等于 %2$@ 年的年度订阅，之后不再扣费。"), lifetime.displayPrice, years))
-            } else {
-                notes.append(String(format: String(localized: "vip.pricing.lifetime.noyears", defaultValue: "永久 %@：一次付费，永久使用全部 VIP 功能，之后不再扣费。"), lifetime.displayPrice))
-            }
-        } else {
-            notes.append(String(localized: "vip.pricing.lifetime.noprice", defaultValue: "永久：一次付费，永久使用全部 VIP 功能，之后不再扣费。"))
-        }
-        notes.append(String(localized: "vip.pricing.same_features", defaultValue: "四种方案包含的功能完全相同，区别只在付费方式。"))
-        if let days = purchases.trialDays, let yearly = products[.yearly] {
-            notes.append(String(format: String(localized: "vip.pricing.trial_rule", defaultValue: "首次订阅年度可免费试用 %1$d 天，每个 Apple ID 仅一次；试用期内取消不会扣费，试用结束后按 %2$@/年 自动续费。永久版不提供试用。"), days, yearly.displayPrice))
-        }
-        notes.append(String(localized: "vip.pricing.switch", defaultValue: "订阅期间更换方案，由 App Store 按剩余时间自动处理，不会重复扣费。"))
-        return notes
-    }
-
-    private var afterExpirySection: some View {
-        Section {
-            ForEach([
-                String(localized: "vip.expiry.cloud", defaultValue: "iCloud 同步：暂停同步。本机和 iCloud 中的数据都不会被删除或修改，续费后从暂停处继续同步。"),
-                String(localized: "vip.expiry.flexible", defaultValue: "灵动模式：当天已开始的任务流不受影响；之后启动的日子使用严格模式，你的偏好会保留。"),
-                String(localized: "vip.expiry.themes", defaultValue: "VIP 主题：界面、小组件和灵动岛切回琥珀主题，你选的主题会保留，续费后自动恢复。"),
-            ], id: \.self) { note in
-                Text(note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        } header: {
-            Text(String(localized: "vip.expiry.header", defaultValue: "到期后会怎样"))
-        }
-    }
-
-    private var renewalTermsSection: some View {
-        Section {
-            Text(String(localized: "vip.renewal.terms", defaultValue: "确认购买后将从你的 Apple ID 账户扣款。订阅会自动续期，除非在当前周期结束前至少 24 小时关闭自动续期；续期费用会在周期结束前 24 小时内扣除。你可以随时在 iPhone 的「设置 › Apple ID › 订阅」中管理或取消订阅。"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } header: {
-            Text(String(localized: "vip.renewal.header", defaultValue: "自动续费说明"))
-        }
-    }
-
-    // MARK: Actions
-
-    private var actionsSection: some View {
-        Section {
-            Button {
-                Task {
-                    await purchases.restorePurchases()
-                    if purchases.hasVIP {
-                        alertMessage = String(localized: "vip.restore.success", defaultValue: "已恢复 VIP。")
-                    } else if let message = purchases.lastErrorMessage {
-                        alertMessage = message
-                    }
-                    purchases.lastErrorMessage = nil
-                }
-            } label: {
-                HStack {
-                    Text(String(localized: "vip.restore", defaultValue: "恢复购买"))
-                    if purchases.isRestoring {
-                        Spacer()
-                        ProgressView()
-                    }
-                }
-            }
-            .disabled(purchases.isRestoring)
-
-            if purchases.access.source == .subscription {
-                Button(String(localized: "vip.manage", defaultValue: "管理订阅")) {
-                    showingManageSubscriptions = true
-                }
-            }
-        }
-    }
-
-    private var legalSection: some View {
-        Section {
-            legalRow(String(localized: "vip.legal.terms", defaultValue: "用户协议"), url: VIPLegalLinks.termsOfUse)
-            legalRow(String(localized: "vip.legal.privacy", defaultValue: "隐私政策"), url: VIPLegalLinks.privacyPolicy)
-        }
-    }
-
-    @ViewBuilder
-    private func legalRow(_ title: String, url: URL?) -> some View {
-        if let url {
-            Link(title, destination: url)
-        } else {
-            LabeledContent(title) {
-                Text(String(localized: "vip.legal.pending", defaultValue: "即将提供"))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    // MARK: Helpers
 
     private func buy(_ item: WeekyiiProduct) async {
         let outcome = await purchases.purchase(item)
@@ -488,6 +675,16 @@ struct VIPServiceView: View {
         case .cancelled:
             break
         }
+    }
+
+    private func restore() async {
+        await purchases.restorePurchases()
+        if purchases.hasVIP {
+            alertMessage = String(localized: "vip.restore.success", defaultValue: "已恢复 VIP。")
+        } else if let message = purchases.lastErrorMessage {
+            alertMessage = message
+        }
+        purchases.lastErrorMessage = nil
     }
 
     static func planName(_ item: WeekyiiProduct) -> String {
@@ -507,16 +704,347 @@ struct VIPServiceView: View {
         case .lifetime: return String(localized: "vip.period.once", defaultValue: "一次性")
         }
     }
+}
 
-    static func lockedMessage(for feature: VIPFeature) -> String {
-        switch feature {
-        case .cloudSync:
-            return String(localized: "vip.locked.cloud", defaultValue: "iCloud 同步是 VIP 功能")
-        case .flexibleMode:
-            return String(localized: "vip.locked.flexible", defaultValue: "灵动模式是 VIP 功能")
-        case .themes:
-            return String(localized: "vip.locked.themes", defaultValue: "这套主题是 VIP 主题")
+// MARK: - Palette
+
+/// Fixed amber palette for the VIP page, resolved for the current light/dark scheme.
+private struct VIPPagePalette {
+    let background: Color
+    let surface: Color
+    let border: Color
+    let primary: Color
+    let primaryDark: Color
+    let accent: Color
+    let textPrimary: Color
+    let textSecondary: Color
+    let textTertiary: Color
+    let glow: Color
+    let selectedFill: LinearGradient
+    let titleGradient: [Color]
+    let isDark: Bool
+
+    init(isDark: Bool) {
+        let amber = WeekTheme.amber.palette(for: .system, systemIsDark: isDark)
+        let primary = Color(hex: amber.primary)
+        self.isDark = isDark
+        self.primary = primary
+        background = Color(hex: amber.backgroundPrimary)
+        surface = Color(hex: amber.backgroundSecondary)
+        border = isDark ? Color.white.opacity(0.10) : primary.opacity(0.14)
+        primaryDark = isDark ? Color(hex: amber.primaryLight) : Color(hex: amber.primaryDark)
+        accent = Color(hex: amber.accentOrange)
+        textPrimary = Color(hex: amber.textPrimary)
+        textSecondary = Color(hex: amber.textSecondary)
+        textTertiary = Color(hex: amber.textTertiary)
+        glow = Color(hex: amber.accentOrange).opacity(isDark ? 0.18 : 0.22)
+        selectedFill = LinearGradient(
+            colors: [primary.opacity(isDark ? 0.22 : 0.12), Color(hex: amber.backgroundSecondary)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        titleGradient = isDark
+            ? [Color(hex: amber.primaryLight), primary]
+            : [Color(hex: amber.primaryDark), primary, Color(hex: amber.accentOrange)]
+    }
+}
+
+private extension View {
+    func vipCard(_ palette: VIPPagePalette) -> some View {
+        background(palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(palette.border, lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(palette.isDark ? 0 : 0.05), radius: 10, y: 4)
+    }
+}
+
+// MARK: - Benefits
+
+private struct VIPBenefitCard: View {
+    let feature: VIPFeature
+    let isHighlighted: Bool
+    let isUnlocked: Bool
+    let palette: VIPPagePalette
+
+    var body: some View {
+        VStack(spacing: 8) {
+            illustration
+                .frame(height: 44)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(palette.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(palette.textTertiary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 12)
+        .background(
+            isHighlighted ? AnyShapeStyle(palette.selectedFill) : AnyShapeStyle(palette.surface),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(isHighlighted ? palette.primary : palette.border, lineWidth: isHighlighted ? 2 : 1)
+        }
+        .overlay(alignment: .topTrailing) {
+            if isUnlocked {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .padding(8)
+            }
+        }
+        .shadow(color: Color.black.opacity(palette.isDark ? 0 : 0.05), radius: 10, y: 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var title: String {
+        switch feature {
+        case .themes: return String(localized: "vip.feature.themes.title", defaultValue: "VIP 主题")
+        case .flexibleMode: return String(localized: "vip.feature.flexible.title", defaultValue: "灵动模式")
+        case .cloudSync: return String(localized: "vip.feature.cloud.title", defaultValue: "iCloud 同步")
+        }
+    }
+
+    private var detail: String {
+        switch feature {
+        case .themes:
+            return String(format: String(localized: "vip.benefit.themes", defaultValue: "%d 套主题，小组件同步换装"), WeekTheme.vipThemes.count)
+        case .flexibleMode:
+            return String(localized: "vip.benefit.flexible", defaultValue: "专注之余，也能随时调整")
+        case .cloudSync:
+            return String(localized: "vip.benefit.cloud", defaultValue: "iPhone 与 iPad 同步，数据只在你手里")
+        }
+    }
+
+    @ViewBuilder
+    private var illustration: some View {
+        switch feature {
+        case .themes:
+            HStack(alignment: .center, spacing: 3) {
+                swatch(.lotr, height: 30)
+                swatch(.neon, height: 38)
+                swatch(.paper, height: 30)
+            }
+        case .flexibleMode:
+            VStack(spacing: 4) {
+                Capsule().fill(palette.primary.opacity(0.16)).frame(width: 40, height: 9)
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(palette.primary)
+                    Capsule().fill(palette.primary).frame(width: 40, height: 10)
+                }
+                .offset(x: 3)
+                Capsule().fill(palette.primary.opacity(0.16)).frame(width: 40, height: 9)
+            }
+        case .cloudSync:
+            Image(systemName: "ipad.and.iphone")
+                .font(.system(size: 30, weight: .regular))
+                .foregroundStyle(Color.blue)
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(palette.primary)
+                        .offset(x: 8, y: -6)
+                }
+        }
+    }
+
+    private func swatch(_ theme: WeekTheme, height: CGFloat) -> some View {
+        let colors = theme.palette(for: .system, systemIsDark: palette.isDark)
+        return RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(Color(hex: colors.primary))
+            .frame(width: 15, height: height)
+    }
+}
+
+// MARK: - Theme showcase
+
+/// Horizontally paged previews of the VIP themes; the centred card is full size.
+private struct VIPThemeCarousel: View {
+    let palette: VIPPagePalette
+
+    /// Lotr sits second so the first screen shows a neighbour on both sides.
+    private let themes: [WeekTheme] = {
+        var list = WeekTheme.vipThemes
+        if let index = list.firstIndex(of: .lotr), list.count > 1 {
+            list.remove(at: index)
+            list.insert(.lotr, at: 1)
+        }
+        return list
+    }()
+
+    @State private var current: WeekTheme? = .lotr
+
+    private let cardSize = CGSize(width: 150, height: 256)
+
+    var body: some View {
+        VStack(spacing: 8) {
+            GeometryReader { proxy in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(themes) { theme in
+                            VIPThemePreviewCard(theme: theme)
+                                .frame(width: cardSize.width, height: cardSize.height)
+                                .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                                    content
+                                        .scaleEffect(phase.isIdentity ? 1 : 0.86)
+                                        .opacity(phase.isIdentity ? 1 : 0.85)
+                                }
+                                .id(theme)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .contentMargins(.horizontal, max(0, (proxy.size.width - cardSize.width) / 2), for: .scrollContent)
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $current)
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled()
+            }
+            .frame(height: cardSize.height + 8)
+
+            Text(current?.displayName ?? "")
+                .font(.footnote.weight(.semibold))
+                .tracking(2)
+                .foregroundStyle(palette.primaryDark)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: current)
+
+            HStack(spacing: 6) {
+                ForEach(themes) { theme in
+                    Capsule()
+                        .fill(theme == current ? palette.primary : palette.textPrimary.opacity(0.15))
+                        .frame(width: theme == current ? 18 : 6, height: 6)
+                }
+            }
+            .animation(.snappy, value: current)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// A miniature "Today" screen drawn with a theme's real palette, card style and artwork.
+private struct VIPThemePreviewCard: View {
+    let theme: WeekTheme
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let isDark = colorScheme == .dark
+        let colors = theme.palette(for: .system, systemIsDark: isDark)
+        let style = theme.visualStyle
+        let artworkRadius = min(style.cornerRadius, 14)
+
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide)))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: colors.textTertiary))
+                Text(String(localized: "vip.preview.today", defaultValue: "今日"))
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color(hex: colors.textPrimary))
+            }
+            ThemeStatusArtwork(theme: theme, renderingMode: .staticImage)
+                .frame(height: 66)
+                .clipShape(RoundedRectangle(cornerRadius: artworkRadius, style: .continuous))
+                .overlay {
+                    if let border = style.borderColor(isDark: isDark) {
+                        RoundedRectangle(cornerRadius: artworkRadius, style: .continuous)
+                            .strokeBorder(border, lineWidth: min(style.borderWidth, 2))
+                    }
+                }
+            taskRow(
+                String(localized: "vip.preview.task.reading", defaultValue: "整理读书笔记"),
+                progress: 0.45,
+                colors: colors,
+                style: style,
+                isDark: isDark
+            )
+            taskRow(
+                String(localized: "vip.preview.task.walk", defaultValue: "晚间散步"),
+                time: "19:30",
+                colors: colors,
+                style: style,
+                isDark: isDark
+            )
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(hex: colors.backgroundPrimary))
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(isDark ? 0.45 : 0.16), radius: 16, y: 10)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(theme.displayName)
+    }
+
+    private func taskRow(
+        _ title: String,
+        progress: Double? = nil,
+        time: String? = nil,
+        colors: WeekThemePalette,
+        style: ThemeVisualStyle,
+        isDark: Bool
+    ) -> some View {
+        let radius = min(style.cornerRadius, 12)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let shadow = style.shadow ?? .classic
+        let barHeight = 4 * style.barScale
+        let barRadius = style.barCornerRadius ?? barHeight / 2
+
+        return VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(hex: colors.textPrimary))
+                .lineLimit(1)
+            if let progress {
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: barRadius)
+                        .fill(Color(hex: colors.backgroundTertiary))
+                    RoundedRectangle(cornerRadius: barRadius)
+                        .fill(Color(hex: colors.primary))
+                        .scaleEffect(x: progress, anchor: .leading)
+                }
+                .frame(height: barHeight)
+            }
+            if let time {
+                Text(verbatim: time)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: colors.textTertiary))
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: colors.backgroundSecondary), in: shape)
+        .overlay {
+            shape.strokeBorder(
+                style.borderColor(isDark: isDark) ?? Color(hex: colors.textPrimary).opacity(0.06),
+                lineWidth: min(style.borderWidth, 2)
+            )
+        }
+        .shadow(
+            color: shadow.color,
+            radius: shadow.radius * 0.6,
+            x: shadow.x * 0.75,
+            y: shadow.y * 0.75
+        )
     }
 }
 
