@@ -1323,20 +1323,60 @@ private struct LotrStatusIllustration: View {
                         )
                     }
                     .stroke(
-                        LinearGradient(colors: [Color(hex: "#FFB14E"), Color(hex: "#B52B1D")], startPoint: .top, endPoint: .bottom),
+                        LinearGradient(colors: [Color(hex: "#FFD27A"), Color(hex: "#FF8A3D"), Color(hex: "#B52B1D")], startPoint: .top, endPoint: .bottom),
                         style: StrokeStyle(lineWidth: 3.2, lineCap: .round)
                     )
+                    .shadow(color: Color(hex: "#FF8A3D").opacity(0.7), radius: 4)
+
+                    // Molten crater glow on the summit.
+                    Ellipse()
+                        .fill(Color(hex: "#FFB14E").opacity(colorScheme == .dark ? 0.55 : 0.4))
+                        .frame(width: 16, height: 6)
+                        .blur(radius: 3)
+                        .position(x: size.width * 0.73, y: size.height * 0.37)
+
+                    // Warm halo behind the ring.
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color(hex: "#F0C46A").opacity(colorScheme == .dark ? 0.34 : 0.24), .clear],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: 52
+                            )
+                        )
+                        .frame(width: 104, height: 104)
+                        .opacity(0.75 + Double(glint) * 0.25)
+                        .position(x: ringX, y: ringY)
 
                     WeatheredRingView(glint: glint, colorScheme: colorScheme)
                         .position(x: ringX, y: ringY)
 
+                    // Near hills in front of the ring's lower edge.
+                    Path { path in
+                        path.move(to: CGPoint(x: -4, y: size.height + 4))
+                        path.addLine(to: CGPoint(x: -4, y: size.height * 0.86))
+                        path.addQuadCurve(
+                            to: CGPoint(x: size.width * 0.3, y: size.height * 0.88),
+                            control: CGPoint(x: size.width * 0.14, y: size.height * 0.76)
+                        )
+                        path.addQuadCurve(
+                            to: CGPoint(x: size.width * 0.62, y: size.height * 0.9),
+                            control: CGPoint(x: size.width * 0.46, y: size.height * 0.98)
+                        )
+                        path.addLine(to: CGPoint(x: size.width * 0.62, y: size.height + 4))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(hex: colorScheme == .dark ? "#050506" : "#3E3935").opacity(0.9))
+
                     Canvas { context, canvas in
-                        for index in 0..<8 {
+                        for index in 0..<14 {
                             let phase = time * 0.42 + Double(index) * 0.73
-                            let x = canvas.width * (0.55 + CGFloat((index * 11) % 37) / 100)
+                            let x = canvas.width * (0.5 + CGFloat((index * 11) % 43) / 100)
                             let rise = CGFloat((phase.truncatingRemainder(dividingBy: 1.0))) * canvas.height * 0.58
                             let y = canvas.height * 0.96 - rise
-                            let ember = Path(ellipseIn: CGRect(x: x, y: y, width: 1.8, height: 1.8))
+                            let side: CGFloat = index.isMultiple(of: 3) ? 2.4 : 1.8
+                            let ember = Path(ellipseIn: CGRect(x: x, y: y, width: side, height: side))
                             context.fill(ember, with: .color(Color(hex: index.isMultiple(of: 2) ? "#FFB14E" : "#D84C2F").opacity(0.58)))
                         }
                     }
@@ -1373,6 +1413,15 @@ private struct WeatheredRingView: View {
             Ellipse()
                 .stroke(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.18), lineWidth: 1)
                 .padding(3)
+
+            // Faint fire-letter inscription along the band.
+            Ellipse()
+                .stroke(
+                    Color(hex: "#FF9A3D").opacity(0.35 + Double(glint) * 0.35),
+                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, dash: [2.2, 2.6])
+                )
+                .padding(1)
+                .shadow(color: Color(hex: "#FF8A3D").opacity(0.8), radius: 2)
 
             Group {
                 Capsule().frame(width: 7, height: 1.2).rotationEffect(.degrees(16)).position(x: 18, y: 13)

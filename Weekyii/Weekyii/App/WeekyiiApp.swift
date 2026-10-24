@@ -102,7 +102,12 @@ enum TodayActivitySnapshotBuilder {
             liveTheme: theme.liveActivityThemeSnapshot(appearanceMode: appearanceMode),
             typeName: typeDefinition?.name,
             typeIconName: typeDefinition?.iconName,
-            typeColorHex: typeDefinition?.colorHex,
+            // The island is always dark, so a themed built-in colour uses the dark palette.
+            typeColorHex: theme.themedTypeColorHex(
+                storedHex: typeDefinition?.colorHex,
+                baseKind: typeDefinition?.baseKind ?? focus.taskType,
+                isDark: true
+            ),
             dayStartedAt: day.initiatedAt,
             nextTitle: day.frozenTasks.first?.title,
             // The language the app UI is actually running in (honours the in-app

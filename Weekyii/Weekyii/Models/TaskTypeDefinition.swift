@@ -42,6 +42,20 @@ final class TaskTypeDefinition {
         Color(hex: colorHex)
     }
 
+    /// The colour each built-in type ships with. A built-in type still on this
+    /// colour has never been recoloured by the user.
+    static func builtInDefaultColorHex(for kind: TaskType) -> String {
+        switch kind {
+        case .regular: return "#4A90A4"
+        case .ddl: return "#C46A1A"
+        case .leisure: return "#8B5A83"
+        }
+    }
+
+    static func isBuiltInDefaultColor(_ hex: String, for kind: TaskType) -> Bool {
+        hex.caseInsensitiveCompare(builtInDefaultColorHex(for: kind)) == .orderedSame
+    }
+
     static func builtInDefinitions() -> [TaskTypeDefinition] {
         [
             TaskTypeDefinition(
@@ -132,12 +146,17 @@ struct TaskTypePresentation {
     let iconName: String
     let color: Color
     let baseKind: TaskType
+    /// Built-in type still on its shipped colour (never recoloured by the user),
+    /// so a theme may redraw it in its own palette.
+    let usesBuiltInDefaultColor: Bool
 
     init(definition: TaskTypeDefinition) {
         name = definition.name
         iconName = definition.iconName
         color = definition.color
         baseKind = definition.baseKind
+        usesBuiltInDefaultColor = definition.idRaw == definition.baseKind.rawValue
+            && TaskTypeDefinition.isBuiltInDefaultColor(definition.colorHex, for: definition.baseKind)
     }
 
     init(fallback: TaskType) {
@@ -145,6 +164,16 @@ struct TaskTypePresentation {
         iconName = fallback.iconName
         color = fallback.color
         baseKind = fallback
+        usesBuiltInDefaultColor = true
+    }
+
+    /// Colour to draw with under `skin`: themes that redraw the built-in types
+    /// use their palette colour unless the user picked a custom one.
+    func color(in skin: ThemeSkin) -> Color {
+        if skin.row?.themesBuiltInTypes == true, usesBuiltInDefaultColor {
+            return baseKind.color
+        }
+        return color
     }
 }
 

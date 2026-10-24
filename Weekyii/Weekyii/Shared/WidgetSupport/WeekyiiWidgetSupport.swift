@@ -349,6 +349,7 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         successHex = try container.decodeIfPresent(String.self, forKey: .successHex) ?? Self.fallbackSuccessHex
         darkSuccessHex = try container.decodeIfPresent(String.self, forKey: .darkSuccessHex) ?? successHex
         appearanceModeRaw = try container.decodeIfPresent(String.self, forKey: .appearanceModeRaw) ?? AppearanceMode.system.rawValue
+        gildedActions = try container.decodeIfPresent(Bool.self, forKey: .gildedActions)
     }
 }
 
@@ -396,6 +397,9 @@ struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
     var darkLockAccentHex: String
     var darkLockProgressTrackHex: String
     var appearanceModeRaw: String
+    /// Gold-filled primary action with an outlined secondary action (魔戒).
+    /// Optional so content states encoded by older builds still decode.
+    var gildedActions: Bool?
 
     init(
         islandTextPrimaryHex: String,
@@ -418,8 +422,10 @@ struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
         darkLockTextSecondaryHex: String? = nil,
         darkLockAccentHex: String? = nil,
         darkLockProgressTrackHex: String? = nil,
-        appearanceModeRaw: String = AppearanceMode.system.rawValue
+        appearanceModeRaw: String = AppearanceMode.system.rawValue,
+        gildedActions: Bool? = nil
     ) {
+        self.gildedActions = gildedActions
         self.islandTextPrimaryHex = islandTextPrimaryHex
         self.islandTextSecondaryHex = islandTextSecondaryHex
         self.islandAccentHex = islandAccentHex
@@ -495,6 +501,7 @@ struct LiveActivityThemeSnapshot: Codable, Equatable, Hashable {
         case darkLockAccentHex
         case darkLockProgressTrackHex
         case appearanceModeRaw
+        case gildedActions
     }
 
     init(from decoder: Decoder) throws {

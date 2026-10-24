@@ -126,8 +126,12 @@ struct ContentView: View {
         Label {
             Text(title)
         } icon: {
-            Image(systemName: systemImage)
-                .symbolVariant(.none)
+            if userSettings.selectedTheme.skin.glyphs == .lotr, let glyph = LotrGlyph(systemName: systemImage) {
+                LotrTabIcon.image(glyph, fallbackSystemName: systemImage)
+            } else {
+                Image(systemName: systemImage)
+                    .symbolVariant(.none)
+            }
         }
     }
 

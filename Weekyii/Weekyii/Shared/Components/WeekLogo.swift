@@ -19,6 +19,25 @@ struct WeekLogo: View {
     let animated: Bool
     
     @State private var isAnimating = false
+    @Environment(\.themeSkin) private var skin
+
+    private var isLotr: Bool { skin.glyphs == .lotr }
+
+    private var logoGradient: LinearGradient {
+        if isLotr {
+            // Forged gold, lit from above.
+            return LinearGradient(
+                colors: [Color(hex: "#F4DFA6"), Color(hex: "#C9A45C"), Color(hex: "#8A6630")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        return LinearGradient(
+            colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
     
     init(size: Size = .large, animated: Bool = true) {
         self.size = size
@@ -29,13 +48,8 @@ struct WeekLogo: View {
         Text("Weekyii")
             .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
             .italic()
-            .foregroundStyle(
-                LinearGradient(
-                    colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .foregroundStyle(logoGradient)
+            .shadow(color: isLotr ? Color(hex: "#E2A64B").opacity(0.35) : .clear, radius: 8)
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(

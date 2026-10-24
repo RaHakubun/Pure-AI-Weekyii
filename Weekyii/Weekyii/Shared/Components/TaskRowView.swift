@@ -12,6 +12,7 @@ struct TaskRowView: View {
     let showsHabitOrigin: Bool
     let renderContext: RenderContext
     @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+    @Environment(\.themeSkin) private var rowSkin
 
     private var taskType: TaskTypePresentation {
         taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
@@ -35,15 +36,24 @@ struct TaskRowView: View {
         HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
             // Left Accent Bar
             RoundedRectangle(cornerRadius: 2)
-                .fill(taskType.color)
+                .fill(taskType.color(in: rowSkin))
                 .frame(width: 4, height: 28)
                 .padding(.top, 2)
             
             // Icon
-            Image(systemName: taskType.iconName)
-                .font(.headline)
-                .foregroundColor(taskType.color)
-                .frame(width: 24)
+            if rowSkin.glyphs == .lotr,
+               let glyph = LotrGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+                LotrGlyphView(glyph: glyph)
+                    .frame(width: 18, height: 18)
+                    .foregroundColor(taskType.color(in: rowSkin))
+                    .frame(width: 24)
+                    .alignmentGuide(.firstTextBaseline) { dimensions in dimensions[.bottom] - 2 }
+            } else {
+                Image(systemName: taskType.iconName)
+                    .font(.headline)
+                    .foregroundColor(taskType.color)
+                    .frame(width: 24)
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {

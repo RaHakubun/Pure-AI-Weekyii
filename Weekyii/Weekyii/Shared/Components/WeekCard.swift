@@ -202,6 +202,20 @@ struct WeekFeatureLabel: View {
 
     @ViewBuilder
     private func themed(_ label: ThemeLabelSkin) -> some View {
+        if skin.glyphs != nil {
+            HStack(spacing: 7) {
+                ThemedSymbol(systemName: systemImage, size: 18)
+                    .foregroundColor(label.ink.color)
+                    .shadow(color: label.ink.color.opacity(0.5), radius: 4)
+                labelText(label)
+            }
+        } else {
+            labelText(label)
+        }
+    }
+
+    @ViewBuilder
+    private func labelText(_ label: ThemeLabelSkin) -> some View {
         switch label.kind {
         case .plain:
             Text(title)
@@ -349,7 +363,12 @@ struct WeekSectionHeader: View {
 
     private func themed(_ section: ThemeSectionSkin) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+            HStack(alignment: section.showsIcon ? .center : .firstTextBaseline, spacing: WeekSpacing.sm) {
+                if section.showsIcon {
+                    ThemedSymbol(systemName: systemImage, size: 17)
+                        .foregroundColor(tint)
+                        .shadow(color: tint.opacity(0.45), radius: 3)
+                }
                 Text(verbatim: (section.titlePrefix ?? "") + title)
                     .font(.titleSmall)
                     .foregroundColor(.textPrimary)
@@ -359,9 +378,21 @@ struct WeekSectionHeader: View {
                 countView(section.count)
             }
             if let rule = section.rule {
-                Rectangle()
-                    .fill(rule.color)
-                    .frame(height: 1.5)
+                if section.ruleFades {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [rule.color, rule.color.opacity(0.35), rule.color.opacity(0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: 1)
+                } else {
+                    Rectangle()
+                        .fill(rule.color)
+                        .frame(height: 1.5)
+                }
             }
         }
     }
@@ -388,6 +419,12 @@ struct WeekSectionHeader: View {
                 .font(.titleSmall)
                 .italic()
                 .foregroundColor(tint)
+        case .serif:
+            Text(verbatim: "\(count)")
+                .font(.system(size: 19, weight: .semibold, design: .serif))
+                .monospacedDigit()
+                .foregroundColor(tint)
+                .shadow(color: tint.opacity(0.5), radius: 4)
         }
     }
 }

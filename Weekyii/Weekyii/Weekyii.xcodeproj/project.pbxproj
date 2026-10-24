@@ -77,6 +77,7 @@
 		94982DB02F2BBB3C00CE8621 /* WeekButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */; };
 		94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */; };
 		94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */; };
+		A7C10D3E2F9B4E51008A1F01 /* LotrGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */; };
 		94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */; };
 		94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */; };
 		94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */; };
@@ -273,6 +274,7 @@
 		94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCard.swift; sourceTree = "<group>"; };
 		94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekButton.swift; sourceTree = "<group>"; };
 		94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCard.swift; sourceTree = "<group>"; };
+		A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LotrGlyph.swift; sourceTree = "<group>"; };
 		94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekLogo.swift; sourceTree = "<group>"; };
 		94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Spacing+Weekyii.swift"; sourceTree = "<group>"; };
 		94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography+Weekyii.swift"; sourceTree = "<group>"; };
@@ -588,6 +590,7 @@
 				C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */,
 				94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */,
 				94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */,
+				A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */,
 				94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */,
 				944E58362F2B593A00DB2DEE /* EmptyStateView.swift */,
 				944E58372F2B593A00DB2DEE /* KillTimeEditor.swift */,
@@ -1002,6 +1005,7 @@
 				94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */,
 				94C1D0F32F3F64FD00AA8E13 /* ProjectStatus.swift in Sources */,
 				94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */,
+				A7C10D3E2F9B4E51008A1F01 /* LotrGlyph.swift in Sources */,
 				94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */,
 				F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */,
 				F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */,

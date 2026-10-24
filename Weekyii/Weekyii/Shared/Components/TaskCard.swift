@@ -52,11 +52,12 @@ struct TaskCard: View {
     }
 
     private func themedCardContent(_ row: ThemeRowSkin) -> some View {
-        HStack(spacing: WeekSpacing.md) {
+        let typeColor = taskType.color(in: skin)
+        return HStack(spacing: WeekSpacing.md) {
             RoundedRectangle(cornerRadius: row.barCornerRadius)
-                .fill(taskType.color)
+                .fill(typeColor)
                 .frame(width: row.barWidth)
-                .shadow(color: row.barGlows ? taskType.color.opacity(0.8) : .clear, radius: row.barGlows ? 4 : 0)
+                .shadow(color: row.barGlows ? typeColor.opacity(0.8) : .clear, radius: row.barGlows ? 4 : 0)
                 .overlay(alignment: .trailing) {
                     if row.barFlush {
                         Rectangle()
@@ -93,13 +94,25 @@ struct TaskCard: View {
         .shadow(color: WeekShadow.light.color, radius: WeekShadow.light.radius, x: WeekShadow.light.x, y: WeekShadow.light.y)
     }
 
+    @ViewBuilder
+    private var taskTypeIcon: some View {
+        if skin.glyphs == .lotr,
+           let glyph = LotrGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+            LotrGlyphView(glyph: glyph)
+                .frame(width: 14, height: 14)
+                .foregroundColor(taskType.color(in: skin))
+        } else {
+            Image(systemName: taskType.iconName)
+                .foregroundColor(taskType.color)
+                .font(.caption)
+        }
+    }
+
     private var details: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.xs) {
             HStack(spacing: WeekSpacing.sm) {
                 // 任务类型图标
-                Image(systemName: taskType.iconName)
-                    .foregroundColor(taskType.color)
-                    .font(.caption)
+                taskTypeIcon
 
                 Text(task.title)
                     .font(.bodyLarge)

@@ -82,7 +82,6 @@ struct WeekyiiLiveActivityWidget: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     IslandExpandedLeading(model: Self.presentation(for: context))
-                        .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     IslandExpandedTrailing(model: Self.presentation(for: context))
@@ -317,12 +316,13 @@ private struct LiveTimeBar: View {
     let tint: Color
     let overdueColor: Color
     let track: Color
+    var barHeight: CGFloat = 5
 
     var body: some View {
         if model.isOverdue {
             Capsule()
                 .fill(overdueColor)
-                .frame(height: 5)
+                .frame(height: barHeight)
         } else if let window = model.timeWindow {
             ProgressView(timerInterval: window, countsDown: false) {
                 EmptyView()
@@ -334,7 +334,7 @@ private struct LiveTimeBar: View {
         } else {
             Capsule()
                 .fill(track)
-                .frame(height: 5)
+                .frame(height: barHeight)
         }
     }
 }
@@ -344,6 +344,7 @@ private struct LiveActionButtonLabel: View {
     var icon: String?
     let fill: Color
     let foreground: Color
+    var border: Color? = nil
     var height: CGFloat = 36
     var expands = true
 
@@ -354,7 +355,7 @@ private struct LiveActionButtonLabel: View {
             }
             Text(title)
         }
-        .font(.subheadline.weight(.bold))
+        .font(height < 32 ? Font.footnote.weight(.bold) : Font.subheadline.weight(.bold))
         .lineLimit(1)
         .minimumScaleFactor(0.8)
         .padding(.horizontal, 14)
@@ -362,6 +363,11 @@ private struct LiveActionButtonLabel: View {
         .frame(height: height)
         .foregroundStyle(foreground)
         .background(fill, in: Capsule())
+        .overlay {
+            if let border {
+                Capsule().strokeBorder(border, lineWidth: 1)
+            }
+        }
         .contentShape(Capsule())
     }
 }
@@ -371,6 +377,8 @@ private struct LiveActionButtonColors {
     var doneForeground: Color
     var secondaryFill: Color
     var secondaryForeground: Color
+    /// Hairline around secondary buttons (gilded themes draw them outlined).
+    var secondaryBorder: Color? = nil
     var confirmDoneFill: Color
     var confirmPostponeFill: Color
     var confirmForeground: Color
@@ -384,7 +392,7 @@ private struct LiveActionRow: View {
     var height: CGFloat = 36
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: height < 32 ? 8 : 10) {
             switch model.state.pendingAction {
             case .doneFocus:
                 confirmButtons(
@@ -418,6 +426,7 @@ private struct LiveActionRow: View {
                         icon: "arrow.right",
                         fill: colors.secondaryFill,
                         foreground: colors.secondaryForeground,
+                        border: colors.secondaryBorder,
                         height: height
                     )
                 }
@@ -444,6 +453,7 @@ private struct LiveActionRow: View {
                 title: model.cancelTitle,
                 fill: colors.secondaryFill,
                 foreground: colors.secondaryForeground,
+                border: colors.secondaryBorder,
                 height: height,
                 expands: false
             )
@@ -505,6 +515,20 @@ private struct LockScreenLiveActivityView: View {
     }
 
     private var buttonColors: LiveActionButtonColors {
+        if model.theme.gildedActions == true {
+            let gold = Color(widgetHex: model.theme.islandSuccessHex)
+            let doneFill = usesLightBackground ? gold.mix(with: .black, by: 0.25) : gold
+            return LiveActionButtonColors(
+                doneFill: doneFill,
+                doneForeground: usesLightBackground ? Color(widgetHex: "#FFF8E6") : Color(widgetHex: "#1D140A"),
+                secondaryFill: doneFill.opacity(0.08),
+                secondaryForeground: primaryTextColor,
+                secondaryBorder: doneFill.opacity(0.45),
+                confirmDoneFill: Color(widgetHex: "#3FA67A"),
+                confirmPostponeFill: Color(widgetHex: usesLightBackground ? "#B4561A" : model.theme.islandChipSecondaryHex),
+                confirmForeground: .white
+            )
+        }
         let success = Color(widgetHex: model.theme.islandSuccessHex)
         let doneFill = usesLightBackground ? success.mix(with: .black, by: 0.3) : success
         let doneForeground: Color = usesLightBackground || !liveActivityPrefersDarkForeground(model.theme.islandSuccessHex)
@@ -522,44 +546,45 @@ private struct LockScreenLiveActivityView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
                 LiveGlyph(symbol: model.glyphSymbol, color: glyphColor, size: 20)
-                Text(verbatim: "Weekyii · \(model.statusText)")
+                Text(verbatim: "Weekyii · \(model.statusWithTypeText)")
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(1)
                 Spacer(minLength: 8)
                 Text(model.deadlineText)
                     .lineLimit(1)
+                    .fixedSize()
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(statusColor)
 
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(model.state.focusTitle)
-                        .font(.headline.weight(.bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .foregroundStyle(primaryTextColor)
-                    Text(model.metaText)
-                        .font(.caption.weight(.medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .foregroundStyle(secondaryTextColor)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .layoutPriority(1)
+            // Title and timer share one row; the timer keeps a fixed slot so a
+            // long title truncates instead of pushing the countdown off.
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(model.state.focusTitle)
+                    .font(.system(size: 17, weight: .bold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(primaryTextColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(model.timerCaption)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(model.isOverdue ? tint : secondaryTextColor)
-                    LiveCountdownText(model: model)
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(tint)
-                        .frame(maxWidth: 120, alignment: .trailing)
-                }
+                LiveCountdownText(model: model)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(tint)
+                    .frame(width: 120, alignment: .trailing)
+                    .layoutPriority(2)
             }
+
+            Text(model.metaText)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(secondaryTextColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             LiveTimeBar(
                 model: model,
@@ -579,6 +604,19 @@ private struct LockScreenLiveActivityView: View {
 
 private func islandButtonColors(for model: LiveActivityPresentation) -> LiveActionButtonColors {
     let successHex = model.theme.islandSuccessHex
+    if model.theme.gildedActions == true {
+        let gold = Color(widgetHex: successHex)
+        return LiveActionButtonColors(
+            doneFill: gold,
+            doneForeground: Color(widgetHex: "#1D140A"),
+            secondaryFill: gold.opacity(0.08),
+            secondaryForeground: model.islandPrimary,
+            secondaryBorder: gold.opacity(0.4),
+            confirmDoneFill: Color(widgetHex: "#3FA67A"),
+            confirmPostponeFill: Color(widgetHex: model.theme.islandChipSecondaryHex),
+            confirmForeground: .white
+        )
+    }
     return LiveActionButtonColors(
         doneFill: Color(widgetHex: successHex),
         doneForeground: liveActivityPrefersDarkForeground(successHex) ? Color(widgetHex: "#0F2624") : .white,
@@ -594,17 +632,17 @@ private struct IslandExpandedLeading: View {
     let model: LiveActivityPresentation
 
     var body: some View {
-        HStack(spacing: 8) {
-            LiveGlyph(symbol: model.glyphSymbol, color: model.islandGlyphColor, size: 34, cornerRadius: 10)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 7) {
+            LiveGlyph(symbol: model.glyphSymbol, color: model.islandGlyphColor, size: 28, cornerRadius: 8)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(model.statusWithTypeText)
                     .foregroundStyle(model.phase == .normal ? model.islandSecondary : model.islandTint)
                 Text(model.deadlineText)
                     .foregroundStyle(model.isOverdue ? model.islandTint : model.islandPrimary)
             }
-            .font(.caption.weight(.semibold))
+            .font(.system(size: 11.5, weight: .semibold))
             .lineLimit(1)
-            .minimumScaleFactor(0.8)
+            .minimumScaleFactor(0.75)
         }
         .padding(.leading, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -615,17 +653,15 @@ private struct IslandExpandedTrailing: View {
     let model: LiveActivityPresentation
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            Text(model.timerCaption)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(model.isOverdue ? model.islandTint : model.islandSecondary)
-                .lineLimit(1)
-            LiveCountdownText(model: model)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(model.islandTint)
-                .frame(maxWidth: 116, alignment: .trailing)
-        }
-        .padding(.trailing, 4)
+        // Timer only: the countdown speaks for itself, and dropping the caption
+        // keeps the expanded leading/trailing row to a single compact height.
+        LiveCountdownText(model: model)
+            .font(.system(size: 25, weight: .bold, design: .rounded))
+            .minimumScaleFactor(0.7)
+            .foregroundStyle(model.islandTint)
+            .frame(width: 112, alignment: .trailing)
+            .frame(maxHeight: .infinity, alignment: .center)
+            .padding(.trailing, 4)
     }
 }
 
@@ -633,17 +669,17 @@ private struct IslandExpandedBottom: View {
     let model: LiveActivityPresentation
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(model.state.focusTitle)
-                    .font(.headline.weight(.bold))
+                    .font(.system(size: 16, weight: .bold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .truncationMode(.tail)
                     .foregroundStyle(model.islandPrimary)
                 Text(model.metaText)
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 11.5, weight: .medium))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .truncationMode(.tail)
                     .foregroundStyle(model.islandSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -652,10 +688,11 @@ private struct IslandExpandedBottom: View {
                 model: model,
                 tint: model.islandTint,
                 overdueColor: model.islandTint,
-                track: Color.white.opacity(0.14)
+                track: Color.white.opacity(0.14),
+                barHeight: 4
             )
 
-            LiveActionRow(model: model, colors: islandButtonColors(for: model), height: 36)
+            LiveActionRow(model: model, colors: islandButtonColors(for: model), height: 30)
         }
         .padding(.horizontal, 4)
     }

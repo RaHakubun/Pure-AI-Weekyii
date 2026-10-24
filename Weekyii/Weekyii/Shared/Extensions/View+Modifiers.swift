@@ -21,9 +21,10 @@ struct ThemedSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(skin.fill?.color ?? fallbackFill)
+            .background { fillLayer }
             .clipShape(shape)
             .overlay { border.allowsHitTesting(false) }
+            .overlay { ornamentLayer.allowsHitTesting(false).accessibilityHidden(true) }
             .background { underlay.allowsHitTesting(false) }
             .shadow(
                 color: glow?.color.color ?? .clear,
@@ -50,6 +51,36 @@ struct ThemedSurfaceModifier: ViewModifier {
     }
 
     @ViewBuilder
+    private var fillLayer: some View {
+        ZStack {
+            skin.fill?.color ?? fallbackFill
+            if let glow = skin.innerGlow {
+                RadialGradient(
+                    colors: [glow.color.opacity(0.30), glow.color.opacity(0)],
+                    center: .topTrailing,
+                    startRadius: 0,
+                    endRadius: 260
+                )
+            }
+        }
+    }
+
+    /// Inner gilded hairline plus a bracket in each corner.
+    @ViewBuilder
+    private var ornamentLayer: some View {
+        if let ornament = skin.ornament {
+            let inset: CGFloat = 3.5
+            ZStack {
+                RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - inset))
+                    .strokeBorder(ornament.color.opacity(0.22), lineWidth: 0.75)
+                    .padding(inset)
+                CornerBracketsShape(inset: 6, arm: 14, radius: 5)
+                    .stroke(ornament.color.opacity(0.85), style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+            }
+        }
+    }
+
+    @ViewBuilder
     private var underlay: some View {
         ZStack {
             if let stack = skin.stackLine {
@@ -61,6 +92,35 @@ struct ThemedSurfaceModifier: ViewModifier {
                 shape.fill(shadow.color.color).offset(x: shadow.x, y: shadow.y)
             }
         }
+    }
+}
+
+/// Four L-shaped brackets hugging the corners of a rect, with rounded elbows.
+struct CornerBracketsShape: Shape {
+    var inset: CGFloat
+    var arm: CGFloat
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let r = rect.insetBy(dx: inset, dy: inset)
+        guard r.width > arm * 2, r.height > arm * 2 else { return path }
+        let corners: [(CGPoint, CGFloat, CGFloat)] = [
+            (CGPoint(x: r.minX, y: r.minY), 1, 1),
+            (CGPoint(x: r.maxX, y: r.minY), -1, 1),
+            (CGPoint(x: r.minX, y: r.maxY), 1, -1),
+            (CGPoint(x: r.maxX, y: r.maxY), -1, -1)
+        ]
+        for (corner, dx, dy) in corners {
+            path.move(to: CGPoint(x: corner.x, y: corner.y + dy * arm))
+            path.addLine(to: CGPoint(x: corner.x, y: corner.y + dy * radius))
+            path.addQuadCurve(
+                to: CGPoint(x: corner.x + dx * radius, y: corner.y),
+                control: corner
+            )
+            path.addLine(to: CGPoint(x: corner.x + dx * arm, y: corner.y))
+        }
+        return path
     }
 }
 

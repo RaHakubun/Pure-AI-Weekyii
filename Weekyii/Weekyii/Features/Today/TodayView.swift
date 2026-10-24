@@ -125,6 +125,7 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
+    @Environment(\.themeSkin) private var todaySkin
 
     @State private var viewModel: TodayViewModel?
     @State private var selectedTaskForDetail: TaskItem?
@@ -372,12 +373,28 @@ struct TodayView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.days_started"))
+                        Text(todaySkin.glyphs == .lotr
+                             ? String(localized: "today.days_journeyed")
+                             : String(localized: "today.days_started"))
                             .font(.caption)
                             .foregroundColor(.textSecondary)
-                        Text("\(appState.daysStartedCount)")
-                            .font(.titleMedium)
-                            .foregroundColor(.weekyiiPrimary)
+                        if todaySkin.glyphs == .lotr {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.system(size: 30, weight: .semibold, design: .serif))
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary, Color.weekyiiPrimaryDark],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .shadow(color: Color.weekyiiPrimary.opacity(0.45), radius: 6)
+                        } else {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.titleMedium)
+                                .foregroundColor(.weekyiiPrimary)
+                        }
                     }
                 }
 
@@ -387,9 +404,21 @@ struct TodayView: View {
                     .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
-                Text(formatDate(day.dayId))
-                    .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
+                if todaySkin.glyphs == .lotr {
+                    HStack(spacing: 6) {
+                        LotrGlyphView(glyph: .candle)
+                            .frame(width: 14, height: 14)
+                            .foregroundColor(.weekyiiPrimary)
+                        Text(formatDate(day.dayId))
+                            .font(.system(.subheadline, design: .serif))
+                            .tracking(0.6)
+                            .foregroundColor(.textSecondary)
+                    }
+                } else {
+                    Text(formatDate(day.dayId))
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                }
             }
         }
     }
@@ -695,7 +724,7 @@ struct TodayView: View {
                     HStack {
                         if let startedAt = focusTask.startedAt {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "clock")
+                                ThemedSymbol(systemName: "clock", size: 13)
                                     .font(.caption)
                                 Text(formatTime(startedAt))
                                     .font(.caption)
@@ -709,7 +738,7 @@ struct TodayView: View {
                             taskForPostpone = focusTask
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "calendar.badge.clock")
+                                ThemedSymbol(systemName: "calendar.badge.clock", size: 13)
                                 Text("后移")
                             }
                             .font(.caption.weight(.semibold))
@@ -750,7 +779,7 @@ struct TodayView: View {
                             }
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "checkmark.circle.fill")
+                                ThemedSymbol(systemName: "checkmark.circle.fill", size: 13)
                                 Text(String(localized: "action.done_focus"))
                             }
                             .font(.caption.weight(.semibold))
@@ -841,7 +870,7 @@ struct TodayView: View {
         // 庆祝卡片
         WeekCard(useGradient: true) {
             VStack(spacing: WeekSpacing.lg) {
-                Image(systemName: "party.popper.fill")
+                ThemedSymbol(systemName: "party.popper.fill", glyph: .sunrise, size: 54)
                     .font(.system(size: 50))
                     .foregroundColor(.weekyiiOnFeature)
                 
@@ -1575,6 +1604,15 @@ private struct SectionToggleView: View {
     let progress: CGFloat
     let selectedSection: TodaySection
     let onSelect: (TodaySection) -> Void
+    @Environment(\.themeSkin) private var skin
+
+    private var isLotr: Bool { skin.glyphs == .lotr }
+
+    private var indicatorColors: [Color] {
+        isLotr
+            ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary, Color.weekyiiPrimaryDark]
+            : [Color.weekyiiPrimary, Color.weekyiiPrimary.opacity(0.85)]
+    }
     
     private let height: CGFloat = 44
     
@@ -1585,7 +1623,7 @@ private struct SectionToggleView: View {
                 onSelect(.today)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "sun.max.fill")
+                    ThemedSymbol(systemName: "sun.max.fill", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
@@ -1603,7 +1641,7 @@ private struct SectionToggleView: View {
                 onSelect(.week)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar")
+                    ThemedSymbol(systemName: "calendar", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
@@ -1625,10 +1663,7 @@ private struct SectionToggleView: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color.weekyiiPrimary,
-                                Color.weekyiiPrimary.opacity(0.85)
-                            ],
+                            colors: indicatorColors,
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -1655,7 +1690,7 @@ private struct SectionToggleView: View {
                     // 边框
                     .overlay(
                         Capsule()
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                            .strokeBorder(isLotr ? Color(hex: "#F4DFA6").opacity(0.55) : Color.white.opacity(0.2), lineWidth: isLotr ? 1 : 0.5)
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
                     )
@@ -1672,11 +1707,13 @@ private struct SectionToggleView: View {
                     Capsule()
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1),
-                                    Color.black.opacity(0.05)
-                                ],
+                                colors: isLotr
+                                    ? [Color.weekyiiPrimary.opacity(0.55), Color.weekyiiPrimaryDark.opacity(0.35)]
+                                    : [
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0.1),
+                                        Color.black.opacity(0.05)
+                                    ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             ),
@@ -1929,6 +1966,18 @@ private struct LotrRainNightBackground: View {
                     .frame(width: 3, height: 12)
                     .blur(radius: 0.4)
                     .position(x: size.width * 0.362, y: horizonY - 8)
+
+                // forge embers glowing from below the horizon
+                RadialGradient(
+                    colors: [
+                        Color(hex: "#D1693A").opacity(colorScheme == .dark ? 0.32 : 0.16),
+                        Color(hex: "#8A3A1C").opacity(colorScheme == .dark ? 0.14 : 0.06),
+                        Color.clear
+                    ],
+                    center: UnitPoint(x: 0.5, y: 1.05),
+                    startRadius: 0,
+                    endRadius: max(size.width, size.height) * 0.55
+                )
 
                 coldRain(size: size, fromY: horizonY - 120)
             }

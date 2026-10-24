@@ -51,6 +51,20 @@ struct StatusBadge: View {
             Text(verbatim: "[\(status.displayName)]")
                 .font(.caption2.weight(.bold))
                 .foregroundColor(status.color)
+        case .ember:
+            HStack(spacing: 4) {
+                LotrGlyphView(glyph: .flame)
+                    .frame(width: 10, height: 10)
+                Text(status.displayName)
+                    .font(.caption2.weight(.semibold))
+                    .tracking(0.6)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundColor(status.color)
+            .background(status.color.opacity(0.16), in: Capsule())
+            .overlay(Capsule().strokeBorder(status.color.opacity(0.55), lineWidth: 1))
+            .shadow(color: status.color.opacity(0.3), radius: 4)
         }
     }
 }
