@@ -1,11 +1,10 @@
 import SwiftUI
 import StoreKit
 
-/// Placeholder legal links. Replace with the published URLs before App Review;
-/// App Store guideline 3.1.2 requires both on the purchase page.
+/// App Store guideline 3.1.2 requires both legal links on the purchase page.
 enum VIPLegalLinks {
-    static let termsOfUse: URL? = nil
-    static let privacyPolicy: URL? = nil
+    static let termsOfUse: URL? = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
+    static let privacyPolicy: URL? = URL(string: "https://weekyii-privacy-h1jjp4ia8f0.qoder.zone")
 }
 
 /// Settings › VIP 服务. Also presented as the paywall sheet whenever a free user
@@ -602,7 +601,7 @@ struct VIPServiceView: View {
             ),
             FAQItem(
                 question: String(localized: "vip.faq.free.q", defaultValue: "哪些功能是免费的？"),
-                answer: String(localized: "vip.faq.free.a", defaultValue: "周计划与今日任务、严格模式、灵动岛、小组件和数据导出等都永久免费。")
+                answer: String(localized: "vip.faq.free.a", defaultValue: "周计划与今日任务、严格模式、灵动岛、小组件和数据导出等都永久免费，保证任何使用 Weekyii 的用户能够建立良好的任务完成习惯。")
             ),
         ])
         return items

@@ -3,121 +3,112 @@
 用于 App Store Connect → TestFlight → 构建版本 → 测试内容。
 每次发版替换顶部的版本号，并增删对应模块即可。
 
-当前版本：**1.0 (5)** · 主要语言：简体中文
+当前版本：**1.2 (1)** · 主要语言：简体中文
 
 ---
 
 ## 简体中文（可直接粘贴）
 
-本次更新包含四块内容：**4 个全新个性化主题**、**设置页扩充**、**悬置箱提醒与到期处理**、**本周结构树绘制修复**。请重点测试以下场景。
+1.2 来了，这是一次「看起来完全不一样」的大改版——新主题、新小组件、新 Live Activity，都在这一版。
 
-### 一、4 个全新个性化主题
+请通过 TestFlight **直接覆盖更新，不要卸载**。更新后先确认旧数据都还在，再跟着下面的清单体验新东西。本版不改动任何数据结构，升级无感过渡。
 
-设置页新增「粗野 / 霓虹 / 纸感 / 终端」四个主题，它们不只是换配色，圆角、描边、阴影和图标形态都不同。
+### 一、换上你的主题：五个世界，五种脾气
 
-1. 在主题选择处依次切换到这四个主题，确认每个主题的整体观感确实不同，而不是只有颜色变化。
-2. 切到新主题后进入「今日」页，查看状态插图；再依次打开「本周」「扩展」「悬置箱」，确认文字与背景对比度清晰、没有看不清的浅色字。
-3. 每个新主题都分别在浅色与深色模式下各看一遍。
-4. 切换主题后回到桌面查看小组件，颜色应与 App 内一致。
-5. 开启「减少动效」后，状态插图与磁贴的动画应全部停止。
+设置页的主题（默认 + 粗野 / 霓虹 / 纸感 / 终端）现在由全新的 ThemeSkin 驱动——圆角、阴影、页面底色、选中态和排版全部跟着主题走，不再是「只换了个颜色」。
 
-### 二、设置页新增项
+1. 依次切换每个主题，逛一遍「今日」「本周」「扩展」「悬置箱」「设置」，感受每个主题独有的气质。
+2. 每个主题在浅色、深色模式下各看一遍，确认文字清晰，没有看不清的浅色字。
+3. 「今日」页的状态插图全部重绘：切主题时看看它是否跟着变身、有没有错位或残留旧图。
+4. 开着「减少动效」的话，插图与磁贴动画应该都静止。
+5. 换完主题回到桌面，小组件应该和 App 里一个脾气。
 
-1. **语言**：新增界面语言选项，切换后需要**完全退出并重新打开** Weekyii 才会生效，请确认提示与实际表现一致。
-2. **动效**：新增「减少动效」（停止主题背景、转场、磁贴翻转动画）与「模块磁贴自动轮换」两个开关，改动应立即生效；「减少动效」开启后磁贴轮换也应一并停止。
-3. **悬置箱**：新增默认倒计时、到期处理方式、到期提醒（开关 / 强度 / 提前天数 / 当晚提醒时刻）。
-4. **项目看板**：新增每行列数（2–6）、默认颜色、默认图标；列数调小后磁贴应变大，宽幅磁贴应自动收窄而不越界。
-5. **使用历程**：新增恢复点保留数量。
-6. 改完上述设置后，**强制退出 App 再重开**，所有设置应完整保留。
+### 二、小组件：放在桌面上的今日全景
 
-### 三、悬置箱提醒与到期处理
+主屏和锁屏小组件都重做了。现在小组件上能看到截止时间、日界提示、即将开始的任务和任务类型颜色——不打开 App，一眼知道今天要干什么。
 
-1. 把「到期处理方式」设为**保留为逾期待处理**，让一个悬置任务过期：它应继续留在悬置箱并显示「已逾期 N 天」，且仍可续期 / 分配 / 删除。
-2. 改回**到期自动删除**，过期任务应直接消失、不留记录。
-3. 把「提醒强度」依次切到精简 / 标准 / 充分，确认实际收到提醒的时机与设置页的描述文字一致。
-4. 新建悬置任务时，倒计时默认值应等于设置里的「悬置箱默认倒计时」，且在保存前仍可单独调整。
-5. 关闭「到期提醒」后，不应再收到任何悬置任务的到期提醒。
+1. 重新添加各尺寸小组件，确认加载正常、没有占位空壳。
+2. 把小组件和 App 内「今日」页对照，信息应该一致。
+3. 完成一个任务，看小组件是否及时刷新。
 
-### 四、本周结构树（全屏视图）
+### 三、Live Activity / 灵动岛：计时活着，操作不打断
 
-1. 打开本周结构树全屏视图：相邻日期的任务卡不应再互相压叠；紧凑日期卡的文字（如「14日 · 2」）不应折行或撞到角标。
-2. **请特别留意连线**：连接线不应穿过日期卡、分组节点或任务卡。
-3. 轻点某一天，应聚焦到该天的任务子树；不应出现「点了没反应」。
-4. 轻点任务卡，应显示任务详情，**不应**显示「任务已遗忘」。
-5. 已知限制：一天任务较多（≥4 个）时，子树装不下紧凑画布，需要拖动查看后续行。
+启动一天后，锁屏和灵动岛上的倒计时、时间环会实时走动，临近截止自动变色提醒。更顺手的是：「完成」「移到明天」在灵动岛上点一下就能办，带确认步骤，全程不用打开 App。
 
-### 五、其他改动
+1. 启动一天，观察倒计时、时间环实时走动。
+2. 依次确认正常 / 即将截止 / 已逾期三种状态；超过截止时间应自动切到逾期态。
+3. 直接在 Live Activity / 灵动岛上点「完成」「移到明天」（不要打开 App），然后再打开 App，核对任务状态、队列顺序和统计数字。
+4. 留意任务类型的名称、图标、颜色，以及下一个任务和待办数量的显示。
 
-1. 扩展页的模块磁贴应每隔几秒轮换展示真实内容；关闭「模块磁贴自动轮换」后应停止轮换。
-2. 关闭「开始仪式」后，确认警告提示应直接开始一天，不再弹出印章。
-3. 请留意 App 图标已更换。
-4. 沿用上一版：iCloud 自动同步请再做一次回归（新建 / 修改 / 删除任务、项目、呆胶布、悬置任务，另一端应自动出现相同变更；带附件的任务在另一台设备应能正常打开）。
-5. 从上一版（1.0 构建 4）**直接覆盖安装，不要卸载**：原有周、日、任务、项目、附件与全部设置应完整保留。
+### 四、两个让你更顺的修复
+
+1. 执行队列更稳了：连续完成多个任务、经过 done focus 和 repair，队列不再乱序或重复。
+2. 焦点卡的「推迟」「交换」按钮不再中英混杂，跟随 App 当前语言。
+
+### 五、数据与同步（老规矩）
+
+1. 从 1.1 (5) 覆盖安装：周、日、任务、项目、附件、习惯、设置，一个都不该少。
+2. iCloud 双设备回归：新建 / 编辑 / 删除任务和项目，另一端应自动同步；带附件的任务在另一台设备能正常打开。
 
 ### 反馈时请附上
 
-设备型号与系统版本、构建号 1.0 (5)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。
+设备型号与系统版本、构建号 1.2 (1)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。这一版好不好看、好不好用，你们说了算。
 
 ---
 
 ## 已知问题（可选，按需保留或删除）
 
-- 英文语言环境下，部分新增文案（主题名、设置项）仍显示中文，本地化尚未完成，正在修复中。
-- 本周结构树中，一天任务较多时子树需要拖动查看，属当前画布尺寸的物理限制。
+- 如发现英文环境下个别新增文案仍显示中文，请反馈具体位置，本地化仍在收尾。
 - iCloud 同步为自动开启、无开关；未登录 iCloud 时 App 仍可正常本地使用。
 
 ---
 
 ## English (optional — fill if the app ships an English localization)
 
-This update has four focus areas: **four new personalised themes**, **expanded settings**, **suspended-box reminders and expiry handling**, and **Week Topology drawing fixes**.
+1.2 is here — a build that looks completely different. New themes, new widgets, new Live Activity, all in one update.
 
-### 1. Four new personalised themes
+Please update **directly over the previous build — do not uninstall**. Confirm your old data is intact first, then walk through the list below. No data-schema changes in this build.
 
-Settings now offers "Brutal / Neon / Paper / Terminal". These change corner radius, borders, shadows and icon form — not just the palette.
+### 1. Make it yours: five worlds, five moods
 
-1. Switch through all four and confirm each one looks genuinely different, not merely recoloured.
-2. Open Today to see the status artwork, then Week / Extensions / Suspended Box — check text contrast is readable everywhere.
-3. Check each new theme in both light and dark appearance.
-4. Check the home-screen widget matches the in-app theme.
-5. With "Reduce motion" on, status artwork and tile animations must stop.
+Every theme (default plus Brutalist / Neon / Paper / Terminal) is now driven by a new ThemeSkin — corner radius, shadows, surfaces, selected state and typography all follow the theme, not just the palette.
 
-### 2. New settings
+1. Switch through each theme and visit Today / Week / Extensions / Suspended Box / Settings; feel the personality of each one.
+2. Check each theme in light and dark appearance; text must stay readable.
+3. The Today status artwork is fully redrawn — watch it transform with the theme, with no misplacement or stale artwork.
+4. With "Reduce motion" on, artwork and tile animations must stop.
+5. After switching themes, the home-screen widget should match the app.
 
-1. **Language** — takes effect only after a full quit and relaunch; confirm the hint matches reality.
-2. **Motion** — "Reduce motion" and "Module tile auto-rotation"; changes apply immediately, and reduce motion should also stop tile rotation.
-3. **Suspended box** — default countdown, expiry policy, due reminders (toggle / intensity / advance days / evening time).
-4. **Project board** — columns per row (2–6), default colour, default icon. Fewer columns should enlarge tiles; wide tiles should narrow instead of overflowing.
-5. **Usage history** — recovery point retention count.
-6. Force-quit and relaunch: every setting must persist.
+### 2. Widgets: your day, on the home screen
 
-### 3. Suspended-box reminders and expiry
+Home-screen and lock-screen widgets are redesigned. They now show deadline, day boundary, upcoming tasks and task-type colours — a glance is enough to know what today asks of you.
 
-1. Set the expiry policy to **keep as overdue**: an expired suspended task must stay in the box showing "overdue by N days", still renew / assign / deletable.
-2. Switch back to **auto-delete**: expired tasks disappear with no record.
-3. Cycle reminder intensity through Minimal / Standard / Full; actual reminder timing must match the description on the settings screen.
-4. New suspended tasks must default to the configured countdown, still adjustable before saving.
-5. With due reminders off, no suspended-box notifications should arrive.
+1. Re-add each widget size; they must load with no placeholder content.
+2. Compare the widget against the in-app Today screen; information must match.
+3. Complete a task and check the widget refreshes promptly.
 
-### 4. Week Topology (full-screen)
+### 3. Live Activity / Dynamic Island: time that moves, actions that don't interrupt
 
-1. Task cards for adjacent days must no longer overlap; compact day cards (e.g. "14 · 2") must not wrap or hit the badge.
-2. **Watch the connectors specifically**: no line should cross a day card, group node or task card.
-3. Tapping a day should focus that day's task subtree — no "nothing happens".
-4. Tapping a task card must show task details, **not** "task forgotten".
-5. Known limit: with four or more tasks in a day the subtree does not fit the compact canvas and must be scrolled.
+After starting a day, the lock-screen Live Activity and Dynamic Island tick in real time and shift to a due-soon look as the deadline nears. Best of all: "Done" and "Move to tomorrow" work right from the island, with a confirm step, without ever opening the app.
 
-### 5. Other changes
+1. Start a day and watch the countdown, ring and bar move in real time.
+2. Confirm normal / due-soon / overdue phases; past the deadline it must switch automatically.
+3. Use "Done" and "Move to tomorrow" directly from the Live Activity / Dynamic Island (without opening the app), then open the app and verify task state, queue order and counters.
+4. Watch the task type name, icon, colour, next task and pending count.
 
-1. Extensions module tiles should rotate through real content; turning off auto-rotation stops it.
-2. With the start ritual disabled, confirming the warning starts the day directly with no stamp.
-3. Note the app icon has changed.
-4. iCloud sync regression (unchanged from the previous build): create / edit / delete tasks, projects, MindStamps and suspended tasks on device A — device B must receive the same changes; attachments must open on the other device.
-5. **Install over the previous build (1.0 build 4) without uninstalling**: existing weeks, days, tasks, projects, attachments and all settings must be preserved.
+### 4. Two fixes that make things smoother
+
+1. The execution queue is steadier: order stays stable after completing several tasks and going through done focus and repair.
+2. Focus-card "Postpone" / "Swap" buttons follow the app language, no more mixed strings.
+
+### 5. Data & sync (as always)
+
+1. Install over 1.1 (5): weeks, days, tasks, projects, attachments, habits and settings — nothing should go missing.
+2. iCloud two-device regression: create / edit / delete tasks and projects; the other device must converge; attachments must open on the other device.
 
 ### When reporting
 
-Include device model and OS version, build number 1.0 (5), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log.
+Include device model and OS version, build number 1.2 (1), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. Whether this build looks and feels right is your call.
 
 ---
 
