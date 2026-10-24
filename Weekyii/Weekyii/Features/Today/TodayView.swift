@@ -315,13 +315,13 @@ struct TodayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 // 顶部状态卡片
-                statusCard(for: day)
+                erasedStatusCard(for: day)
 
                 // 任务流区域
                 taskFlowSection(day: day, viewModel: viewModel)
 
                 // 截止时间（放在最后）
-                killTimeCard(day: day, viewModel: viewModel)
+                erasedKillTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
@@ -333,27 +333,71 @@ struct TodayView: View {
         }
     }
 
-    @ViewBuilder
+    // 启动崩溃修复（1.2 (3)，iOS 27 真机）：
+    // 原先这里是 5 路 `@ViewBuilder switch`，返回类型是把 5 个状态视图全部拼进去的
+    // `_ConditionalContent` 复合类型。编译器在判断 `day.status` 之前就按每个分支视图
+    // 类型的真实大小，在栈上一次性预留全部缓冲区，再叠加类型元数据的递归解析，
+    // 把 1MB 的主线程栈撑爆。
+    // 现在每个状态单独放进一个不内联的函数，并用 `AnyView` 隔开：
+    // - 这里只持有固定大小的 `AnyView`，不再为 5 个分支预留栈空间；
+    // - 只有当前状态那一支的视图类型会在它自己的栈帧里实例化，其余分支不会被解析。
+    // 不要把这里改回 `@ViewBuilder switch`，也不要去掉 `@inline(never)`。
     private func taskFlowSection(day: DayModel, viewModel: TodayViewModel) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-            // 根据状态显示不同内容
-            switch day.status {
-            case .empty:
-                emptyStateContent(day: day, viewModel: viewModel)
-                
-            case .draft:
-                draftStateContent(day: day, viewModel: viewModel)
-                
-            case .execute:
-                executeStateContent(day: day, viewModel: viewModel)
-                
-            case .completed:
-                completedStateContent(day: day)
-                
-            case .expired:
-                expiredStateContent(day: day)
-            }
+            stateContent(day: day, viewModel: viewModel)
         }
+    }
+
+    private func stateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        switch day.status {
+        case .empty:
+            return erasedEmptyStateContent(day: day, viewModel: viewModel)
+        case .draft:
+            return erasedDraftStateContent(day: day, viewModel: viewModel)
+        case .execute:
+            return erasedExecuteStateContent(day: day, viewModel: viewModel)
+        case .completed:
+            return erasedCompletedStateContent(day: day)
+        case .expired:
+            return erasedExpiredStateContent(day: day)
+        }
+    }
+
+    @inline(never)
+    private func erasedEmptyStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(emptyStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedDraftStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(draftStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedExecuteStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(executeStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedCompletedStateContent(day: DayModel) -> AnyView {
+        AnyView(completedStateContent(day: day))
+    }
+
+    @inline(never)
+    private func erasedExpiredStateContent(day: DayModel) -> AnyView {
+        AnyView(expiredStateContent(day: day))
+    }
+
+    /// The status card and kill-time card sit beside the task flow in the same
+    /// stack; erasing them keeps the page's top-level type small as well.
+    @inline(never)
+    private func erasedStatusCard(for day: DayModel) -> AnyView {
+        AnyView(statusCard(for: day))
+    }
+
+    @inline(never)
+    private func erasedKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(killTimeCard(day: day, viewModel: viewModel))
     }
 
     // MARK: - Status Card
