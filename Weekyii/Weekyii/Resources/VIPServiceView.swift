@@ -75,7 +75,7 @@ struct VIPServiceView: View {
         }
         .navigationTitle(String(localized: "vip.title", defaultValue: "VIP 服务"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar { toolbarContent }
         .tint(palette.primary)
         .task {
@@ -279,6 +279,7 @@ struct VIPServiceView: View {
                 featuredBadge(pricing: pricing)
                     .offset(x: -14, y: -11)
             }
+            .compositingGroup()
             .shadow(color: palette.primary.opacity(isSelected ? 0.15 : 0), radius: 12, y: 6)
             .contentShape(Rectangle())
         }
@@ -382,6 +383,7 @@ struct VIPServiceView: View {
                     LinearGradient(colors: [palette.accent, palette.primary], startPoint: .leading, endPoint: .trailing),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
+                .compositingGroup()
                 .shadow(color: palette.primary.opacity(0.30), radius: 12, y: 6)
             }
             .buttonStyle(.plain)
@@ -396,18 +398,18 @@ struct VIPServiceView: View {
             legalLinks
         }
         .padding(.horizontal, 16)
-        .padding(.top, 18)
+        .padding(.top, 12)
         .padding(.bottom, 6)
         .background {
-            LinearGradient(
-                stops: [
-                    .init(color: palette.background.opacity(0), location: 0),
-                    .init(color: palette.background, location: 0.28),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
+            palette.background
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .overlay(alignment: .top) {
+            // Content scrolling underneath fades out instead of showing through.
+            LinearGradient(colors: [palette.background.opacity(0), palette.background], startPoint: .top, endPoint: .bottom)
+                .frame(height: 24)
+                .offset(y: -24)
+                .allowsHitTesting(false)
         }
     }
 
@@ -756,6 +758,7 @@ private extension View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(palette.border, lineWidth: 1)
             }
+            .compositingGroup()
             .shadow(color: Color.black.opacity(palette.isDark ? 0 : 0.05), radius: 10, y: 4)
     }
 }
@@ -771,7 +774,7 @@ private struct VIPBenefitCard: View {
     var body: some View {
         VStack(spacing: 8) {
             illustration
-                .frame(height: 44)
+                .frame(height: 38)
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.textPrimary)
@@ -781,12 +784,13 @@ private struct VIPBenefitCard: View {
                 .font(.caption2)
                 .foregroundStyle(palette.textTertiary)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 8)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(
             isHighlighted ? AnyShapeStyle(palette.selectedFill) : AnyShapeStyle(palette.surface),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -803,6 +807,7 @@ private struct VIPBenefitCard: View {
                     .padding(8)
             }
         }
+        .compositingGroup()
         .shadow(color: Color.black.opacity(palette.isDark ? 0 : 0.05), radius: 10, y: 4)
         .accessibilityElement(children: .combine)
     }
@@ -818,11 +823,11 @@ private struct VIPBenefitCard: View {
     private var detail: String {
         switch feature {
         case .themes:
-            return String(format: String(localized: "vip.benefit.themes", defaultValue: "%d 套主题，小组件同步换装"), WeekTheme.vipThemes.count)
+            return String(format: String(localized: "vip.benefit.themes", defaultValue: "%d 套主题，小组件同步"), WeekTheme.vipThemes.count)
         case .flexibleMode:
             return String(localized: "vip.benefit.flexible", defaultValue: "专注之余，也能随时调整")
         case .cloudSync:
-            return String(localized: "vip.benefit.cloud", defaultValue: "iPhone 与 iPad 同步，数据只在你手里")
+            return String(localized: "vip.benefit.cloud", defaultValue: "iPhone 与 iPad 无缝同步")
         }
     }
 
@@ -884,9 +889,12 @@ private struct VIPThemeCarousel: View {
         return list
     }()
 
-    @State private var current: WeekTheme? = .lotr
+    @State private var current: WeekTheme?
 
-    private let cardSize = CGSize(width: 150, height: 256)
+    private let cardSize = CGSize(width: 136, height: 226)
+
+    /// Until the scroll view reports a position, the leading card is the one on screen.
+    private var displayedTheme: WeekTheme? { current ?? themes.first }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -909,12 +917,18 @@ private struct VIPThemeCarousel: View {
                 .contentMargins(.horizontal, max(0, (proxy.size.width - cardSize.width) / 2), for: .scrollContent)
                 .scrollTargetBehavior(.viewAligned)
                 .scrollPosition(id: $current)
+                .onAppear {
+                    // The initial binding value is ignored before the lazy stack has
+                    // laid out, so centre the flagship theme on the next run loop.
+                    guard current == nil else { return }
+                    Task { @MainActor in current = .lotr }
+                }
                 .scrollIndicators(.hidden)
                 .scrollClipDisabled()
             }
             .frame(height: cardSize.height + 8)
 
-            Text(current?.displayName ?? "")
+            Text(displayedTheme?.displayName ?? "")
                 .font(.footnote.weight(.semibold))
                 .tracking(2)
                 .foregroundStyle(palette.primaryDark)
@@ -924,8 +938,8 @@ private struct VIPThemeCarousel: View {
             HStack(spacing: 6) {
                 ForEach(themes) { theme in
                     Capsule()
-                        .fill(theme == current ? palette.primary : palette.textPrimary.opacity(0.15))
-                        .frame(width: theme == current ? 18 : 6, height: 6)
+                        .fill(theme == displayedTheme ? palette.primary : palette.textPrimary.opacity(0.15))
+                        .frame(width: theme == displayedTheme ? 18 : 6, height: 6)
                 }
             }
             .animation(.snappy, value: current)
@@ -955,7 +969,7 @@ private struct VIPThemePreviewCard: View {
                     .foregroundStyle(Color(hex: colors.textPrimary))
             }
             ThemeStatusArtwork(theme: theme, renderingMode: .staticImage)
-                .frame(height: 66)
+                .frame(height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: artworkRadius, style: .continuous))
                 .overlay {
                     if let border = style.borderColor(isDark: isDark) {
@@ -989,6 +1003,7 @@ private struct VIPThemePreviewCard: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
+        .compositingGroup()
         .shadow(color: Color.black.opacity(isDark ? 0.45 : 0.16), radius: 16, y: 10)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(theme.displayName)
@@ -1039,6 +1054,7 @@ private struct VIPThemePreviewCard: View {
                 lineWidth: min(style.borderWidth, 2)
             )
         }
+        .compositingGroup()
         .shadow(
             color: shadow.color,
             radius: shadow.radius * 0.6,

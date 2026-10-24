@@ -54,13 +54,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone and iPad, your data stays yours"
+            "value" : "Seamless on iPhone and iPad"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone 与 iPad 同步，数据只在你手里"
+            "value" : "iPhone 与 iPad 无缝同步"
           }
         }
       }
@@ -86,13 +86,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d themes, widgets match too"
+            "value" : "%d themes, widgets too"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%d 套主题，小组件同步换装"
+            "value" : "%d 套主题，小组件同步"
           }
         }
       }
