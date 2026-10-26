@@ -19,6 +19,9 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case neon
     case paper
     case terminal
+    /// Drafting-table skin: cool sheet, hairline rules, one construction-orange
+    /// accent. Free on purpose — it is the house style, not a paid extra.
+    case blueprint
 
     var id: String { rawValue }
 
@@ -38,6 +41,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
         case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
+        case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
         }
     }
 
@@ -58,6 +62,8 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             return .paper
         case .terminal:
             return .terminal
+        case .blueprint:
+            return .drafting
         case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr:
             return .classic
         }
@@ -296,6 +302,19 @@ struct ThemeVisualStyle: Equatable {
         barCornerRadius: 0
     )
 
+    /// Drafting sheet: a small radius (drawn by hand, not by a stamp), one hairline
+    /// rule, no elevation, hairline outline glyphs and square-capped bars.
+    static let drafting = ThemeVisualStyle(
+        cornerRadius: 4,
+        borderWidth: 1,
+        borderColorHexLight: "#C3D2DA",
+        borderColorHexDark: "#23343E",
+        shadow: .flat,
+        symbolVariant: .none,
+        barScale: 0.75,
+        barCornerRadius: 0.5
+    )
+
     func borderColor(isDark: Bool) -> Color? {
         let hex = isDark ? borderColorHexDark : borderColorHexLight
         return hex.map { Color(hex: $0) }
@@ -415,7 +434,8 @@ struct ThemeSurfaceSkin: Equatable {
     var borderGradient: [String]? = nil
     /// A second sheet peeking out under the bottom edge (paper).
     var stackLine: ThemeHexPair? = nil
-    /// Gilded inner hairline plus four corner brackets (魔戒).
+    /// Gilded inner hairline (魔戒). The four corner brackets this used to draw
+    /// alongside the hairline have been removed.
     var ornament: ThemeHexPair? = nil
     /// Warm glow rising from the top trailing corner inside the surface (魔戒 forge).
     var innerGlow: ThemeHexPair? = nil
@@ -496,6 +516,8 @@ enum ThemeBadgeKind: Equatable {
     case bracket
     /// Flame glyph in a tinted capsule with a status-colour rim (魔戒).
     case ember
+    /// Map-legend key: a short colour sample before the label (蓝图).
+    case legend
 }
 
 struct ThemeBadgeSkin: Equatable {
@@ -540,6 +562,8 @@ enum ThemeBackdrop: Equatable {
     case paperGrain(ThemeHexPair)
     /// CRT scanlines.
     case scanlines(ThemeHexPair)
+    /// Drafting grid: a 10pt minor square with a 50pt major every fifth line.
+    case draftingGrid(ThemeHexPair)
 }
 
 /// The `WeekRadius` scale for a skin. Every page reads its corner radii through
@@ -609,6 +633,7 @@ extension WeekTheme {
         case .neon: return .neon
         case .paper: return .paper
         case .terminal: return .terminal
+        case .blueprint: return .drafting
         case .lotr: return .lotr
         case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight:
             return .classic
@@ -617,8 +642,8 @@ extension WeekTheme {
 }
 
 extension ThemeSkin {
-    /// 魔戒: gilded hairlines with corner brackets on obsidian / parchment, a
-    /// dark forge for the feature panel, ember status badges and hand-drawn glyphs.
+    /// 魔戒: gilded hairlines on obsidian / parchment, a dark forge for the
+    /// feature panel, ember status badges and hand-drawn glyphs.
     /// Serif titles and the classic radius scale are kept on purpose.
     static let lotr: ThemeSkin = {
         let gold = ThemeHexPair("#B89A62", "#6A5530")
@@ -845,6 +870,57 @@ extension ThemeSkin {
             onPrimary: ThemeHexPair("#FFFFFF", "#05100A"),
             onSuccess: ThemeHexPair("#FFFFFF", "#05100A"),
             backdrop: .scanlines(ThemeHexPair("#00000000", "#0D33FF66")),
+            softShadows: false
+        )
+    }()
+
+    /// 蓝图: a drafting sheet. Cool paper, hairline rules, monospaced lettering and
+    /// a single construction-orange marker. The focus panel is a cyanotype print:
+    /// deep blue in both appearances, so it stays the one dark mass on the page.
+    static let drafting: ThemeSkin = {
+        let rule = ThemeHexPair("#C3D2DA", "#23343E")
+        let line = ThemeHexPair("#D5E1E7", "#1C2C35")
+        let sheet = ThemeHexPair("#F9FBFC", "#0F1A21")
+        let cyan = ThemeHexPair("#2F8CB4", "#6FB4D6")
+        let marker = ThemeHexPair("#B64B24", "#E08A5C")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .monospaced, titleWeight: .medium, bodyDesign: .default),
+            radii: ThemeRadii(small: 2, medium: 3, large: 4, xlarge: 6),
+            card: ThemeSurfaceSkin(cornerRadius: 4, borderWidth: 1, border: rule, fill: sheet),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 3, borderWidth: 1, border: line, fill: sheet),
+                barWidth: 2.5,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 4,
+                    borderWidth: 1,
+                    border: cyan,
+                    fill: ThemeHexPair("#0E2836")
+                ),
+                ink: ThemeHexPair("#DCEEF7"),
+                secondaryInk: ThemeHexPair("#9CC2D2"),
+                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#8FD3E8")),
+                action: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#B7E3F2"),
+                    border: ThemeHexPair("#3D7E99"),
+                    borderWidth: 1
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#1C0E06"),
+                    fill: marker,
+                    border: marker,
+                    borderWidth: 1
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .legend),
+            section: ThemeSectionSkin(count: .bracket, rule: ThemeHexPair("#9FBDCB", "#28414E")),
+            onPrimary: ThemeHexPair("#F1FAFF", "#06202B"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#06202B"),
+            backdrop: .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")),
             softShadows: false
         )
     }()
@@ -1556,6 +1632,53 @@ private struct WeekThemePalettePair {
                     taskDDLBg: "#2A0F0F",
                     taskLeisure: "#9D8CFF",
                     taskLeisureBg: "#171334"
+                )
+            )
+        case .blueprint:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#1D5C82",
+                    primaryLight: "#4C8DB4",
+                    primaryDark: "#123C56",
+                    accentOrange: "#B64B24",
+                    accentOrangeLight: "#D98055",
+                    accentGreen: "#2E7D63",
+                    accentGreenLight: "#5AA88C",
+                    accentPink: "#A05672",
+                    backgroundPrimary: "#EDF2F5",
+                    backgroundSecondary: "#F9FBFC",
+                    backgroundTertiary: "#E1E9ED",
+                    textPrimary: "#14262F",
+                    textSecondary: "#48616E",
+                    textTertiary: "#7A8F9A",
+                    taskRegular: "#2E6D86",
+                    taskRegularBg: "#DCEBF2",
+                    taskDDL: "#A63A2E",
+                    taskDDLBg: "#F5DED8",
+                    taskLeisure: "#5B5FA8",
+                    taskLeisureBg: "#E5E5F5"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#6FB4D6",
+                    primaryLight: "#9BCEE6",
+                    primaryDark: "#2A6C8C",
+                    accentOrange: "#E08A5C",
+                    accentOrangeLight: "#EDA981",
+                    accentGreen: "#6BBFA2",
+                    accentGreenLight: "#94D6BE",
+                    accentPink: "#D08BA3",
+                    backgroundPrimary: "#0A1116",
+                    backgroundSecondary: "#0F1A21",
+                    backgroundTertiary: "#16252E",
+                    textPrimary: "#DBE8EE",
+                    textSecondary: "#A6BAC4",
+                    textTertiary: "#6F8590",
+                    taskRegular: "#6FC0DA",
+                    taskRegularBg: "#12303C",
+                    taskDDL: "#E98F6E",
+                    taskDDLBg: "#38211A",
+                    taskLeisure: "#A6A8E8",
+                    taskLeisureBg: "#232441"
                 )
             )
         }

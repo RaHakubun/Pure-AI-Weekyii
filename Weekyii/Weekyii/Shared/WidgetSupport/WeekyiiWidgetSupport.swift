@@ -349,7 +349,6 @@ struct WidgetThemeSnapshot: Codable, Equatable, Hashable {
         successHex = try container.decodeIfPresent(String.self, forKey: .successHex) ?? Self.fallbackSuccessHex
         darkSuccessHex = try container.decodeIfPresent(String.self, forKey: .darkSuccessHex) ?? successHex
         appearanceModeRaw = try container.decodeIfPresent(String.self, forKey: .appearanceModeRaw) ?? AppearanceMode.system.rawValue
-        gildedActions = try container.decodeIfPresent(Bool.self, forKey: .gildedActions)
     }
 }
 

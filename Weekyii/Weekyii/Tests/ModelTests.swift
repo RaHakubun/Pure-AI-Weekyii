@@ -4185,7 +4185,7 @@ final class ModelTests: XCTestCase {
     }
 
     func test_themeSkin_personalisedThemesRestyleSharedComponents() {
-        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal]
+        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal, .blueprint]
         for theme in personalised {
             let skin = theme.skin
             XCTAssertNotEqual(skin, .classic, "\(theme.rawValue) must ship its own skin")
@@ -4210,12 +4210,14 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(WeekTheme.neon.visualStyle, .neon)
         XCTAssertEqual(WeekTheme.paper.visualStyle, .paper)
         XCTAssertEqual(WeekTheme.terminal.visualStyle, .terminal)
+        XCTAssertEqual(WeekTheme.blueprint.visualStyle, .drafting)
 
         // Brutalist is defined by a hard (unblurred) offset shadow.
         XCTAssertEqual(WeekTheme.brutal.visualStyle.shadow?.radius, 0)
         // Flat themes must not silently fall back to the classic diffuse shadow.
         XCTAssertEqual(WeekTheme.paper.visualStyle.shadow, .flat)
         XCTAssertEqual(WeekTheme.terminal.visualStyle.shadow, .flat)
+        XCTAssertEqual(WeekTheme.blueprint.visualStyle.shadow, .flat)
 
         XCTAssertEqual(WeekTheme.brutal.visualStyle.symbolVariant, .fill)
         XCTAssertEqual(WeekTheme.neon.visualStyle.symbolVariant, .fill)
@@ -4226,10 +4228,26 @@ final class ModelTests: XCTestCase {
         // otherwise it is just a recolour wearing a new name.
         for theme in WeekTheme.allCases where theme.visualStyle != .classic {
             XCTAssertTrue(
-                [.brutal, .neon, .paper, .terminal].contains(theme),
+                [.brutal, .neon, .paper, .terminal, .blueprint].contains(theme),
                 "\(theme.rawValue) changed the visual form without being a personalised theme"
             )
         }
+    }
+
+    /// 蓝图 ships in the free list on purpose: the drafting language is part of
+    /// the house style, not a paid extra.
+    func test_blueprintThemeIsFreeAndDrawsItsOwnSheet() {
+        XCTAssertFalse(WeekTheme.blueprint.requiresVIP)
+        XCTAssertFalse(WeekTheme.blueprint.isPremiumTheme)
+        XCTAssertTrue(WeekTheme.freeThemes.contains(.blueprint))
+
+        let skin = WeekTheme.blueprint.skin
+        XCTAssertEqual(skin.typography.titleDesign, .monospaced)
+        XCTAssertNil(skin.typography.environmentDesign, "body text stays in the system design")
+        XCTAssertEqual(skin.badge?.kind, .legend)
+        XCTAssertEqual(skin.softShadows, false)
+        XCTAssertEqual(skin.backdrop, .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")))
+        XCTAssertEqual(WeekTheme.blueprint.visualStyle.barThickness(8), 6, accuracy: 0.001)
     }
 
     /// `barScale` is a multiplier precisely so `.classic` stays untouched:

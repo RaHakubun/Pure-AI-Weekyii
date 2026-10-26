@@ -16,6 +16,23 @@
     "“" : {
 
     },
+    "“有过期”和“没完成的一天”判定条件相同，可以只留一种，也可以同时显示。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Had expired items\" and \"Unfinished day\" use the same rule. Keep one, or show both."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“有过期”和“没完成的一天”判定条件相同，可以只留一种，也可以同时显示。"
+          }
+        }
+      }
+    },
     "/ %lld" : {
 
     },
@@ -26,7 +43,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ · %2$@"
           }
         }
@@ -36,7 +59,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ behavior"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ · %2$@行为"
           }
         }
@@ -46,7 +75,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld items"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ · %2$lld 项"
           }
         }
@@ -59,7 +94,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@，%2$@"
           }
         }
@@ -69,7 +110,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$@, %2$@ · %3$lld items"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@，%2$@ %3$lld 项"
           }
         }
@@ -94,7 +141,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "%1$lld/%2$lld"
           }
         },
@@ -110,7 +157,13 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$lld/%2$lld 个任务"
           }
         }
@@ -1167,12 +1220,17 @@
       }
     },
     "error.task_not_found" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "Task not found."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到任务。"
           }
         }
       }
@@ -1268,6 +1326,12 @@
             "state" : "translated",
             "value" : "No habits yet. Tap to create one."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有习惯，点按创建一个"
+          }
         }
       }
     },
@@ -1278,6 +1342,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Today %lld/%lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日 %1$lld/%2$lld"
           }
         }
       }
@@ -1855,6 +1925,12 @@
             "state" : "translated",
             "value" : "Habits"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "习惯"
+          }
         }
       }
     },
@@ -2028,6 +2104,12 @@
             "state" : "translated",
             "value" : "Archive"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档"
+          }
         }
       }
     },
@@ -2037,6 +2119,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restore"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
           }
         }
       }
@@ -2048,6 +2136,12 @@
             "state" : "translated",
             "value" : "Creativity"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创意"
+          }
         }
       }
     },
@@ -2057,6 +2151,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fitness"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "健身"
           }
         }
       }
@@ -2068,6 +2168,12 @@
             "state" : "translated",
             "value" : "Health"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "健康"
+          }
         }
       }
     },
@@ -2077,6 +2183,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Learning"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "学习"
           }
         }
       }
@@ -2088,6 +2200,12 @@
             "state" : "translated",
             "value" : "Mindfulness"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正念"
+          }
         }
       }
     },
@@ -2097,6 +2215,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Productivity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "效率"
           }
         }
       }
@@ -2108,6 +2232,12 @@
             "state" : "translated",
             "value" : "Social"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社交"
+          }
         }
       }
     },
@@ -2117,6 +2247,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add to Today"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入今日"
           }
         }
       }
@@ -2128,6 +2264,12 @@
             "state" : "translated",
             "value" : "Already added today"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天已经加过了"
+          }
         }
       }
     },
@@ -2138,6 +2280,12 @@
             "state" : "translated",
             "value" : "Delete Habit"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除习惯"
+          }
         }
       }
     },
@@ -2147,6 +2295,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tasks in unstarted days are removed; started days only lose the link. All records and stats are deleted."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未开始的日子会移除对应任务；已开始的日子只解除关联。所有记录与统计都会被删除。"
           }
         }
       }
@@ -2350,6 +2504,12 @@
             "state" : "translated",
             "value" : "Category"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分类"
+          }
         }
       }
     },
@@ -2359,6 +2519,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Color"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色"
           }
         }
       }
@@ -2370,6 +2536,12 @@
             "state" : "translated",
             "value" : "New Habit"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建习惯"
+          }
         }
       }
     },
@@ -2379,6 +2551,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Edit Habit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑习惯"
           }
         }
       }
@@ -2390,6 +2568,12 @@
             "state" : "translated",
             "value" : "Habits join the draft zone on the first launch of a scheduled day. Started or past-cutoff days are never written."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "习惯会在计划日的首次启动时进入草稿区；已开始或已过截止时间的日子不会被写入。"
+          }
         }
       }
     },
@@ -2399,6 +2583,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Icon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图标"
           }
         }
       }
@@ -2410,6 +2600,12 @@
             "state" : "translated",
             "value" : "Months without the selected day are skipped."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有所选日期的月份会自动跳过。"
+          }
         }
       }
     },
@@ -2419,6 +2615,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
           }
         }
       }
@@ -2430,6 +2632,12 @@
             "state" : "translated",
             "value" : "e.g. Meditation, Running"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：冥想、跑步"
+          }
         }
       }
     },
@@ -2439,6 +2647,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Today's task is re-evaluated after you change the repeat plan."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改重复计划后，今日任务会重新判定。"
           }
         }
       }
@@ -2450,6 +2664,12 @@
             "state" : "translated",
             "value" : "Repeat"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复"
+          }
         }
       }
     },
@@ -2459,6 +2679,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start Date"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始日期"
           }
         }
       }
@@ -2470,6 +2696,12 @@
             "state" : "translated",
             "value" : "Date locked"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该日期已锁定"
+          }
         }
       }
     },
@@ -2479,6 +2711,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name required"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请填写名称"
           }
         }
       }
@@ -2490,6 +2728,12 @@
             "state" : "translated",
             "value" : "Today is not in this habit's schedule"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天不在这个习惯的计划内"
+          }
         }
       }
     },
@@ -2499,6 +2743,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Past today's cutoff — it will return tomorrow"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已过今日截止时间，明天会再来"
           }
         }
       }
@@ -2510,6 +2760,12 @@
             "state" : "translated",
             "value" : "Save failed"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存失败"
+          }
         }
       }
     },
@@ -2519,6 +2775,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pick a day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择一天"
           }
         }
       }
@@ -2643,6 +2905,12 @@
             "state" : "translated",
             "value" : "Completed at %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 完成"
+          }
         }
       }
     },
@@ -2652,6 +2920,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
           }
         }
       }
@@ -2663,6 +2937,12 @@
             "state" : "translated",
             "value" : "Interrupted"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已中断"
+          }
         }
       }
     },
@@ -2672,6 +2952,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "To do"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待完成"
           }
         }
       }
@@ -2683,6 +2969,12 @@
             "state" : "translated",
             "value" : "Every day"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天"
+          }
         }
       }
     },
@@ -2692,6 +2984,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "By month"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按月"
           }
         }
       }
@@ -2703,6 +3001,12 @@
             "state" : "translated",
             "value" : "Once"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单次"
+          }
         }
       }
     },
@@ -2712,6 +3016,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "By weekday"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按星期"
           }
         }
       }
@@ -2723,6 +3033,12 @@
             "state" : "translated",
             "value" : "Monthly on %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月 %@"
+          }
         }
       }
     },
@@ -2732,6 +3048,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Once on %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 一次"
           }
         }
       }
@@ -2743,6 +3065,12 @@
             "state" : "translated",
             "value" : "Weekdays"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工作日"
+          }
         }
       }
     },
@@ -2752,6 +3080,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Weekends"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周末"
           }
         }
       }
@@ -2763,6 +3097,12 @@
             "state" : "translated",
             "value" : "Completion rate"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成率"
+          }
         }
       }
     },
@@ -2772,6 +3112,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Current streak"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前连续"
           }
         }
       }
@@ -2783,6 +3129,12 @@
             "state" : "translated",
             "value" : "%lld days"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天"
+          }
         }
       }
     },
@@ -2793,12 +3145,24 @@
             "state" : "translated",
             "value" : "Longest streak"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最长连续"
+          }
         }
       }
     },
     "habit.stats.placeholder" : {
       "localizations" : {
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "—"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "—"
@@ -2813,6 +3177,12 @@
             "state" : "translated",
             "value" : "Statistics"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "统计"
+          }
         }
       }
     },
@@ -2822,6 +3192,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Total completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "累计完成"
           }
         }
       }
@@ -2834,6 +3210,12 @@
             "state" : "translated",
             "value" : "\"Interrupted\" = created that day but not finished; \"not recorded\" = never created (app not opened or past cutoff)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「中断」= 当天已生成但没完成；「未记录」= 从未生成（没打开 App 或已过截止时间）。"
+          }
         }
       }
     },
@@ -2843,6 +3225,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Starts %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 开始"
           }
         }
       }
@@ -2855,6 +3243,12 @@
             "state" : "translated",
             "value" : "Timeline"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间线"
+          }
         }
       }
     },
@@ -2864,6 +3258,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Done today"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已完成"
           }
         }
       }
@@ -2891,6 +3291,12 @@
             "state" : "translated",
             "value" : "Not scheduled"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天不安排"
+          }
         }
       }
     },
@@ -2900,6 +3306,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Due today"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日待完成"
           }
         }
       }
@@ -2911,6 +3323,12 @@
             "state" : "translated",
             "value" : "Archived"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档"
+          }
         }
       }
     },
@@ -2920,6 +3338,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New Habit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建习惯"
           }
         }
       }
@@ -2931,6 +3355,12 @@
             "state" : "translated",
             "value" : "No habits yet"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有习惯"
+          }
         }
       }
     },
@@ -2940,6 +3370,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进行中"
           }
         }
       }
@@ -2951,6 +3387,12 @@
             "state" : "translated",
             "value" : "Habits join the draft zone on scheduled days"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "习惯会在计划日进入草稿区"
+          }
         }
       }
     },
@@ -2961,6 +3403,12 @@
             "state" : "translated",
             "value" : "My Habits"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的习惯"
+          }
         }
       }
     },
@@ -2970,6 +3418,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld of %lld done today"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天完成 %1$lld / %2$lld"
           }
         }
       }
@@ -3715,6 +4169,38 @@
         }
       }
     },
+    "notification.auto_start.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your task flow started automatically. Now focusing: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日任务流已自动开始，现在专注：%@"
+          }
+        }
+      }
+    },
+    "notification.auto_start.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scheduled start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动托管"
+          }
+        }
+      }
+    },
     "notification.kill_time" : {
       "localizations" : {
         "en" : {
@@ -3796,44 +4282,64 @@
       }
     },
     "past.analytics.collapse" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Hide analytics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "收起分析"
           }
         }
       }
     },
     "past.analytics.expand" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Show analytics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "展开分析"
           }
         }
       }
     },
     "past.analytics.subtitle" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Trends, heatmap and efficiency stats"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "趋势、热力与效率统计"
           }
         }
       }
     },
     "past.analytics.title" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Past Analytics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "过去分析"
           }
         }
@@ -3984,11 +4490,16 @@
       }
     },
     "past.month.legend.expired" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Had expired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "有过期"
           }
         }
@@ -4043,33 +4554,48 @@
       }
     },
     "past.month.selected" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Selected date"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "已选日期"
           }
         }
       }
     },
     "past.switch.month" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Switch to month view"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "切换到月视图"
           }
         }
       }
     },
     "past.switch.week" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Switch to week list"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "切换到周列表"
           }
         }
@@ -7545,11 +8071,16 @@
       }
     },
     "settings.default_kill_time.guidance" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "A day's tasks are settled at the Kill Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "一天的任务将在截止时间结算"
           }
         }
@@ -7670,7 +8201,6 @@
       }
     },
     "settings.developer.simulate_vip" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7687,7 +8217,6 @@
       }
     },
     "settings.developer.simulate_vip.subtitle" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7720,44 +8249,64 @@
       }
     },
     "settings.future.month_markers.ddl" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Deadline tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "截止任务"
           }
         }
       }
     },
     "settings.future.month_markers.leisure" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Leisure tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "休闲任务"
           }
         }
       }
     },
     "settings.future.month_markers.regular" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Regular tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "常规任务"
           }
         }
       }
     },
     "settings.future.month_markers.title" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Show on month view"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "在月视图上显示"
           }
         }
@@ -9461,13 +10010,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reminds you about unfinished tasks at this time, also used for suspended task mornings"
+            "value" : "Reminds you about today's unfinished tasks at this time; the Suspended Box morning reminders follow it too."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"
+            "value" : "每天在这个时间提醒今日未完成项；悬置箱的早间提醒也跟随这个时刻。"
           }
         }
       }
@@ -9505,11 +10054,16 @@
       }
     },
     "settings.section.future" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "Future"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "未来"
           }
         }
@@ -9565,6 +10119,22 @@
         }
       }
     },
+    "settings.suspended.behavior.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Countdown & Expiry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倒计时与到期"
+          }
+        }
+      }
+    },
     "settings.suspended.default_countdown" : {
       "localizations" : {
         "en" : {
@@ -9609,6 +10179,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%d 天"
+          }
+        }
+      }
+    },
+    "settings.suspended.entry.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default %d days"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认 %d 天"
           }
         }
       }
@@ -9885,34 +10471,50 @@
         }
       }
     },
-    "settings.suspended.section" : {
+    "settings.suspended.reminder.section" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suspended Box Reminders"
+            "value" : "Reminders"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "悬置箱提醒"
+            "value" : "提醒"
           }
         }
       }
     },
-    "settings.suspended.section.footer" : {
+    "settings.suspended.reminder.section.footer" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suspended tasks are reminded before their deadline using this rhythm. What happens once the deadline passes is configured under Task Management → Suspended Box."
+            "value" : "Suspended tasks are reminded before their deadline using this rhythm. The shared morning reminder time is set under Today's Rhythm → Reminders."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "悬置任务会按这里的节奏在到期前提醒你。到期后的处理方式在「任务管理 → 悬置箱」中设置。"
+            "value" : "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。"
+          }
+        }
+      }
+    },
+    "settings.task_type.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务类型"
           }
         }
       }
@@ -10655,15 +11257,26 @@
             "state" : "translated",
             "value" : "Habit · %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "习惯 · %@"
+          }
         }
       }
     },
     "task.project.origin" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "From %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "来自 %@"
           }
         }
@@ -10815,6 +11428,24 @@
         }
       }
     },
+    "theme.blueprint.name" : {
+      "comment" : "",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blueprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蓝图"
+          }
+        }
+      }
+    },
     "theme.brutal.name" : {
       "localizations" : {
         "en" : {
@@ -10899,22 +11530,6 @@
         }
       }
     },
-    "today.days_started" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Days Started"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已启动天数"
-          }
-        }
-      }
-    },
     "today.days_journeyed" : {
       "localizations" : {
         "en" : {
@@ -10927,6 +11542,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已启程 · 天"
+          }
+        }
+      }
+    },
+    "today.days_started" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Days Started"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启动天数"
           }
         }
       }
@@ -12820,14 +13451,104 @@
     "下移" : {
 
     },
+    "不显示明细，仅留计数" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Count only, no details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不显示明细，仅留计数"
+          }
+        }
+      }
+    },
     "两种模式都遵守" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Both modes follow"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两种模式都遵守"
+          }
+        }
+      }
     },
     "个性化" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalization"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个性化"
+          }
+        }
+      }
+    },
+    "中型" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中型"
+          }
+        }
+      }
+    },
+    "主动解冻后" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once you unfreeze"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主动解冻后"
+          }
+        }
+      }
     },
     "主题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题"
+          }
+        }
+      }
     },
     "也可拖动或双指缩放浏览" : {
 
@@ -12848,50 +13569,300 @@
         }
       }
     },
+    "仅后移到未来" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only push to the future"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅后移到未来"
+          }
+        }
+      }
+    },
     "仅对明日以后生效" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start tomorrow"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅对明日以后生效"
+          }
+        }
+      }
     },
     "仅影响以后新建的项目，不会修改现有项目。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only affects projects you create later; existing ones stay unchanged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅影响以后新建的项目，不会修改现有项目。"
+          }
+        }
+      }
+    },
+    "今天不再自动启动；启动托管从明日起生效。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No auto-start today; auto-start applies from tomorrow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天不再自动启动；启动托管从明日起生效。"
+          }
+        }
+      }
     },
     "今日任务流已过期，无法同步到今天。本次提交已取消。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's task flow has already expired and can't be synced. This change was cancelled."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日任务流已过期，无法同步到今天。本次提交已取消。"
+          }
+        }
+      }
     },
     "今日呆胶布" : {
 
     },
+    "今日已完成，保留当日的执行方式；新选择会用于以后每一次启动任务流。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today is complete, so its execution mode stays. The new choice applies to future task flows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已完成，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+          }
+        }
+      }
+    },
+    "今日已经启动或结束；新的托管设置从明日起生效。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today has already started or ended; new auto-start settings apply from tomorrow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已经启动或结束；新的托管设置从明日起生效。"
+          }
+        }
+      }
+    },
+    "今日已跳过启动托管；新计划从明日起生效。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's auto-start was skipped; the new schedule applies from tomorrow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已跳过启动托管；新计划从明日起生效。"
+          }
+        }
+      }
+    },
     "今日已过期" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today has expired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已过期"
+          }
+        }
+      }
+    },
+    "今日已过期，保留当日的执行方式；新选择会用于以后每一次启动任务流。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today has expired, so its execution mode stays. The new choice applies to future task flows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日已过期，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+          }
+        }
+      }
     },
     "今日节奏" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's Rhythm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日节奏"
+          }
+        }
+      }
+    },
+    "今日队列" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's queue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日队列"
+          }
+        }
+      }
+    },
+    "仍只专注一件事" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Still one thing at a time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍只专注一件事"
+          }
+        }
+      }
     },
     "从最近恢复点还原" : {
 
     },
     "从归档恢复" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore from Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从归档恢复"
+          }
+        }
+      }
     },
     "任务已遗忘" : {
-
-    },
-    "任务管理" : {
 
     },
     "任务类型" : {
 
     },
     "任务行为" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task behavior"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务行为"
+          }
+        }
+      }
     },
     "任务记录仍然保留，恢复后可重新打开项目。" : {
 
     },
     "你可以选择同步今日，或只让新默认值从明日开始生效。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can apply it to today, or let the new default start tomorrow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你可以选择同步今日，或只让新默认值从明日开始生效。"
+          }
+        }
+      }
     },
     "使用方式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workflow"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用方式"
+          }
+        }
+      }
     },
     "保存" : {
 
@@ -12902,11 +13873,62 @@
     "保存图片" : {
 
     },
+    "保持冻结" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stay frozen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持冻结"
+          }
+        }
+      }
+    },
+    "保留专注，也为真实变化留出入口。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps focus, but leaves room for real change."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留专注，也为真实变化留出入口。"
+          }
+        }
+      }
+    },
     "倒计时" : {
 
     },
     "倒计时 %lld 天" : {
 
+    },
+    "允许变化" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow change"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许变化"
+          }
+        }
+      }
     },
     "全局视图" : {
 
@@ -12915,7 +13937,20 @@
 
     },
     "决定该类型在截止提醒、未来标记和统计中的归类；名称、图标和颜色仍保持自定义。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decides how this type is grouped in deadline reminders, future markers and stats. Name, icon and colour stay custom."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "决定该类型在截止提醒、未来标记和统计中的归类；名称、图标和颜色仍保持自定义。"
+          }
+        }
+      }
     },
     "冻结" : {
 
@@ -12927,7 +13962,20 @@
 
     },
     "列出最近备份摘要" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List Recent Backups"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出最近备份摘要"
+          }
+        }
+      }
     },
     "创建任务后，这里会按日期显示任务数量与完成状态。" : {
 
@@ -12945,19 +13993,101 @@
 
     },
     "到达设定时间后，今日草稿可能自动进入专注；启动后无法撤回。首次在今天设定时间之后开启，将从明天生效。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the set time, today's draft may enter Focus automatically. Once started it can't be undone. If you turn this on after today's set time, it starts tomorrow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到达设定时间后，今日草稿可能自动进入专注；启动后无法撤回。首次在今天设定时间之后开启，将从明天生效。"
+          }
+        }
+      }
     },
     "到达设定时间后，若今日已有草稿任务，将自动进入专注。App 未运行时会在下次打开后补启动。启动后无法撤回。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the set time, today's draft tasks enter Focus automatically. If the app isn't running, it catches up the next time you open it. Once started this can't be undone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到达设定时间后，若今日已有草稿任务，将自动进入专注。App 未运行时会在下次打开后补启动。启动后无法撤回。"
+          }
+        }
+      }
     },
     "单文件包含任务、项目、标签、图片与设置" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One file with tasks, projects, tags, images and settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单文件包含任务、项目、标签、图片与设置"
+          }
+        }
+      }
     },
     "取消" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
     },
     "取消更改" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消更改"
+          }
+        }
+      }
+    },
+    "可增改、排序、交换" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add, edit, reorder, swap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可增改、排序、交换"
+          }
+        }
+      }
     },
     "右上角点 + 新建呆胶布" : {
 
@@ -12966,10 +14096,36 @@
 
     },
     "同步至今日及以后" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply to today and later"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步至今日及以后"
+          }
+        }
+      }
     },
     "名称" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
+          }
+        }
+      }
     },
     "后移" : {
       "localizations" : {
@@ -13000,31 +14156,130 @@
 
     },
     "启动托管" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动托管"
+          }
+        }
+      }
     },
     "呆胶布内容：%@" : {
 
+    },
+    "周一开始" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts Monday"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周一开始"
+          }
+        }
+      }
     },
     "周列表" : {
 
     },
     "回滚到最新备份" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roll back to latest backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回滚到最新备份"
+          }
+        }
+      }
     },
     "回滚到最新备份（危险）" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roll Back to Latest Backup (Dangerous)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回滚到最新备份（危险）"
+          }
+        }
+      }
     },
     "固定时刻提醒" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixed-time reminder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定时刻提醒"
+          }
+        }
+      }
     },
     "图例" : {
 
     },
     "图标" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图标"
+          }
+        }
+      }
     },
     "在冻结和解冻状态之间切换" : {
 
+    },
+    "在日期右上角显示当天完成了几项" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show how many items were completed in each day's top-right corner"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在日期右上角显示当天完成了几项"
+          }
+        }
+      }
     },
     "在这里记录任务思绪" : {
 
@@ -13033,7 +14288,20 @@
 
     },
     "外观与主题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance & Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观与主题"
+          }
+        }
+      }
     },
     "完成任务保留详情；过期任务仅保留数量。" : {
 
@@ -13042,19 +14310,101 @@
 
     },
     "完成项目前必须先完成全部开放任务" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All open tasks must be finished before a project can complete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成项目前必须先完成全部开放任务"
+          }
+        }
+      }
     },
     "完整恢复" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Fully"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整恢复"
+          }
+        }
+      }
     },
     "完整替换当前数据？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace all current data?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整替换当前数据？"
+          }
+        }
+      }
+    },
+    "宽幅" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wide"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "宽幅"
+          }
+        }
+      }
     },
     "导出 Weekyii 数据" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Weekyii Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出 Weekyii 数据"
+          }
+        }
+      }
     },
     "导出状态诊断" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Diagnostics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出状态诊断"
+          }
+        }
+      }
     },
     "导出诊断信息" : {
 
@@ -13063,22 +14413,125 @@
 
     },
     "将直接替换当前数据库文件，可能丢失最新数据。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This replaces the current database file and may lose your latest data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将直接替换当前数据库文件，可能丢失最新数据。"
+          }
+        }
+      }
     },
     "将移动到" : {
 
     },
+    "小型" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小型"
+          }
+        }
+      }
+    },
+    "已完成" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
+          }
+        }
+      }
+    },
     "已完成项目保持只读。你可以归档收纳，或重新打开继续添加任务。" : {
 
     },
+    "已归档" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档"
+          }
+        }
+      }
+    },
     "已归档类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived Types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档类型"
+          }
+        }
+      }
     },
     "已有同名类型，请换一个名称" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A type with this name already exists. Choose another."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已有同名类型，请换一个名称"
+          }
+        }
+      }
     },
     "已选择" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选择"
+          }
+        }
+      }
     },
     "已遗忘" : {
 
@@ -13087,25 +14540,116 @@
 
     },
     "应用" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用"
+          }
+        }
+      }
     },
     "应用启动和数据导入前会自动建立恢复点。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A recovery point is created automatically on launch and before importing."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用启动和数据导入前会自动建立恢复点。"
+          }
+        }
+      }
     },
     "应用新的默认截止时间" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply new default Kill Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用新的默认截止时间"
+          }
+        }
+      }
     },
     "建立恢复点并导入" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create Recovery Point and Import"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建立恢复点并导入"
+          }
+        }
+      }
     },
     "开发者与诊断" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Developer & Diagnostics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者与诊断"
+          }
+        }
+      }
     },
     "开启启动托管？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on auto-start?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启启动托管？"
+          }
+        }
+      }
     },
     "开启托管" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启托管"
+          }
+        }
+      }
     },
     "开始 %@" : {
 
@@ -13116,44 +14660,310 @@
     "开始任务流风险提示" : {
 
     },
+    "开始后" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After starting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始后"
+          }
+        }
+      }
+    },
+    "开始执行后，到截止时间仍有任务没完成" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Started, but tasks were still unfinished at the Kill Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始执行后，到截止时间仍有任务没完成"
+          }
+        }
+      }
+    },
     "归档" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档"
+          }
+        }
+      }
     },
     "归档始终由你主动执行" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archiving is always your call"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档始终由你主动执行"
+          }
+        }
+      }
     },
     "归档类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档类型"
+          }
+        }
+      }
     },
     "归档采用带版本与 SHA-256 校验的 JSON 格式。导入不会合并数据。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archives are versioned JSON with SHA-256 checksums. Importing never merges data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档采用带版本与 SHA-256 校验的 JSON 格式。导入不会合并数据。"
+          }
+        }
+      }
     },
     "归档项目" : {
 
     },
     "当前主题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Theme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前主题"
+          }
+        }
+      }
     },
     "当前仅可选择 23:59，请使用时间选择器确认。" : {
 
     },
     "当前数据库会被替换。完成后请立即完全退出并重新打开应用。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current database will be replaced. Fully quit and reopen the app afterwards."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前数据库会被替换。完成后请立即完全退出并重新打开应用。"
+          }
+        }
+      }
+    },
+    "当前没有可用备份。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No backups available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前没有可用备份。"
+          }
+        }
+      }
+    },
+    "当前项目状态不能执行该操作。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This action isn't available in the project's current state."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前项目状态不能执行该操作。"
+          }
+        }
+      }
+    },
+    "当天有任务过期时显示小火苗" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show a small flame on days with expired tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当天有任务过期时显示小火苗"
+          }
+        }
+      }
+    },
+    "当天有计划、执行或完成记录时显示绿点" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show a green dot on days with planned, started or completed records"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当天有计划、执行或完成记录时显示绿点"
+          }
+        }
+      }
     },
     "快捷选择" : {
 
     },
     "恢复" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
+          }
+        }
+      }
     },
     "恢复到已完成" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore to Completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复到已完成"
+          }
+        }
+      }
+    },
+    "恢复完成。请立即完全退出并重新打开 Weekyii。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore complete. Fully quit and reopen Weekyii now."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复完成。请立即完全退出并重新打开 Weekyii。"
+          }
+        }
+      }
     },
     "恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery points are database snapshots on this device. After restoring, fully quit and reopen Weekyii."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。"
+          }
+        }
+      }
     },
     "恢复这个时间点？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore this point in time?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复这个时间点？"
+          }
+        }
+      }
+    },
+    "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspended tasks remind you before they expire, on the rhythm set here. The shared morning reminder time lives in Today's Rhythm → Reminders."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。"
+          }
+        }
+      }
     },
     "悬置箱" : {
 
@@ -13164,11 +14974,121 @@
     "所有项目任务均已完成" : {
 
     },
+    "所选归档" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选归档"
+          }
+        }
+      }
+    },
+    "托管已关闭；今日状态不变，设定时间会保留。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-start is off. Today is unchanged and your time is kept."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "托管已关闭；今日状态不变，设定时间会保留。"
+          }
+        }
+      }
+    },
+    "托管已关闭；设定时间会保留，开启后才会自动启动。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-start is off. Your time is kept and will be used once you turn it on."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "托管已关闭；设定时间会保留，开启后才会自动启动。"
+          }
+        }
+      }
+    },
     "执行方式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Execution"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行方式"
+          }
+        }
+      }
     },
     "执行模式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Execution Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行模式"
+          }
+        }
+      }
+    },
+    "扩展" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extensions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展"
+          }
+        }
+      }
+    },
+    "把今天当成一份已经签下的清单。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treats today as a list you've already committed to."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把今天当成一份已经签下的清单。"
+          }
+        }
+      }
     },
     "把暂时无法承诺到特定日期的任务放这里。" : {
 
@@ -13179,38 +15099,240 @@
     "把这项悬置任务真正落到某一天。若那一天或所属周不存在，系统会自动补齐。" : {
 
     },
+    "按休闲任务运行" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs as a leisure task"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按休闲任务运行"
+          }
+        }
+      }
+    },
     "按当前顺序执行，共 %lld 项" : {
 
     },
+    "按截止任务运行" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs as a deadline task"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按截止任务运行"
+          }
+        }
+      }
+    },
+    "按既定顺序推进" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advance in the set order"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按既定顺序推进"
+          }
+        }
+      }
+    },
+    "按普通任务运行" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs as a regular task"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按普通任务运行"
+          }
+        }
+      }
+    },
     "提交修改" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Submit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提交修改"
+          }
+        }
+      }
     },
     "提交后今日未完成内容会立即过期，是否继续？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfinished items today will expire right after you submit. Continue?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提交后今日未完成内容会立即过期，是否继续？"
+          }
+        }
+      }
     },
     "提前 90 分钟" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "90 minutes before"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前 90 分钟"
+          }
+        }
+      }
     },
     "提前 120 分钟" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "120 minutes before"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提前 120 分钟"
+          }
+        }
+      }
     },
     "提醒" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminders"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒"
+          }
+        }
+      }
     },
     "提醒时刻" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminder time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒时刻"
+          }
+        }
+      }
     },
     "提醒时间" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminder time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒时间"
+          }
+        }
+      }
     },
     "数据" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据"
+          }
+        }
+      }
     },
     "数据与安全" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data & Security"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据与安全"
+          }
+        }
+      }
     },
     "数据库不可用" : {
 
+    },
+    "新任务类型" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Task Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新任务类型"
+          }
+        }
+      }
     },
     "新增" : {
 
@@ -13219,7 +15341,20 @@
 
     },
     "新增任务类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Task Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增任务类型"
+          }
+        }
+      }
     },
     "新增悬置任务" : {
 
@@ -13228,10 +15363,36 @@
 
     },
     "新建项目默认值" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New project defaults"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建项目默认值"
+          }
+        }
+      }
     },
     "新截止时间会导致今日任务立即过期" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The new Kill Time expires today's tasks immediately"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新截止时间会导致今日任务立即过期"
+          }
+        }
+      }
     },
     "日程详情" : {
 
@@ -13243,16 +15404,55 @@
 
     },
     "显示模式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示模式"
+          }
+        }
+      }
     },
     "晨间提醒时刻" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morning reminder time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "晨间提醒时刻"
+          }
+        }
+      }
     },
     "暂存未分配日期的任务。到期前可续期、分配或删除。" : {
 
     },
     "暂无本地恢复点" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No local recovery points yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无本地恢复点"
+          }
+        }
+      }
     },
     "暂无步骤" : {
 
@@ -13263,14 +15463,74 @@
     "月历" : {
 
     },
+    "月历上不会显示任何标记" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No markers will appear on the calendar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月历上不会显示任何标记"
+          }
+        }
+      }
+    },
     "月趋势" : {
 
     },
+    "有计划却没点开始就过期，只有习惯自动生成任务的日子也算" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expired without being started; days where only a habit generated tasks count too"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有计划却没点开始就过期，只有习惯自动生成任务的日子也算"
+          }
+        }
+      }
+    },
     "未来" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Future"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未来"
+          }
+        }
+      }
     },
     "未选择" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not selected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未选择"
+          }
+        }
+      }
     },
     "本周" : {
 
@@ -13281,6 +15541,23 @@
     "本周任务结构" : {
 
     },
+    "本周和今天一过截止时间就会立即标出，不必等到整周结束。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This week and today are marked as soon as the Kill Time passes — no need to wait for the week to end."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本周和今天一过截止时间就会立即标出，不必等到整周结束。"
+          }
+        }
+      }
+    },
     "本周详情" : {
 
     },
@@ -13288,7 +15565,20 @@
 
     },
     "本地恢复点" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Recovery Points"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地恢复点"
+          }
+        }
+      }
     },
     "本月回顾" : {
 
@@ -13300,7 +15590,37 @@
 
     },
     "校验完成后完整替换当前数据" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fully replaces current data once verified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校验完成后完整替换当前数据"
+          }
+        }
+      }
+    },
+    "此选择会用于以后每一次启动任务流。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This choice applies to every future task flow."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此选择会用于以后每一次启动任务流。"
+          }
+        }
+      }
     },
     "步骤" : {
 
@@ -13315,13 +15635,69 @@
 
     },
     "每套主题仍保留独立的色彩与印象画。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each theme keeps its own colours and artwork."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每套主题仍保留独立的色彩与印象画。"
+          }
+        }
+      }
     },
     "每日启动时间" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily start time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日启动时间"
+          }
+        }
+      }
     },
     "每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the daily Kill Time passes, unfinished items leave Today and their details are no longer viewable. Only the expired count and completed records are kept."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。"
+          }
+        }
+      }
+    },
+    "没有找到可回滚备份。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No backup is available to roll back to."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有找到可回滚备份。"
+          }
+        }
+      }
     },
     "添加" : {
 
@@ -13330,10 +15706,53 @@
 
     },
     "点按后立即同步尚未结束的今日" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to today's unfinished flow as soon as you tap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按后立即同步尚未结束的今日"
+          }
+        }
+      }
+    },
+    "状态诊断已复制到剪贴板。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics copied to the clipboard."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状态诊断已复制到剪贴板。"
+          }
+        }
+      }
     },
     "生命周期" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifecycle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生命周期"
+          }
+        }
+      }
     },
     "目标周尚未创建" : {
 
@@ -13342,7 +15761,20 @@
 
     },
     "确认" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认"
+          }
+        }
+      }
     },
     "确认分配" : {
 
@@ -13354,7 +15786,20 @@
 
     },
     "确认回滚" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roll Back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认回滚"
+          }
+        }
+      }
     },
     "确认结项" : {
 
@@ -13366,19 +15811,101 @@
 
     },
     "立即重算状态" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recompute Status Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重算状态"
+          }
+        }
+      }
     },
     "管理已完成项目" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage completed projects"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理已完成项目"
+          }
+        }
+      }
     },
     "管理已归档项目" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage archived projects"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理已归档项目"
+          }
+        }
+      }
     },
     "类型名称" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型名称"
+          }
+        }
+      }
     },
     "类型管理" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型管理"
+          }
+        }
+      }
+    },
+    "系统类型" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统类型"
+          }
+        }
+      }
     },
     "结束 %@" : {
 
@@ -13396,13 +15923,56 @@
 
     },
     "编辑任务类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Task Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑任务类型"
+          }
+        }
+      }
     },
     "编辑项目信息" : {
 
     },
     "自动开始今日草稿任务" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start today's draft tasks automatically"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动开始今日草稿任务"
+          }
+        }
+      }
+    },
+    "自定义类型" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义类型"
+          }
+        }
+      }
     },
     "草稿任务" : {
 
@@ -13420,10 +15990,40 @@
 
     },
     "设置中的预览保持静止；动态印象画仅在“今日”页面播放。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previews stay still in Settings; the animated artwork only plays on Today."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置中的预览保持静止；动态印象画仅在“今日”页面播放。"
+          }
+        }
+      }
     },
     "诊断信息已复制到剪贴板" : {
 
+    },
+    "该恢复点校验失败，不能使用。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This recovery point failed verification and can't be used."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该恢复点校验失败，不能使用。"
+          }
+        }
+      }
     },
     "调整顺序或删除任务" : {
 
@@ -13452,20 +16052,127 @@
     "输入任务描述" : {
 
     },
+    "过期任务" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expired tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过期任务"
+          }
+        }
+      }
+    },
     "这个月还没有可以回顾的记录。" : {
 
+    },
+    "这是示意数据，开关改动后，「过去」月历会同步变成这个样子。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sample data — the Past calendar will look like this once you change the switches."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是示意数据，开关改动后，「过去」月历会同步变成这个样子。"
+          }
+        }
+      }
     },
     "进入后将按任务顺序推进，直到完成或截止。" : {
 
     },
+    "进行中" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进行中"
+          }
+        }
+      }
+    },
+    "迷你" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mini"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "迷你"
+          }
+        }
+      }
+    },
     "选择后会立即同步尚未结束的今日，并成为以后默认方式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to today's unfinished flow right away and becomes the default from now on"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择后会立即同步尚未结束的今日，并成为以后默认方式"
+          }
+        }
+      }
     },
     "逾期项目不会自动隐藏或改变状态" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overdue projects are never hidden or auto-changed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逾期项目不会自动隐藏或改变状态"
+          }
+        }
+      }
     },
     "重新打开" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reopen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开"
+          }
+        }
+      }
     },
     "重新打开项目" : {
 
@@ -13486,7 +16193,20 @@
 
     },
     "项目" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projects"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目"
+          }
+        }
+      }
     },
     "项目已完成" : {
 
@@ -13498,25 +16218,137 @@
 
     },
     "项目概览" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目概览"
+          }
+        }
+      }
     },
     "预览呆胶布图片" : {
 
     },
     "颜色" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色"
+          }
+        }
+      }
     },
     "默认" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认"
+          }
+        }
+      }
+    },
+    "默认保持冻结" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frozen by default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认保持冻结"
+          }
+        }
+      }
     },
     "默认卡片尺寸" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default tile size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认卡片尺寸"
+          }
+        }
+      }
+    },
+    "默认只显示“没完成的一天”。这些选项只保存在本机，不会通过 iCloud 同步。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only \"Unfinished day\" is shown by default. These options stay on this device and do not sync via iCloud."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认只显示“没完成的一天”。这些选项只保存在本机，不会通过 iCloud 同步。"
+          }
+        }
+      }
     },
     "默认周期" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default duration"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认周期"
+          }
+        }
+      }
     },
     "默认类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认类型"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

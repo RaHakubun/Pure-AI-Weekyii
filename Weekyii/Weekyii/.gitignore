@@ -21,3 +21,8 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Local agent / tool scratch directories
+.workbuddy-ai/
+.qoder-credits/
+*.qoder.site

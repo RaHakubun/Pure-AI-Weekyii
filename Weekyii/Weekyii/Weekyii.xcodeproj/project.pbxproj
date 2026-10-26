@@ -138,6 +138,7 @@
 		A90000072FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */; };
 		A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */; };
 		A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */; };
+		A900000C2FA0000100AAA001 /* NotificationPresentationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */; };
 		DA2D00072F7A100100AAA001 /* CloudSyncD2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */; };
 		ECA100012F7A100100AAA001 /* CloudSyncLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */; };
 		ECA100032F7A100100AAA001 /* CloudSyncReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */; };
@@ -349,6 +350,7 @@
 		A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitorTests.swift; sourceTree = "<group>"; };
 		A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouter.swift; sourceTree = "<group>"; };
 		A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiAppDelegate.swift; sourceTree = "<group>"; };
+		A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresentationDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -415,6 +417,7 @@
 			isa = PBXGroup;
 			children = (
 				A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */,
+				A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */,
 				944E58092F2B593A00DB2DEE /* AppState.swift */,
 				944E580A2F2B593A00DB2DEE /* ContentView.swift */,
 				944E580B2F2B593A00DB2DEE /* WeekyiiApp.swift */,
@@ -906,6 +909,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */,
+				A900000C2FA0000100AAA001 /* NotificationPresentationDelegate.swift in Sources */,
 				A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */,
 				A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */,
 				C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */,
@@ -1218,7 +1222,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1257,7 +1261,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1374,7 +1378,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
@@ -1404,7 +1408,7 @@
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
@@ -1493,7 +1497,7 @@
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1571,7 +1575,7 @@
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;

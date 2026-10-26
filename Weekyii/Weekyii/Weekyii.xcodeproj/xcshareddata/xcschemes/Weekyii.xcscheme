@@ -87,7 +87,7 @@
          </TestableReference>
       </Testables>
       <StoreKitConfigurationFileReference
-         identifier = "../../../Resources/Weekyii.storekit">
+         identifier = "../../Resources/Weekyii.storekit">
       </StoreKitConfigurationFileReference>
    </TestAction>
    <LaunchAction
@@ -111,7 +111,7 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../../../Resources/Weekyii.storekit">
+         identifier = "../../Resources/Weekyii.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

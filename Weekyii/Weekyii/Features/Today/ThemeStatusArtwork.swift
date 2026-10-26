@@ -25,7 +25,7 @@ struct ThemeStatusArtwork: View {
                 LotrStatusIllustration(renderingMode: renderingMode)
             case .amber, .ocean, .forest, .rose, .lavender, .graphite, .mint, .midnight:
                 NarrativeThemeStatusIllustration(theme: theme, renderingMode: renderingMode)
-            case .brutal, .neon, .paper, .terminal:
+            case .brutal, .neon, .paper, .terminal, .blueprint:
                 GeometricStatusIllustration(theme: theme, renderingMode: renderingMode)
             }
         }
@@ -113,7 +113,7 @@ private struct NarrativeThemeStatusIllustration: View {
             MintGreenhouseScene(size: size, time: time)
         case .midnight:
             MidnightAuroraScene(size: size, time: time)
-        case .sunset, .lotr, .brutal, .neon, .paper, .terminal:
+        case .sunset, .lotr, .brutal, .neon, .paper, .terminal, .blueprint:
             Color.clear
         }
     }
@@ -189,6 +189,8 @@ private struct GeometricStatusIllustration: View {
                 PaperStatusScene(size: size, time: time, palette: palette)
             case .terminal:
                 TerminalStatusScene(size: size, time: time, palette: palette)
+            case .blueprint:
+                DraftingStatusScene(size: size, time: time, palette: palette)
             default:
                 Color.clear
             }
@@ -460,6 +462,187 @@ private struct TerminalStatusScene: View {
             line = line + Text(verbatim: isLit ? "█" : "░").foregroundColor(isLit ? bright : dim)
         }
         return line + Text(verbatim: "]")
+    }
+}
+
+/// Drafting sheet: a floor plan in hairlines, a door leaf swinging to its stop,
+/// an architect's dimension rule and a title block. Flat ink, no elevation, one
+/// construction-orange marker. It shows no numbers: the artwork has no access to
+/// the day's real progress.
+private struct DraftingStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    var body: some View {
+        let grid = ArtworkGrid(size: size)
+        let ink = palette.primary
+        let soft = palette.primaryLight
+        let marker = palette.accent
+        let rule = palette.textSecondary
+        let swing = CGFloat((sin(time * 0.45 - Double.pi / 2) + 1) / 2)
+        let leafAngle = -CGFloat.pi / 2 - swing * CGFloat.pi / 2
+        let labelSize = max(5, 6.5 * grid.s)
+
+        ZStack(alignment: .topLeading) {
+            Canvas { context, canvas in
+                let grid = ArtworkGrid(size: canvas)
+                let thin = max(0.6, 1 * grid.s)
+                let wall = max(1.1, 1.5 * grid.s)
+
+                context.fill(Path(grid.bounds), with: .color(palette.backgroundSecondary))
+
+                // Sheet grid: 10-unit cells, a heavier rule every fifth.
+                var minor = Path()
+                for x in stride(from: CGFloat.zero, through: 260, by: 10) {
+                    minor.addRect(grid.rect(x, 0, 0.5, 88))
+                }
+                for y in stride(from: CGFloat.zero, through: 88, by: 10) {
+                    minor.addRect(grid.rect(0, y, 260, 0.5))
+                }
+                context.fill(minor, with: .color(soft.opacity(0.16)))
+
+                var major = Path()
+                for x in stride(from: CGFloat.zero, through: 260, by: 50) {
+                    major.addRect(grid.rect(x, 0, 1, 88))
+                }
+                for y in stride(from: CGFloat.zero, through: 88, by: 50) {
+                    major.addRect(grid.rect(0, y, 260, 1))
+                }
+                context.fill(major, with: .color(soft.opacity(0.3)))
+
+                // Plan: an outer wall, a partition with a door opening, a window.
+                var walls = Path()
+                walls.addRect(grid.rect(22, 14, 96, 54))
+                walls.move(to: grid.point(68, 14))
+                walls.addLine(to: grid.point(68, 38))
+                walls.move(to: grid.point(68, 52))
+                walls.addLine(to: grid.point(68, 68))
+                walls.move(to: grid.point(68, 44))
+                walls.addLine(to: grid.point(118, 44))
+                context.stroke(
+                    walls,
+                    with: .color(ink),
+                    style: StrokeStyle(lineWidth: wall, lineCap: .square, lineJoin: .miter)
+                )
+
+                var window = Path()
+                window.move(to: grid.point(34, 17.5))
+                window.addLine(to: grid.point(58, 17.5))
+                window.move(to: grid.point(34, 14))
+                window.addLine(to: grid.point(34, 17.5))
+                window.move(to: grid.point(58, 14))
+                window.addLine(to: grid.point(58, 17.5))
+                context.stroke(window, with: .color(soft), lineWidth: thin)
+
+                // Door: the arc is the drawn geometry, the leaf sweeps to its stop.
+                let hinge = grid.point(68, 52)
+                let radius = 14 * grid.s
+                var arc = Path()
+                arc.addArc(
+                    center: hinge,
+                    radius: radius,
+                    startAngle: .degrees(180),
+                    endAngle: .degrees(270),
+                    clockwise: false
+                )
+                context.stroke(arc, with: .color(soft.opacity(0.7)), lineWidth: thin)
+
+                let tip = CGPoint(
+                    x: hinge.x + cos(leafAngle) * radius,
+                    y: hinge.y + sin(leafAngle) * radius
+                )
+                var leaf = Path()
+                leaf.move(to: hinge)
+                leaf.addLine(to: tip)
+                context.stroke(leaf, with: .color(marker), style: StrokeStyle(lineWidth: wall, lineCap: .square))
+                context.fill(
+                    Path(ellipseIn: CGRect(
+                        x: tip.x - 1.6 * grid.s,
+                        y: tip.y - 1.6 * grid.s,
+                        width: 3.2 * grid.s,
+                        height: 3.2 * grid.s
+                    )),
+                    with: .color(marker)
+                )
+
+                var centerMark = Path()
+                centerMark.move(to: CGPoint(x: hinge.x - 3 * grid.s, y: hinge.y))
+                centerMark.addLine(to: CGPoint(x: hinge.x + 3 * grid.s, y: hinge.y))
+                centerMark.move(to: CGPoint(x: hinge.x, y: hinge.y - 3 * grid.s))
+                centerMark.addLine(to: CGPoint(x: hinge.x, y: hinge.y + 3 * grid.s))
+                context.stroke(centerMark, with: .color(rule.opacity(0.6)), lineWidth: thin)
+
+                // Dimension rule with slash ticks under the plan.
+                var dimension = Path()
+                dimension.move(to: grid.point(22, 76))
+                dimension.addLine(to: grid.point(118, 76))
+                dimension.move(to: grid.point(22, 68))
+                dimension.addLine(to: grid.point(22, 79))
+                dimension.move(to: grid.point(118, 68))
+                dimension.addLine(to: grid.point(118, 79))
+                context.stroke(
+                    dimension,
+                    with: .color(rule.opacity(0.55)),
+                    style: StrokeStyle(lineWidth: thin, lineCap: .square)
+                )
+
+                var ticks = Path()
+                for x in [CGFloat(22), CGFloat(118)] {
+                    ticks.move(to: grid.point(x - 2, 78))
+                    ticks.addLine(to: grid.point(x + 2, 74))
+                }
+                context.stroke(
+                    ticks,
+                    with: .color(marker),
+                    style: StrokeStyle(lineWidth: max(1, 1.4 * grid.s), lineCap: .square)
+                )
+
+                // Detail callout and title block.
+                var leader = Path()
+                leader.move(to: grid.point(187, 30))
+                leader.addLine(to: grid.point(124, 30))
+                leader.move(to: grid.point(124, 30))
+                leader.addLine(to: grid.point(124, 34))
+                context.stroke(
+                    leader,
+                    with: .color(rule.opacity(0.8)),
+                    style: StrokeStyle(lineWidth: thin, lineCap: .square)
+                )
+                context.stroke(grid.circle(196, 30, radius: 9), with: .color(ink), lineWidth: thin)
+                context.fill(grid.circle(124, 30, radius: 1.4), with: .color(marker))
+
+                let callout = context.resolve(
+                    Text(verbatim: "A")
+                        .font(.system(size: max(6, 8 * grid.s), weight: .semibold, design: .monospaced))
+                        .foregroundColor(ink)
+                )
+                context.draw(callout, at: grid.point(196, 30), anchor: .center)
+
+                var block = Path()
+                block.addRect(grid.rect(176, 62, 70, 20))
+                block.move(to: grid.point(176, 72))
+                block.addLine(to: grid.point(246, 72))
+                block.move(to: grid.point(212, 72))
+                block.addLine(to: grid.point(212, 82))
+                context.stroke(block, with: .color(soft.opacity(0.85)), lineWidth: thin)
+            }
+            .frame(width: size.width, height: size.height)
+
+            Text(verbatim: "WEEKYII")
+                .tracking(1.4)
+                .frame(width: 64 * grid.sx, alignment: .leading)
+                .position(x: 211 * grid.sx, y: 67 * grid.sy)
+            Text(verbatim: "PLAN 01")
+                .frame(width: 32 * grid.sx, alignment: .leading)
+                .position(x: 196 * grid.sx, y: 77 * grid.sy)
+            Text(verbatim: "1:100")
+                .frame(width: 32 * grid.sx, alignment: .leading)
+                .position(x: 231 * grid.sx, y: 77 * grid.sy)
+        }
+        .font(.system(size: labelSize, weight: .medium, design: .monospaced))
+        .foregroundColor(rule)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 }
 

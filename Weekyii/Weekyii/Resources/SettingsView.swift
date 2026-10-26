@@ -255,6 +255,7 @@ struct SettingsView: View {
                         tint: .purple
                     )
                 }
+                .accessibilityIdentifier("settings.row.appearance")
 
                 NavigationLink {
                     languageSettingsPage
@@ -266,6 +267,7 @@ struct SettingsView: View {
                         tint: .cyan
                     )
                 }
+                .accessibilityIdentifier("settings.row.language")
             }
 
             Section("使用方式") {
@@ -279,17 +281,19 @@ struct SettingsView: View {
                         tint: .orange
                     )
                 }
+                .accessibilityIdentifier("settings.row.todayRhythm")
 
                 NavigationLink {
                     taskTypeSettingsPage
                 } label: {
                     SettingsNavigationRow(
-                        title: "任务管理",
+                        title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
                         value: "\(activeTaskTypeDefinitions.count) 个类型",
                         icon: "tag.fill",
                         tint: .teal
                     )
                 }
+                .accessibilityIdentifier("settings.row.taskTypes")
 
                 NavigationLink {
                     pastSettingsPage
@@ -301,6 +305,7 @@ struct SettingsView: View {
                         tint: .indigo
                     )
                 }
+                .accessibilityIdentifier("settings.row.past")
 
                 NavigationLink {
                     futureSettingsPage
@@ -312,6 +317,24 @@ struct SettingsView: View {
                         tint: .blue
                     )
                 }
+                .accessibilityIdentifier("settings.row.future")
+            }
+
+            Section("扩展") {
+                NavigationLink {
+                    SuspendedSettingsView()
+                } label: {
+                    SettingsNavigationRow(
+                        title: String(localized: "settings.suspended.header", defaultValue: "悬置箱"),
+                        value: String(
+                            format: String(localized: "settings.suspended.entry.value", defaultValue: "默认 %d 天"),
+                            settings.suspendedDefaultCountdownDays
+                        ),
+                        icon: "hourglass",
+                        tint: .suspendedModuleTint
+                    )
+                }
+                .accessibilityIdentifier("settings.row.suspended")
 
                 NavigationLink {
                     ProjectSettingsView()
@@ -323,6 +346,7 @@ struct SettingsView: View {
                         tint: .brown
                     )
                 }
+                .accessibilityIdentifier("settings.row.projects")
             }
 
             Section("数据") {
@@ -335,6 +359,7 @@ struct SettingsView: View {
                         tint: .indigo
                     )
                 }
+                .accessibilityIdentifier("settings.row.data")
             }
 
             Section("应用") {
@@ -348,6 +373,7 @@ struct SettingsView: View {
                         tint: .mint
                     )
                 }
+                .accessibilityIdentifier("settings.row.about")
 
                 NavigationLink {
                     developerSettingsPage
@@ -358,6 +384,7 @@ struct SettingsView: View {
                         tint: .gray
                     )
                 }
+                .accessibilityIdentifier("settings.row.developer")
             }
         }
         .listStyle(.insetGrouped)
@@ -372,13 +399,6 @@ struct SettingsView: View {
             }
             Section("提醒") {
                 reminderSettings
-            }
-            Section {
-                suspendedReminderSettings
-            } header: {
-                Text(String(localized: "settings.suspended.section", defaultValue: "悬置箱提醒"))
-            } footer: {
-                Text(String(localized: "settings.suspended.section.footer", defaultValue: "悬置任务会按这里的节奏在到期前提醒你。到期后的处理方式在「任务管理 → 悬置箱」中设置。"))
             }
         }
         .navigationTitle("今日节奏")
@@ -470,41 +490,6 @@ struct SettingsView: View {
             Section("默认类型") {
                 taskTypeSettings
             }
-            Section {
-                Stepper(value: Binding(
-                    get: { settings.suspendedDefaultCountdownDays },
-                    set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
-                ), in: 1...120) {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
-                        Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
-                        Spacer(minLength: 8)
-                        Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Picker(selection: Binding(
-                    get: { settings.suspendedExpiryPolicy },
-                    set: { settings.suspendedExpiryPolicy = $0 }
-                )) {
-                    ForEach(SuspendedExpiryPolicy.allCases) { policy in
-                        Text(policy.displayName).tag(policy)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "trash.slash.fill", color: .red)
-                        Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
-                    }
-                }
-            } header: {
-                Text(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
-                    Text(settings.suspendedExpiryPolicy.summary)
-                }
-            }
             Section("类型管理") {
                 taskTypeManagementSettings
             }
@@ -516,7 +501,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("任务管理")
+        .navigationTitle(String(localized: "settings.task_type.title", defaultValue: "任务类型"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -1626,7 +1611,7 @@ struct SettingsView: View {
                 SettingsIcon(icon: "sunrise.fill", color: .orange)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
-                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"))
+                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项；悬置箱的早间提醒也跟随这个时刻。"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1650,74 +1635,6 @@ struct SettingsView: View {
             .padding(.leading, 40)
         }
         .padding(.vertical, 4)
-    }
-
-    // MARK: - Suspended Task Reminder Settings
-    @ViewBuilder
-    private var suspendedReminderSettings: some View {
-        Toggle(isOn: Binding(
-            get: { settings.suspendedReminderEnabled },
-            set: { settings.suspendedReminderEnabled = $0 }
-        )) {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
-                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-
-        if settings.suspendedReminderEnabled {
-            Picker(selection: Binding(
-                get: { settings.suspendedReminderIntensityRaw },
-                set: { settings.suspendedReminderIntensityRaw = $0 }
-            )) {
-                ForEach(SuspendedReminderIntensity.allCases) { intensity in
-                    Text(intensity.displayName).tag(intensity.rawValue)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
-                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
-                }
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 12) {
-                Color.clear
-                    .frame(width: 28, height: 28)
-                Text(settings.suspendedReminderIntensity.summary)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-
-            if settings.suspendedReminderIntensity == .full {
-                Stepper(value: Binding(
-                    get: { settings.suspendedReminderAdvanceDays },
-                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
-                ), in: 1...14) {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
-                        Text(String(
-                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
-                            settings.suspendedReminderAdvanceDays
-                        ))
-                    }
-                }
-            }
-
-            DatePicker(selection: suspendedEveningReminderDateBinding, displayedComponents: .hourAndMinute) {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
-                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
-                }
-            }
-            .datePickerStyle(.compact)
-        }
     }
 
     private var seedOptions: SeedOptions {
@@ -2012,23 +1929,6 @@ struct SettingsView: View {
                 let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
                 settings.morningReminderHour = min(max(components.hour ?? 0, 0), 23)
                 settings.morningReminderMinute = min(max(components.minute ?? 0, 0), 59)
-            }
-        )
-    }
-
-    private var suspendedEveningReminderDateBinding: Binding<Date> {
-        Binding(
-            get: {
-                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
-                components.hour = settings.suspendedReminderEveningHour
-                components.minute = settings.suspendedReminderEveningMinute
-                components.second = 0
-                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
-            },
-            set: { newDate in
-                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
-                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
-                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
             }
         )
     }
@@ -2597,6 +2497,8 @@ private struct ThemePaletteMark: View {
             paperMark
         case .terminal:
             terminalMark
+        case .blueprint:
+            blueprintMark
         default:
             classicMark
         }
@@ -2722,6 +2624,38 @@ private struct ThemePaletteMark: View {
                 path.addRect(cursor)
             }
             .fill(Color(hex: "#8CFFA8"))
+        }
+    }
+
+    /// A cyanotype tile: graph grid, with an orange corner bracket drawn like a
+    /// title-block crop mark.
+    private var blueprintMark: some View {
+        let grid = Path { path in
+            for x in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: x, y: 0, width: 0.6, height: 30))
+            }
+            for y in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: 0, y: y, width: 30, height: 0.6))
+            }
+        }
+
+        let bracket = Path { path in
+            path.move(to: CGPoint(x: 20, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 20))
+        }
+
+        return ZStack {
+            Rectangle().fill(Color(hex: "#0E2836"))
+
+            grid
+                .fill(Color(hex: "#6FB4D6").opacity(0.28))
+
+            bracket
+                .stroke(
+                    Color(hex: "#E08A5C"),
+                    style: StrokeStyle(lineWidth: 1.8, lineCap: .square, lineJoin: .miter)
+                )
         }
     }
 }
@@ -2998,6 +2932,154 @@ private struct ProjectSettingsView: View {
         case .medium: "中型"
         case .wide: "宽幅"
         }
+    }
+}
+
+private struct SuspendedSettingsView: View {
+    @EnvironmentObject private var settings: UserSettings
+
+    var body: some View {
+        Form {
+            Section {
+                reminderSettings
+            } header: {
+                Text(String(localized: "settings.suspended.reminder.section", defaultValue: "提醒"))
+            } footer: {
+                Text(String(
+                    localized: "settings.suspended.reminder.section.footer",
+                    defaultValue: "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。"
+                ))
+            }
+
+            Section {
+                countdownSettings
+                expiryPolicySettings
+            } header: {
+                Text(String(localized: "settings.suspended.behavior.section", defaultValue: "倒计时与到期"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
+                    Text(settings.suspendedExpiryPolicy.summary)
+                }
+            }
+        }
+        .navigationTitle(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private var reminderSettings: some View {
+        Toggle(isOn: Binding(
+            get: { settings.suspendedReminderEnabled },
+            set: { settings.suspendedReminderEnabled = $0 }
+        )) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
+                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        if settings.suspendedReminderEnabled {
+            Picker(selection: Binding(
+                get: { settings.suspendedReminderIntensityRaw },
+                set: { settings.suspendedReminderIntensityRaw = $0 }
+            )) {
+                ForEach(SuspendedReminderIntensity.allCases) { intensity in
+                    Text(intensity.displayName).tag(intensity.rawValue)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
+                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Color.clear
+                    .frame(width: 28, height: 28)
+                Text(settings.suspendedReminderIntensity.summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            if settings.suspendedReminderIntensity == .full {
+                Stepper(value: Binding(
+                    get: { settings.suspendedReminderAdvanceDays },
+                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
+                ), in: 1...14) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
+                        Text(String(
+                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
+                            settings.suspendedReminderAdvanceDays
+                        ))
+                    }
+                }
+            }
+
+            DatePicker(selection: eveningReminderDateBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
+                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
+                }
+            }
+            .datePickerStyle(.compact)
+        }
+    }
+
+    private var countdownSettings: some View {
+        Stepper(value: Binding(
+            get: { settings.suspendedDefaultCountdownDays },
+            set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
+        ), in: 1...120) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
+                Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
+                Spacer(minLength: 8)
+                Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var expiryPolicySettings: some View {
+        Picker(selection: Binding(
+            get: { settings.suspendedExpiryPolicy },
+            set: { settings.suspendedExpiryPolicy = $0 }
+        )) {
+            ForEach(SuspendedExpiryPolicy.allCases) { policy in
+                Text(policy.displayName).tag(policy)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "trash.slash.fill", color: .red)
+                Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
+            }
+        }
+    }
+
+    private var eveningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.suspendedReminderEveningHour
+                components.minute = settings.suspendedReminderEveningMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
+                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
     }
 }
 

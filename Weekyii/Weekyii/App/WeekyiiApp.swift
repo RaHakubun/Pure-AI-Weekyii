@@ -525,6 +525,13 @@ final class AppHealthCoordinator: AppHealthCoordinating {
                 .start(day: day, at: startTime, executionMode: settings.effectiveDefaultExecutionMode)
         } catch {
             recordAutoStartFailure("启动托管未能启动今日任务：\(error.localizedDescription)")
+            return
+        }
+
+        // The user never confirms this start, so announce the task it locked in.
+        let focusTitle = day.focusTask?.title ?? validDraftTasks.first?.title ?? ""
+        if !focusTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notificationService.notifyAutomaticStart(dayId: dayId, focusTitle: focusTitle)
         }
     }
 

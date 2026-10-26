@@ -65,18 +65,14 @@ struct ThemedSurfaceModifier: ViewModifier {
         }
     }
 
-    /// Inner gilded hairline plus a bracket in each corner.
+    /// Inner gilded hairline, inset from the surface edge.
     @ViewBuilder
     private var ornamentLayer: some View {
         if let ornament = skin.ornament {
             let inset: CGFloat = 3.5
-            ZStack {
-                RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - inset))
-                    .strokeBorder(ornament.color.opacity(0.22), lineWidth: 0.75)
-                    .padding(inset)
-                CornerBracketsShape(inset: 6, arm: 14, radius: 5)
-                    .stroke(ornament.color.opacity(0.85), style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
-            }
+            RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - inset))
+                .strokeBorder(ornament.color.opacity(0.22), lineWidth: 0.75)
+                .padding(inset)
         }
     }
 
@@ -96,6 +92,8 @@ struct ThemedSurfaceModifier: ViewModifier {
 }
 
 /// Four L-shaped brackets hugging the corners of a rect, with rounded elbows.
+/// Kept as a reusable shape even though no surface draws it today: 魔戒's corner
+/// brackets were removed, and this is the piece to re-attach if they come back.
 struct CornerBracketsShape: Shape {
     var inset: CGFloat
     var arm: CGFloat
@@ -234,9 +232,9 @@ private struct WeekSoftShadowModifier: ViewModifier {
     }
 }
 
-/// Full-screen texture for skins that have one (paper fibres, CRT scanlines):
-/// a 1 pt line every 3 pt, drawn above the content so every page and the tab
-/// bar get it without any page knowing. Draws nothing for `.none`.
+/// Full-screen texture for skins that have one (paper fibres, CRT scanlines,
+/// a drafting grid): drawn above the content so every page and the tab bar get
+/// it without any page knowing. Draws nothing for `.none`.
 struct ThemeBackdropOverlay: View {
     let backdrop: ThemeBackdrop
 
@@ -248,6 +246,8 @@ struct ThemeBackdropOverlay: View {
             lines(ink)
         case .scanlines(let ink):
             lines(ink)
+        case .draftingGrid(let ink):
+            draftingGrid(ink)
         }
     }
 
@@ -258,6 +258,31 @@ struct ThemeBackdropOverlay: View {
             while y < size.height {
                 context.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 1)), with: .color(color))
                 y += 3
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// A 10 pt minor square with a heavier 50 pt major every fifth line, so the
+    /// page reads as graph paper rather than a ruled list.
+    private func draftingGrid(_ ink: ThemeHexPair) -> some View {
+        let color = ink.color
+        return Canvas { context, size in
+            for x in stride(from: CGFloat.zero, through: size.width, by: 10) {
+                let major = Int((x / 10).rounded()) % 5 == 0
+                context.fill(
+                    Path(CGRect(x: x, y: 0, width: 1, height: size.height)),
+                    with: .color(color.opacity(major ? 1 : 0.45))
+                )
+            }
+            for y in stride(from: CGFloat.zero, through: size.height, by: 10) {
+                let major = Int((y / 10).rounded()) % 5 == 0
+                context.fill(
+                    Path(CGRect(x: 0, y: y, width: size.width, height: 1)),
+                    with: .color(color.opacity(major ? 1 : 0.45))
+                )
             }
         }
         .ignoresSafeArea()

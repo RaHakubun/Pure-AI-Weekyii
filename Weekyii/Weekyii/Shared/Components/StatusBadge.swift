@@ -65,6 +65,16 @@ struct StatusBadge: View {
             .background(status.color.opacity(0.16), in: Capsule())
             .overlay(Capsule().strokeBorder(status.color.opacity(0.55), lineWidth: 1))
             .shadow(color: status.color.opacity(0.3), radius: 4)
+        case .legend:
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(status.color)
+                    .frame(width: 12, height: 2)
+                Text(status.displayName)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .tracking(0.8)
+            }
+            .foregroundColor(status.color)
         }
     }
 }

@@ -1,8 +1,11 @@
 import UIKit
+import UserNotifications
 
 @MainActor
 final class WeekyiiAppDelegate: NSObject, UIApplicationDelegate {
     private(set) var cloudRemoteNotificationRouter = CloudRemoteNotificationRouter()
+    /// `UNUserNotificationCenter.delegate` is weak, so the app delegate owns it.
+    private let notificationPresentationDelegate = NotificationPresentationDelegate()
 
     func application(
         _ application: UIApplication,
@@ -11,6 +14,7 @@ final class WeekyiiAppDelegate: NSObject, UIApplicationDelegate {
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         let isRunningUITests = ProcessInfo.processInfo.arguments.contains("-uiTesting")
         if !isRunningTests && !isRunningUITests {
+            UNUserNotificationCenter.current().delegate = notificationPresentationDelegate
             application.registerForRemoteNotifications()
         }
         return true
