@@ -4133,15 +4133,40 @@ final class ModelTests: XCTestCase {
         let skin = WeekTheme.lotr.skin
         XCTAssertNotEqual(skin, .classic)
         XCTAssertNotNil(skin.card)
-        XCTAssertNotNil(skin.card?.ornament)
+        // Sections are page blocks between two ink rules, carrying a bookmark ribbon.
+        XCTAssertEqual(skin.card?.edges, .horizontalRules)
+        XCTAssertNil(skin.card?.shadow)
+        XCTAssertEqual(skin.card?.ribbonAccent, true)
         XCTAssertNotNil(skin.row)
+        XCTAssertEqual(skin.row?.surface.edges, .bottomRule)
         XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
+        // The focus panel is the red-book leather cover with a tooled gilt frame, no forge glow.
         XCTAssertNotNil(skin.feature)
-        XCTAssertEqual(skin.badge?.kind, .ember)
+        if case .leather = skin.feature?.surface.material {} else {
+            XCTFail("魔戒 focus panel must be drawn as leather")
+        }
+        XCTAssertNotNil(skin.feature?.surface.tooling)
+        XCTAssertNil(skin.feature?.surface.innerGlow)
+        XCTAssertEqual(skin.feature?.primaryAction.glows, false)
+        XCTAssertEqual(skin.badge?.kind, .waxSeal)
         XCTAssertEqual(skin.section?.count, .serif)
         XCTAssertEqual(skin.section?.showsIcon, true)
+        XCTAssertNotNil(skin.section?.rubric)
+        XCTAssertNotNil(skin.section?.countInk)
+        if case .vellum = skin.backdrop {} else {
+            XCTFail("魔戒 pages must carry the vellum backdrop")
+        }
+        XCTAssertFalse(skin.softShadows)
         XCTAssertEqual(skin.glyphs, .lotr)
         XCTAssertNotNil(skin.onPrimary)
+        // Built-in task types and status seals map onto film props.
+        XCTAssertEqual(LotrGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .sting)
+        XCTAssertEqual(LotrGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .mountDoom)
+        XCTAssertEqual(LotrGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .pipe)
+        XCTAssertNil(LotrGlyph(builtInType: .leisure, iconName: "star"))
+        XCTAssertEqual(LotrGlyph(systemName: "clock.arrow.circlepath"), .redBook)
+        XCTAssertEqual(LotrGlyph(systemName: "square.grid.2x2"), .phial)
+        XCTAssertEqual(LotrGlyph(status: .execute), .beacon)
         // No other theme opts into the hand-drawn glyph set.
         for theme in WeekTheme.allCases where theme != .lotr {
             XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")

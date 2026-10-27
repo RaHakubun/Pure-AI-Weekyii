@@ -36,7 +36,9 @@ struct ThemedSurfaceModifier: ViewModifier {
 
     @ViewBuilder
     private var border: some View {
-        if let stops = skin.borderGradient, !stops.isEmpty {
+        if skin.edges != .all {
+            edgeRules
+        } else if let stops = skin.borderGradient, !stops.isEmpty {
             shape.strokeBorder(
                 LinearGradient(
                     colors: stops.map { Color(hex: $0) },
@@ -50,10 +52,29 @@ struct ThemedSurfaceModifier: ViewModifier {
         }
     }
 
+    /// Top / bottom rules for page-block and ledger-row surfaces.
+    @ViewBuilder
+    private var edgeRules: some View {
+        if skin.borderWidth > 0 {
+            VStack(spacing: 0) {
+                if skin.edges == .horizontalRules {
+                    Rectangle().fill(skin.border.color).frame(height: skin.borderWidth)
+                }
+                Spacer(minLength: 0)
+                Rectangle().fill(skin.border.color).frame(height: skin.borderWidth)
+            }
+        }
+    }
+
     @ViewBuilder
     private var fillLayer: some View {
         ZStack {
-            skin.fill?.color ?? fallbackFill
+            if case .leather(let top, let bottom) = skin.material {
+                LinearGradient(colors: [top.color, bottom.color], startPoint: .top, endPoint: .bottom)
+                LeatherGrain()
+            } else {
+                skin.fill?.color ?? fallbackFill
+            }
             if let glow = skin.innerGlow {
                 RadialGradient(
                     colors: [glow.color.opacity(0.30), glow.color.opacity(0)],
@@ -65,14 +86,25 @@ struct ThemedSurfaceModifier: ViewModifier {
         }
     }
 
-    /// Inner gilded hairline, inset from the surface edge.
+    /// Inner gilded hairline, inset from the surface edge, and/or the tooled
+    /// double gilt rule of a bound cover.
     @ViewBuilder
     private var ornamentLayer: some View {
-        if let ornament = skin.ornament {
-            let inset: CGFloat = 3.5
-            RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - inset))
-                .strokeBorder(ornament.color.opacity(0.22), lineWidth: 0.75)
-                .padding(inset)
+        ZStack {
+            if let ornament = skin.ornament {
+                let inset: CGFloat = 3.5
+                RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - inset))
+                    .strokeBorder(ornament.color.opacity(0.22), lineWidth: 0.75)
+                    .padding(inset)
+            }
+            if let tooling = skin.tooling {
+                RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - 5))
+                    .strokeBorder(tooling.color.opacity(0.85), lineWidth: 0.8)
+                    .padding(5)
+                RoundedRectangle(cornerRadius: max(0, skin.cornerRadius - 8))
+                    .strokeBorder(tooling.color.opacity(0.45), lineWidth: 0.5)
+                    .padding(8)
+            }
         }
     }
 
@@ -88,6 +120,34 @@ struct ThemedSurfaceModifier: ViewModifier {
                 shape.fill(shadow.color.color).offset(x: shadow.x, y: shadow.y)
             }
         }
+    }
+}
+
+/// Fine pore grain for a leather surface: deterministic dark and light specks,
+/// so the texture is identical on every redraw.
+struct LeatherGrain: View {
+    var body: some View {
+        Canvas { context, size in
+            var seed: UInt64 = 0x9E3779B97F4A7C15
+            func next() -> CGFloat {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return CGFloat((seed >> 33) % 10_000) / 10_000
+            }
+            let count = Int(size.width * size.height / 14)
+            for index in 0..<count {
+                let x = next() * size.width
+                let y = next() * size.height
+                let side = 0.6 + next() * 0.9
+                let light = index % 7 == 0
+                let alpha = light ? 0.05 + next() * 0.05 : 0.10 + next() * 0.16
+                context.fill(
+                    Path(ellipseIn: CGRect(x: x, y: y, width: side, height: side)),
+                    with: .color(light ? Color(red: 1, green: 0.85, blue: 0.7).opacity(alpha) : Color.black.opacity(alpha))
+                )
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -248,7 +308,53 @@ struct ThemeBackdropOverlay: View {
             lines(ink)
         case .draftingGrid(let ink):
             draftingGrid(ink)
+        case .vellum(let fibre, let vignette, let topLight):
+            vellum(fibre: fibre, vignette: vignette, topLight: topLight)
         }
+    }
+
+    /// Short scattered fibres, a darkened edge and a warm light from the top.
+    /// The fibres come from a fixed seed, so the sheet never shimmers.
+    private func vellum(fibre: ThemeHexPair, vignette: ThemeHexPair, topLight: ThemeHexPair) -> some View {
+        let fibreColor = fibre.color
+        return GeometryReader { proxy in
+            let size = proxy.size
+            ZStack {
+                Canvas { context, canvas in
+                    var seed: UInt64 = 0x2545F4914F6CDD1D
+                    func next() -> CGFloat {
+                        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                        return CGFloat((seed >> 33) % 10_000) / 10_000
+                    }
+                    let count = Int(canvas.width * canvas.height / 240)
+                    for _ in 0..<count {
+                        let x = next() * canvas.width
+                        let y = next() * canvas.height
+                        let length = 3 + next() * 7
+                        let angle = (next() - 0.5) * 0.45
+                        var path = Path()
+                        path.move(to: CGPoint(x: x, y: y))
+                        path.addLine(to: CGPoint(x: x + cos(angle) * length, y: y + sin(angle) * length))
+                        context.stroke(path, with: .color(fibreColor.opacity(0.35 + next() * 0.65)), lineWidth: 0.5)
+                    }
+                }
+                RadialGradient(
+                    colors: [topLight.color, topLight.color.opacity(0)],
+                    center: .top,
+                    startRadius: 0,
+                    endRadius: max(1, size.height * 0.55)
+                )
+                RadialGradient(
+                    colors: [vignette.color.opacity(0), vignette.color],
+                    center: .center,
+                    startRadius: min(size.width, size.height) * 0.5,
+                    endRadius: max(size.width, size.height) * 0.75
+                )
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private func lines(_ ink: ThemeHexPair) -> some View {

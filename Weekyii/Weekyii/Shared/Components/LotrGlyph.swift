@@ -3,53 +3,55 @@ import UIKit
 
 // MARK: - 魔戒 glyph set
 
-/// Hand-drawn icons for the 魔戒 theme. Each glyph is authored on a 24 × 24
-/// grid with round caps, so it reads like an engraved line at any size and
-/// takes the current foreground style (tint, gradient, opacity).
+/// Hand-drawn icons for the 魔戒 theme. Each glyph is a prop seen in the films,
+/// authored on a 24 × 24 grid with round caps so it reads like an engraved line
+/// at any size and takes the current foreground style (ink, status colour, gold).
+/// No glyph glows; only the ring artwork on 当下 is lit.
 enum LotrGlyph: String, CaseIterable {
-    /// Focus: a gold ring.
+    /// 当下 / focus: the One Ring, a band with visible thickness.
     case ring
-    /// Past / time: an hourglass.
-    case hourglass
-    /// Today: the sun rising over a ridge.
-    case dawn
-    /// Future / postpone: a folded map.
+    /// 过去: the Red Book of Westmarch.
+    case redBook
+    /// 未来 / 本周 / postpone: a rolled map of Middle-earth with a route.
     case map
-    /// Extensions: four rune stones.
-    case runes
-    /// Settings: a shield.
-    case shield
-    /// Frozen tasks: a six-armed frost star.
-    case frost
-    /// DDL tasks: an anvil throwing sparks.
-    case anvil
-    /// Regular tasks / done: a mithril diamond with a check.
-    case mithril
-    /// Leisure tasks: an elven leaf.
-    case leaf
-    /// In progress: a flame.
-    case flame
-    /// Origin chips: a scroll.
-    case scroll
-    /// Date line: a candle.
-    case candle
-    /// Completed section: first light on the horizon.
-    case sunrise
+    /// 扩展: the Phial of Galadriel.
+    case phial
+    /// 我的 / settings: the leaf-of-Lórien brooch.
+    case brooch
+    /// Regular tasks: Sting.
+    case sting
+    /// DDL tasks: Mount Doom.
+    case mountDoom
+    /// Leisure tasks: a hobbit's long-stemmed pipe.
+    case pipe
+    /// Frozen tasks: the snow-bound peak of Caradhras.
+    case caradhras
+    /// In progress: a lit beacon of Gondor.
+    case beacon
+    /// Completed / done: the White Tree of Gondor.
+    case whiteTree
+    /// Start time: the hourglass on Bilbo's desk.
+    case hourglass
+    /// Date line / drafting: Bilbo's quill.
+    case quill
+    /// Origin chips: a letter under a wax seal.
+    case letter
 
     /// The SF Symbols a call site may pass that this set redraws.
     init?(systemName: String) {
         switch systemName {
         case "target": self = .ring
-        case "clock", "clock.fill", "clock.arrow.circlepath": self = .hourglass
-        case "sun.max", "sun.max.fill": self = .dawn
+        case "sun.max", "sun.max.fill": self = .ring
+        case "clock.arrow.circlepath": self = .redBook
+        case "clock", "clock.fill": self = .hourglass
         case "calendar", "calendar.badge.clock": self = .map
-        case "square.grid.2x2": self = .runes
-        case "gearshape": self = .shield
-        case "snowflake": self = .frost
-        case "checkmark.circle", "checkmark.circle.fill": self = .mithril
-        case "leaf", "leaf.fill": self = .leaf
-        case "flame", "flame.fill": self = .flame
-        case "folder", "folder.fill": self = .scroll
+        case "square.grid.2x2": self = .phial
+        case "gearshape": self = .brooch
+        case "snowflake": self = .caradhras
+        case "checkmark.circle", "checkmark.circle.fill": self = .whiteTree
+        case "leaf", "leaf.fill": self = .pipe
+        case "flame", "flame.fill": self = .beacon
+        case "folder", "folder.fill": self = .letter
         default: return nil
         }
     }
@@ -58,20 +60,25 @@ enum LotrGlyph: String, CaseIterable {
     init?(builtInType kind: TaskType, iconName: String) {
         guard iconName == kind.iconName else { return nil }
         switch kind {
-        case .regular: self = .mithril
-        case .ddl: self = .anvil
-        case .leisure: self = .leaf
+        case .regular: self = .sting
+        case .ddl: self = .mountDoom
+        case .leisure: self = .pipe
+        }
+    }
+
+    /// The glyph pressed into a day-status wax seal.
+    init(status: DayStatus) {
+        switch status {
+        case .empty: self = .hourglass
+        case .draft: self = .quill
+        case .execute: self = .beacon
+        case .completed: self = .whiteTree
+        case .expired: self = .mountDoom
         }
     }
 
     /// Stroke width on the 24 pt grid.
-    fileprivate var lineWidth: CGFloat {
-        switch self {
-        case .ring: return 2.6
-        case .frost: return 1.6
-        default: return 1.7
-        }
-    }
+    fileprivate var lineWidth: CGFloat { 1.6 }
 }
 
 // MARK: - Drawing
@@ -110,143 +117,174 @@ private struct LotrGlyphShape: Shape {
         }
     }
 
-    private func diamond(_ path: inout Path, center: CGPoint, radius: CGFloat) {
-        line(&path, [
-            p(center.x, center.y - radius),
-            p(center.x + radius, center.y),
-            p(center.x, center.y + radius),
-            p(center.x - radius, center.y)
-        ])
-        path.closeSubpath()
+    private func dot(_ path: inout Path, _ x: CGFloat, _ y: CGFloat, _ r: CGFloat) {
+        path.addEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
     }
 
     private var strokePath: Path {
         var path = Path()
         switch glyph {
         case .ring:
-            path.addEllipse(in: CGRect(x: 3, y: 5.8, width: 18, height: 12.4))
-        case .hourglass:
-            line(&path, [p(6, 3), p(18, 3)])
-            line(&path, [p(6, 21), p(18, 21)])
-            path.move(to: p(7, 3))
-            path.addCurve(to: p(17, 12), control1: p(7, 8), control2: p(17, 8))
-            path.addCurve(to: p(7, 21), control1: p(17, 16), control2: p(7, 16))
-            path.move(to: p(17, 3))
-            path.addCurve(to: p(7, 12), control1: p(17, 8), control2: p(7, 8))
-            path.addCurve(to: p(17, 21), control1: p(7, 16), control2: p(17, 16))
-        case .dawn:
-            line(&path, [p(2, 19), p(8, 12), p(12, 16), p(15, 13), p(22, 19)])
-            path.addEllipse(in: CGRect(x: 9, y: 5, width: 6, height: 6))
-            line(&path, [p(12, 1.8), p(12, 3.2)])
-            line(&path, [p(6.6, 4.2), p(7.6, 5.2)])
-            line(&path, [p(17.4, 4.2), p(16.4, 5.2)])
+            path.addEllipse(in: CGRect(x: 2.8, y: 6.2, width: 18.4, height: 12.8))
+            path.addEllipse(in: CGRect(x: 5.6, y: 7.7, width: 12.8, height: 7.4))
+        case .redBook:
+            // Cover, spine, raised bands, strap clasp, tooled lozenge, title lines.
+            path.move(to: p(6.5, 3))
+            path.addLine(to: p(17.5, 3))
+            path.addQuadCurve(to: p(19, 4.5), control: p(19, 3))
+            path.addLine(to: p(19, 19.5))
+            path.addQuadCurve(to: p(17.5, 21), control: p(19, 21))
+            path.addLine(to: p(6.5, 21))
+            path.move(to: p(6.5, 3))
+            path.addQuadCurve(to: p(4.5, 5), control: p(4.5, 3))
+            path.addLine(to: p(4.5, 19))
+            path.addQuadCurve(to: p(6.5, 21), control: p(4.5, 21))
+            path.closeSubpath()
+            line(&path, [p(4.6, 7.5), p(6.5, 7.5)])
+            line(&path, [p(4.6, 16.5), p(6.5, 16.5)])
+            line(&path, [p(19, 10.2), p(15.8, 10.2), p(15.8, 13.8), p(19, 13.8)])
+            line(&path, [p(10, 8.2), p(12.2, 6.2), p(14.4, 8.2), p(12.2, 10.2)])
+            path.closeSubpath()
+            line(&path, [p(9.5, 13.5), p(14.7, 13.5)])
+            line(&path, [p(9.5, 16), p(13.1, 16)])
         case .map:
-            line(&path, [p(3, 6), p(9, 4), p(15, 6), p(21, 4), p(21, 18), p(15, 20), p(9, 18), p(3, 20)])
+            line(&path, [p(5, 5.5), p(19, 5.5)])
+            line(&path, [p(5, 18.5), p(19, 18.5)])
+            path.addRoundedRect(in: CGRect(x: 2.8, y: 4.2, width: 2.6, height: 15.6), cornerSize: CGSize(width: 1.3, height: 1.3))
+            path.addRoundedRect(in: CGRect(x: 18.6, y: 4.2, width: 2.6, height: 15.6), cornerSize: CGSize(width: 1.3, height: 1.3))
+            line(&path, [p(8, 11.5), p(9.8, 8.9), p(11.4, 11.2), p(12.8, 9.4), p(14.4, 11.5)])
+            // Dashed route towards the destination mark.
+            line(&path, [p(8.2, 15.8), p(9.2, 15.65)])
+            line(&path, [p(10.4, 15.3), p(11.2, 14.9)])
+            line(&path, [p(12.2, 14.5), p(13.1, 14.4)])
+            line(&path, [p(14.6, 13.4), p(16.4, 15.2)])
+            line(&path, [p(16.4, 13.4), p(14.6, 15.2)])
+        case .phial:
+            line(&path, [p(9.6, 3.2), p(14.4, 3.2)])
+            line(&path, [p(10.6, 3.2), p(10.6, 6.8)])
+            line(&path, [p(13.4, 3.2), p(13.4, 6.8)])
+            path.move(to: p(10.6, 6.8))
+            path.addCurve(to: p(5.8, 13.6), control1: p(7.3, 8), control2: p(5.8, 10.7))
+            path.addCurve(to: p(12, 19.8), control1: p(5.8, 17.02), control2: p(8.58, 19.8))
+            path.addCurve(to: p(18.2, 13.6), control1: p(15.42, 19.8), control2: p(18.2, 17.02))
+            path.addCurve(to: p(13.4, 6.8), control1: p(18.2, 10.7), control2: p(16.7, 8))
+        case .brooch:
+            path.move(to: p(12, 5.2))
+            path.addCurve(to: p(12, 21), control1: p(16.4, 7.8), control2: p(18.1, 12.3))
+            path.addCurve(to: p(12, 5.2), control1: p(5.9, 12.3), control2: p(7.6, 7.8))
             path.closeSubpath()
-            line(&path, [p(9, 4), p(9, 18)])
-            line(&path, [p(15, 6), p(15, 20)])
-        case .runes:
-            diamond(&path, center: p(7, 6.5), radius: 4)
-            diamond(&path, center: p(17, 6.5), radius: 4)
-            diamond(&path, center: p(7, 17.5), radius: 4)
-            diamond(&path, center: p(17, 17.5), radius: 4)
-        case .shield:
-            line(&path, [p(12, 2.5), p(20, 5.5), p(20, 11.5)])
-            path.addCurve(to: p(12, 21.5), control1: p(20, 16.5), control2: p(16.5, 20))
-            path.addCurve(to: p(4, 11.5), control1: p(7.5, 20), control2: p(4, 16.5))
-            path.addLine(to: p(4, 5.5))
+            line(&path, [p(12, 7.5), p(12, 19.5)])
+            line(&path, [p(10, 9.6), p(12, 11.2), p(14, 9.6)])
+            line(&path, [p(9.6, 12.8), p(12, 14.6), p(14.4, 12.8)])
+            path.move(to: p(12, 5.2))
+            path.addCurve(to: p(14.8, 2.8), control1: p(12, 3.6), control2: p(13.2, 2.6))
+        case .sting:
+            line(&path, [p(12, 2.2), p(13.7, 6), p(13.3, 14.6), p(10.7, 14.6), p(10.3, 6)])
             path.closeSubpath()
-            line(&path, [p(12, 7), p(12, 17)])
-            line(&path, [p(8.5, 10.5), p(15.5, 10.5)])
-        case .frost:
-            line(&path, [p(12, 2), p(12, 22)])
-            line(&path, [p(3.3, 7), p(20.7, 17)])
-            line(&path, [p(3.3, 17), p(20.7, 7)])
-            line(&path, [p(10, 3.6), p(12, 5.2), p(14, 3.6)])
-            line(&path, [p(10, 20.4), p(12, 18.8), p(14, 20.4)])
-            line(&path, [p(4, 9.6), p(6.5, 9.2), p(5.6, 6.8)])
-            line(&path, [p(20, 14.4), p(17.5, 14.8), p(18.4, 17.2)])
-            line(&path, [p(4, 14.4), p(6.5, 14.8), p(5.6, 17.2)])
-            line(&path, [p(20, 9.6), p(17.5, 9.2), p(18.4, 6.8)])
-        case .anvil:
-            path.move(to: p(3, 8))
-            path.addLine(to: p(16, 8))
-            path.addCurve(to: p(21, 12), control1: p(16, 11), control2: p(18, 12))
-            path.addCurve(to: p(15, 14), control1: p(20, 14), control2: p(18, 14))
-            path.addLine(to: p(16, 17))
-            path.addLine(to: p(8, 17))
-            path.addLine(to: p(9, 14))
-            path.addCurve(to: p(3, 8), control1: p(5, 14), control2: p(3, 12))
+            line(&path, [p(12, 5), p(12, 13.4)])
+            path.move(to: p(7.4, 16.8))
+            path.addCurve(to: p(12, 14.6), control1: p(8.6, 15.2), control2: p(10.2, 14.6))
+            path.addCurve(to: p(16.6, 16.8), control1: p(13.8, 14.6), control2: p(15.4, 15.2))
+            line(&path, [p(12, 15), p(12, 19.2)])
+            path.addEllipse(in: CGRect(x: 10.7, y: 19.3, width: 2.6, height: 2.6))
+        case .mountDoom:
+            line(&path, [p(2.5, 20.5), p(9.4, 8.2), p(14.6, 8.2), p(21.5, 20.5)])
             path.closeSubpath()
-            line(&path, [p(6, 20.5), p(18, 20.5)])
-            line(&path, [p(14, 3), p(15.6, 4.6)])
-            line(&path, [p(18, 1.8), p(18, 3.8)])
-            line(&path, [p(20.2, 5), p(22, 5)])
-        case .mithril:
-            diamond(&path, center: p(12, 12), radius: 9.5)
-            line(&path, [p(8.5, 12.3), p(10.9, 14.7), p(15.5, 9.7)])
-        case .leaf:
-            path.move(to: p(5, 19))
-            path.addCurve(to: p(20, 4), control1: p(4, 10), control2: p(10, 4))
-            path.addCurve(to: p(5, 19), control1: p(20, 14), control2: p(14, 20))
+            line(&path, [p(12, 8.2), p(11.2, 11.2), p(12.8, 13.6), p(11.6, 16.8), p(12.5, 19.4)])
+            path.move(to: p(11, 5.6))
+            path.addCurve(to: p(12.2, 4), control1: p(9.8, 4.6), control2: p(11.2, 3.4))
+            path.addCurve(to: p(14.8, 4.8), control1: p(13, 2.6), control2: p(15.2, 3.2))
+        case .pipe:
+            path.move(to: p(2.6, 10.4))
+            path.addCurve(to: p(14.2, 13.5), control1: p(7, 12.8), control2: p(10.6, 13.7))
+            line(&path, [p(14, 13.6), p(14, 10.2), p(20.2, 10.2), p(20.2, 13.6)])
+            path.addCurve(to: p(17.1, 16.7), control1: p(20.2, 15.31), control2: p(18.81, 16.7))
+            path.addCurve(to: p(14, 13.6), control1: p(15.39, 16.7), control2: p(14, 15.31))
+            path.move(to: p(17.1, 8))
+            path.addCurve(to: p(16.9, 4.4), control1: p(15.7, 6.8), control2: p(17.9, 5.8))
+            path.addCurve(to: p(16.7, 1.4), control1: p(16.1, 3.3), control2: p(17.5, 2.4))
+        case .caradhras:
+            line(&path, [p(2.5, 20.5), p(10, 8), p(13, 12.6), p(15, 9.8), p(21.5, 20.5)])
             path.closeSubpath()
-            line(&path, [p(5, 19), p(14, 10)])
-            line(&path, [p(10, 14), p(7, 14)])
-            line(&path, [p(12, 12), p(12, 9)])
-        case .flame:
-            break
-        case .scroll:
-            line(&path, [p(6, 4), p(18, 4), p(18, 17)])
-            path.addQuadCurve(to: p(15, 20), control: p(18, 20))
-            path.addLine(to: p(6, 20))
-            path.addQuadCurve(to: p(3, 17), control: p(3, 20))
-            path.addQuadCurve(to: p(6, 14), control: p(3, 14))
-            path.addLine(to: p(15, 14))
-            path.move(to: p(6, 4))
-            path.addQuadCurve(to: p(4, 6), control: p(4, 4))
-            path.addQuadCurve(to: p(6, 8), control: p(4, 8))
-            path.addLine(to: p(8, 8))
-            line(&path, [p(10, 9), p(15, 9)])
-            line(&path, [p(10, 11.5), p(14, 11.5)])
-        case .candle:
-            path.addRect(CGRect(x: 9, y: 11, width: 6, height: 10))
-            line(&path, [p(6, 21), p(18, 21)])
-        case .sunrise:
-            line(&path, [p(4, 18), p(20, 18)])
-            path.move(to: p(7, 14))
-            path.addCurve(to: p(12, 9), control1: p(7, 11.2), control2: p(9.2, 9))
-            path.addCurve(to: p(17, 14), control1: p(14.8, 9), control2: p(17, 11.2))
-            line(&path, [p(12, 3.5), p(12, 6.5)])
-            line(&path, [p(5, 8), p(6.5, 9.5)])
-            line(&path, [p(19, 8), p(17.5, 9.5)])
-            line(&path, [p(8, 21), p(16, 21)])
+            line(&path, [p(7.6, 12), p(9.2, 13.2), p(10.6, 11.8), p(12.2, 13.2), p(13.2, 12.1)])
+        case .beacon:
+            line(&path, [p(5, 16.8), p(19, 16.8), p(16.8, 20.5), p(7.2, 20.5)])
+            path.closeSubpath()
+            line(&path, [p(12, 20.5), p(12, 22.1)])
+            line(&path, [p(8.5, 22.1), p(15.5, 22.1)])
+        case .whiteTree:
+            line(&path, [p(12, 21), p(12, 8.4)])
+            path.move(to: p(12, 17.2))
+            path.addCurve(to: p(5.6, 11), control1: p(9, 16.6), control2: p(6.6, 14.6))
+            path.move(to: p(12, 17.2))
+            path.addCurve(to: p(18.4, 11), control1: p(15, 16.6), control2: p(17.4, 14.6))
+            path.move(to: p(12, 13.6))
+            path.addCurve(to: p(8.3, 9.2), control1: p(10.2, 13), control2: p(8.8, 11.6))
+            path.move(to: p(12, 13.6))
+            path.addCurve(to: p(15.7, 9.2), control1: p(13.8, 13), control2: p(15.2, 11.6))
+            line(&path, [p(6.6, 13.4), p(4.6, 13.8)])
+            line(&path, [p(17.4, 13.4), p(19.4, 13.8)])
+            line(&path, [p(9, 21), p(15, 21)])
+        case .hourglass:
+            line(&path, [p(5.5, 3), p(18.5, 3)])
+            line(&path, [p(5.5, 21), p(18.5, 21)])
+            path.move(to: p(9, 4.5))
+            path.addLine(to: p(15, 4.5))
+            path.addCurve(to: p(12, 12), control1: p(15, 8.5), control2: p(12, 10))
+            path.addCurve(to: p(15, 19.5), control1: p(12, 14), control2: p(15, 15.5))
+            path.addLine(to: p(9, 19.5))
+            path.addCurve(to: p(12, 12), control1: p(9, 15.5), control2: p(12, 14))
+            path.addCurve(to: p(9, 4.5), control1: p(12, 10), control2: p(9, 8.5))
+            path.closeSubpath()
+        case .quill:
+            path.move(to: p(20.5, 3))
+            path.addCurve(to: p(7.2, 16.6), control1: p(13, 4), control2: p(8.4, 9.2))
+            path.addLine(to: p(8.8, 16))
+            path.addCurve(to: p(20.5, 3), control1: p(15, 14.6), control2: p(19, 9.6))
+            path.closeSubpath()
+            line(&path, [p(7.2, 16.6), p(4.5, 20.8)])
+            line(&path, [p(11, 12.6), p(14.2, 11.4)])
+            line(&path, [p(12.8, 9.6), p(15.8, 8.6)])
+            line(&path, [p(9.5, 21), p(19.5, 21)])
+        case .letter:
+            path.addRoundedRect(in: CGRect(x: 3, y: 6, width: 18, height: 12.5), cornerSize: CGSize(width: 1.2, height: 1.2))
+            line(&path, [p(3.4, 6.6), p(12, 12.4)])
+            line(&path, [p(20.6, 6.6), p(12, 12.4)])
         }
         return path
     }
 
+    /// Filled with the even-odd rule, so an inner shape punches a hole.
     private var fillPath: Path {
         var path = Path()
         switch glyph {
+        case .phial:
+            line(&path, [p(12, 10.4), p(12.9, 12.7), p(15.2, 13.6), p(12.9, 14.5), p(12, 16.8), p(11.1, 14.5), p(8.8, 13.6), p(11.1, 12.7)])
+            path.closeSubpath()
+        case .caradhras:
+            dot(&path, 16.5, 4.2, 0.9)
+            dot(&path, 19.6, 6.6, 0.8)
+            dot(&path, 5, 5.4, 0.8)
+        case .beacon:
+            path.move(to: p(12, 2.5))
+            path.addCurve(to: p(16.6, 11.3), control1: p(12.8, 5.5), control2: p(16.6, 7.1))
+            path.addCurve(to: p(12, 15.9), control1: p(16.6, 13.84), control2: p(14.54, 15.9))
+            path.addCurve(to: p(7.4, 11.3), control1: p(9.46, 15.9), control2: p(7.4, 13.84))
+            path.addCurve(to: p(9.6, 6.9), control1: p(7.4, 9.1), control2: p(8.8, 7.7))
+            path.addCurve(to: p(11.2, 9.3), control1: p(9.6, 8.4), control2: p(10.4, 9.3))
+            path.addCurve(to: p(12, 2.5), control1: p(11.2, 6.9), control2: p(10.6, 4.7))
+            path.closeSubpath()
+        case .whiteTree:
+            dot(&path, 12, 4.6, 1.1)
+            dot(&path, 7.6, 5.8, 0.9)
+            dot(&path, 16.4, 5.8, 0.9)
         case .hourglass:
-            path.addRoundedRect(in: CGRect(x: 9.5, y: 17.4, width: 5, height: 2.2), cornerSize: CGSize(width: 1.1, height: 1.1))
-        case .frost:
-            diamond(&path, center: p(12, 12), radius: 1.8)
-        case .flame:
-            path.move(to: p(12, 2))
-            path.addCurve(to: p(18, 14), control1: p(13, 6), control2: p(18, 8))
-            path.addCurve(to: p(12, 20), control1: p(18, 17.3), control2: p(15.3, 20))
-            path.addCurve(to: p(6, 14), control1: p(8.7, 20), control2: p(6, 17.3))
-            path.addCurve(to: p(9, 8), control1: p(6, 11), control2: p(8, 9))
-            path.addCurve(to: p(11, 11), control1: p(9, 10), control2: p(10, 11))
-            path.addCurve(to: p(12, 2), control1: p(11, 8), control2: p(10, 5))
+            line(&path, [p(10.2, 18.6), p(13.8, 18.6), p(12, 16.4)])
             path.closeSubpath()
-        case .candle:
-            path.move(to: p(12, 3))
-            path.addCurve(to: p(14, 7.2), control1: p(13.5, 5), control2: p(14, 6))
-            path.addQuadCurve(to: p(12, 9.2), control: p(14, 9.2))
-            path.addQuadCurve(to: p(10, 7.2), control: p(10, 9.2))
-            path.addCurve(to: p(12, 3), control1: p(10, 6), control2: p(10.8, 5))
-            path.closeSubpath()
+        case .letter:
+            // Wax seal with a pressed ring.
+            dot(&path, 12, 13.6, 3)
+            dot(&path, 12, 13.6, 1.2)
         default:
             break
         }
@@ -266,20 +304,21 @@ struct LotrGlyphView: View {
                 LotrGlyphShape(glyph: glyph, layer: .stroke)
                     .stroke(style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
                 LotrGlyphShape(glyph: glyph, layer: .fill)
-                    .fill()
-                if glyph == .ring {
-                    // Engraved highlight along the upper band.
+                    .fill(style: FillStyle(eoFill: true))
+                if glyph == .ring, side >= 14 {
+                    // Fire-letter inscription along the near side of the band.
                     Path { path in
                         let s = side / 24
                         let ox = proxy.size.width / 2 - 12 * s
                         let oy = proxy.size.height / 2 - 12 * s
-                        path.move(to: CGPoint(x: ox + 6.5 * s, y: oy + 9.8 * s))
+                        path.move(to: CGPoint(x: ox + 6.2 * s, y: oy + 15.6 * s))
                         path.addQuadCurve(
-                            to: CGPoint(x: ox + 17.5 * s, y: oy + 9.8 * s),
-                            control: CGPoint(x: ox + 12 * s, y: oy + 6.8 * s)
+                            to: CGPoint(x: ox + 17.8 * s, y: oy + 15.6 * s),
+                            control: CGPoint(x: ox + 12 * s, y: oy + 18.2 * s)
                         )
                     }
-                    .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: max(0.6, side / 24 * 0.9), lineCap: .round))
+                    .stroke(style: StrokeStyle(lineWidth: max(0.6, side / 24 * 0.9), lineCap: .round, dash: [side / 24 * 1.1, side / 24 * 1.2]))
+                    .opacity(0.75)
                 }
             }
         }

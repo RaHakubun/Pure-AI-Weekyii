@@ -439,6 +439,30 @@ struct ThemeSurfaceSkin: Equatable {
     var ornament: ThemeHexPair? = nil
     /// Warm glow rising from the top trailing corner inside the surface (魔戒 forge).
     var innerGlow: ThemeHexPair? = nil
+    /// Which edges carry the border. `.horizontalRules` draws the surface as a
+    /// block of a book page: a rule above and below, nothing at the sides.
+    var edges: ThemeSurfaceEdges = .all
+    /// A physical material drawn under the content (魔戒 red-book leather).
+    var material: ThemeSurfaceMaterial? = nil
+    /// A double gilt rule tooled just inside the edge, as on a bound cover.
+    var tooling: ThemeHexPair? = nil
+    /// The card's accent colour hangs from the top edge as a silk bookmark
+    /// ribbon instead of the short 40 × 4 bar.
+    var ribbonAccent: Bool = false
+}
+
+enum ThemeSurfaceEdges: Equatable {
+    /// Border all round the rounded rect.
+    case all
+    /// Only a rule along the top and bottom edges.
+    case horizontalRules
+    /// Only a rule along the bottom edge (ledger rows).
+    case bottomRule
+}
+
+enum ThemeSurfaceMaterial: Equatable {
+    /// Tanned leather: a vertical two-tone fill with a fine pore grain.
+    case leather(top: ThemeHexPair, bottom: ThemeHexPair)
 }
 
 /// Task rows: a surface plus the task-type bar on the leading edge.
@@ -488,6 +512,8 @@ struct ThemeActionLook: Equatable {
     var border: ThemeHexPair? = nil
     var borderWidth: CGFloat = 0
     var hardShadow: ThemeHexPair? = nil
+    /// A filled capsule casts a soft halo in its own colour.
+    var glows: Bool = true
 }
 
 /// The emphasised surface that classic themes draw as a primary gradient with
@@ -514,8 +540,9 @@ enum ThemeBadgeKind: Equatable {
     case stamp
     /// `[执行中]` in the status colour.
     case bracket
-    /// Flame glyph in a tinted capsule with a status-colour rim (魔戒).
-    case ember
+    /// A wax seal in the status colour with the status glyph pressed in,
+    /// followed by the label (魔戒).
+    case waxSeal
     /// Map-legend key: a short colour sample before the label (蓝图).
     case legend
 }
@@ -534,7 +561,7 @@ enum ThemeCountKind: Equatable {
     case bracket
     /// Italic serif numeral (paper).
     case italic
-    /// Upright serif numeral with a soft glow (魔戒).
+    /// Upright serif numeral (魔戒).
     case serif
 }
 
@@ -548,6 +575,15 @@ struct ThemeSectionSkin: Equatable {
     var ruleFades: Bool = false
     /// Keep the section icon in front of the title.
     var showsIcon: Bool = false
+    /// Ink for the icon / count instead of the caller's tint, so a skin can keep
+    /// headers monochrome. `nil` keeps the tint.
+    var iconInk: ThemeHexPair? = nil
+    var countInk: ThemeHexPair? = nil
+    /// The title's first character is drawn in this colour (rubricated initial).
+    var rubric: ThemeHexPair? = nil
+    var titleTracking: CGFloat = 0
+    /// Height of a solid (non-fading) rule.
+    var ruleWidth: CGFloat = 1.5
 }
 
 /// A theme-drawn icon set that replaces selected SF Symbols.
@@ -564,6 +600,9 @@ enum ThemeBackdrop: Equatable {
     case scanlines(ThemeHexPair)
     /// Drafting grid: a 10pt minor square with a 50pt major every fifth line.
     case draftingGrid(ThemeHexPair)
+    /// Vellum: short scattered fibres, a darkened edge and an optional warm
+    /// light falling from the top (魔戒).
+    case vellum(fibre: ThemeHexPair, vignette: ThemeHexPair, topLight: ThemeHexPair)
 }
 
 /// The `WeekRadius` scale for a skin. Every page reads its corner radii through
@@ -642,64 +681,86 @@ extension WeekTheme {
 }
 
 extension ThemeSkin {
-    /// 魔戒: gilded hairlines on obsidian / parchment, a dark forge for the
-    /// feature panel, ember status badges and hand-drawn glyphs.
-    /// Serif titles and the classic radius scale are kept on purpose.
+    /// 魔戒: the Red Book of Westmarch. Pages are vellum (light) or a candle-lit
+    /// study (dark); sections sit on the page between two ink rules, task rows
+    /// are ledger lines, and the focus panel is the book's red leather cover with
+    /// a tooled gilt frame, the only object that floats. Status is a wax seal,
+    /// the accent bar a bookmark ribbon, and nothing glows: gold is kept for the
+    /// ring, the selected state, the cover and the day count.
     static let lotr: ThemeSkin = {
-        let gold = ThemeHexPair("#B89A62", "#6A5530")
-        let ornament = ThemeHexPair("#A8874C", "#D1AD66")
+        let rule = ThemeHexPair("#8F7C5C", "#75664E")
+        let ink = ThemeHexPair("#2A2118", "#EDE3CF")
         return ThemeSkin(
             typography: .classic,
             radii: nil,
             card: ThemeSurfaceSkin(
-                cornerRadius: 18,
+                cornerRadius: 6,
                 borderWidth: 1,
-                border: gold,
-                shadow: ThemeShadowSkin(color: ThemeHexPair("#1F3A2A22", "#40000000"), radius: 12, x: 0, y: 4),
-                ornament: ornament
+                border: rule,
+                fill: ThemeHexPair("#E6F2E8D2", "#E6161210"),
+                edges: .horizontalRules,
+                ribbonAccent: true
             ),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(
-                    cornerRadius: 12,
-                    borderWidth: 1,
-                    border: ThemeHexPair("#DCCDAE", "#2B271D"),
-                    fill: ThemeHexPair("#FBF6EA", "#171612")
+                    cornerRadius: 0,
+                    borderWidth: 0.5,
+                    border: ThemeHexPair("#808F7C5C", "#8075664E"),
+                    fill: ThemeHexPair("#00000000"),
+                    edges: .bottomRule
                 ),
-                barWidth: 3.5,
-                barCornerRadius: 1.75,
+                barWidth: 3,
+                barCornerRadius: 1.5,
                 themesBuiltInTypes: true
             ),
             feature: ThemeFeatureSkin(
                 surface: ThemeSurfaceSkin(
-                    cornerRadius: 18,
-                    borderWidth: 1.5,
-                    border: ThemeHexPair("#D1AD66"),
-                    fill: ThemeHexPair("#1A140D"),
-                    shadow: ThemeShadowSkin(color: ThemeHexPair("#33D1693A", "#40D1693A"), radius: 14, x: 0, y: 4),
-                    borderGradient: ["#F0D28F", "#9B7638", "#D1693A"],
-                    innerGlow: ThemeHexPair("#D15E2C")
+                    cornerRadius: 8,
+                    borderWidth: 0.5,
+                    border: ThemeHexPair("#592A0D06"),
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#4D280C04", "#8C000000"), radius: 7, x: 0, y: 3),
+                    edges: .all,
+                    material: .leather(top: ThemeHexPair("#6E2418", "#5E1E14"), bottom: ThemeHexPair("#3E120C", "#2E0D08")),
+                    tooling: ThemeHexPair("#C9A45C")
                 ),
-                ink: ThemeHexPair("#F3E9D4"),
-                secondaryInk: ThemeHexPair("#BFAE8D"),
+                ink: ThemeHexPair("#F6EBD3"),
+                secondaryInk: ThemeHexPair("#D6BFA0"),
                 label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#E2C27E")),
                 action: ThemeActionLook(
                     kind: .capsule,
-                    ink: ThemeHexPair("#E8D3A2"),
-                    border: ThemeHexPair("#99E2C27E"),
+                    ink: ThemeHexPair("#F0DDB4"),
+                    border: ThemeHexPair("#8CE2C27E"),
                     borderWidth: 1
                 ),
                 primaryAction: ThemeActionLook(
                     kind: .capsule,
-                    ink: ThemeHexPair("#1D140A"),
+                    ink: ThemeHexPair("#2A1A0A"),
                     fill: ThemeHexPair("#D9B66F"),
                     border: ThemeHexPair("#F0D28F"),
-                    borderWidth: 0.5
+                    borderWidth: 0.5,
+                    glows: false
                 )
             ),
-            badge: ThemeBadgeSkin(kind: .ember),
-            section: ThemeSectionSkin(count: .serif, rule: ThemeHexPair("#B89A62", "#9C7D45"), ruleFades: true, showsIcon: true),
+            badge: ThemeBadgeSkin(kind: .waxSeal),
+            section: ThemeSectionSkin(
+                count: .serif,
+                rule: rule,
+                ruleFades: false,
+                showsIcon: true,
+                iconInk: ink,
+                countInk: ink,
+                rubric: ThemeHexPair("#9E3B22", "#D9774A"),
+                titleTracking: 2,
+                ruleWidth: 1
+            ),
             onPrimary: ThemeHexPair("#FFF8E6", "#1D140A"),
             onSuccess: ThemeHexPair("#FFFFFF", "#14110C"),
+            backdrop: .vellum(
+                fibre: ThemeHexPair("#266B4A28", "#1AE8D2A8"),
+                vignette: ThemeHexPair("#2E6B4A1E", "#59000000"),
+                topLight: ThemeHexPair("#00000000", "#1FE0A050")
+            ),
+            softShadows: false,
             glyphs: .lotr
         )
     }()
@@ -1410,11 +1471,11 @@ private struct WeekThemePalettePair {
                     accentGreen: "#4F7048",
                     accentGreenLight: "#7E9C76",
                     accentPink: "#8F6150",
-                    backgroundPrimary: "#EFE6D2",
+                    backgroundPrimary: "#F2E8D2",
                     backgroundSecondary: "#F7F0E1",
                     backgroundTertiary: "#E2D6BC",
-                    textPrimary: "#231A10",
-                    textSecondary: "#5A4A36",
+                    textPrimary: "#2A2118",
+                    textSecondary: "#6B5A44",
                     textTertiary: "#85745D",
                     taskRegular: "#5D6B80",
                     taskRegularBg: "#DDE2EA",
@@ -1432,11 +1493,11 @@ private struct WeekThemePalettePair {
                     accentGreen: "#8FAE86",
                     accentGreenLight: "#A9C59F",
                     accentPink: "#B07A62",
-                    backgroundPrimary: "#0A0907",
-                    backgroundSecondary: "#13110D",
-                    backgroundTertiary: "#1C1913",
-                    textPrimary: "#F0E6D2",
-                    textSecondary: "#B8AB94",
+                    backgroundPrimary: "#100D0A",
+                    backgroundSecondary: "#181410",
+                    backgroundTertiary: "#221D16",
+                    textPrimary: "#EDE3CF",
+                    textSecondary: "#B3A68E",
                     textTertiary: "#837662",
                     taskRegular: "#A9B7CC",
                     taskRegularBg: "#1A202B",

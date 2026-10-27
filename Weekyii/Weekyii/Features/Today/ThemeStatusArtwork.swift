@@ -1473,13 +1473,13 @@ private struct LotrStatusIllustration: View {
                     LinearGradient(
                         colors: colorScheme == .dark
                             ? [Color(hex: "#090909"), Color(hex: "#231512"), Color(hex: "#4B1E15")]
-                            : [Color(hex: "#E8DFD0"), Color(hex: "#B7A995"), Color(hex: "#755A48")],
+                            : [Color(hex: "#EBDDBF"), Color(hex: "#C9A47A"), Color(hex: "#7A4A30")],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
 
                     Circle()
-                        .fill(Color(hex: "#D94A2E").opacity(colorScheme == .dark ? 0.24 : 0.16))
+                        .fill(Color(hex: "#D94A2E").opacity(colorScheme == .dark ? 0.24 : 0.18))
                         .frame(width: 78, height: 78)
                         .blur(radius: 12)
                         .position(x: size.width * 0.76, y: size.height * 0.48)
@@ -1495,7 +1495,7 @@ private struct LotrStatusIllustration: View {
                         path.addLine(to: CGPoint(x: size.width + 8, y: size.height + 4))
                         path.closeSubpath()
                     }
-                    .fill(Color(hex: colorScheme == .dark ? "#08090A" : "#4B4642").opacity(0.94))
+                    .fill(Color(hex: colorScheme == .dark ? "#08090A" : "#3F332B").opacity(0.94))
 
                     Path { path in
                         path.move(to: CGPoint(x: size.width * 0.75, y: size.height * 0.42))
@@ -1513,7 +1513,7 @@ private struct LotrStatusIllustration: View {
 
                     // Molten crater glow on the summit.
                     Ellipse()
-                        .fill(Color(hex: "#FFB14E").opacity(colorScheme == .dark ? 0.55 : 0.4))
+                        .fill(Color(hex: "#FFB14E").opacity(colorScheme == .dark ? 0.55 : 0.45))
                         .frame(width: 16, height: 6)
                         .blur(radius: 3)
                         .position(x: size.width * 0.73, y: size.height * 0.37)
@@ -1550,7 +1550,7 @@ private struct LotrStatusIllustration: View {
                         path.addLine(to: CGPoint(x: size.width * 0.62, y: size.height + 4))
                         path.closeSubpath()
                     }
-                    .fill(Color(hex: colorScheme == .dark ? "#050506" : "#3E3935").opacity(0.9))
+                    .fill(Color(hex: colorScheme == .dark ? "#050506" : "#30271F").opacity(0.9))
 
                     Canvas { context, canvas in
                         for index in 0..<14 {

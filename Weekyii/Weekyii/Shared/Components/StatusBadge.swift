@@ -51,20 +51,31 @@ struct StatusBadge: View {
             Text(verbatim: "[\(status.displayName)]")
                 .font(.caption2.weight(.bold))
                 .foregroundColor(status.color)
-        case .ember:
-            HStack(spacing: 4) {
-                LotrGlyphView(glyph: .flame)
-                    .frame(width: 10, height: 10)
+        case .waxSeal:
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [status.color.opacity(0.85), status.color],
+                                center: UnitPoint(x: 0.35, y: 0.3),
+                                startRadius: 0,
+                                endRadius: 10
+                            )
+                        )
+                    Circle()
+                        .strokeBorder(Color.black.opacity(0.18), lineWidth: 1)
+                    LotrGlyphView(glyph: LotrGlyph(status: status))
+                        .frame(width: 11, height: 11)
+                        .foregroundColor(Color(hex: "#F7E9D0"))
+                }
+                .frame(width: 19, height: 19)
+                .shadow(color: Color.black.opacity(0.25), radius: 0.75, x: 0, y: 0.75)
                 Text(status.displayName)
-                    .font(.caption2.weight(.semibold))
-                    .tracking(0.6)
+                    .font(.caption.weight(.semibold))
+                    .tracking(0.8)
+                    .foregroundColor(status.color)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .foregroundColor(status.color)
-            .background(status.color.opacity(0.16), in: Capsule())
-            .overlay(Capsule().strokeBorder(status.color.opacity(0.55), lineWidth: 1))
-            .shadow(color: status.color.opacity(0.3), radius: 4)
         case .legend:
             HStack(spacing: 6) {
                 Rectangle()

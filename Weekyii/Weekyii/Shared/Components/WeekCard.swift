@@ -70,7 +70,17 @@ struct WeekCard<Content: View>: View {
 
     @ViewBuilder
     private func themedAccentBar(_ surface: ThemeSurfaceSkin) -> some View {
-        if let color = accentColor {
+        if let color = accentColor, surface.ribbonAccent {
+            // A silk bookmark hanging from the top rule.
+            BookmarkRibbonShape()
+                .fill(color)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Color.black.opacity(0.18)).frame(height: 1.5)
+                }
+                .frame(width: 9, height: 18)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else if let color = accentColor {
             VStack {
                 RoundedRectangle(cornerRadius: min(2, surface.cornerRadius))
                     .fill(color)
@@ -177,6 +187,21 @@ struct WeekCard<Content: View>: View {
     }
 }
 
+/// A ribbon bookmark with a swallow-tail notch at the bottom.
+struct BookmarkRibbonShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let notch = min(rect.width * 0.5, rect.height * 0.3)
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - notch))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 // MARK: - Feature panel parts
 
 /// Heading of a feature panel ("专注任务"). Classic themes keep the white
@@ -206,7 +231,6 @@ struct WeekFeatureLabel: View {
             HStack(spacing: 7) {
                 ThemedSymbol(systemName: systemImage, size: 18)
                     .foregroundColor(label.ink.color)
-                    .shadow(color: label.ink.color.opacity(0.5), radius: 4)
                 labelText(label)
             }
         } else {
@@ -284,7 +308,10 @@ struct WeekFeatureActionModifier: ViewModifier {
                 .foregroundColor(ink)
                 .background(fill, in: Capsule())
                 .overlay(Capsule().strokeBorder(border, lineWidth: look.borderWidth))
-                .shadow(color: look.fill == nil ? .clear : fill.opacity(0.7), radius: look.fill == nil ? 0 : 5)
+                .shadow(
+                    color: look.fill == nil || !look.glows ? .clear : fill.opacity(0.7),
+                    radius: look.fill == nil || !look.glows ? 0 : 5
+                )
         case .rect:
             content
                 .foregroundColor(ink)
@@ -365,13 +392,14 @@ struct WeekSectionHeader: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: section.showsIcon ? .center : .firstTextBaseline, spacing: WeekSpacing.sm) {
                 if section.showsIcon {
+                    let iconColor = section.iconInk?.color ?? tint
                     ThemedSymbol(systemName: systemImage, size: 17)
-                        .foregroundColor(tint)
-                        .shadow(color: tint.opacity(0.45), radius: 3)
+                        .foregroundColor(iconColor)
+                        .shadow(color: section.iconInk == nil ? tint.opacity(0.45) : .clear, radius: section.iconInk == nil ? 3 : 0)
                 }
-                Text(verbatim: (section.titlePrefix ?? "") + title)
+                titleText(section)
                     .font(.titleSmall)
-                    .foregroundColor(.textPrimary)
+                    .tracking(section.titleTracking)
 
                 Spacer(minLength: WeekSpacing.sm)
 
@@ -391,14 +419,26 @@ struct WeekSectionHeader: View {
                 } else {
                     Rectangle()
                         .fill(rule.color)
-                        .frame(height: 1.5)
+                        .frame(height: section.ruleWidth)
                 }
             }
         }
     }
 
+    /// The title, with a rubricated first character when the skin asks for one.
+    private func titleText(_ section: ThemeSectionSkin) -> Text {
+        let full = (section.titlePrefix ?? "") + title
+        guard let rubric = section.rubric, let first = full.first else {
+            return Text(verbatim: full).foregroundColor(.textPrimary)
+        }
+        let initial = Text(verbatim: String(first)).foregroundColor(rubric.color)
+        let rest = Text(verbatim: String(full.dropFirst())).foregroundColor(.textPrimary)
+        return Text("\(initial)\(rest)")
+    }
+
     @ViewBuilder
     private func countView(_ kind: ThemeCountKind) -> some View {
+        let tint = skin.section?.countInk?.color ?? self.tint
         switch kind {
         case .plain:
             Text(verbatim: "\(count)")
@@ -424,7 +464,6 @@ struct WeekSectionHeader: View {
                 .font(.system(size: 19, weight: .semibold, design: .serif))
                 .monospacedDigit()
                 .foregroundColor(tint)
-                .shadow(color: tint.opacity(0.5), radius: 4)
         }
     }
 }

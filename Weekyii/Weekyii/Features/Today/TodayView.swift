@@ -426,14 +426,7 @@ struct TodayView: View {
                             Text("\(appState.daysStartedCount)")
                                 .font(.system(size: 30, weight: .semibold, design: .serif))
                                 .monospacedDigit()
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary, Color.weekyiiPrimaryDark],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .shadow(color: Color.weekyiiPrimary.opacity(0.45), radius: 6)
+                                .foregroundColor(.weekyiiPrimary)
                         } else {
                             Text("\(appState.daysStartedCount)")
                                 .font(.titleMedium)
@@ -450,9 +443,9 @@ struct TodayView: View {
                 // 日期显示
                 if todaySkin.glyphs == .lotr {
                     HStack(spacing: 6) {
-                        LotrGlyphView(glyph: .candle)
-                            .frame(width: 14, height: 14)
-                            .foregroundColor(.weekyiiPrimary)
+                        LotrGlyphView(glyph: .quill)
+                            .frame(width: 15, height: 15)
+                            .foregroundColor(.textSecondary)
                         Text(formatDate(day.dayId))
                             .font(.system(.subheadline, design: .serif))
                             .tracking(0.6)
@@ -914,7 +907,7 @@ struct TodayView: View {
         // 庆祝卡片
         WeekCard(useGradient: true) {
             VStack(spacing: WeekSpacing.lg) {
-                ThemedSymbol(systemName: "party.popper.fill", glyph: .sunrise, size: 54)
+                ThemedSymbol(systemName: "party.popper.fill", glyph: .whiteTree, size: 54)
                     .font(.system(size: 50))
                     .foregroundColor(.weekyiiOnFeature)
                 
@@ -1654,7 +1647,7 @@ private struct SectionToggleView: View {
 
     private var indicatorColors: [Color] {
         isLotr
-            ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary, Color.weekyiiPrimaryDark]
+            ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary]
             : [Color.weekyiiPrimary, Color.weekyiiPrimary.opacity(0.85)]
     }
     
@@ -1714,12 +1707,12 @@ private struct SectionToggleView: View {
                     )
                     .frame(width: halfWidth - 4, height: height - 6)
                     .offset(x: indicatorX + 2, y: 3)
-                    // 顶部高光
+                    // 顶部高光（魔戒是平的金箔，不加高光）
                     .overlay(
                         Capsule()
                             .fill(
                                 LinearGradient(
-                                    colors: [
+                                    colors: isLotr ? [Color.clear] : [
                                         Color.white.opacity(0.4),
                                         Color.white.opacity(0.1),
                                         Color.clear
@@ -1734,7 +1727,7 @@ private struct SectionToggleView: View {
                     // 边框
                     .overlay(
                         Capsule()
-                            .strokeBorder(isLotr ? Color(hex: "#F4DFA6").opacity(0.55) : Color.white.opacity(0.2), lineWidth: isLotr ? 1 : 0.5)
+                            .strokeBorder(isLotr ? Color.clear : Color.white.opacity(0.2), lineWidth: isLotr ? 0 : 0.5)
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
                     )
@@ -1746,13 +1739,13 @@ private struct SectionToggleView: View {
         .background(
             // 底层背景胶囊 - 带内阴影效果
             Capsule()
-                .fill(Color.backgroundSecondary.opacity(0.8))
+                .fill(isLotr ? Color.clear : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
                     Capsule()
                         .strokeBorder(
                             LinearGradient(
                                 colors: isLotr
-                                    ? [Color.weekyiiPrimary.opacity(0.55), Color.weekyiiPrimaryDark.opacity(0.35)]
+                                    ? [Color.textTertiary, Color.textTertiary]
                                     : [
                                         Color.white.opacity(0.3),
                                         Color.white.opacity(0.1),
@@ -1767,7 +1760,7 @@ private struct SectionToggleView: View {
                 // 内阴影模拟
                 .overlay(
                     Capsule()
-                        .stroke(Color.black.opacity(0.08), lineWidth: 2)
+                        .stroke(Color.black.opacity(isLotr ? 0 : 0.08), lineWidth: 2)
                         .blur(radius: 2)
                         .mask(Capsule().fill(Color.black))
                         .offset(y: 1)
@@ -1979,6 +1972,10 @@ private struct SunsetWaterReflectionBackground: View {
     }
 }
 
+/// 当下 backdrop for 魔戒. Light: a vellum page with an ink-drawn map range
+/// (peaks with hatching, a dashed road and a compass) along the lower third,
+/// no rain. Dark: the rain night over layered mountains, warmed to sit under
+/// the candle-lit study.
 private struct LotrRainNightBackground: View {
     let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1992,44 +1989,97 @@ private struct LotrRainNightBackground: View {
             let horizonY = size.height * 0.6
 
             ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#070808"), Color(hex: "#0D0F12"), Color(hex: "#13161A"), Color(hex: "#1A1D22")]
-                        : [Color(hex: "#E6E7EA"), Color(hex: "#D6D8DD"), Color(hex: "#C1C4CB"), Color(hex: "#ADB1BA")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                if colorScheme == .dark {
+                    LinearGradient(
+                        colors: [Color(hex: "#15110C"), Color(hex: "#110E0A"), Color(hex: "#0E0C09"), Color(hex: "#0B0907")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
 
-                // starless night: no stars, only layered mountain silhouettes
-                mountainLayer(size: size, y: horizonY - 34, opacity: colorScheme == .dark ? 0.7 : 0.34, offset: 0)
-                mountainLayer(size: size, y: horizonY - 12, opacity: colorScheme == .dark ? 0.86 : 0.46, offset: 24)
+                    mountainLayer(size: size, y: horizonY - 34, opacity: 0.55, offset: 0)
+                    mountainLayer(size: size, y: horizonY - 12, opacity: 0.75, offset: 24)
 
-                // distant call: a tiny warm beacon near golden-left valley
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color(hex: colorScheme == .dark ? "#D1A261" : "#AF7D47"))
-                    .frame(width: 3, height: 12)
-                    .blur(radius: 0.4)
-                    .position(x: size.width * 0.362, y: horizonY - 8)
+                    // distant call: a tiny warm beacon near golden-left valley
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(Color(hex: "#D1A261"))
+                        .frame(width: 3, height: 12)
+                        .blur(radius: 0.4)
+                        .position(x: size.width * 0.362, y: horizonY - 8)
 
-                // forge embers glowing from below the horizon
-                RadialGradient(
-                    colors: [
-                        Color(hex: "#D1693A").opacity(colorScheme == .dark ? 0.32 : 0.16),
-                        Color(hex: "#8A3A1C").opacity(colorScheme == .dark ? 0.14 : 0.06),
-                        Color.clear
-                    ],
-                    center: UnitPoint(x: 0.5, y: 1.05),
-                    startRadius: 0,
-                    endRadius: max(size.width, size.height) * 0.55
-                )
-
-                coldRain(size: size, fromY: horizonY - 120)
+                    coldRain(size: size, fromY: horizonY - 120)
+                } else {
+                    Color.backgroundPrimary
+                    inkMap(size: size)
+                        .opacity(0.38)
+                }
             }
             .drawingGroup(opaque: false, colorMode: .linear)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// Thrór's-map style range: open peaks, hatching on the shaded flank, a
+    /// dashed road and a compass rose, all in secondary ink.
+    private func inkMap(size: CGSize) -> some View {
+        let ink = Color.textSecondary
+        let baseY = size.height * 0.84
+        let peaks: [(CGFloat, CGFloat, CGFloat)] = [
+            (0.10, 10, 22), (0.20, -2, 30), (0.30, 14, 20), (0.41, -6, 34), (0.53, 10, 24),
+            (0.63, -12, 38), (0.75, 6, 26), (0.85, -4, 30), (0.94, 12, 20)
+        ]
+        return Canvas { context, canvas in
+            for (fx, dy, height) in peaks {
+                let x = canvas.width * fx
+                let top = baseY - height + dy
+                let half = height * 0.9
+                var peak = Path()
+                peak.move(to: CGPoint(x: x - half, y: top + height))
+                peak.addLine(to: CGPoint(x: x, y: top))
+                peak.addLine(to: CGPoint(x: x + half, y: top + height))
+                context.stroke(peak, with: .color(ink), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                for step in 1...4 {
+                    let t = CGFloat(step) / 5
+                    var hatch = Path()
+                    let start = CGPoint(x: x + half * t * 0.9, y: top + height * t * 0.9 + 2)
+                    hatch.move(to: start)
+                    hatch.addLine(to: CGPoint(x: start.x - half * 0.18, y: start.y + height * 0.22))
+                    context.stroke(hatch, with: .color(ink), lineWidth: 0.8)
+                }
+            }
+
+            var road = Path()
+            let roadY = baseY + 46
+            road.move(to: CGPoint(x: canvas.width * 0.05, y: roadY))
+            road.addCurve(
+                to: CGPoint(x: canvas.width * 0.54, y: roadY - 6),
+                control1: CGPoint(x: canvas.width * 0.23, y: roadY - 14),
+                control2: CGPoint(x: canvas.width * 0.36, y: roadY + 10)
+            )
+            road.addCurve(
+                to: CGPoint(x: canvas.width * 0.95, y: roadY),
+                control1: CGPoint(x: canvas.width * 0.72, y: roadY - 18),
+                control2: CGPoint(x: canvas.width * 0.85, y: roadY - 8)
+            )
+            context.stroke(road, with: .color(ink), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, dash: [3, 4]))
+
+            let centre = CGPoint(x: canvas.width * 0.12, y: baseY - 52)
+            var compass = Path()
+            compass.addEllipse(in: CGRect(x: centre.x - 11, y: centre.y - 11, width: 22, height: 22))
+            compass.move(to: CGPoint(x: centre.x, y: centre.y - 16))
+            compass.addLine(to: CGPoint(x: centre.x, y: centre.y + 16))
+            compass.move(to: CGPoint(x: centre.x - 16, y: centre.y))
+            compass.addLine(to: CGPoint(x: centre.x + 16, y: centre.y))
+            context.stroke(compass, with: .color(ink), lineWidth: 0.9)
+            var needle = Path()
+            needle.move(to: CGPoint(x: centre.x, y: centre.y - 11))
+            needle.addLine(to: CGPoint(x: centre.x + 2.5, y: centre.y))
+            needle.addLine(to: CGPoint(x: centre.x, y: centre.y + 11))
+            needle.addLine(to: CGPoint(x: centre.x - 2.5, y: centre.y))
+            needle.closeSubpath()
+            context.fill(needle, with: .color(ink))
+        }
     }
 
     private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {

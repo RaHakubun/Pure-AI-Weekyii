@@ -49,7 +49,6 @@ struct WeekLogo: View {
             .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
             .italic()
             .foregroundStyle(logoGradient)
-            .shadow(color: isLotr ? Color(hex: "#E2A64B").opacity(0.35) : .clear, radius: 8)
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
