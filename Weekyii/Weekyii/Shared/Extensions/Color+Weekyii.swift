@@ -682,11 +682,12 @@ extension WeekTheme {
 
 extension ThemeSkin {
     /// 魔戒: the Red Book of Westmarch. Pages are vellum (light) or a candle-lit
-    /// study (dark); sections sit on the page between two ink rules, task rows
-    /// are ledger lines, and the focus panel is the book's red leather cover with
-    /// a tooled gilt frame, the only object that floats. Status is a wax seal,
-    /// the accent bar a bookmark ribbon, and nothing glows: gold is kept for the
-    /// ring, the selected state, the cover and the day count.
+    /// study (dark); sections are panels of lighter paper closed by an ink rule on
+    /// all four sides, task rows are ledger lines, and the focus panel is the
+    /// book's red leather cover with a tooled gilt frame, the only object that
+    /// floats. Status is a wax seal, the accent bar a bookmark ribbon, and nothing
+    /// glows: gold is kept for the ring, the selected state, the cover and the day
+    /// count.
     static let lotr: ThemeSkin = {
         let rule = ThemeHexPair("#8F7C5C", "#75664E")
         let ink = ThemeHexPair("#2A2118", "#EDE3CF")
@@ -697,8 +698,10 @@ extension ThemeSkin {
                 cornerRadius: 6,
                 borderWidth: 1,
                 border: rule,
-                fill: ThemeHexPair("#E6F2E8D2", "#E6161210"),
-                edges: .horizontalRules,
+                // A sheet of paper lighter than the page it lies on, so the four
+                // rules enclose something instead of outlining empty vellum.
+                fill: ThemeHexPair("#FFFCF2", "#221C15"),
+                edges: .all,
                 ribbonAccent: true
             ),
             row: ThemeRowSkin(

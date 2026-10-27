@@ -122,6 +122,16 @@
         }
       }
     },
+    "%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
     "%@执行模式" : {
 
     },
@@ -1465,6 +1475,22 @@
         }
       }
     },
+    "extensions.hub.projects.empty_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to create your first project"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按创建一个项目"
+          }
+        }
+      }
+    },
     "extensions.hub.projects.empty_prompt" : {
       "localizations" : {
         "en" : {
@@ -1723,6 +1749,7 @@
       }
     },
     "extensions.hub.projects.tap_to_see_all" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

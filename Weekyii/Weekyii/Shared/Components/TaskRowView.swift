@@ -33,28 +33,48 @@ struct TaskRowView: View {
     }
 
     var body: some View {
+        if let row = rowSkin.row {
+            // 主题行：不画底框，只在行脚压一条墨线（账本式）。
+            rowContent
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .themedSurface(row.surface)
+                .contentShape(Rectangle())
+                .compositingGroup()
+        } else {
+            rowContent
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        .fill(backgroundColor)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: WeekRadius.medium)
+                        .stroke(
+                            borderColor,
+                            style: StrokeStyle(lineWidth: 1, lineJoin: .round)
+                        )
+                )
+                .contentShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+                .compositingGroup()
+        }
+    }
+
+    private var rowContent: some View {
         HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
             // Left Accent Bar
             RoundedRectangle(cornerRadius: 2)
                 .fill(taskType.color(in: rowSkin))
                 .frame(width: 4, height: 28)
                 .padding(.top, 2)
-            
-            // Icon
-            if rowSkin.glyphs == .lotr,
-               let glyph = LotrGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
-                LotrGlyphView(glyph: glyph)
-                    .frame(width: 18, height: 18)
-                    .foregroundColor(taskType.color(in: rowSkin))
-                    .frame(width: 24)
-                    .alignmentGuide(.firstTextBaseline) { dimensions in dimensions[.bottom] - 2 }
-            } else {
-                Image(systemName: taskType.iconName)
-                    .font(.headline)
-                    .foregroundColor(taskType.color)
-                    .frame(width: 24)
-            }
-            
+
+            // Icon：始终用任务类型自己的那一套图标，主题不重画它。
+            Image(systemName: taskType.iconName)
+                .font(.headline)
+                .foregroundColor(taskType.color(in: rowSkin))
+                .frame(width: 24)
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
                     // Title
@@ -78,9 +98,9 @@ struct TaskRowView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            
+
             Spacer()
-            
+
             // Steps Indicator
             if !task.steps.isEmpty {
                 let completed = task.steps.filter(\.isCompleted).count
@@ -92,21 +112,6 @@ struct TaskRowView: View {
                 .foregroundColor(.secondary)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                .fill(backgroundColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: WeekRadius.medium)
-                .stroke(
-                    borderColor,
-                    style: StrokeStyle(lineWidth: 1, lineJoin: .round)
-                )
-        )
-        .contentShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-        .compositingGroup()
     }
     
     @ViewBuilder

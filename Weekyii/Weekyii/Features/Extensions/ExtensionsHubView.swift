@@ -369,6 +369,9 @@ private struct ProjectsModulePreview: View {
     /// 视口剩余可拉伸高度；瓦片只吃富余空间，绝不低于自身内容高度。
     var fillHeight: CGFloat = 0
 
+    /// 卡片最终高度。空态要自己撑到这个高度，占位图标才落得进卡片中间。
+    private var tileHeight: CGFloat { max(172, fillHeight) }
+
     var body: some View {
         NavigationLink {
             ProjectsFullView(viewModel: viewModel)
@@ -378,7 +381,7 @@ private struct ProjectsModulePreview: View {
                 initialDelay: .seconds(5.6),
                 isActive: animationsActive,
                 accessibilityIdentifier: "extensionsProjectsLiveTile",
-                minHeight: max(172, fillHeight),
+                minHeight: tileHeight,
                 stretches: true,
                 tint: { Color.weekyiiEmphasis(hex: $0.colorHex) },
                 emptyTint: .weekyiiPrimary
@@ -388,7 +391,7 @@ private struct ProjectsModulePreview: View {
                     projectCount: viewModel.activeProjects().count
                 )
             } emptyContent: {
-                ProjectEmptyLiveTile()
+                ProjectEmptyLiveTile(height: tileHeight)
             }
         }
         .buttonStyle(.plain)
@@ -1863,32 +1866,45 @@ private struct ProjectHubRhythmChart: View {
 }
 
 private struct ProjectEmptyLiveTile: View {
+    /// 与 `LiveModuleTile` 的拉伸高度一致。空态没有内容可量自然高度，
+    /// 所以直接吃满这个高度，占位图标才能真正落到卡片中间而不是贴顶。
+    let height: CGFloat
+
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        VStack(alignment: .leading, spacing: 0) {
             HubModuleLabel(
                 title: String(localized: "extensions.module.projects.title"),
                 icon: "folder.fill",
                 tint: .weekyiiPrimary,
                 trailing: ""
             )
-            HStack(alignment: .center, spacing: WeekSpacing.sm) {
-                Image(systemName: "folder.badge.plus")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(Color.weekyiiPrimary.opacity(0.45))
-                Text(String(localized: "extensions.hub.projects.empty"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.textSecondary)
-                Spacer(minLength: 0)
-                Label(
-                    String(localized: "extensions.hub.projects.tap_to_see_all"),
-                    systemImage: "chevron.right"
-                )
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(Color.textTertiary)
+
+            Spacer(minLength: WeekSpacing.md)
+
+            // 没有项目时，整张卡下半部分是空的；用一枚安静的占位图标占住中间，
+            // 比让一行文字孤零零贴在顶上更像「这页还等着你写」。
+            VStack(spacing: WeekSpacing.sm) {
+                ThemedSymbol(systemName: "folder", size: 56)
+                    .font(.system(size: 56, weight: .ultraLight))
+                    .foregroundStyle(Color.weekyiiPrimary.opacity(0.22))
+
+                VStack(spacing: 3) {
+                    Text(String(localized: "extensions.hub.projects.empty"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.textSecondary)
+                    Text(String(localized: "extensions.hub.projects.empty_hint", defaultValue: "点按创建一个项目"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
+
+            Spacer(minLength: WeekSpacing.md)
         }
         .padding(WeekSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .frame(height: height, alignment: .top)
     }
 }
 

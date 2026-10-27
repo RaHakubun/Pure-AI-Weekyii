@@ -4133,11 +4133,13 @@ final class ModelTests: XCTestCase {
         let skin = WeekTheme.lotr.skin
         XCTAssertNotEqual(skin, .classic)
         XCTAssertNotNil(skin.card)
-        // Sections are page blocks between two ink rules, carrying a bookmark ribbon.
-        XCTAssertEqual(skin.card?.edges, .horizontalRules)
+        // Sections are lighter sheets closed by an ink rule on all four sides,
+        // carrying a bookmark ribbon.
+        XCTAssertEqual(skin.card?.edges, .all)
         XCTAssertNil(skin.card?.shadow)
         XCTAssertEqual(skin.card?.ribbonAccent, true)
         XCTAssertNotNil(skin.row)
+        // Task rows stay ledger lines: bottom rule only.
         XCTAssertEqual(skin.row?.surface.edges, .bottomRule)
         XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
         // The focus panel is the red-book leather cover with a tooled gilt frame, no forge glow.
@@ -4172,6 +4174,34 @@ final class ModelTests: XCTestCase {
             XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
             XCTAssertNotEqual(theme.skin.row?.themesBuiltInTypes, true, "\(theme.rawValue) must keep stored type colours")
         }
+    }
+
+    func test_killTimeFirePalette_doesNotFollowTheTheme() {
+        // 火焰是「时间压力」的状态色，不是纸张配色的一部分：换主题时它必须
+        // 保持同一组温度梯度，只有深浅色模式可以变。
+        for isDark in [false, true] {
+            let reference = flamePaletteComponents(KillTimeFirePalette(theme: .lotr, isDark: isDark))
+            for theme in WeekTheme.allCases {
+                XCTAssertEqual(
+                    flamePaletteComponents(KillTimeFirePalette(theme: theme, isDark: isDark)),
+                    reference,
+                    "\(theme.rawValue) must not recolour the deadline flame"
+                )
+            }
+        }
+    }
+
+    private func flamePaletteComponents(_ palette: KillTimeFirePalette) -> [Float] {
+        let colors = [
+            palette.glow, palette.outer, palette.body, palette.core,
+            palette.outerBase, palette.bodyBase, palette.coreBase, palette.ember
+        ]
+        var values = colors.flatMap { color -> [Float] in
+            let resolved = color.resolve(in: EnvironmentValues())
+            return [resolved.red, resolved.green, resolved.blue, resolved.opacity]
+        }
+        values.append(Float(palette.opacity))
+        return values
     }
 
     func test_lotrThemedTypeColor_onlyReplacesUntouchedBuiltInColours() {

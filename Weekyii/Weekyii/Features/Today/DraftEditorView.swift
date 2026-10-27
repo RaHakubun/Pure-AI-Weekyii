@@ -16,6 +16,13 @@ struct DraftEditorView: View {
 
     @State private var errorMessage: String?
     @State private var localEditMode: EditMode = .inactive
+    /// 每行实测高度。`List` 没有固有高度，只能用测量值给它一个恰好的框，
+    /// 否则固定的估算高度会在最后一行下面留一条露出底色的空带。
+    @State private var rowHeights: [Int: CGFloat] = [:]
+
+    /// 首帧还没量到行高时的估值，只为让 `List` 先把行摆出来。
+    private static let estimatedRowHeight: CGFloat = 48
+    private static let rowVerticalInset = WeekSpacing.xs
 
     private var isEditing: Bool {
         localEditMode == .active
@@ -61,7 +68,7 @@ struct DraftEditorView: View {
 
     private var header: some View {
         HStack(spacing: 2) {
-            ThemedSectionTitle(title: presentationMode == .draft ? String(localized: "draft.title") : String(localized: "草稿区"))
+            ThemedSectionTitle(title: presentationMode == .draft ? String(localized: "draft.title") : String(localized: "zone.draft"))
             Spacer()
             Text("\(tasks.count)")
                 .font(.titleSmall)
@@ -163,24 +170,31 @@ struct DraftEditorView: View {
                 ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                     rowView(task: task, index: index)
                         .listRowInsets(EdgeInsets(
-                            top: WeekSpacing.xs,
+                            top: Self.rowVerticalInset,
                             leading: WeekSpacing.xs,
-                            bottom: WeekSpacing.xs,
+                            bottom: Self.rowVerticalInset,
                             trailing: WeekSpacing.xs
                         ))
                         .listRowSeparator(.hidden)
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                                .fill(Color.backgroundSecondary)
-                        )
+                        // 行底下不再垫一块圆角矩形：任务行本身就是纸上的一行，
+                        // 由行内的皮肤压一条脚线，列表只负责排版。
+                        .listRowBackground(Color.clear)
                 }
                 .onMove(perform: moveTasks)
                 .onDelete(perform: deleteTasks)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Color.backgroundSecondary.opacity(0.65))
-            .frame(height: CGFloat(max(1, tasks.count)) * 82)
+            .frame(height: taskListHeight)
+            .onPreferenceChange(DraftRowHeightKey.self) { rowHeights = $0 }
+        }
+    }
+
+    /// 行高由行自己量出来，`List` 的框正好等于所有行加行距，不多留一个像素。
+    private var taskListHeight: CGFloat {
+        let perRowInsets = Self.rowVerticalInset * 2
+        return tasks.indices.reduce(CGFloat.zero) { total, index in
+            total + (rowHeights[index] ?? Self.estimatedRowHeight) + perRowInsets
         }
     }
 
@@ -235,6 +249,14 @@ struct DraftEditorView: View {
             }
         }
         .padding(.vertical, 2)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: DraftRowHeightKey.self,
+                    value: [index: proxy.size.height]
+                )
+            }
+        )
     }
 
     private func moveTasks(from source: IndexSet, to destination: Int) {
@@ -295,5 +317,15 @@ struct DraftEditorView: View {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
+/// 草稿行实测高度（按行下标）。`List` 没有固有高度，只能靠行自己上报，
+/// 让外框正好等于内容，底部不再留一条空带。
+private struct DraftRowHeightKey: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
