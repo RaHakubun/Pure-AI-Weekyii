@@ -161,6 +161,8 @@ struct TodayView: View {
                     ProgressView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(todaySceneBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -177,7 +179,6 @@ struct TodayView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .background(todaySceneBackground)
         .onAppear {
             if viewModel == nil {
                 let model = TodayViewModel(
@@ -401,6 +402,20 @@ struct TodayView: View {
     }
 
     // MARK: - Status Card
+
+    /// Small caption over the status seal. Rubricated skins (红皮书) ink its
+    /// first character like every other heading on the page.
+    private func statusCaption(_ title: String) -> Text {
+        if let section = todaySkin.section, section.rubric != nil {
+            var plain = section
+            plain.titlePrefix = nil
+            return WeekSectionHeader.rubricText(title, section: plain, ink: .textSecondary)
+                .font(.caption)
+        }
+        return Text(verbatim: title)
+            .font(.caption)
+            .foregroundColor(.textSecondary)
+    }
     
     @ViewBuilder
     private func statusCard(for day: DayModel) -> some View {
@@ -408,9 +423,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.status"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
+                        statusCaption(String(localized: "today.status"))
                         StatusBadge(status: day.status)
                     }
                     
@@ -471,11 +484,8 @@ struct TodayView: View {
 
     private func killTimeTitleRow(deadline: Date?, isEditable: Bool) -> some View {
         HStack(spacing: WeekSpacing.xs) {
-            Image(systemName: "clock.fill")
-                .foregroundColor(.accentOrange)
-            Text(String(localized: "killtime.title"))
-                .font(.titleSmall)
-                .foregroundColor(.textPrimary)
+            ThemedSectionIcon(systemName: "clock.fill", tint: .accentOrange)
+            ThemedSectionTitle(title: String(localized: "killtime.title"))
             Spacer(minLength: WeekSpacing.sm)
             if isEditable {
                 TimelineView(.periodic(from: .now, by: 30)) { context in

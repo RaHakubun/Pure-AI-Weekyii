@@ -229,7 +229,7 @@ struct SettingsView: View {
     }
 
     private var settingsHome: some View {
-        List {
+        List { Group {
             Section {
                 NavigationLink {
                     VIPServiceView()
@@ -386,12 +386,12 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings.row.developer")
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .listStyle(.insetGrouped)
     }
 
     private var todayRhythmSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("执行方式") {
                 executionModeSettings
                 killTimeSettings
@@ -400,7 +400,7 @@ struct SettingsView: View {
             Section("提醒") {
                 reminderSettings
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("今日节奏")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -462,7 +462,7 @@ struct SettingsView: View {
     }
 
     private var languageSettingsPage: some View {
-        Form {
+        Form { Group {
             Section {
                 Picker(String(localized: "settings.language.title", defaultValue: "语言"), selection: Binding(
                     get: { settings.languageOverrideRaw },
@@ -480,13 +480,13 @@ struct SettingsView: View {
             } footer: {
                 Text(String(localized: "settings.language.footer", defaultValue: "更改后需要完全退出并重新打开 Weekyii 才会生效。"))
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle(String(localized: "settings.language.title", defaultValue: "语言"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var taskTypeSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("默认类型") {
                 taskTypeSettings
             }
@@ -500,37 +500,37 @@ struct SettingsView: View {
                     }
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle(String(localized: "settings.task_type.title", defaultValue: "任务类型"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var pastSettingsPage: some View {
-        Form { pastMarkerSection }
+        Form { Group { pastMarkerSection }.themedListRows() }.themedGroupedList()
             .navigationTitle(String(localized: "settings.section.past", defaultValue: "过去"))
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var futureSettingsPage: some View {
-        Form { futureSection }
+        Form { Group { futureSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("未来")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var dataSettingsPage: some View {
-        Form { dataPrivacySection }
+        Form { Group { dataPrivacySection }.themedListRows() }.themedGroupedList()
             .navigationTitle("数据与安全")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var developerSettingsPage: some View {
-        Form { developerSection }
+        Form { Group { developerSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("开发者与诊断")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var appearanceSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("显示模式") {
                 Picker(
                     "显示模式",
@@ -616,7 +616,7 @@ struct SettingsView: View {
             } footer: {
                 Text(String(localized: "settings.motion.footer", defaultValue: "“减少动效”开启后，磁贴轮换也会一并停止。改动立即生效。"))
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -2304,7 +2304,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            Form { Group {
                 Section {
                     HStack(spacing: 16) {
                         Image(systemName: iconName)
@@ -2393,7 +2393,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
                         }
                     }
                 }
-            }
+            }.themedListRows() }.themedGroupedList()
             .navigationTitle(definition == nil ? "新增任务类型" : "编辑任务类型")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2766,7 +2766,7 @@ private struct ProjectSettingsView: View {
     }
 
     var body: some View {
-        Form {
+        Form { Group {
             Section {
                 Stepper(value: Binding(
                     get: { settings.defaultProjectDurationDays },
@@ -2857,7 +2857,7 @@ private struct ProjectSettingsView: View {
                     }
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("项目")
         .navigationBarTitleDisplayMode(.inline)
         .alert(String(localized: "alert.title"), isPresented: Binding(
@@ -2939,7 +2939,7 @@ private struct SuspendedSettingsView: View {
     @EnvironmentObject private var settings: UserSettings
 
     var body: some View {
-        Form {
+        Form { Group {
             Section {
                 reminderSettings
             } header: {
@@ -2962,7 +2962,7 @@ private struct SuspendedSettingsView: View {
                     Text(settings.suspendedExpiryPolicy.summary)
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -3266,7 +3266,7 @@ private struct RecoveryPointsView: View {
     @State private var message: String?
 
     var body: some View {
-        List {
+        List { Group {
             if snapshots.isEmpty {
                 ContentUnavailableView("暂无本地恢复点", systemImage: "clock.arrow.circlepath", description: Text("应用启动和数据导入前会自动建立恢复点。"))
             } else {
@@ -3296,7 +3296,7 @@ private struct RecoveryPointsView: View {
                     Text("恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。")
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("本地恢复点")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }

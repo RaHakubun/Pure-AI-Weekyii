@@ -52,7 +52,7 @@ struct StatusBadge: View {
                 .font(.caption2.weight(.bold))
                 .foregroundColor(status.color)
         case .waxSeal:
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 ZStack {
                     Circle()
                         .fill(
@@ -60,16 +60,20 @@ struct StatusBadge: View {
                                 colors: [status.color.opacity(0.85), status.color],
                                 center: UnitPoint(x: 0.35, y: 0.3),
                                 startRadius: 0,
-                                endRadius: 10
+                                endRadius: 13
                             )
                         )
                     Circle()
                         .strokeBorder(Color.black.opacity(0.18), lineWidth: 1)
+                    // The pressed rim a seal matrix leaves in the wax.
+                    Circle()
+                        .inset(by: 3)
+                        .stroke(Color.black.opacity(0.14), lineWidth: 0.75)
                     LotrGlyphView(glyph: LotrGlyph(status: status))
-                        .frame(width: 11, height: 11)
+                        .frame(width: 14, height: 14)
                         .foregroundColor(Color(hex: "#F7E9D0"))
                 }
-                .frame(width: 19, height: 19)
+                .frame(width: 24, height: 24)
                 .shadow(color: Color.black.opacity(0.25), radius: 0.75, x: 0, y: 0.75)
                 Text(status.displayName)
                     .font(.caption.weight(.semibold))

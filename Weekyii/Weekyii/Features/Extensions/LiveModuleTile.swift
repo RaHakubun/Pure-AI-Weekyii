@@ -20,6 +20,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.weekyiiReduceMotion) private var appReduceMotion
+    @Environment(\.themeSkin) private var skin
     @State private var selectedIndex = 0
     @State private var rotationQueue: [Int] = []
     @State private var naturalHeight: CGFloat = 0
@@ -54,14 +55,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     }
 
     var body: some View {
-        shapedFaces
-            .background(Color.backgroundSecondary)
-            .clipShape(.rect(cornerRadius: WeekRadius.medium))
-            .overlay {
-                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                    .stroke(currentTint.opacity(0.16), lineWidth: 1)
-            }
-            .weekSoftShadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        tileSurface
             .contentShape(Rectangle())
             .overlay { naturalHeightProbe }
             .accessibilityIdentifier(accessibilityIdentifier)
@@ -69,6 +63,24 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
                 normalizeSelection()
                 await rotateWhileVisible()
             }
+    }
+
+    /// 红皮书把模块瓦片画成书页上的一块（与 WeekCard 相同的皮肤），
+    /// 其他主题保持原来的圆角卡片与内容色描边。
+    @ViewBuilder
+    private var tileSurface: some View {
+        if skin.glyphs == .lotr, let card = skin.card {
+            shapedFaces.themedSurface(card)
+        } else {
+            shapedFaces
+                .background(Color.backgroundSecondary)
+                .clipShape(.rect(cornerRadius: WeekRadius.medium))
+                .overlay {
+                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        .stroke(currentTint.opacity(0.16), lineWidth: 1)
+                }
+                .weekSoftShadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        }
     }
 
     @ViewBuilder

@@ -427,12 +427,16 @@ struct WeekSectionHeader: View {
 
     /// The title, with a rubricated first character when the skin asks for one.
     private func titleText(_ section: ThemeSectionSkin) -> Text {
+        Self.rubricText(title, section: section)
+    }
+
+    static func rubricText(_ title: String, section: ThemeSectionSkin, ink: Color = .textPrimary) -> Text {
         let full = (section.titlePrefix ?? "") + title
         guard let rubric = section.rubric, let first = full.first else {
-            return Text(verbatim: full).foregroundColor(.textPrimary)
+            return Text(verbatim: full).foregroundColor(ink)
         }
         let initial = Text(verbatim: String(first)).foregroundColor(rubric.color)
-        let rest = Text(verbatim: String(full.dropFirst())).foregroundColor(.textPrimary)
+        let rest = Text(verbatim: String(full.dropFirst())).foregroundColor(ink)
         return Text("\(initial)\(rest)")
     }
 
@@ -505,4 +509,50 @@ struct WeekSectionHeader: View {
     }
     .padding()
     .background(Color.backgroundPrimary)
+}
+
+/// A section title drawn outside `WeekSectionHeader` (draft area, kill time …).
+/// It follows the same skin rules (rubricated first character, tracking), so
+/// every visible header on a page speaks the same language.
+struct ThemedSectionTitle: View {
+    let title: String
+    @Environment(\.themeSkin) private var skin
+
+    /// Only the rubric and tracking carry over; a skin's title prefix stays on
+    /// `WeekSectionHeader`, so these headers keep reading as before.
+    private var headerSection: ThemeSectionSkin? {
+        guard var section = skin.section else { return nil }
+        section.titlePrefix = nil
+        return section
+    }
+
+    var body: some View {
+        if let section = headerSection {
+            WeekSectionHeader.rubricText(title, section: section)
+                .font(.titleSmall)
+                .tracking(section.titleTracking)
+        } else {
+            Text(verbatim: title)
+                .font(.titleSmall)
+                .foregroundColor(.textPrimary)
+        }
+    }
+}
+
+/// The small icon in front of a custom section title. Skinned themes draw the
+/// skin glyph in the section's icon ink; classic themes keep the SF Symbol tint.
+struct ThemedSectionIcon: View {
+    let systemName: String
+    let tint: Color
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let section = skin.section, section.showsIcon {
+            ThemedSymbol(systemName: systemName, size: 17)
+                .foregroundColor(section.iconInk?.color ?? tint)
+        } else {
+            Image(systemName: systemName)
+                .foregroundColor(tint)
+        }
+    }
 }

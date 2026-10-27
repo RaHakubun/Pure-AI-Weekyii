@@ -433,3 +433,37 @@ extension View {
         modifier(StateTransitionRefreshModifier(appState: appState, action: action))
     }
 }
+
+extension View {
+    /// Grouped `Form` / `List` screens (Settings). Personalised skins drop the
+    /// system grey and let the theme's page show through; classic themes are
+    /// left exactly as they were.
+    func themedGroupedList() -> some View {
+        modifier(ThemedGroupedListModifier())
+    }
+
+    /// Row fill for grouped lists. Apply to the rows' container (a `Group` of
+    /// sections); `nil` on classic themes keeps the system cell background.
+    func themedListRows() -> some View {
+        modifier(ThemedListRowsModifier())
+    }
+}
+
+private struct ThemedGroupedListModifier: ViewModifier {
+    @Environment(\.themeSkin) private var skin
+
+    func body(content: Content) -> some View {
+        let skinned = skin.card != nil
+        content
+            .scrollContentBackground(skinned ? .hidden : .automatic)
+            .background(skinned ? Color.backgroundPrimary.ignoresSafeArea() : Color.clear.ignoresSafeArea())
+    }
+}
+
+private struct ThemedListRowsModifier: ViewModifier {
+    @Environment(\.themeSkin) private var skin
+
+    func body(content: Content) -> some View {
+        content.listRowBackground(skin.card != nil ? Color.backgroundSecondary : nil)
+    }
+}

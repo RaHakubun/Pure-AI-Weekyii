@@ -52,6 +52,9 @@ enum LotrGlyph: String, CaseIterable {
         case "leaf", "leaf.fill": self = .pipe
         case "flame", "flame.fill": self = .beacon
         case "folder", "folder.fill": self = .letter
+        case "hourglass", "hourglass.circle", "hourglass.circle.fill": self = .hourglass
+        case "repeat", "repeat.circle", "repeat.circle.fill": self = .pipe
+        case "bandage", "bandage.fill": self = .brooch
         default: return nil
         }
     }

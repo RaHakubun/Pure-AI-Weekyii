@@ -61,9 +61,7 @@ struct DraftEditorView: View {
 
     private var header: some View {
         HStack(spacing: 2) {
-            Text(presentationMode == .draft ? String(localized: "draft.title") : "草稿区")
-                .font(.titleSmall)
-                .foregroundColor(.textPrimary)
+            ThemedSectionTitle(title: presentationMode == .draft ? String(localized: "draft.title") : String(localized: "草稿区"))
             Spacer()
             Text("\(tasks.count)")
                 .font(.titleSmall)

@@ -658,7 +658,22 @@ struct KillTimeFirePalette {
     /// Overall silhouette opacity — raised to make fire genuinely visible.
     let opacity: Double
 
-    init(theme _: WeekTheme, isDark: Bool) {
+    init(theme: WeekTheme, isDark: Bool) {
+        if theme == .lotr {
+            // 红皮书: a candle and a hearth, not a blowtorch. Burnt umber and
+            // vermilion ink, kept below the page's gilt so it no longer is the
+            // loudest colour on the page.
+            glow      = Color(hex: isDark ? "6E2410" : "8A3A1E")
+            outer     = Color(hex: isDark ? "A33A18" : "A8452A")
+            body      = Color(hex: isDark ? "C26A2C" : "BF7440")
+            core      = Color(hex: isDark ? "E3BE78" : "E2C48C")
+            outerBase = Color(hex: isDark ? "9A4420" : "9E4E2C")
+            bodyBase  = Color(hex: isDark ? "C08A44" : "C49258")
+            coreBase  = Color(hex: isDark ? "EBD6A2" : "EEDDB4")
+            ember     = Color(hex: isDark ? "D49A52" : "C98E4E")
+            opacity   = isDark ? 0.74 : 0.58
+            return
+        }
         glow      = Color(hex: isDark ? "C03010" : "CC3A10")
         outer     = Color(hex: isDark ? "F04010" : "F25220")
         body      = Color(hex: isDark ? "FF8018" : "FF8C22")

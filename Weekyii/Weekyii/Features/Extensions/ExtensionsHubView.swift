@@ -1434,7 +1434,8 @@ private struct MindStampLiveTile: View {
                         icon: "bandage.fill",
                         tint: image == nil ? .accentPink : .white,
                         textColor: image == nil ? .textTertiary : .white.opacity(0.85),
-                        trailing: ""
+                        trailing: "",
+                        overImage: image != nil
                     )
 
                     Spacer(minLength: 0)
@@ -1900,8 +1901,42 @@ private struct HubModuleLabel: View {
     var tint: Color = .textTertiary
     var textColor: Color = .textTertiary
     let trailing: String
+    /// Drawn over a photo: keep the caller's light colours.
+    var overImage: Bool = false
+    @Environment(\.themeSkin) private var skin
 
     var body: some View {
+        if skin.glyphs == .lotr, let section = skin.section, !overImage {
+            bookLabel(section)
+        } else {
+            standardLabel
+        }
+    }
+
+    /// 红皮书：去掉彩色圆底，换成墨线道具图标；标题首字朱红，与页内其他标题一致。
+    private func bookLabel(_ section: ThemeSectionSkin) -> some View {
+        HStack(spacing: 7) {
+            if let icon {
+                ThemedSymbol(systemName: icon, size: 16)
+                    .foregroundColor(section.iconInk?.color ?? tint)
+                    .frame(width: 20, height: 20)
+            }
+            WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
+                .font(.caption.weight(.semibold))
+                .tracking(max(section.titleTracking, 0.6))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if !trailing.isEmpty {
+                Text(trailing)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(section.countInk?.color ?? textColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var standardLabel: some View {
         HStack(spacing: 6) {
             if let icon {
                 Image(systemName: icon)
