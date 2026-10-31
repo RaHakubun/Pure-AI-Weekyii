@@ -193,6 +193,11 @@ enum WeekyiiDataArchiveService {
         let (envelope, payload) = try decode(data)
         try validate(payload)
         try modelContext.save()
+        // Before anything is replaced: turn iCloud sync off and forget this
+        // device's sync baselines. Otherwise the next cycle reads the imported
+        // store as "the user deleted everything not in the archive" and deletes
+        // those records from iCloud. Throws (nothing replaced) if it cannot.
+        try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
         _ = try BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "import")
 
         do {
@@ -401,4 +406,31 @@ enum WeekyiiDataArchiveService {
     private static func encoder() -> JSONEncoder { let value = JSONEncoder(); value.outputFormatting = [.sortedKeys]; value.dateEncodingStrategy = .millisecondsSince1970; return value }
     private static func decoder() -> JSONDecoder { let value = JSONDecoder(); value.dateDecodingStrategy = .millisecondsSince1970; return value }
     private static func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+}
+
+/// Local data is about to be replaced wholesale (archive import, recovery point
+/// restore). iCloud sync must not interpret that as a series of user edits.
+@MainActor
+enum CloudSyncLocalReplacementGuard {
+    /// Posted after sync was switched off for a replacement, so the running
+    /// coordinator can drop its session immediately (WeekyiiApp observes it).
+    static let didSuspendSyncNotification = Notification.Name("WeekyiiCloudSyncSuspendedForLocalReplacement")
+
+    /// Turns iCloud sync off (the running cycle is invalidated at its next check,
+    /// because the coordinator's session test includes `cloudSyncRequested`) and
+    /// resets every account's device-local sync state. Turning sync back on then
+    /// inspects iCloud and asks: use this device / use iCloud / merge / cancel.
+    ///
+    /// - Returns: whether sync had been on, so the caller can tell the user.
+    @discardableResult
+    static func prepareForLocalReplacement(
+        settings: UserSettings,
+        metadataStore: CloudSyncMetadataStore = CloudSyncMetadataStore()
+    ) throws -> Bool {
+        let wasRequested = settings.cloudSyncRequested
+        settings.setCloudSyncRequested(false)
+        try metadataStore.resetSynchronizationStateForAllAccounts()
+        NotificationCenter.default.post(name: didSuspendSyncNotification, object: nil)
+        return wasRequested
+    }
 }
