@@ -705,6 +705,11 @@ struct WeekyiiApp: App {
                         await cloudSyncCoordinator.handle(.appLaunch)
                         appDelegate.attach(coordinator: cloudSyncCoordinator)
                     }
+                    .onReceive(NotificationCenter.default.publisher(for: CloudSyncLocalReplacementGuard.didSuspendSyncNotification)) { _ in
+                        // Archive import / recovery restore already switched the
+                        // setting off; drop the coordinator's session and status too.
+                        Task { await cloudSyncCoordinator.setRequested(false) }
+                    }
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
