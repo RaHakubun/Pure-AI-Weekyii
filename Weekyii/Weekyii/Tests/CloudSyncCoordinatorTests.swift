@@ -1378,6 +1378,66 @@ final class CloudSyncCoordinatorTests: XCTestCase {
         XCTAssertNotNil(reopenedContext)
     }
 
+    // MARK: Deleted remote zone
+
+    /// CloudKit removed Weekyii's zone. That is not a user-actionable failure:
+    /// the transport already dropped this account's baselines, so the session must
+    /// drop the stale transport and land in the first-enable inspection instead of
+    /// parking in `pausedAfterFailure` until the user taps sync.
+    func test_deletedRemoteZoneReentersFirstEnableInspectionInsteadOfLatching() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.fetch])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteEmpty))
+        XCTAssertFalse(harness.coordinator.automaticRetrySuppressed)
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.accountRecordName))
+        XCTAssertFalse(metadata.automaticRetrySuppressed)
+        XCTAssertNil(metadata.lastFailure)
+        XCTAssertNil(metadata.lastFailureReason)
+        XCTAssertFalse(metadata.zoneInitialized)
+        XCTAssertNotNil(try harness.metadataStore.loadActiveAccountHash(), "the account did not change, only its zone")
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"], "nothing may be re-created silently")
+        let remoteAfterLoss = await base.remoteRecords()
+        XCTAssertTrue(remoteAfterLoss.isEmpty)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 1)
+    }
+
+    /// The re-entry is bounded: a zone that keeps vanishing must not spin.
+    func test_repeatedZoneLossStopsAfterOneReentryAndFallsBackToAnOrdinaryFailure() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.fetch, .inspect])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .pausedAfterFailure)
+        XCTAssertTrue(harness.coordinator.automaticRetrySuppressed)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 2, "one re-entry, then an ordinary failure")
+        let remaining = await transport.scheduledRemaining()
+        XCTAssertEqual(remaining, 0)
+    }
+
     private struct Harness {
         let coordinator: CloudSyncCoordinator
         let settings: UserSettings
@@ -1622,6 +1682,69 @@ private actor CoordinatorAsyncGate {
     func release() { operationContinuation?.resume(); operationContinuation = nil }
 }
 
+private enum ZoneLossPoint: Sendable {
+    case infrastructure
+    case inspect
+    case fetch
+}
+
+/// Simulates CloudKit deleting Weekyii's custom zone at a chosen point. Like the
+/// real transport it resets this account's device-local state before failing, so
+/// the coordinator sees exactly what `handleRemoteZoneLoss` leaves behind.
+private actor ZoneLossTransport: CloudSyncTransport {
+    private let base: InMemoryCloudSyncTransport
+    private var schedule: [ZoneLossPoint] = []
+    private var metadataStore: CloudSyncMetadataStore?
+    private var accountRecordName: String?
+    private var losses = 0
+
+    init(base: InMemoryCloudSyncTransport) { self.base = base }
+
+    func attach(metadataStore: CloudSyncMetadataStore, accountRecordName: String) {
+        self.metadataStore = metadataStore
+        self.accountRecordName = accountRecordName
+    }
+
+    func schedule(_ points: [ZoneLossPoint]) { schedule = points }
+    func lossCount() -> Int { losses }
+    func scheduledRemaining() -> Int { schedule.count }
+
+    private func loseZoneIfScheduled(_ point: ZoneLossPoint) async throws {
+        guard schedule.first == point else { return }
+        schedule.removeFirst()
+        losses += 1
+        if let metadataStore, let accountRecordName {
+            try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+        }
+        // A deleted zone takes its records with it.
+        try? await base.resetCustomZone()
+        throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
+    }
+
+    var databaseScope: CloudSyncDatabaseScope { get async { await base.databaseScope } }
+
+    func ensureInfrastructure() async throws -> CloudSyncRemoteInfrastructure {
+        try await loseZoneIfScheduled(.infrastructure)
+        return try await base.ensureInfrastructure()
+    }
+
+    func inspectRemoteZone() async throws -> CloudSyncZoneInspection {
+        try await loseZoneIfScheduled(.inspect)
+        return try await base.inspectRemoteZone()
+    }
+
+    func resetCustomZone() async throws { try await base.resetCustomZone() }
+
+    func fetchChanges(since token: Data?) async throws -> CloudSyncChangeBatch {
+        try await loseZoneIfScheduled(.fetch)
+        return try await base.fetchChanges(since: token)
+    }
+
+    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] { await base.upsert(records) }
+    func delete(_ keys: [SyncEntityKey]) async -> [CloudSyncRecordResult] { await base.delete(keys) }
+    func restoreTransportState(_ state: Data?) async { await base.restoreTransportState(state) }
+    func persistedTransportState() async -> Data? { await base.persistedTransportState() }
+}
 private actor GatedCoordinatorTransport: CloudSyncTransport, CloudSyncCancellableTransport {
     private let base: InMemoryCloudSyncTransport
     private let gate: CoordinatorAsyncGate

@@ -758,7 +758,7 @@ final class CloudSyncCoordinator {
             // after its full reset/apply/reconcile sequence succeeds.
             try metadataStore.saveActiveAccountHash(accountHash)
             currentAccountRecordName = accountRecordName
-            let didSync = await reconcileWithRetries(transport: transport, accountRecordName: accountRecordName, generation: generation)
+            let didSync = try await reconcileWithRetries(transport: transport, accountRecordName: accountRecordName, generation: generation)
             if didSync, isCurrent(generation) {
                 try metadataStore.saveActiveAccountHash(accountHash)
                 currentAccountRecordName = accountRecordName
@@ -958,7 +958,7 @@ final class CloudSyncCoordinator {
                 try await boundTransport.resetCustomZone()
                 try metadataStore.resetSynchronizationState(forAccountRecordName: targetRecordName)
                 _ = try await boundTransport.ensureInfrastructure()
-                let succeeded = await reconcileWithRetries(
+                let succeeded = try await reconcileWithRetries(
                     transport: boundTransport,
                     accountRecordName: targetRecordName,
                     generation: generation
@@ -1066,7 +1066,7 @@ final class CloudSyncCoordinator {
                 try await boundTransport.resetCustomZone()
                 try metadataStore.resetSynchronizationState(forAccountRecordName: targetRecordName)
                 _ = try await boundTransport.ensureInfrastructure()
-                let succeeded = await reconcileWithRetries(
+                let succeeded = try await reconcileWithRetries(
                     transport: boundTransport,
                     accountRecordName: targetRecordName,
                     generation: generation
@@ -1123,7 +1123,8 @@ final class CloudSyncCoordinator {
     private func runForAvailableAccount(
         recordName: String,
         trigger: CloudSyncTrigger,
-        generation: Int
+        generation: Int,
+        zoneLossRetries: Int = 0
     ) async {
         guard let localStore else { status = .ready; return }
         cycleInProgress = true
@@ -1190,9 +1191,24 @@ final class CloudSyncCoordinator {
             _ = localStore
             _ = try await transport.ensureInfrastructure()
             guard isCurrent(generation) else { return }
-            _ = await reconcileWithRetries(transport: transport, accountRecordName: recordName, generation: generation)
+            _ = try await reconcileWithRetries(transport: transport, accountRecordName: recordName, generation: generation)
         } catch {
             guard isCurrent(generation) else { return }
+            // CloudKit removing the custom zone is not a failure the user can act
+            // on. The transport has already dropped this account's baselines, so
+            // re-enter once: the session now takes the first-enable inspection
+            // path and asks which side wins instead of parking in a latch.
+            if zoneLossRetries < 1, Self.isRemoteZoneLoss(Self.failure(from: error)) {
+                recoverFromRemoteZoneLoss(accountRecordName: recordName)
+                guard isCurrent(generation) else { return }
+                await runForAvailableAccount(
+                    recordName: recordName,
+                    trigger: trigger,
+                    generation: generation,
+                    zoneLossRetries: zoneLossRetries + 1
+                )
+                return
+            }
             await handleFailure(error, accountRecordName: recordName)
         }
     }
@@ -1201,7 +1217,7 @@ final class CloudSyncCoordinator {
         transport: any CloudSyncTransport,
         accountRecordName: String,
         generation: Int
-    ) async -> Bool {
+    ) async throws -> Bool {
         guard let localStore, isCurrent(generation) else { return false }
         cycleInProgress = true
         status = .syncing
@@ -1271,6 +1287,10 @@ final class CloudSyncCoordinator {
                 if case CloudSyncReconciliationError.sessionInvalidated = error { return false }
                 if case CloudSyncReconciliationError.accountChanged = error { return false }
                 let failure = Self.failure(from: error)
+                // Zone loss is terminal by category but not a failure to latch:
+                // hand it back so the session can re-enter the first-enable
+                // inspection. Retrying it here would only re-hit the same wall.
+                if Self.isRemoteZoneLoss(failure) { throw error }
                 guard let retryFailure = retryFailureCandidate(failure),
                       retryNumber < retryPolicy.maximumRetries else {
                     await latchFailure(failure, accountRecordName: accountRecordName)
@@ -1689,7 +1709,35 @@ final class CloudSyncCoordinator {
     }
 
     private func handleFailure(_ error: Error, accountRecordName: String) async {
+        // A deleted zone never latches here unless the single re-entry below was
+        // already spent; that second loss really is an ordinary failure.
         await latchFailure(Self.failure(from: error), accountRecordName: accountRecordName)
+    }
+
+    /// CloudKit removed Weekyii's custom zone (or the account/container was
+    /// reset). The transport has already thrown away this account's baselines and
+    /// engine cursor, so nothing here is worth latching: drop the stale transport
+    /// (its in-memory zone and engine state are gone with it) and clear the latch
+    /// so the re-entered session reaches the first-enable inspection. The
+    /// active-account marker is deliberately kept — the account did not change,
+    /// only its zone did, and clearing it would demand an account decision.
+    private func recoverFromRemoteZoneLoss(accountRecordName: String) {
+        transport = nil
+        automaticRetrySuppressed = false
+        latchedFailureReason = nil
+        lastFailurePresentation = nil
+        lastSuccessfulSync = nil
+        do {
+            try metadataStore.update(forAccountRecordName: accountRecordName) { metadata in
+                metadata.automaticRetrySuppressed = false
+                metadata.lastFailure = nil
+                metadata.lastFailureCategory = nil
+                metadata.lastFailureReason = nil
+            }
+        } catch {
+            // The in-memory reset above is enough to re-enter the inspection; a
+            // metadata write failure must not turn this into a latch.
+        }
     }
 
     private func latchFailure(_ failure: CloudSyncFailure, accountRecordName: String) async {
@@ -1811,6 +1859,15 @@ final class CloudSyncCoordinator {
             }
         }
         return .other(error.localizedDescription)
+    }
+
+    /// CloudKit reports a missing custom zone as `.other(remoteZoneDeletedReason)`
+    /// because the failure enum has no dedicated case for it.
+    private static func isRemoteZoneLoss(_ failure: CloudSyncFailure) -> Bool {
+        if case .other(let detail) = failure {
+            return detail == CloudKitFailureMapper.remoteZoneDeletedReason
+        }
+        return false
     }
 
     private static func reason(for failure: CloudSyncFailure) -> CloudSyncLatchedFailureReason {

@@ -428,8 +428,10 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
 
     /// The zone is gone on the server. Every baseline now describes records that
     /// no longer exist, so this account's device-local state is reset and the
-    /// cycle stops. The next manual sync inspects the (empty) zone and asks the
-    /// user before anything is uploaded again; nothing is re-created silently.
+    /// cycle stops. The coordinator does not treat this as a latchable failure: it
+    /// drops this transport and re-enters the session once, so the normal
+    /// first-enable inspection asks the user which side wins before anything is
+    /// uploaded again. Nothing is re-created silently.
     private func handleRemoteZoneLoss() throws {
         remoteZoneDeleted = false
         engineStateData = nil
