@@ -148,4 +148,50 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 
 ## 验收记录
 
-（本地 Agent 填写：编译结果、测试通过数、Console 部署截图位置、验收矩阵逐项结果、遗留问题）
+填写方：本地 Agent（macOS + Xcode）。日期：2026-10-31。
+
+### 环境
+
+- Xcode 26.3（17C529）/ iOS 26.2 SDK / Swift 6.2.4
+- 模拟器：**iPhone 17 Pro**（本机没有 iPhone 16，§1 里的设备名按实际改了）
+- 起点 `ab96ef3`，第一次提交 `66650f1`
+
+### 合并过程
+
+1. **本地有未提交改动，补丁一开始打不上。** 本地 10-29 有一轮魔戒主题改动留在工作区（8 个源文件，其中就含 `SettingsView.swift`），云端 Agent 看不到它。`git apply --3way` 直接报 `SettingsView.swift: does not match index`。
+2. 处理方式：先把主题改动落库成独立提交（`2d3c222`），再 rebase 到 `ab96ef3` 之上，然后打补丁。补丁插入点在 `RecoveryPointsView` 之前，本地改的是 `SettingsIcon` 内部，相邻但不重叠。
+3. `git apply --3way` 结果：**3 个文件全部 clean，无冲突标记**。
+4. 补丁文件已 `git rm`（内容已进代码）。因此本文 §0.1 与 §1 里指向 `docs/handoff/icloud-round5-large-files.patch` 的路径**自此失效**。
+
+### 编译
+
+- `xcodebuild build`（Debug / iPhone 17 Pro）**一次通过，没有任何编译错误**。
+- 所以本轮**没有"编译修正"**：提交里不含对云端代码的任何改动。
+- §3 列的高风险写法全部一次过：`database.recordZoneChanges(inZoneWith:since:)` + `modificationResultsByID` / `changeToken` / `moreComing`、`nonisolated enum` + `import CryptoKit`、`Text + Text` 拼接、`RecoveryPointsView` 新增的 `@EnvironmentObject settings`。
+- **唯一与预期不符的是本地化抽取**：`xcodebuild` 命令行构建只产出 `.stringsdata`，不会合并回 `.xcstrings`（IDE 里构建才会）。15 个 key 是手工写入 catalog 的，格式对齐既有条目，`xcstringstool compile` 通过，并已核对英文确实进了 `en.lproj/Localizable.strings` 产物。
+
+### 测试
+
+| 范围 | 结果 |
+|---|---|
+| 同步相关 7 个类 | **109 例，0 失败** |
+| 全量 `WeekyiiTests` | **538 例，0 失败** |
+| UI 测试 | 未跑（见下） |
+
+- **失败的测试：无。**
+- 基线实测是 **529**（不是本文写的 528），+ 新增 9 = **538**。§1 的"预期 537"作废，以 `xcodebuild test` 输出为准。
+- §4 的 9 例全部通过，名字与意图一一对应。
+- UI 测试没跑的理由：本轮 UI 改动只有设置页两个按钮和首页横幅按钮，不涉及列表/拖拽/导航；且 `testPendingWeekDetailShowsDraftCrudEntryPoints` 在 `28149dd` 就已失败，跑起来只会把既有噪声混进结论。
+
+### 遗留与需人确认
+
+1. **N1 回归测试可能"假过"。** `test_conflictResendDoesNotRevertLocalWinnerOnNextCycle` 通过，但**没有做"把缺陷改回去看它失败"的对照**。按 §4 的提示，如果 `InMemoryCloudSyncTransport` 没复现"旧版本留在收件箱"，这例会无条件通过。要确认得临时回退 reconciler 的收件箱丢弃逻辑再跑一次，本轮未做。
+2. **§8 的"Zone 删除后的失败锁存"本轮未核查**（任务边界只要求合并/编译/测试）。
+3. **§6 Production 部署、§7 双设备验收矩阵本轮未做**，11 项全部待人工执行。
+4. 测试数与文档口径不一致的问题建议统一：以后写"以 `xcodebuild test` 输出为准"，不写死数字。
+
+### 是否有改动超出补丁范围
+
+- **源码：没有。** 三个补丁文件之外，未改任何 `.swift`。
+- **文案：有，属于任务要求范围。** `Resources/Localizable.xcstrings` +240 行（15 个 key，中英各一）。原计划靠 Xcode 自动抽取，实际是手工写入。
+- **仓库结构：有。** 删除了补丁文件本身；另有一个与 iCloud 无关的独立提交 `2d3c222`（本地主题 WIP 落库，为了解开补丁冲突）。
