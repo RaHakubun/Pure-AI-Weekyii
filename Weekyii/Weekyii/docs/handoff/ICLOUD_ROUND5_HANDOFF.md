@@ -85,7 +85,9 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 |---|---|
 | `test_undecodableRemoteRecordIsQuarantinedInsteadOfFailingTheCycle` | `payloadVersion = 99` 的远端记录：本轮成功、`quarantinedRecords == 1`、远端记录不被删改、其他记录正常落地、第二轮仍成功 |
 | `test_serverRecordChangedWithoutNewerServerVersionResendsWithoutStaleMetadata` | 上传收到 `serverRecordChanged` 但拉不到更新版本（对应 CloudKit `unknownItem`）：以新记录重发成功 |
-| `test_conflictResendDoesNotRevertLocalWinnerOnNextCycle` | N1 回归：冲突重发后再跑两轮，本机胜者与远端都保持“local winner” |
+| `test_conflictResendWithEchoingTransportKeepsLocalWinner` | 冲突重发路径本身：连跑三轮，本机胜者与远端都保持 "local winner"。**不验证 N1**（见下方说明） |
+| `test_conflictResendKeepsLocalWinnerWhenTransportDoesNotEchoWrites` | **N1 回归 A**：用不回送自身写入、走持久收件箱的传输连跑三轮，本机胜者不回退，且收件箱不再残留被取代的服务器版本 |
+| `test_partialFailureDoesNotReplaySupersededServerVersionOverLocalWinner` | **N1 回归 B**：同轮里 `k2` 本机胜出、`k1` 上传失败（确认游标不前进）；第二、三轮 `k2` 仍是本机版本，远端也是 |
 | `test_duplicateHabitTasksForSameDayConvergeOnDeterministicID` | 同习惯同日：本机随机 ID 草稿 + 远端确定性 ID 草稿 → 只留确定性 ID，远端也只有它 |
 | `test_habitDeterministicIDIsStableAndDistinctPerKind` | ID 稳定、按日不同、任务与打卡不同 |
 | `test_discardPendingChangesDropsOnlySettledKeysUpToSequence` | 只丢指定键、且只丢 ≤ 序号的条目 |
@@ -93,7 +95,29 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 | `test_resetSynchronizationStateForAllAccountsClearsEveryAccount` | 多账号元数据全部清空 |
 | `test_initialDecisionStatusSurfacesBanner` | 首次决策状态出横幅；未开启同步不出 |
 
-注意：`InMemoryCloudSyncTransport` 会把自己的写入回送到变更日志（等同 CKSyncEngine 回送的情形）。如果第 3 个测试在未修复代码上也能通过，说明内存传输没有复现“旧版本留在收件箱”，可再写一个直接操作 `CloudSyncDurableInbox` 的测试；不强制。
+### 4.1 N1 回归为什么换了写法
+
+原测试 `test_conflictResendDoesNotRevertLocalWinnerOnNextCycle` 是**摆设**，已实测确认：
+
+- 把 `CloudSyncReconciler` 提交阶段的两处 `discardPendingChanges` 全部注释掉，它**照样通过**。
+- 原因：`InMemoryCloudSyncTransport.upsert` 会把自己写入的记录 append 进 `changeLog`，所以下一轮的批次里"被取代的服务器版本"后面紧跟着"重发成功的本机版本"，`remoteRecords[key] = record` 的字典赋值把旧版本覆盖掉了。缺陷被回送掩盖。
+- 真实 `CKSyncEngineTransport` 不回送自身写入，且变更先落 `CloudSyncDurableInbox`、由应用游标读取，所以缺陷是真实的。
+
+新写法（`InboxBackedTransport`，`Tests/CloudSyncETests.swift` 末尾）：
+
+1. `fetchChanges(since:)` 内部维护**私有的服务器游标**（等价 CKSyncEngine 的序列化状态），从服务器拉增量；
+2. 过滤掉本机写入过的记录（按 `recordName + payloadHash` 匹配，覆盖 upsert 与 delete）；
+3. 剩下的用 `inbox.append(...)` 写进持久收件箱；
+4. 返回 `inbox.batch(since:)`——游标是**收件箱序号**，与 `CloudSyncDurableInbox.encodeToken/decodeToken` 同源，避免"服务器序号当收件箱序号用"。
+
+顺带修了一个测试夹具缺陷：`Harness.establishBaseline` 原来用新建的 `CloudSyncMetadata` 整体 `save`，会把收件箱的 `changeSequence` / `pendingRemoteChanges` 一起冲掉，导致下一轮 `inbox.batch` 游标越界。改成 `metadataStore.update` 增量写。
+
+**变异验证结果（两次都实测）**
+
+| 变异 | A（冲突重发） | B（部分失败） | 旧用例 |
+|---|---|---|---|
+| 注释 `CloudSyncReconciler.swift` 提交阶段两处 `discardPendingChanges` | **失败**：`["superseded server version"]` ≠ `["local winner"]` | **失败**：第二轮起 `k2` 变回 `k2 superseded server edit` | 仍通过（印证是摆设） |
+| 恢复实现 | 通过 | 通过 | 通过 |
 
 ## 5. 新文案 key（需补英文）
 
@@ -143,7 +167,7 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 - **M5**：冷启动后台推送（App 被杀时收到推送）不会立即同步，下次前台才同步。是否接 `BGAppRefreshTask` 需要产品决定。
 - **H3 余项**：对账前的 `beforeApply` 快照仍会读入附件二进制；彻底解决需要在 `WeekyiiPersistence` 提供“不含 blob 的快照”（文件 61KB，云端未改）。
 - **合并路径**（首次决策选“合并”）会重置 Zone，此时被隔离的新版本记录会随之丢失。建议：合并前若 `inspection.undecodableRecordNames` 非空则提示用户先升级。
-- **Zone 删除后的失败锁存**：`handleRemoteZoneLoss` 抛出 `.other` 后协调器走 `handleFailure`；请确认它不会把 `automaticRetrySuppressed` 锁住导致无法进入首次决策（场景 6）。如会，在 `handleFailure` 对 `remoteZoneDeletedReason` 特判：不锁存、直接重跑启动流程。
+- ~~**Zone 删除后的失败锁存**~~：**已修**（`dd22ca6`）。`handleRemoteZoneLoss` 抛出的 `.other(remoteZoneDeletedReason)` 不再进 `latchFailure`：`runForAvailableAccount` 会丢掉旧 transport、清掉锁存与 `lastFailure`、保留 `activeAccountHash`，并在同一 generation 内重跑一次，第二次运行走首次决策检查。重跑预算 1 次，第二次仍丢 Zone 才落普通失败（防止死循环）。`reconcileWithRetries` 改为 `throws` 把 Zone 丢失原样交回，`.other` 归类是 `.terminal`，所以不会先当临时错误重试。
 - 第四轮报告中的 L3/L4/L5/L7 未处理（低优先级，见报告）。
 
 ## 验收记录
@@ -172,22 +196,30 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 
 ### 测试
 
+第一轮（合并补丁后）：
+
 | 范围 | 结果 |
 |---|---|
-| 同步相关 7 个类 | **109 例，0 失败** |
-| 全量 `WeekyiiTests` | **538 例，0 失败** |
-| UI 测试 | 未跑（见下） |
+| 同步相关 7 个类 | 0 失败 |
+| 全量 `WeekyiiTests` | 0 失败 |
+| UI 测试 | 未跑 |
 
-- **失败的测试：无。**
-- 基线实测是 **529**（不是本文写的 528），+ 新增 9 = **538**。§1 的"预期 537"作废，以 `xcodebuild test` 输出为准。
-- §4 的 9 例全部通过，名字与意图一一对应。
-- UI 测试没跑的理由：本轮 UI 改动只有设置页两个按钮和首页横幅按钮，不涉及列表/拖拽/导航；且 `testPendingWeekDetailShowsDraftCrudEntryPoints` 在 `28149dd` 就已失败，跑起来只会把既有噪声混进结论。
+第二轮（`dd22ca6` 收尾）：
+
+| 范围 | 结果 |
+|---|---|
+| 同步相关类 | 0 失败 |
+| 全量 `WeekyiiTests` | **542 例，0 失败**（基线 + 新增 4） |
+| UI 测试（`WeekyiiUITests`） | **23 例，22 通过、1 失败**：`testPendingWeekDetailShowsDraftCrudEntryPoints`，在 `28149dd` 即为红，与本轮无关 |
+
+- **失败的测试：无新增。** 唯一红的 UI 用例是既有缺陷（未来页显示"暂无未来周"，`pendingWeekCard_*` 不存在），本轮未触碰相关代码。
+- 具体数字以 `xcodebuild test` 输出为准；本文不再写死基线（第一轮记的 528/529 是当时的快照，已过期）。
 
 ### 遗留与需人确认
 
-1. **N1 回归测试可能"假过"。** `test_conflictResendDoesNotRevertLocalWinnerOnNextCycle` 通过，但**没有做"把缺陷改回去看它失败"的对照**。按 §4 的提示，如果 `InMemoryCloudSyncTransport` 没复现"旧版本留在收件箱"，这例会无条件通过。要确认得临时回退 reconciler 的收件箱丢弃逻辑再跑一次，本轮未做。
-2. **§8 的"Zone 删除后的失败锁存"本轮未核查**（任务边界只要求合并/编译/测试）。
-3. **§6 Production 部署、§7 双设备验收矩阵本轮未做**，11 项全部待人工执行。
+1. **N1 回归测试"假过"——已查明并重写（`dd22ca6`）。** 旧用例在去掉提交阶段收件箱清理后仍通过，确系摆设（原因见 §4.1）。现由 `InboxBackedTransport` 的两条新用例覆盖，两条都做过变异验证。
+2. **§8 的"Zone 删除后的失败锁存"——已核查并修复（`dd22ca6`）。** 原来确实会锁存；现自动进首次决策，重跑有界。两条用例 + 变异验证。
+3. **§6 Production 部署、§7 双设备验收矩阵仍需人工执行**，11 项全部待办（模拟器无 CloudKit 账户，端到端只能真机）。
 4. 测试数与文档口径不一致的问题建议统一：以后写"以 `xcodebuild test` 输出为准"，不写死数字。
 
 ### 是否有改动超出补丁范围
@@ -195,3 +227,9 @@ git apply --3way Weekyii/Weekyii/docs/handoff/icloud-round5-large-files.patch
 - **源码：没有。** 三个补丁文件之外，未改任何 `.swift`。
 - **文案：有，属于任务要求范围。** `Resources/Localizable.xcstrings` +240 行（15 个 key，中英各一）。原计划靠 Xcode 自动抽取，实际是手工写入。
 - **仓库结构：有。** 删除了补丁文件本身；另有一个与 iCloud 无关的独立提交 `2d3c222`（本地主题 WIP 落库，为了解开补丁冲突）。
+- **第二轮（`dd22ca6`）**：只动了 `CloudSyncCoordinator`、`CKSyncEngineTransport` 的注释、两个测试文件；`CloudSyncReconciler` 与 `CloudSyncMetadataStore` 一行未改——N1 的实现本来就是对的，坏的是测试。
+
+### 两条经验（下一轮直接复用）
+
+1. **`xcrun simctl spawn booted defaults write` 写的是模拟器全局域，不是 App 容器。** 想改 App 的偏好（例如 `cloudSyncRequested`）必须直接写 `$(xcrun simctl get_app_container booted <bundle-id> data)/Library/Preferences/<bundle-id>.plist`，并且要先 `xcrun simctl shutdown` 或 `killall -9 cfprefsd`，否则被缓存覆盖。另外 `simctl install` 替换 App 会让容器 UUID 变化，业务数据还在，只是路径变了。
+2. **模拟器没有可用的 CloudKit 账户，同步端到端只能真机。** 打开同步后横幅固定显示"iCloud 账户暂不可用，同步已暂停。"，走 `.accountUnavailable` 分支，根本到不了 `inspectRemoteZone`。所以 §7 的 11 项验收不要试图在模拟器上做，模拟器只能验证到单元测试这一层。
