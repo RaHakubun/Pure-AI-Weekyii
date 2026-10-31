@@ -705,6 +705,54 @@
         }
       }
     },
+    "cloud.accountSwitch.useLocal.confirm.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete iCloud data and upload this device"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除 iCloud 中的数据并上传本机"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.useLocal.confirm.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This iCloud account has %lld Weekyii items that will be deleted and replaced with this device's data. This can't be undone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个 iCloud 账户里现有 %lld 项 Weekyii 数据，将被删除并替换为本机数据。此操作无法撤销。"
+          }
+        }
+      }
+    },
+    "cloud.accountSwitch.useLocal.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace this iCloud account with this device's data?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用本机数据覆盖这个 iCloud 账户？"
+          }
+        }
+      }
+    },
     "cloud.sync.account.available" : {
       "localizations" : {
         "en" : {
@@ -8403,6 +8451,54 @@
         }
       }
     },
+    "settings.icloud.banner.initial_decision" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is on and waiting for you to choose which data to keep."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步已开启，等待你选择以哪份数据为准。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.initial_decision.open" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.renew" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renew"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "续订"
+          }
+        }
+      }
+    },
     "settings.icloud.banner.locked" : {
       "localizations" : {
         "en" : {
@@ -8737,6 +8833,150 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次成功同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.renew" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renew membership to resume iCloud sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "续订会员以恢复 iCloud 同步"
+          }
+        }
+      }
+    },
+    "settings.icloud.replacement_notice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync will be turned off first. When you turn it back on, you'll choose whether this device or iCloud is the source of truth."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Sync State on This Device"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置本机同步状态"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn Off Sync and Reset"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭同步并重置"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is off and this device's sync state was reset. Turn it back on any time."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭 iCloud 同步并重置本机同步状态。需要时可重新开启。"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset failed:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置失败："
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing on this device or in iCloud is deleted. When you turn sync back on, Weekyii checks iCloud again and asks which data to keep. Use only if sync keeps failing."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机和 iCloud 中的数据都不会被删除。重新开启同步时，会重新检查 iCloud 并让你选择以哪份数据为准。仅在同步长期异常时使用。"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deletes no data; turns sync off and clears this device's sync records"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不删除任何数据；关闭同步并清除本机同步记录"
+          }
+        }
+      }
+    },
+    "settings.icloud.reset_state.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset sync state on this device?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置本机同步状态？"
           }
         }
       }

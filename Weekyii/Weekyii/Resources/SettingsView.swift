@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var pendingImportData: Data?
     @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
     @State private var showingImportConfirm = false
+    @State private var showingResetCloudSyncStateConfirm = false
     @State private var showingInitialCloudSyncDecision = false
     @State private var showingAutoStartEnableConfirm = false
     
@@ -46,11 +47,13 @@ struct SettingsView: View {
             .tint(.weekyiiPrimary)
         }
         .onAppear {
+            // Re-evaluated on every appearance: the decision may have become
+            // pending while Settings was off screen.
+            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
             guard !hasInitializedPendingDefaultKillTime else { return }
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
-            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
         }
         .onChange(of: cloudSyncCoordinator.status) { _, _ in
             if isInitialCloudSyncDecisionRequired { showingInitialCloudSyncDecision = true }
@@ -145,6 +148,9 @@ struct SettingsView: View {
                     return
                 }
                 do {
+                    // Replacing the store underneath sync would make the old
+                    // baselines delete/overwrite the restored data in iCloud.
+                    try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
                     try BackupRecoveryService.restoreSnapshot(named: latest.folderName, to: storeURL)
                     seedAlertMessage = "已回滚到 \(latest.folderName)。请立即重启应用。"
                 } catch {
@@ -152,7 +158,7 @@ struct SettingsView: View {
                 }
             }
         } message: {
-            Text("将直接替换当前数据库文件，可能丢失最新数据。")
+            Text("将直接替换当前数据库文件，可能丢失最新数据。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert("完整替换当前数据？", isPresented: $showingImportConfirm) {
             Button(String(localized: "action.cancel"), role: .cancel) {
@@ -163,7 +169,7 @@ struct SettingsView: View {
                 performPendingArchiveImport()
             }
         } message: {
-            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。")
+            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .fileExporter(
             isPresented: $showingArchiveExporter,
@@ -945,6 +951,45 @@ struct SettingsView: View {
                 }
             }
 
+            if case .locked = cloudSyncCoordinator.status, settings.cloudSyncRequested {
+                Button {
+                    paywallFeature = .cloudSync
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "crown.fill", color: .orange)
+                        Text(String(localized: "settings.icloud.renew", defaultValue: "续订会员以恢复 iCloud 同步"))
+                    }
+                }
+                .accessibilityIdentifier("settings.icloud.renew")
+            }
+
+            Button(role: .destructive) {
+                showingResetCloudSyncStateConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "arrow.counterclockwise.icloud", color: .red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.icloud.reset_state", defaultValue: "重置本机同步状态"))
+                        Text(String(localized: "settings.icloud.reset_state.subtitle", defaultValue: "不删除任何数据；关闭同步并清除本机同步记录"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .accessibilityIdentifier("settings.icloud.resetState")
+            .confirmationDialog(
+                String(localized: "settings.icloud.reset_state.title", defaultValue: "重置本机同步状态？"),
+                isPresented: $showingResetCloudSyncStateConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "settings.icloud.reset_state.confirm", defaultValue: "关闭同步并重置"), role: .destructive) {
+                    resetCloudSyncState()
+                }
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            } message: {
+                Text(String(localized: "settings.icloud.reset_state.message", defaultValue: "本机和 iCloud 中的数据都不会被删除。重新开启同步时，会重新检查 iCloud 并让你选择以哪份数据为准。仅在同步长期异常时使用。"))
+            }
+
             Button {
                 exportArchive()
             } label: {
@@ -1126,6 +1171,16 @@ struct SettingsView: View {
             pendingImportData = nil
             pendingImportInspection = nil
             seedAlertMessage = "无法导入：\(error.localizedDescription)"
+        }
+    }
+
+    private func resetCloudSyncState() {
+        do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
+            Task { await cloudSyncCoordinator.setRequested(false) }
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.done", defaultValue: "已关闭 iCloud 同步并重置本机同步状态。需要时可重新开启。")
+        } catch {
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.failed", defaultValue: "重置失败：") + error.localizedDescription
         }
     }
 
@@ -3343,6 +3398,7 @@ struct SettingsIcon: View {
 }
 
 private struct RecoveryPointsView: View {
+    @EnvironmentObject private var settings: UserSettings
     @State private var snapshots: [BackupRecoveryService.SnapshotSummary] = []
     @State private var pendingSnapshot: BackupRecoveryService.SnapshotSummary?
     @State private var message: String?
@@ -3389,7 +3445,7 @@ private struct RecoveryPointsView: View {
             Button("取消", role: .cancel) { pendingSnapshot = nil }
             Button("完整恢复", role: .destructive) { restorePendingSnapshot() }
         } message: {
-            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。")
+            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { message != nil },
@@ -3409,6 +3465,7 @@ private struct RecoveryPointsView: View {
         guard let snapshot = pendingSnapshot else { return }
         pendingSnapshot = nil
         do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
             try BackupRecoveryService.restoreSnapshot(named: snapshot.folderName, to: WeekyiiPersistence.persistentStoreURL())
             message = "恢复完成。请立即完全退出并重新打开 Weekyii。"
         } catch {

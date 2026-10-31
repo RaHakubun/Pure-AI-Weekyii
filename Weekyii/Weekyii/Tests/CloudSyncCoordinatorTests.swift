@@ -78,7 +78,7 @@ final class CloudSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .locked(.notPurchased), requested: true, requiresAccountResolution: false), .locked)
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .pausedAfterFailure, requested: true, requiresAccountResolution: false), .paused)
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .quotaExceeded, requested: true, requiresAccountResolution: true), .accountDecision)
-        XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: true, requiresAccountResolution: false), nil)
+        XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: true, requiresAccountResolution: false), .initialDecision)
     }
 
     func test_diagnosticsManualSyncRequiresSafeRequestedSession() {

@@ -741,6 +741,11 @@ final class CloudSyncCoordinator {
                 _ = try await transport.ensureInfrastructure()
                 guard isCurrent(generation) else { return }
             default:
+                // Choice does not fit the pending decision (e.g. a stale dialog
+                // after the decision kind flipped). Restore the prompt instead
+                // of leaving the status stuck at `.syncing`.
+                pendingInitialChoice = nil
+                if let pendingInitialDecision { status = .initialEnableDecisionRequired(pendingInitialDecision) }
                 return
             }
 
