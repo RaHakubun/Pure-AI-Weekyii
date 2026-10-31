@@ -16,6 +16,9 @@ struct CloudSyncReconciliationReport: Hashable, Sendable {
     let perRecordFailures: [CloudSyncEntityFailure]
     let pendingChanges: Int
     let successTimestamp: Date?
+    /// Remote records this build cannot read. They are skipped (never applied,
+    /// overwritten or deleted) and do not count as failures.
+    var quarantinedRecords: Int = 0
 
     var succeeded: Bool { perRecordFailures.isEmpty }
 }
@@ -110,18 +113,37 @@ final class CloudSyncReconciler {
 
         var remoteRecords: [SyncEntityKey: CloudSyncRecord] = [:]
         var remoteDeleted: Set<SyncEntityKey> = []
+        // Records the transport already set aside plus any that fail to decode
+        // here. One unreadable record must never fail the whole cycle (that used
+        // to latch sync permanently); it is skipped in both directions instead.
+        var newlyQuarantined: [String: String] = [:]
         for change in batch.changes {
             switch change {
             case .upsert(let record):
                 let entity: CloudSyncEntity
                 do { entity = try CloudRecordCodec.decode(record) }
-                catch { throw CloudSyncReconciliationError.invalidRemoteRecord(record.entityKey) }
+                catch {
+                    newlyQuarantined[record.recordName] = "reconciler decode failed"
+                    remoteRecords.removeValue(forKey: record.entityKey)
+                    continue
+                }
                 remoteRecords[entity.key] = record
                 remoteDeleted.remove(entity.key)
             case .delete(let key):
                 remoteRecords.removeValue(forKey: key)
                 remoteDeleted.insert(key)
             }
+        }
+
+        let quarantinedKeys: Set<SyncEntityKey> = {
+            var probe = metadata
+            for (name, reason) in newlyQuarantined { probe.quarantine(recordName: name, reason: reason) }
+            let keys = Set(currentEntities.keys).union(metadata.entityBaselines.keys).union(remoteRecords.keys).union(remoteDeleted)
+            return keys.filter { probe.isQuarantined($0) }
+        }()
+        for key in quarantinedKeys {
+            remoteRecords.removeValue(forKey: key)
+            remoteDeleted.remove(key)
         }
 
         var plan = try Self.makePlan(
@@ -133,31 +155,18 @@ final class CloudSyncReconciler {
             concurrentlyEdited: Set(concurrentlyEdited)
         )
 
-        // Re-read each remote-winning entity immediately before mutation. If a
-        // context edit landed after planning, preserve it and make it a local send.
+        // Rebase on the latest whole local graph once, immediately before apply.
+        // (An earlier version re-read the whole store, attachments included, once
+        // per remote-winning entity; the single comparison below already catches
+        // every edit that landed after planning, so that loop was pure cost.)
         var safeRemoteUpserts = plan.remoteUpserts
         var safeRemoteDeletes = plan.remoteDeletes
-        let remoteWinnerKeys = Set(plan.remoteUpserts.keys).union(plan.remoteDeletes).sorted()
-        var latestEntitiesForApply = currentEntities
-        for key in remoteWinnerKeys {
-            guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
-            let latestSnapshot: WeekyiiBusinessSnapshot
-            do { latestSnapshot = try localStore.currentSnapshot() }
-            catch { throw CloudSyncReconciliationError.invalidLocalSnapshot(error.localizedDescription) }
-            let latest = try Self.entityMap(latestSnapshot)
-            let latestHashes = try Self.hashes(latest)
-            latestEntitiesForApply = latest
-            let plannedHash = currentHashes[key]
-            guard latestHashes[key] != plannedHash else { continue }
-
-            safeRemoteUpserts.removeValue(forKey: key)
-            safeRemoteDeletes.remove(key)
-            plan.conflicts += 1
-        }
-
-        // Rebase on the latest whole local graph so an unrelated edit made during
-        // fetch is carried through the apply as well.
-        let beforeApply = try localStore.currentSnapshot()
+        // An unrelated edit made during fetch is carried through the apply too.
+        let latestEntitiesForApply: [SyncEntityKey: CloudSyncEntity]
+        let beforeApply: WeekyiiBusinessSnapshot
+        do { beforeApply = try localStore.currentSnapshot() }
+        catch { throw CloudSyncReconciliationError.invalidLocalSnapshot(error.localizedDescription) }
+        guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
         latestEntitiesForApply = try Self.entityMap(beforeApply)
         let beforeApplyHashes = try Self.hashes(latestEntitiesForApply)
         for key in Set(safeRemoteUpserts.keys).union(safeRemoteDeletes) where beforeApplyHashes[key] != currentHashes[key] {
@@ -178,6 +187,14 @@ final class CloudSyncReconciler {
             knownRemoteKeys: Set(metadata.entityBaselines.keys).union(remoteRecords.keys),
             deleteKeys: &plan.remoteDeletes,
             upsertKeys: &plan.remoteUpserts,
+            groupCount: &duplicateGroups
+        )
+
+        Self.convergeHabitTaskDuplicates(
+            entities: &plan.desired,
+            localEntities: currentEntities,
+            knownRemoteKeys: Set(metadata.entityBaselines.keys).union(remoteRecords.keys),
+            deleteKeys: &plan.remoteDeletes,
             groupCount: &duplicateGroups
         )
 
@@ -206,7 +223,7 @@ final class CloudSyncReconciler {
         var upsertsToSend: [CloudSyncRecord] = []
         var deletesToSend: [SyncEntityKey] = []
         let candidateKeys = Set(finalEntities.keys).union(metadata.entityBaselines.keys).union(remoteRecords.keys).union(remoteDeleted)
-        for key in candidateKeys.sorted() {
+        for key in candidateKeys.sorted() where !quarantinedKeys.contains(key) {
             if let entity = finalEntities[key], finalHashes[key] != effectiveRemoteHashes[key] {
                 var record = try CloudRecordCodec.encode(entity)
                 record = Self.applyingServerMetadata(
@@ -235,6 +252,9 @@ final class CloudSyncReconciler {
         // A serverRecordChanged is a local-first conflict, not a transport retry.
         // Read the latest server version and perform at most one metadata-based resend.
         var serverConflictKeys: Set<SyncEntityKey> = []
+        // Inbox position covered by each successful resend. Everything queued up
+        // to there for that key is superseded by the version just written.
+        var resendCoverage: [SyncEntityKey: UInt64] = [:]
         for (key, result) in resultsByKey.sorted(by: { $0.key < $1.key }) {
             guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
             guard case .failed(.serverRecordChanged) = result.outcome,
@@ -244,15 +264,31 @@ final class CloudSyncReconciler {
             do {
                 let latestServer = try await transport.fetchChanges(since: batch.nextToken)
                 guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
-                guard let remote = latestServer.changes.reversed().compactMap({ change -> CloudSyncRecord? in
-                    if case .upsert(let value) = change, value.entityKey == key { return value }
-                    return nil
-                }).first else { continue }
+                let latestChange = latestServer.changes.last(where: { change in
+                    switch change {
+                    case .upsert(let value): return value.entityKey == key
+                    case .delete(let deleted): return deleted == key
+                    }
+                })
                 var resend = try CloudRecordCodec.encode(entity)
-                resend = Self.applyingServerMetadata(remote.serverMetadata, to: resend)
+                switch latestChange {
+                case .upsert(let remote)?:
+                    resend = Self.applyingServerMetadata(remote.serverMetadata, to: resend)
+                case .delete(_)?, .none:
+                    // The server no longer has this record (deleted on another
+                    // device, CloudKit `unknownItem`). The local edit wins: send it
+                    // as a brand-new record without stale system fields.
+                    resend = Self.applyingServerMetadata(nil, to: resend)
+                }
                 let retryResults = await transport.upsert([resend])
                 guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
-                if let retry = retryResults.first { resultsByKey[key] = retry }
+                if let retry = retryResults.first {
+                    resultsByKey[key] = retry
+                    if Self.isUpsertSuccess(retry),
+                       let covered = try? CloudSyncDurableInbox.decodeToken(latestServer.nextToken) {
+                        resendCoverage[key] = covered
+                    }
+                }
             } catch let error as CloudSyncReconciliationError {
                 throw error
             } catch {
@@ -274,7 +310,9 @@ final class CloudSyncReconciler {
         // final commit must apply this delta to the latest account metadata.
         var baselineUpdates: [SyncEntityKey: CloudSyncEntityBaseline] = [:]
         var baselineDeletes: Set<SyncEntityKey> = []
-        for key in candidateKeys.sorted() where !failedKeys.contains(key) {
+        // Quarantined keys keep their old baseline, so a local edit made while the
+        // server copy was unreadable is still seen as an edit once it is readable.
+        for key in candidateKeys.sorted() where !failedKeys.contains(key) && !quarantinedKeys.contains(key) {
             if finalEntities[key] != nil, let hash = finalHashes[key] {
                 let sendResult = resultsByKey[key]
                 let remoteRecord = remoteRecords[key]
@@ -316,6 +354,15 @@ final class CloudSyncReconciler {
                     }
                 }
                 latest.zoneInitialized = true
+                // Per-key acknowledgement, even after a partial failure: entries for
+                // keys whose baseline was just committed are settled and must not
+                // replay over the local winner. Failed keys keep their entries.
+                let settled = Set(baselineUpdates.keys).union(baselineDeletes)
+                latest.discardPendingChanges(for: settled, through: acknowledgedSequence)
+                for (key, sequence) in resendCoverage where settled.contains(key) {
+                    latest.discardPendingChanges(for: [key], through: sequence)
+                }
+                for (name, reason) in newlyQuarantined { latest.quarantine(recordName: name, reason: reason) }
                 if completeSuccess { latest.acknowledgeChanges(through: acknowledgedSequence, token: batch.nextToken) }
                 latest.lastAttempt = now()
                 if completeSuccess {
@@ -342,7 +389,8 @@ final class CloudSyncReconciler {
             semanticHabitDuplicateGroups: duplicateGroups,
             perRecordFailures: failures,
             pendingChanges: failures.count,
-            successTimestamp: completeSuccess ? committed.lastSuccessfulSync : nil
+            successTimestamp: completeSuccess ? committed.lastSuccessfulSync : nil,
+            quarantinedRecords: committed.quarantinedRecordCount
         )
     }
 
@@ -488,6 +536,55 @@ final class CloudSyncReconciler {
                 entities.removeValue(forKey: loser.entityKey)
                 if knownRemoteKeys.contains(loser.entityKey) { deleteKeys.insert(loser.entityKey) }
             }
+        }
+    }
+
+    /// Two devices that materialised the same habit on the same day before task
+    /// ids became deterministic each hold their own copy. Keep one: the most
+    /// advanced (completed > focus > frozen > draft), then the deterministic id,
+    /// then a local one, then the lowest id. Only untouched duplicates (still in
+    /// the draft zone, no attachments) are removed, so no user work is dropped.
+    private static func convergeHabitTaskDuplicates(
+        entities: inout [SyncEntityKey: CloudSyncEntity],
+        localEntities: [SyncEntityKey: CloudSyncEntity],
+        knownRemoteKeys: Set<SyncEntityKey>,
+        deleteKeys: inout Set<SyncEntityKey>,
+        groupCount: inout Int
+    ) {
+        let tasks = entities.values.compactMap { entity -> TaskSnapshot? in
+            if case .task(let value) = entity, value.habitId != nil, value.dayId != nil { return value }
+            return nil
+        }
+        let groups = Dictionary(grouping: tasks, by: { "\($0.habitId!.uuidString)|\($0.dayId!)" })
+        for group in groups.values where group.count > 1 {
+            func rank(_ task: TaskSnapshot) -> (Int, Int, Int, String) {
+                let zone: Int
+                switch task.zone {
+                case .complete: zone = 3
+                case .focus: zone = 2
+                case .frozen: zone = 1
+                case .draft: zone = 0
+                }
+                let deterministic = task.id == HabitDeterministicID.task(habitId: task.habitId!, dayId: task.dayId!) ? 1 : 0
+                let local = localEntities[task.entityKey] != nil ? 1 : 0
+                return (zone, deterministic, local, task.id.uuidString)
+            }
+            let survivor = group.max { lhs, rhs in
+                let l = rank(lhs), r = rank(rhs)
+                if l.0 != r.0 { return l.0 < r.0 }
+                if l.1 != r.1 { return l.1 < r.1 }
+                if l.2 != r.2 { return l.2 < r.2 }
+                return l.3 > r.3
+            }!
+            var removed = false
+            for loser in group where loser.id != survivor.id && loser.zone == .draft && loser.attachmentIds.isEmpty {
+                entities.removeValue(forKey: loser.entityKey)
+                // Counted even when local-only, so the UI refreshes; the upload
+                // of the deletion is derived from the final graph as usual.
+                deleteKeys.insert(loser.entityKey)
+                removed = true
+            }
+            if removed { groupCount += 1 }
         }
     }
 

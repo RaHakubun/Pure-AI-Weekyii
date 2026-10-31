@@ -85,6 +85,8 @@ enum CloudSyncBannerKind: Equatable, Sendable {
     case accountUnavailable
     case locked
     case syncing
+    /// Sync was switched on but waits for the user to pick a data source.
+    case initialDecision
 }
 
 enum CloudSyncRemoteTriggerResult: Equatable, Sendable {
@@ -119,6 +121,7 @@ struct CloudSyncDiagnosticsSnapshot: Equatable, Sendable {
         case .accountUnavailable: .accountUnavailable
         case .locked: .locked
         case .syncing: .syncing
+        case .initialEnableDecisionRequired: .initialDecision
         default: nil
         }
     }
