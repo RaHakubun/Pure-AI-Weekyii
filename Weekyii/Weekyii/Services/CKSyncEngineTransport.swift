@@ -19,6 +19,9 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
     private var engine: CKSyncEngine?
     private var rebuildingLegacySnapshot = false
     private var fetchFailure: CloudSyncFailure?
+    /// Set when CloudKit reports that Weekyii's zone was deleted or purged
+    /// (for example from Settings > Apple ID > iCloud > Manage Storage).
+    private var remoteZoneDeleted = false
     private var sendResults: [String: CloudSyncRecordResult] = [:]
     private var outgoingRecords: [String: CloudSyncRecord] = [:]
     private var outgoingDeletes: [String: SyncEntityKey] = [:]
@@ -120,11 +123,16 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
         do {
             _ = try await ensureInfrastructure()
             fetchFailure = nil
+            remoteZoneDeleted = false
             try await engine!.fetchChanges(.init(scope: .zoneIDs([zoneID])))
+            if remoteZoneDeleted { try handleRemoteZoneLoss() }
             if let fetchFailure { throw CloudSyncTransportError.cloudFailure(fetchFailure) }
             if rebuildingLegacySnapshot {
                 let inspection = try await infrastructure.inspect()
-                try inbox.appendAuthoritativeSnapshot(inspection.records)
+                try inbox.appendAuthoritativeSnapshot(
+                    inspection.records,
+                    undecodableRecordNames: inspection.undecodableRecordNames
+                )
             }
             try persistStagedEngineState()
             // The old D2 cursor referred to a process-local array. A migrated
@@ -135,8 +143,19 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
         } catch let error as CloudSyncTransportError {
             throw error
         } catch {
+            if Self.isZoneLoss(error) {
+                engineStateData = nil
+                engine = nil
+                try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+            }
             throw CloudSyncTransportError.cloudFailure(CloudKitFailureMapper.map(error, recordNames: recordNameIndex()))
         }
+    }
+
+    nonisolated private static func isZoneLoss(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == CKErrorDomain else { return false }
+        return nsError.code == CKError.zoneNotFound.rawValue || nsError.code == CKError.userDeletedZone.rawValue
     }
 
     func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] {
@@ -175,25 +194,41 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
             } catch {
                 fetchFailure = .other("Could not encode CloudKit sync state")
             }
+        case .fetchedDatabaseChanges(let fetched):
+            if fetched.deletions.contains(where: { $0.zoneID == zoneID }) {
+                remoteZoneDeleted = true
+            }
         case .fetchedRecordZoneChanges(let fetched):
             do {
                 var upserts: [CloudSyncRecord] = []
+                var quarantined: [String: String] = [:]
                 for modification in fetched.modifications where modification.record.recordID.zoneID == zoneID {
-                    upserts.append(try await CloudKitRecordAdapter.decode(modification.record))
+                    // One record this build cannot read (newer payload version,
+                    // unknown kind, damaged fields) must not stop the whole zone.
+                    // It is set aside, left untouched on the server, and read
+                    // again by a build whose decoder signature differs.
+                    do {
+                        upserts.append(try await CloudKitRecordAdapter.decode(modification.record))
+                    } catch {
+                        quarantined[modification.record.recordID.recordName] = Self.quarantineReason(error)
+                    }
                 }
                 let deletedNames = fetched.deletions.filter {
                     $0.recordID.zoneID == zoneID && $0.recordType == CloudRecordCodec.recordTypeName
                 }
-                try inbox.append(upserts: upserts, deletedRecordNames: deletedNames.map { $0.recordID.recordName })
+                try inbox.append(
+                    upserts: upserts,
+                    deletedRecordNames: deletedNames.map { $0.recordID.recordName },
+                    quarantined: quarantined
+                )
             } catch {
-                fetchFailure = error is CloudKitRecordAdapterError
-                    ? .invalidArguments
-                    : CloudKitFailureMapper.map(error, recordNames: recordNameIndex())
+                fetchFailure = CloudKitFailureMapper.map(error, recordNames: recordNameIndex())
             }
         case .sentRecordZoneChanges(let sent):
             let knownMetadata = try? metadataStore.load(forAccountRecordName: accountRecordName)
             var remembered: [CloudSyncRecord] = []
             var conflictRecords: [CloudSyncRecord] = []
+            var quarantinedConflicts: [String: String] = [:]
             for record in sent.savedRecords where record.recordID.zoneID == zoneID {
                 do {
                     let decoded = try await CloudKitRecordAdapter.decode(record)
@@ -216,6 +251,7 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
             }
             for failed in sent.failedRecordSaves where failed.record.recordID.zoneID == zoneID {
                 let name = failed.record.recordID.recordName
+                if Self.isZoneLoss(failed.error) { remoteZoneDeleted = true }
                 guard let key = outgoingRecords[name]?.entityKey ?? knownMetadata?.entityKey(forRecordName: name) else { continue }
                 var latestServerMetadata: Data?
                 if (failed.error as NSError).code == CKError.serverRecordChanged.rawValue,
@@ -226,7 +262,9 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
                         latestServerMetadata = decoded.serverMetadata
                         conflictRecords.append(decoded)
                     } catch {
-                        fetchFailure = .invalidArguments
+                        // The server copy was written by a build this one cannot
+                        // read. Keep it; never overwrite what cannot be understood.
+                        quarantinedConflicts[name] = Self.quarantineReason(error)
                     }
                 }
                 sendResults[name] = CloudSyncRecordResult(
@@ -242,6 +280,11 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
             }
             for (id, error) in sent.failedRecordDeletes where id.zoneID == zoneID {
                 guard let key = outgoingDeletes[id.recordName] else { continue }
+                // Deleting a record that is already gone is the outcome we wanted.
+                if (error as NSError).code == CKError.unknownItem.rawValue {
+                    sendResults[id.recordName] = CloudSyncRecordResult(entityKey: key, outcome: .deleted, recordName: id.recordName)
+                    continue
+                }
                 sendResults[id.recordName] = CloudSyncRecordResult(
                     entityKey: key,
                     outcome: .failed(CloudKitFailureMapper.map(error, recordNames: recordNameIndex())),
@@ -257,6 +300,9 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
                         metadata.remember(record.entityKey, recordName: record.recordName, serverMetadata: record.serverMetadata)
                         metadata.enqueue(.upsert(record))
                     }
+                    for (recordName, reason) in quarantinedConflicts {
+                        metadata.quarantine(recordName: recordName, reason: reason)
+                    }
                     // A successful server delete does not clear the baseline here.
                     // Reconciliation owns that change and commits it with its ACK.
                 }
@@ -267,7 +313,7 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
             // The coordinator observes account state and increments its generation;
             // this transport never follows an account into a different user namespace.
             break
-        case .fetchedDatabaseChanges, .sentDatabaseChanges, .willFetchChanges,
+        case .sentDatabaseChanges, .willFetchChanges,
              .willFetchRecordZoneChanges, .didFetchRecordZoneChanges, .didFetchChanges,
              .willSendChanges, .didSendChanges:
             break
@@ -325,6 +371,13 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
             } onCancel: {
                 Task { await currentEngine.cancelOperations() }
             }
+            if remoteZoneDeleted {
+                // Results already carry the zone-loss failure; the latch follows.
+                remoteZoneDeleted = false
+                engineStateData = nil
+                engine = nil
+                try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+            }
             if let fetchFailure { throw CloudSyncTransportError.cloudFailure(fetchFailure) }
             try persistStagedEngineState()
             await assets.cleanup()
@@ -366,6 +419,23 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
         let stateSerialization = serialized.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
         let config = Self.makeEngineConfiguration(database: database, stateSerialization: stateSerialization, delegate: self)
         engine = CKSyncEngine(config)
+    }
+
+    nonisolated private static func quarantineReason(_ error: Error) -> String {
+        if let adapterError = error as? CloudKitRecordAdapterError { return "\(adapterError)" }
+        return "decode failed (\((error as NSError).domain) \((error as NSError).code))"
+    }
+
+    /// The zone is gone on the server. Every baseline now describes records that
+    /// no longer exist, so this account's device-local state is reset and the
+    /// cycle stops. The next manual sync inspects the (empty) zone and asks the
+    /// user before anything is uploaded again; nothing is re-created silently.
+    private func handleRemoteZoneLoss() throws {
+        remoteZoneDeleted = false
+        engineStateData = nil
+        engine = nil
+        try metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+        throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
     }
 
     private func persistStagedEngineState() throws {

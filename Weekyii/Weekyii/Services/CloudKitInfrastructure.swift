@@ -49,11 +49,18 @@ nonisolated actor CloudKitInfrastructureManager {
         }
         let cloudRecords = try await client.recordsInWeekyiiZone()
         var records: [CloudSyncRecord] = []
+        var undecodable: [String] = []
         records.reserveCapacity(cloudRecords.count)
         for record in cloudRecords {
-            records.append(try await CloudKitRecordAdapter.decode(record))
+            // A record written by a newer build is counted, not fatal: the
+            // first-enable and account-switch decisions must stay reachable.
+            do {
+                records.append(try await CloudKitRecordAdapter.decode(record))
+            } catch {
+                undecodable.append(record.recordID.recordName)
+            }
         }
-        return CloudSyncZoneInspection(exists: true, records: records)
+        return CloudSyncZoneInspection(exists: true, records: records, undecodableRecordNames: undecodable.sorted())
     }
 
     func resetWeekyiiZone() async throws {
@@ -124,20 +131,25 @@ nonisolated final class CloudKitPrivateDatabaseClient: CloudKitInfrastructureCli
         try deleteResult.get()
     }
 
+    /// Enumerates the zone with a zone-changes fetch from a nil token rather than
+    /// a `CKQuery`. A query needs a queryable `recordName` index deployed in the
+    /// production schema; a zone-changes fetch needs no index at all, so first
+    /// enable and account switch cannot fail on a missing index.
     func recordsInWeekyiiZone() async throws -> [CKRecord] {
-        let query = CKQuery(recordType: CloudRecordCodec.recordTypeName, predicate: NSPredicate(value: true))
-        var cursor: CKQueryOperation.Cursor?
-        var allRecords: [CKRecord] = []
-        repeat {
-            let page: (matchResults: [(CKRecord.ID, Result<CKRecord, Error>)], queryCursor: CKQueryOperation.Cursor?)
-            if let cursor {
-                page = try await database.records(continuingMatchFrom: cursor, desiredKeys: nil, resultsLimit: CKQueryOperation.maximumResults)
-            } else {
-                page = try await database.records(matching: query, inZoneWith: zoneID, desiredKeys: nil, resultsLimit: CKQueryOperation.maximumResults)
+        var token: CKServerChangeToken?
+        var byID: [CKRecord.ID: CKRecord] = [:]
+        var moreComing = true
+        while moreComing {
+            let page = try await database.recordZoneChanges(inZoneWith: zoneID, since: token)
+            for (id, result) in page.modificationResultsByID {
+                byID[id] = try result.get().record
             }
-            for (_, result) in page.matchResults { allRecords.append(try result.get()) }
-            cursor = page.queryCursor
-        } while cursor != nil
-        return allRecords
+            for deletion in page.deletions { byID.removeValue(forKey: deletion.recordID) }
+            token = page.changeToken
+            moreComing = page.moreComing
+        }
+        return byID.values
+            .filter { $0.recordType == CloudRecordCodec.recordTypeName }
+            .sorted { $0.recordID.recordName < $1.recordID.recordName }
     }
 }
