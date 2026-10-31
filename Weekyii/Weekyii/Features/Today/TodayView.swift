@@ -2001,7 +2001,7 @@ private struct LotrRainNightBackground: View {
             ZStack {
                 if colorScheme == .dark {
                     LinearGradient(
-                        colors: [Color(hex: "#15110C"), Color(hex: "#110E0A"), Color(hex: "#0E0C09"), Color(hex: "#0B0907")],
+                        colors: [Color(hex: "#14171A"), Color(hex: "#111416"), Color(hex: "#0E1113"), Color(hex: "#0B0D0F")],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -2011,7 +2011,7 @@ private struct LotrRainNightBackground: View {
 
                     // distant call: a tiny warm beacon near golden-left valley
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color(hex: "#D1A261"))
+                        .fill(Color(hex: "#B59A62"))
                         .frame(width: 3, height: 12)
                         .blur(radius: 0.4)
                         .position(x: size.width * 0.362, y: horizonY - 8)

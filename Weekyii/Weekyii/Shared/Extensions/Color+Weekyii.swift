@@ -449,6 +449,9 @@ struct ThemeSurfaceSkin: Equatable {
     /// The card's accent colour hangs from the top edge as a silk bookmark
     /// ribbon instead of the short 40 × 4 bar.
     var ribbonAccent: Bool = false
+    /// The caller's accent washes the whole surface, so a page of cards shows
+    /// several materials instead of one flat sheet (魔戒 paper stock).
+    var tintsWithAccent: Bool = false
 }
 
 enum ThemeSurfaceEdges: Equatable {
@@ -551,6 +554,19 @@ struct ThemeBadgeSkin: Equatable {
     var kind: ThemeBadgeKind
     /// Border for `.block`; other kinds use the status colour.
     var border: ThemeHexPair? = nil
+}
+
+/// The small icon chip at the head of a settings row.
+///
+/// `nil` keeps the classic saturated square: the caller's tint behind a white
+/// glyph. A skin can strip the colour and draw a ruled stamp instead, so a
+/// column of rows stops reading as a rainbow against a monochrome page.
+struct ThemeIconSkin: Equatable {
+    var cornerRadius: CGFloat = 7
+    var borderWidth: CGFloat = 0.5
+    var border: ThemeHexPair? = nil
+    /// `nil` leaves the chip unfilled.
+    var fill: ThemeHexPair? = nil
 }
 
 enum ThemeCountKind: Equatable {
@@ -657,6 +673,8 @@ struct ThemeSkin: Equatable {
     var softShadows: Bool = true
     /// `nil` keeps SF Symbols everywhere.
     var glyphs: ThemeGlyphSet? = nil
+    /// Settings-row icon chip. `nil` keeps the tinted square.
+    var icon: ThemeIconSkin? = nil
 
     static let classic = ThemeSkin()
 
@@ -681,16 +699,21 @@ extension WeekTheme {
 }
 
 extension ThemeSkin {
-    /// 魔戒: the Red Book of Westmarch. Pages are vellum (light) or a candle-lit
-    /// study (dark); sections are panels of lighter paper closed by an ink rule on
-    /// all four sides, task rows are ledger lines, and the focus panel is the
-    /// book's red leather cover with a tooled gilt frame, the only object that
-    /// floats. Status is a wax seal, the accent bar a bookmark ribbon, and nothing
-    /// glows: gold is kept for the ring, the selected state, the cover and the day
-    /// count.
+    /// 魔戒: the Red Book of Westmarch. Pages are vellum (light) or a Gondor
+    /// archive after dusk (dark); sections are panels of lighter paper closed by
+    /// a rule on all four sides, task rows are ledger lines, and the focus panel
+    /// is the book's red leather cover with a tooled gilt frame, the only object
+    /// that floats. Status is a wax seal, the accent bar a bookmark ribbon.
+    ///
+    /// Two rules keep it from becoming a fantasy skin:
+    /// - The structural ink is weathered limestone, not warm brown. Rules have to
+    ///   read as carved stone so the page looks ruled rather than aged.
+    /// - Gilt is scarce. It appears on the cover tooling, the cover's actions and
+    ///   a selected state — never as a page-wide wash, or it turns into a
+    ///   cheap gold-plated RPG menu.
     static let lotr: ThemeSkin = {
-        let rule = ThemeHexPair("#8F7C5C", "#75664E")
-        let ink = ThemeHexPair("#2A2118", "#EDE3CF")
+        let rule = ThemeHexPair("#7C8280", "#6B7270")
+        let ink = ThemeHexPair("#222724", "#E8E4D6")
         return ThemeSkin(
             typography: .classic,
             radii: nil,
@@ -700,15 +723,16 @@ extension ThemeSkin {
                 border: rule,
                 // A sheet of paper lighter than the page it lies on, so the four
                 // rules enclose something instead of outlining empty vellum.
-                fill: ThemeHexPair("#FFFCF2", "#221C15"),
+                fill: ThemeHexPair("#F8F5EC", "#222724"),
                 edges: .all,
-                ribbonAccent: true
+                ribbonAccent: true,
+                tintsWithAccent: true
             ),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 0,
                     borderWidth: 0.5,
-                    border: ThemeHexPair("#808F7C5C", "#8075664E"),
+                    border: ThemeHexPair("#5C7C8280", "#666B7270"),
                     fill: ThemeHexPair("#00000000"),
                     edges: .bottomRule
                 ),
@@ -724,22 +748,22 @@ extension ThemeSkin {
                     shadow: ThemeShadowSkin(color: ThemeHexPair("#4D280C04", "#8C000000"), radius: 7, x: 0, y: 3),
                     edges: .all,
                     material: .leather(top: ThemeHexPair("#6E2418", "#5E1E14"), bottom: ThemeHexPair("#3E120C", "#2E0D08")),
-                    tooling: ThemeHexPair("#C9A45C")
+                    tooling: ThemeHexPair("#B59A62")
                 ),
-                ink: ThemeHexPair("#F6EBD3"),
-                secondaryInk: ThemeHexPair("#D6BFA0"),
-                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#E2C27E")),
+                ink: ThemeHexPair("#F2EAD6"),
+                secondaryInk: ThemeHexPair("#D2C0A0"),
+                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#C4A874")),
                 action: ThemeActionLook(
                     kind: .capsule,
-                    ink: ThemeHexPair("#F0DDB4"),
-                    border: ThemeHexPair("#8CE2C27E"),
+                    ink: ThemeHexPair("#EADFC2"),
+                    border: ThemeHexPair("#8CC4A874"),
                     borderWidth: 1
                 ),
                 primaryAction: ThemeActionLook(
                     kind: .capsule,
-                    ink: ThemeHexPair("#2A1A0A"),
-                    fill: ThemeHexPair("#D9B66F"),
-                    border: ThemeHexPair("#F0D28F"),
+                    ink: ThemeHexPair("#1B1F1D"),
+                    fill: ThemeHexPair("#C4A874"),
+                    border: ThemeHexPair("#DCC48F"),
                     borderWidth: 0.5,
                     glows: false
                 )
@@ -752,19 +776,29 @@ extension ThemeSkin {
                 showsIcon: true,
                 iconInk: ink,
                 countInk: ink,
-                rubric: ThemeHexPair("#9E3B22", "#D9774A"),
+                rubric: ThemeHexPair("#8A4A38", "#D29279"),
                 titleTracking: 2,
                 ruleWidth: 1
             ),
-            onPrimary: ThemeHexPair("#FFF8E6", "#1D140A"),
+            onPrimary: ThemeHexPair("#F8F5EC", "#14171A"),
             onSuccess: ThemeHexPair("#FFFFFF", "#14110C"),
+            // Paper fibres and a stone vignette; the warm light from the top of
+            // the page is the candle, and it is the only warm thing in the dark.
             backdrop: .vellum(
-                fibre: ThemeHexPair("#266B4A28", "#1AE8D2A8"),
-                vignette: ThemeHexPair("#2E6B4A1E", "#59000000"),
+                fibre: ThemeHexPair("#175C625E", "#1ABFC8C0"),
+                vignette: ThemeHexPair("#2E4A4C48", "#59000000"),
                 topLight: ThemeHexPair("#00000000", "#1FE0A050")
             ),
             softShadows: false,
-            glyphs: .lotr
+            glyphs: .lotr,
+            // A ruled stamp instead of a coloured chip: the icon is drawn in the
+            // same ink as the text it introduces, never in a system tint.
+            icon: ThemeIconSkin(
+                cornerRadius: 3,
+                borderWidth: 0.75,
+                border: ThemeHexPair("#807C8280", "#8C6B7270"),
+                fill: nil
+            )
         )
     }()
 
@@ -1462,52 +1496,57 @@ private struct WeekThemePalettePair {
                 )
             )
         case .lotr:
-            // Forged gold, ember, mithril and elven leaf on obsidian (dark) or
-            // parchment (light).
+            // Middle-earth as a material world, not a fantasy skin: bleached
+            // vellum, weathered limestone rules, coal-black ink, and a forest
+            // green that carries the brand. Gilt is a scarce accent — the tooling
+            // on the red cover, a selected state — never a background wash.
+            //
+            // Light is the Shire at midday; dark is a Gondor archive after dusk
+            // (blue-grey stone, not warm brown).
             return WeekThemePalettePair(
                 light: WeekThemePalette(
-                    primary: "#8A6A34",
-                    primaryLight: "#B58E4B",
-                    primaryDark: "#5C4520",
-                    accentOrange: "#A8452A",
-                    accentOrangeLight: "#C9734F",
-                    accentGreen: "#4F7048",
-                    accentGreenLight: "#7E9C76",
-                    accentPink: "#8F6150",
-                    backgroundPrimary: "#F2E8D2",
-                    backgroundSecondary: "#F7F0E1",
-                    backgroundTertiary: "#E2D6BC",
-                    textPrimary: "#2A2118",
-                    textSecondary: "#6B5A44",
-                    textTertiary: "#85745D",
-                    taskRegular: "#5D6B80",
-                    taskRegularBg: "#DDE2EA",
-                    taskDDL: "#A8452A",
-                    taskDDLBg: "#F0D9CC",
-                    taskLeisure: "#4F7048",
-                    taskLeisureBg: "#DCE7D6"
+                    primary: "#263B30",
+                    primaryLight: "#3E5A48",
+                    primaryDark: "#16241D",
+                    accentOrange: "#9A5A47",
+                    accentOrangeLight: "#B87A63",
+                    accentGreen: "#5E7550",
+                    accentGreenLight: "#83996F",
+                    accentPink: "#8A6F62",
+                    backgroundPrimary: "#EDE8DB",
+                    backgroundSecondary: "#F8F5EC",
+                    backgroundTertiary: "#DAD5C6",
+                    textPrimary: "#222724",
+                    textSecondary: "#5C625E",
+                    textTertiary: "#7C827E",
+                    taskRegular: "#3D5A73",
+                    taskRegularBg: "#D8E1E6",
+                    taskDDL: "#9A5A47",
+                    taskDDLBg: "#F0DACF",
+                    taskLeisure: "#62764F",
+                    taskLeisureBg: "#DDE7D2"
                 ),
                 dark: WeekThemePalette(
-                    primary: "#C9A45C",
-                    primaryLight: "#E2C27E",
-                    primaryDark: "#8A6630",
-                    accentOrange: "#E07A4F",
-                    accentOrangeLight: "#F0A26C",
-                    accentGreen: "#8FAE86",
-                    accentGreenLight: "#A9C59F",
-                    accentPink: "#B07A62",
-                    backgroundPrimary: "#100D0A",
-                    backgroundSecondary: "#181410",
-                    backgroundTertiary: "#221D16",
-                    textPrimary: "#EDE3CF",
-                    textSecondary: "#B3A68E",
-                    textTertiary: "#837662",
-                    taskRegular: "#A9B7CC",
-                    taskRegularBg: "#1A202B",
-                    taskDDL: "#E07A4F",
-                    taskDDLBg: "#2B1810",
-                    taskLeisure: "#8FAE86",
-                    taskLeisureBg: "#1A2418"
+                    primary: "#8FAF9A",
+                    primaryLight: "#AFC9B6",
+                    primaryDark: "#2C4437",
+                    accentOrange: "#D08F78",
+                    accentOrangeLight: "#E0AB94",
+                    accentGreen: "#9CB886",
+                    accentGreenLight: "#B6CFA1",
+                    accentPink: "#B08D7C",
+                    backgroundPrimary: "#15181A",
+                    backgroundSecondary: "#222724",
+                    backgroundTertiary: "#2C3133",
+                    textPrimary: "#E8E4D6",
+                    textSecondary: "#A6ADA9",
+                    textTertiary: "#7B827E",
+                    taskRegular: "#8FB4CE",
+                    taskRegularBg: "#1D2A33",
+                    taskDDL: "#D08F78",
+                    taskDDLBg: "#33211C",
+                    taskLeisure: "#A3BE86",
+                    taskLeisureBg: "#222B1D"
                 )
             )
         case .brutal:
@@ -1807,6 +1846,12 @@ extension Color {
     /// `accentGreen` 填充上的文字和图标，规则同 `weekyiiOnPrimary`。
     static var weekyiiOnSuccess: Color { ThemeSkin.active.onSuccess?.color ?? .white }
 
+    /// 旧金：红皮书封面上那道烫金线。只有给了 `tooling` 的皮肤才有这层金，
+    /// 其余主题退回主色，免得凭空冒出一块不属于它的黄。
+    static var weekyiiGilt: Color {
+        ThemeSkin.active.feature?.surface.tooling?.color ?? .weekyiiPrimary
+    }
+
     /// 特色面板（经典主题的主色渐变卡）上的文字和图标。经典主题保持白色。
     static var weekyiiOnFeature: Color { ThemeSkin.active.feature?.ink.color ?? .white }
 
@@ -1951,6 +1996,28 @@ extension Color {
         )
         #else
         return Color(hex: lightHex)
+        #endif
+    }
+
+    // MARK: - 卡片纸染色
+
+    /// Card stock is dyed, not painted. Washing a dark accent (forest green,
+    /// rust red) straight over paper just greys it; lifting the accent towards
+    /// its own brightest form first keeps the hue when it lands on the sheet.
+    var weekPaperDye: Color {
+        #if canImport(UIKit)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        guard UIColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return self
+        }
+        return Color(
+            hue: hue,
+            saturation: min(1, saturation * 1.25),
+            brightness: min(1, brightness + 0.30),
+            opacity: alpha
+        )
+        #else
+        return self
         #endif
     }
 

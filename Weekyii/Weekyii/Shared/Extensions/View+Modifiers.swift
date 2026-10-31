@@ -7,6 +7,11 @@ import SwiftUI
 struct ThemedSurfaceModifier: ViewModifier {
     let skin: ThemeSurfaceSkin
     let fallbackFill: Color
+    /// A wash of the caller's accent laid over the fill, so a page of cards reads
+    /// as several materials rather than one flat sheet. Only skins that ask for
+    /// it (`tintsWithAccent`) receive one.
+    var tint: Color? = nil
+    var tintOpacity: Double = 0.08
 
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: skin.cornerRadius)
@@ -74,6 +79,9 @@ struct ThemedSurfaceModifier: ViewModifier {
                 LeatherGrain()
             } else {
                 skin.fill?.color ?? fallbackFill
+                if let tint {
+                    tint.opacity(tintOpacity)
+                }
             }
             if let glow = skin.innerGlow {
                 RadialGradient(
@@ -253,11 +261,17 @@ private struct WeekyiiCardModifier: ViewModifier {
 /// their card.
 private struct WeekPageSurfaceModifier: ViewModifier {
     @Environment(\.themeSkin) private var skin
+    @Environment(\.colorScheme) private var colorScheme
+    var tint: Color? = nil
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if let card = skin.card {
-            content.themedSurface(card)
+            content.themedSurface(
+                card,
+                tint: tint?.weekPaperDye,
+                tintOpacity: colorScheme == .dark ? 0.18 : 0.22
+            )
         } else {
             content
                 .background(Color.backgroundSecondary)
@@ -411,16 +425,23 @@ private struct StateTransitionRefreshModifier: ViewModifier {
 extension View {
     /// Frames the view as a theme surface (card, task row, feature panel).
     /// `fallbackFill` is used when the skin keeps the palette's own surface colour.
-    func themedSurface(_ skin: ThemeSurfaceSkin, fallbackFill: Color = .backgroundSecondary) -> some View {
-        modifier(ThemedSurfaceModifier(skin: skin, fallbackFill: fallbackFill))
+    /// `tint` washes the caller's accent over the fill; skins opt in through
+    /// `ThemeSurfaceSkin.tintsWithAccent`.
+    func themedSurface(
+        _ skin: ThemeSurfaceSkin,
+        fallbackFill: Color = .backgroundSecondary,
+        tint: Color? = nil,
+        tintOpacity: Double = 0.08
+    ) -> some View {
+        modifier(ThemedSurfaceModifier(skin: skin, fallbackFill: fallbackFill, tint: tint, tintOpacity: tintOpacity))
     }
 
     func weekyiiCard() -> some View {
         modifier(WeekyiiCardModifier())
     }
 
-    func weekPageSurface() -> some View {
-        modifier(WeekPageSurfaceModifier())
+    func weekPageSurface(tint: Color? = nil) -> some View {
+        modifier(WeekPageSurfaceModifier(tint: tint))
     }
 
     /// Drop-in for `.shadow(color:radius:x:y:)` on decorative shadows. Classic

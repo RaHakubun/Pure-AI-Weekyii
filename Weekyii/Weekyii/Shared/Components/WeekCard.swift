@@ -27,11 +27,24 @@ struct WeekCard<Content: View>: View {
             featureBody(feature)
         } else if !useGradient, let card = skin.card {
             stack
-                .themedSurface(card)
+                .themedSurface(card, tint: cardTint, tintOpacity: cardTintOpacity)
                 .overlay(themedAccentBar(card), alignment: .top)
         } else {
             classicBody
         }
+    }
+
+    /// Skins that tint their paper take the caller's accent as a wash, so the
+    /// cards on one page stop looking like one flat sheet.
+    private var cardTint: Color? {
+        guard skin.card?.tintsWithAccent == true else { return nil }
+        return accentColor?.weekPaperDye
+    }
+
+    /// Dark paper needs a heavier wash to read at all; light paper turns muddy
+    /// past about a quarter.
+    private var cardTintOpacity: Double {
+        colorScheme == .dark ? 0.18 : 0.22
     }
 
     private var stack: some View {

@@ -13512,6 +13512,7 @@
       }
     },
     "个性化" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13876,6 +13877,7 @@
       }
     },
     "使用方式" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14567,6 +14569,7 @@
 
     },
     "应用" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15085,6 +15088,7 @@
       }
     },
     "扩展" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15310,6 +15314,7 @@
       }
     },
     "数据" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

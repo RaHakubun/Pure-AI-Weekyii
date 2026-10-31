@@ -382,7 +382,7 @@ struct PastView: View {
 
     private var analyticsSection: some View {
         VStack(spacing: WeekSpacing.md) {
-            pastSurface {
+            pastSurface(tint: .accentOrange) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
                         Text("趋势与洞察")
@@ -444,7 +444,7 @@ struct PastView: View {
     // MARK: - Empty State
 
     private var monthReviewCard: some View {
-        pastSurface {
+        pastSurface(tint: .accentGreen) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -497,10 +497,10 @@ struct PastView: View {
     }
 
     /// 保留过去页既有卡片与信息顺序，只统一其表面材质、圆角、边界和阴影。
-    private func pastSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func pastSurface<Content: View>(tint: Color? = nil, @ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(WeekSpacing.base)
-            .weekPageSurface()
+            .weekPageSurface(tint: tint)
     }
 
     private var emptyStateView: some View {
@@ -550,7 +550,7 @@ private struct PastWeekCard: View {
         NavigationLink {
             PastWeekDetailView(week: week)
         } label: {
-            WeekCard {
+            WeekCard(accentColor: week.expiredTasksCount > 0 ? .taskDDL : .accentGreen) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
                         Image(systemName: "calendar.badge.checkmark")

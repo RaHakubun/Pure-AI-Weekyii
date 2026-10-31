@@ -21,6 +21,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.weekyiiReduceMotion) private var appReduceMotion
     @Environment(\.themeSkin) private var skin
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedIndex = 0
     @State private var rotationQueue: [Int] = []
     @State private var naturalHeight: CGFloat = 0
@@ -70,7 +71,13 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     @ViewBuilder
     private var tileSurface: some View {
         if skin.glyphs == .lotr, let card = skin.card {
-            shapedFaces.themedSurface(card)
+            // 每块瓦片用自己模块的颜色染纸，四个模块并排时才像一叠不同颜色的纸，
+            // 而不是四张一样的白卡。
+            shapedFaces.themedSurface(
+                card,
+                tint: currentTint.weekPaperDye,
+                tintOpacity: colorScheme == .dark ? 0.18 : 0.22
+            )
         } else {
             shapedFaces
                 .background(Color.backgroundSecondary)

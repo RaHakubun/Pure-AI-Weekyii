@@ -238,13 +238,14 @@ struct SettingsView: View {
                         title: String(localized: "vip.title", defaultValue: "VIP 服务"),
                         value: vipStatusSummary,
                         icon: "crown.fill",
-                        tint: .orange
+                        tint: .orange,
+                        themedTint: .weekyiiGilt
                     )
                 }
                 .accessibilityIdentifier("settings.vip")
             }
 
-            Section("个性化") {
+            Section {
                 NavigationLink {
                     appearanceSettingsPage
                 } label: {
@@ -252,7 +253,8 @@ struct SettingsView: View {
                         title: "外观与主题",
                         value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
                         icon: "paintpalette.fill",
-                        tint: .purple
+                        tint: .purple,
+                        themedTint: .weekyiiPrimary
                     )
                 }
                 .accessibilityIdentifier("settings.row.appearance")
@@ -264,13 +266,16 @@ struct SettingsView: View {
                         title: String(localized: "settings.language.title", defaultValue: "语言"),
                         value: settings.languageOverride.displayName,
                         icon: "globe",
-                        tint: .cyan
+                        tint: .cyan,
+                        themedTint: .taskRegular
                     )
                 }
                 .accessibilityIdentifier("settings.row.language")
+            } header: {
+                SettingsSectionHeader(title: "个性化")
             }
 
-            Section("使用方式") {
+            Section {
                 NavigationLink {
                     todayRhythmSettingsPage
                 } label: {
@@ -278,7 +283,8 @@ struct SettingsView: View {
                         title: "今日节奏",
                         value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
                         icon: "timer",
-                        tint: .orange
+                        tint: .orange,
+                        themedTint: .accentOrange
                     )
                 }
                 .accessibilityIdentifier("settings.row.todayRhythm")
@@ -290,7 +296,8 @@ struct SettingsView: View {
                         title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
                         value: "\(activeTaskTypeDefinitions.count) 个类型",
                         icon: "tag.fill",
-                        tint: .teal
+                        tint: .teal,
+                        themedTint: .accentGreen
                     )
                 }
                 .accessibilityIdentifier("settings.row.taskTypes")
@@ -302,7 +309,8 @@ struct SettingsView: View {
                         title: String(localized: "settings.section.past", defaultValue: "过去"),
                         value: settings.pastMonthMarkerOptions.summaryText,
                         icon: "clock.arrow.circlepath",
-                        tint: .indigo
+                        tint: .indigo,
+                        themedTint: .taskRegular
                     )
                 }
                 .accessibilityIdentifier("settings.row.past")
@@ -314,13 +322,16 @@ struct SettingsView: View {
                         title: "未来",
                         value: settings.weekStartsOnMonday ? "周一开始" : nil,
                         icon: "calendar.badge.clock",
-                        tint: .blue
+                        tint: .blue,
+                        themedTint: .taskLeisure
                     )
                 }
                 .accessibilityIdentifier("settings.row.future")
+            } header: {
+                SettingsSectionHeader(title: "使用方式")
             }
 
-            Section("扩展") {
+            Section {
                 NavigationLink {
                     SuspendedSettingsView()
                 } label: {
@@ -331,7 +342,8 @@ struct SettingsView: View {
                             settings.suspendedDefaultCountdownDays
                         ),
                         icon: "hourglass",
-                        tint: .suspendedModuleTint
+                        tint: .suspendedModuleTint,
+                        themedTint: .weekyiiGilt
                     )
                 }
                 .accessibilityIdentifier("settings.row.suspended")
@@ -343,26 +355,32 @@ struct SettingsView: View {
                         title: "项目",
                         value: "默认 \(settings.defaultProjectDurationDays) 天",
                         icon: "folder.fill",
-                        tint: .brown
+                        tint: .brown,
+                        themedTint: .accentOrange
                     )
                 }
                 .accessibilityIdentifier("settings.row.projects")
+            } header: {
+                SettingsSectionHeader(title: "扩展")
             }
 
-            Section("数据") {
+            Section {
                 NavigationLink {
                     dataSettingsPage
                 } label: {
                     SettingsNavigationRow(
                         title: "数据与安全",
                         icon: "lock.shield.fill",
-                        tint: .indigo
+                        tint: .indigo,
+                        themedTint: .textSecondary
                     )
                 }
                 .accessibilityIdentifier("settings.row.data")
+            } header: {
+                SettingsSectionHeader(title: "数据")
             }
 
-            Section("应用") {
+            Section {
                 NavigationLink {
                     AboutWeekyiiPage()
                 } label: {
@@ -370,7 +388,8 @@ struct SettingsView: View {
                         title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
                         value: AboutWeekyiiPage.appVersion,
                         icon: "info.circle.fill",
-                        tint: .mint
+                        tint: .mint,
+                        themedTint: .accentGreen
                     )
                 }
                 .accessibilityIdentifier("settings.row.about")
@@ -381,10 +400,13 @@ struct SettingsView: View {
                     SettingsNavigationRow(
                         title: "开发者与诊断",
                         icon: "hammer.fill",
-                        tint: .gray
+                        tint: .gray,
+                        themedTint: .textTertiary
                     )
                 }
                 .accessibilityIdentifier("settings.row.developer")
+            } header: {
+                SettingsSectionHeader(title: "应用")
             }
         }.themedListRows() }.themedGroupedList()
         .listStyle(.insetGrouped)
@@ -2420,15 +2442,38 @@ private struct TaskTypeDefinitionEditorSheet: View {
     }
 }
 
+/// Group titles in the settings list. A themed skin draws them with its own
+/// section typography — letterspaced ink with a rubricated initial (魔戒), so the
+/// page speaks the same language as the rest of the app. Classic themes keep the
+/// plain header.
+private struct SettingsSectionHeader: View {
+    let title: String
+
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let section = skin.section {
+            WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
+                .font(.footnote)
+                .tracking(section.titleTracking)
+                .textCase(nil)
+        } else {
+            Text(title)
+        }
+    }
+}
+
 private struct SettingsNavigationRow: View {
     let title: String
     var value: String? = nil
     let icon: String
     let tint: Color
+    /// Stamp ink on a themed skin; `nil` keeps `tint`.
+    var themedTint: Color? = nil
 
     var body: some View {
         HStack(spacing: 12) {
-            SettingsIcon(icon: icon, color: tint)
+            SettingsIcon(icon: icon, color: tint, themedColor: themedTint)
 
             Text(title)
 
@@ -3249,14 +3294,51 @@ private struct PastMarkerSettingsPreview: View {
 struct SettingsIcon: View {
     let icon: String
     let color: Color
-    
+    /// Ink for the themed stamp. `nil` keeps `color`, so classic themes draw
+    /// exactly what they drew before.
+    var themedColor: Color? = nil
+
+    @Environment(\.themeSkin) private var skin
+
     var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(width: 28, height: 28)
-            .background(color)
-            .cornerRadius(WeekRadius.scaled(7))
+        if let chip = skin.icon {
+            stamped(chip)
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(color)
+                .cornerRadius(WeekRadius.scaled(7))
+        }
+    }
+
+    /// The themed chip: a hairline-ruled stamp whose glyph carries the row's own
+    /// ink, so a column of rows stays a single family of muted colours instead of
+    /// a grid of saturated tiles. Filled symbols fall back to their outline so
+    /// every stamp has the same weight as the line work around it.
+    private func stamped(_ chip: ThemeIconSkin) -> some View {
+        ZStack {
+            if let fill = chip.fill {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(fill.color)
+            }
+            if let border = chip.border {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .strokeBorder(border.color, lineWidth: chip.borderWidth)
+            }
+            Image(systemName: outlineName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(themedColor ?? color)
+        }
+        .frame(width: 28, height: 28)
+    }
+
+    /// `tag.fill` → `tag`, but only when the outline really exists.
+    private var outlineName: String {
+        let stripped = icon.replacingOccurrences(of: ".fill", with: "")
+        guard stripped != icon, UIImage(systemName: stripped) != nil else { return icon }
+        return stripped
     }
 }
 

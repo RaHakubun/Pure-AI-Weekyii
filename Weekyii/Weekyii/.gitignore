@@ -26,3 +26,6 @@ coverage/
 .workbuddy-ai/
 .qoder-credits/
 *.qoder.site
+
+# Third-party reference checkouts (cloned for reading, never committed)
+docs/reference/open-claude-ui/
