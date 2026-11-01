@@ -14,6 +14,7 @@ struct WeekButton: View {
     let style: Style
     let isEnabled: Bool
     let action: () -> Void
+    @Environment(\.themeSkin) private var skin
     
     init(
         _ title: String,
@@ -56,7 +57,11 @@ struct WeekButton: View {
     private var backgroundForStyle: some View {
         switch style {
         case .primary:
-            Color.weekyiiGradient
+            if let gilded = skin.gildedFill {
+                gilded.gradient
+            } else {
+                Color.weekyiiGradient
+            }
         case .secondary:
             Color.weekyiiPrimary.opacity(0.1)
         case .outline:
@@ -67,7 +72,7 @@ struct WeekButton: View {
     private var foregroundForStyle: Color {
         switch style {
         case .primary:
-            return .weekyiiOnPrimary
+            return skin.gildedFill?.ink.color ?? .weekyiiOnPrimary
         case .secondary:
             return .weekyiiPrimary
         case .outline:
@@ -80,6 +85,10 @@ struct WeekButton: View {
         if style == .outline {
             RoundedRectangle(cornerRadius: WeekRadius.xlarge)
                 .stroke(Color.weekyiiPrimary, lineWidth: 2)
+        } else if style == .primary, let gilded = skin.gildedFill {
+            // Gilt hairline just inside the leather edge.
+            RoundedRectangle(cornerRadius: WeekRadius.xlarge)
+                .strokeBorder(gilded.hairline.color, lineWidth: 1)
         }
     }
 

@@ -454,6 +454,20 @@ struct ThemeSurfaceSkin: Equatable {
     var tintsWithAccent: Bool = false
 }
 
+/// Green leather with a gilt hairline for filled, selected controls (魔戒).
+struct ThemeGildedFill: Equatable {
+    var top: ThemeHexPair
+    var bottom: ThemeHexPair
+    /// Text and glyphs on the leather.
+    var ink: ThemeHexPair
+    /// Hairline just inside the edge.
+    var hairline: ThemeHexPair
+
+    var gradient: LinearGradient {
+        LinearGradient(colors: [top.color, bottom.color], startPoint: .top, endPoint: .bottom)
+    }
+}
+
 enum ThemeSurfaceEdges: Equatable {
     /// Border all round the rounded rect.
     case all
@@ -532,6 +546,9 @@ struct ThemeFeatureSkin: Equatable {
     var marginRule: ThemeHexPair? = nil
     /// Block cursor after the title (terminal).
     var cursor: ThemeHexPair? = nil
+    /// A band of Elvish-looking letter strokes tooled along the top edge, like
+    /// the fire-letters on the Ring (魔戒). Pure ornament, never readable text.
+    var inscription: ThemeHexPair? = nil
 }
 
 enum ThemeBadgeKind: Equatable {
@@ -600,6 +617,8 @@ struct ThemeSectionSkin: Equatable {
     var titleTracking: CGFloat = 0
     /// Height of a solid (non-fading) rule.
     var ruleWidth: CGFloat = 1.5
+    /// A small ring drawn where the header rule ends (魔戒).
+    var ruleEndMark: ThemeHexPair? = nil
 }
 
 /// A theme-drawn icon set that replaces selected SF Symbols.
@@ -675,6 +694,10 @@ struct ThemeSkin: Equatable {
     var glyphs: ThemeGlyphSet? = nil
     /// Settings-row icon chip. `nil` keeps the tinted square.
     var icon: ThemeIconSkin? = nil
+    /// Filled selected controls (segmented indicator, primary button, selected
+    /// calendar day) drawn as green leather with a gilt hairline instead of a
+    /// flat primary fill. `nil` keeps the primary fill and `onPrimary` ink.
+    var gildedFill: ThemeGildedFill? = nil
 
     static let classic = ThemeSkin()
 
@@ -712,18 +735,21 @@ extension ThemeSkin {
     ///   a selected state — never as a page-wide wash, or it turns into a
     ///   cheap gold-plated RPG menu.
     static let lotr: ThemeSkin = {
-        let rule = ThemeHexPair("#7C8280", "#6B7270")
-        let ink = ThemeHexPair("#222724", "#E8E4D6")
+        let rule = ThemeHexPair("#8E8A7E", "#3E4A54")
+        let gilt = ThemeHexPair("#B59A62", "#C4A86E")
+        let ink = ThemeHexPair("#222724", "#E6E0D0")
         return ThemeSkin(
             typography: .classic,
             radii: nil,
             card: ThemeSurfaceSkin(
-                cornerRadius: 6,
+                cornerRadius: 4,
                 borderWidth: 1,
                 border: rule,
                 // A sheet of paper lighter than the page it lies on, so the four
                 // rules enclose something instead of outlining empty vellum.
-                fill: ThemeHexPair("#F8F5EC", "#222724"),
+                fill: ThemeHexPair("#F4EEDF", "#1B232A"),
+                // A second, fainter rule just inside the first: the frame of a map.
+                ornament: ThemeHexPair("#737A78", "#C9D3D6"),
                 edges: .all,
                 ribbonAccent: true,
                 tintsWithAccent: true
@@ -732,7 +758,7 @@ extension ThemeSkin {
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 0,
                     borderWidth: 0.5,
-                    border: ThemeHexPair("#5C7C8280", "#666B7270"),
+                    border: ThemeHexPair("#61737A78", "#21C9D3D6"),
                     fill: ThemeHexPair("#00000000"),
                     edges: .bottomRule
                 ),
@@ -747,8 +773,8 @@ extension ThemeSkin {
                     border: ThemeHexPair("#592A0D06"),
                     shadow: ThemeShadowSkin(color: ThemeHexPair("#4D280C04", "#8C000000"), radius: 7, x: 0, y: 3),
                     edges: .all,
-                    material: .leather(top: ThemeHexPair("#6E2418", "#5E1E14"), bottom: ThemeHexPair("#3E120C", "#2E0D08")),
-                    tooling: ThemeHexPair("#B59A62")
+                    material: .leather(top: ThemeHexPair("#6A281C", "#55201A"), bottom: ThemeHexPair("#3A140D", "#250F0A")),
+                    tooling: gilt
                 ),
                 ink: ThemeHexPair("#F2EAD6"),
                 secondaryInk: ThemeHexPair("#D2C0A0"),
@@ -766,7 +792,8 @@ extension ThemeSkin {
                     border: ThemeHexPair("#DCC48F"),
                     borderWidth: 0.5,
                     glows: false
-                )
+                ),
+                inscription: ThemeHexPair("#C4A874")
             ),
             badge: ThemeBadgeSkin(kind: .waxSeal),
             section: ThemeSectionSkin(
@@ -776,11 +803,12 @@ extension ThemeSkin {
                 showsIcon: true,
                 iconInk: ink,
                 countInk: ink,
-                rubric: ThemeHexPair("#8A4A38", "#D29279"),
+                rubric: ThemeHexPair("#805044", "#C98A74"),
                 titleTracking: 2,
-                ruleWidth: 1
+                ruleWidth: 1,
+                ruleEndMark: gilt
             ),
-            onPrimary: ThemeHexPair("#F8F5EC", "#14171A"),
+            onPrimary: ThemeHexPair("#F2EAD6", "#12181E"),
             onSuccess: ThemeHexPair("#FFFFFF", "#14110C"),
             // Paper fibres and a stone vignette; the warm light from the top of
             // the page is the candle, and it is the only warm thing in the dark.
@@ -796,8 +824,14 @@ extension ThemeSkin {
             icon: ThemeIconSkin(
                 cornerRadius: 3,
                 borderWidth: 0.75,
-                border: ThemeHexPair("#807C8280", "#8C6B7270"),
+                border: ThemeHexPair("#808E8A7E", "#993E4A54"),
                 fill: nil
+            ),
+            gildedFill: ThemeGildedFill(
+                top: ThemeHexPair("#3E5A48", "#355344"),
+                bottom: ThemeHexPair("#263B30", "#243A2F"),
+                ink: ThemeHexPair("#F2EAD6", "#EFE8D6"),
+                hairline: ThemeHexPair("#8CE3CC94", "#99C4A86E")
             )
         )
     }()
@@ -1496,57 +1530,57 @@ private struct WeekThemePalettePair {
                 )
             )
         case .lotr:
-            // Middle-earth as a material world, not a fantasy skin: bleached
-            // vellum, weathered limestone rules, coal-black ink, and a forest
-            // green that carries the brand. Gilt is a scarce accent — the tooling
-            // on the red cover, a selected state — never a background wash.
+            // 红皮书抄本 / 伊希尔丁之夜. Light is parchment ruled in weathered
+            // limestone, coal-black ink, Shire-forest green carrying the brand and
+            // rust-red rubrics. Dark is Gondor's blue-grey stone under moonlight:
+            // silver-grey ink, elven sage for the brand. Gilt stays scarce — the
+            // Ring, the red cover, a selected state — never a background wash.
             //
-            // Light is the Shire at midday; dark is a Gondor archive after dusk
-            // (blue-grey stone, not warm brown).
+            // Task types: Gondor blue-grey (regular), rust (DDL), moss (leisure).
             return WeekThemePalettePair(
                 light: WeekThemePalette(
                     primary: "#263B30",
                     primaryLight: "#3E5A48",
                     primaryDark: "#16241D",
-                    accentOrange: "#9A5A47",
-                    accentOrangeLight: "#B87A63",
-                    accentGreen: "#5E7550",
-                    accentGreenLight: "#83996F",
+                    accentOrange: "#805044",
+                    accentOrangeLight: "#A06B5C",
+                    accentGreen: "#536448",
+                    accentGreenLight: "#7A8C6C",
                     accentPink: "#8A6F62",
-                    backgroundPrimary: "#EDE8DB",
-                    backgroundSecondary: "#F8F5EC",
-                    backgroundTertiary: "#DAD5C6",
+                    backgroundPrimary: "#E9DFC8",
+                    backgroundSecondary: "#F4EEDF",
+                    backgroundTertiary: "#DDD2B8",
                     textPrimary: "#222724",
-                    textSecondary: "#5C625E",
-                    textTertiary: "#7C827E",
-                    taskRegular: "#3D5A73",
-                    taskRegularBg: "#D8E1E6",
-                    taskDDL: "#9A5A47",
-                    taskDDLBg: "#F0DACF",
-                    taskLeisure: "#62764F",
-                    taskLeisureBg: "#DDE7D2"
+                    textSecondary: "#5B5F58",
+                    textTertiary: "#8A8C84",
+                    taskRegular: "#26384A",
+                    taskRegularBg: "#D5DCE2",
+                    taskDDL: "#805044",
+                    taskDDLBg: "#EBD8CE",
+                    taskLeisure: "#536448",
+                    taskLeisureBg: "#DCE3D0"
                 ),
                 dark: WeekThemePalette(
-                    primary: "#8FAF9A",
-                    primaryLight: "#AFC9B6",
+                    primary: "#A3BFAA",
+                    primaryLight: "#C2D6C6",
                     primaryDark: "#2C4437",
-                    accentOrange: "#D08F78",
-                    accentOrangeLight: "#E0AB94",
-                    accentGreen: "#9CB886",
-                    accentGreenLight: "#B6CFA1",
+                    accentOrange: "#C98A74",
+                    accentOrangeLight: "#DBA592",
+                    accentGreen: "#A0B78A",
+                    accentGreenLight: "#B9CCA6",
                     accentPink: "#B08D7C",
-                    backgroundPrimary: "#15181A",
-                    backgroundSecondary: "#222724",
-                    backgroundTertiary: "#2C3133",
-                    textPrimary: "#E8E4D6",
-                    textSecondary: "#A6ADA9",
-                    textTertiary: "#7B827E",
-                    taskRegular: "#8FB4CE",
-                    taskRegularBg: "#1D2A33",
-                    taskDDL: "#D08F78",
-                    taskDDLBg: "#33211C",
-                    taskLeisure: "#A3BE86",
-                    taskLeisureBg: "#222B1D"
+                    backgroundPrimary: "#12181E",
+                    backgroundSecondary: "#1B232A",
+                    backgroundTertiary: "#252F38",
+                    textPrimary: "#E6E0D0",
+                    textSecondary: "#A3AAA6",
+                    textTertiary: "#737C7A",
+                    taskRegular: "#93AECA",
+                    taskRegularBg: "#1C2833",
+                    taskDDL: "#C98A74",
+                    taskDDLBg: "#33221D",
+                    taskLeisure: "#A0B78A",
+                    taskLeisureBg: "#212A1E"
                 )
             )
         case .brutal:

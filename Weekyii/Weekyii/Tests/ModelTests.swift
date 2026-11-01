@@ -4160,6 +4160,16 @@ final class ModelTests: XCTestCase {
         }
         XCTAssertFalse(skin.softShadows)
         XCTAssertEqual(skin.glyphs, .lotr)
+        // 红皮书抄本: map-frame inner rule on the paper, ring-letter band on the
+        // cover, a ring closing each header rule, gilt-rimmed leather selection.
+        XCTAssertNotNil(skin.card?.ornament)
+        XCTAssertNotNil(skin.feature?.inscription)
+        XCTAssertNotNil(skin.section?.ruleEndMark)
+        XCTAssertNotNil(skin.gildedFill)
+        for theme in WeekTheme.allCases where theme != .lotr {
+            XCTAssertNil(theme.skin.gildedFill, "\(theme.rawValue) must keep its flat primary fill")
+            XCTAssertNil(theme.skin.feature?.inscription, "\(theme.rawValue) must not carry the ring inscription")
+        }
         XCTAssertNotNil(skin.onPrimary)
         // Built-in task types and status seals map onto film props.
         XCTAssertEqual(LotrGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .sting)
@@ -4207,11 +4217,11 @@ final class ModelTests: XCTestCase {
     func test_lotrThemedTypeColor_onlyReplacesUntouchedBuiltInColours() {
         XCTAssertEqual(
             WeekTheme.lotr.themedTypeColorHex(storedHex: "#8B5A83", baseKind: .leisure, isDark: true),
-            "#A3BE86"
+            "#A0B78A"
         )
         XCTAssertEqual(
             WeekTheme.lotr.themedTypeColorHex(storedHex: "#8b5a83", baseKind: .leisure, isDark: false),
-            "#62764F"
+            "#536448"
         )
         // A colour the user picked is kept.
         XCTAssertEqual(
@@ -4793,8 +4803,8 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system)
 
         XCTAssertEqual(snapshot.primaryHex, WeekTheme.lotr.primaryThemeHex)
-        XCTAssertEqual(snapshot.darkBackgroundHex, "#222724")
-        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#E8E4D6")
+        XCTAssertEqual(snapshot.darkBackgroundHex, "#1B232A")
+        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#E6E0D0")
     }
 
     func test_liveActivityThemeSnapshot_resolvesLockPaletteForForcedDarkMode() {
@@ -4833,10 +4843,10 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system)
         let darkLockPalette = snapshot.resolvedLockPalette(prefersDarkLock: true)
 
-        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E8E4D6")
-        XCTAssertEqual(snapshot.islandKeylineHex, "#AFC9B6")
-        XCTAssertEqual(darkLockPalette.backgroundHex, "#222724")
-        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#E8E4D6")
+        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E6E0D0")
+        XCTAssertEqual(snapshot.islandKeylineHex, "#C2D6C6")
+        XCTAssertEqual(darkLockPalette.backgroundHex, "#1B232A")
+        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#E6E0D0")
     }
 
     func test_widgetSnapshotStore_roundTrip() throws {

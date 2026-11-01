@@ -15,6 +15,8 @@ struct KillTimeSlider: View {
     let onChange: (Double) -> Void
     var onEditingChanged: ((Bool) -> Void)? = nil
 
+    @Environment(\.themeSkin) private var skin
+
     // MARK: Layout
 
     static let layoutThumbDiameter: CGFloat = 18
@@ -131,6 +133,34 @@ struct KillTimeSlider: View {
                 .offset(x: thumbRadius)
 
             // 滑块
+            thumb
+                .frame(width: thumbDiameter, height: thumbDiameter)
+                .offset(x: thumbCenterX - thumbRadius)
+                .scaleEffect(isDragging ? 1.12 : 1.0)
+                .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isDragging)
+        }
+    }
+
+    /// 魔戒：滑块是一枚金戒（纸色戒心 + 锻金戒圈）；其他主题保持白色圆点。
+    @ViewBuilder
+    private var thumb: some View {
+        if skin.glyphs == .lotr {
+            ZStack {
+                Ellipse()
+                    .fill(Color.backgroundSecondary)
+                Ellipse()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color(hex: "#8A6630"), Color(hex: "#F4DFA6"), Color(hex: "#C9A45C"), Color(hex: "#6F4217")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3.4
+                    )
+            }
+            .scaleEffect(x: 1.18, y: 1)
+            .shadow(color: .black.opacity(isDragging ? 0.28 : 0.18), radius: isDragging ? 4 : 2, x: 0, y: 1)
+        } else {
             Circle()
                 .fill(Color.white)
                 .shadow(
@@ -139,10 +169,6 @@ struct KillTimeSlider: View {
                     x: 0, y: 1
                 )
                 .overlay(Circle().stroke(Color.secondary.opacity(0.12), lineWidth: 0.5))
-                .frame(width: thumbDiameter, height: thumbDiameter)
-                .offset(x: thumbCenterX - thumbRadius)
-                .scaleEffect(isDragging ? 1.12 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isDragging)
         }
     }
 

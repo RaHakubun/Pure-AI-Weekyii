@@ -49,6 +49,7 @@ struct WeekLogo: View {
             .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
             .italic()
             .foregroundStyle(logoGradient)
+            .overlay(alignment: .bottom) { inscription }
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
@@ -60,6 +61,19 @@ struct WeekLogo: View {
                     isAnimating = true
                 }
             }
+    }
+}
+
+extension WeekLogo {
+    /// 魔戒：字标下方一道极淡的金色戒文，像至尊戒上的火焰文字。
+    /// 只是叠加层，不改变字标的尺寸与布局。
+    @ViewBuilder
+    fileprivate var inscription: some View {
+        if isLotr {
+            ElvishInscriptionBand(seed: 11, color: Color(hex: "#B59A62"), opacity: 0.5, lineWidth: 0.7)
+                .frame(width: size.fontSize * 3.6, height: max(6, size.fontSize * 0.24))
+                .offset(y: max(5, size.fontSize * 0.2))
+        }
     }
 }
 

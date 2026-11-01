@@ -1656,9 +1656,23 @@ private struct SectionToggleView: View {
     private var isLotr: Bool { skin.glyphs == .lotr }
 
     private var indicatorColors: [Color] {
-        isLotr
+        if let gilded = skin.gildedFill {
+            return [gilded.top.color, gilded.bottom.color]
+        }
+        return isLotr
             ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary]
             : [Color.weekyiiPrimary, Color.weekyiiPrimary.opacity(0.85)]
+    }
+
+    /// Ink on the selected half: the leather's own ink when the skin gilds it.
+    private var selectedInk: Color {
+        skin.gildedFill?.ink.color ?? .weekyiiOnPrimary
+    }
+
+    /// Gilt hairline inside the selected leather, or the classic soft rim.
+    private var indicatorRim: Color {
+        if let gilded = skin.gildedFill { return gilded.hairline.color }
+        return isLotr ? Color.clear : Color.white.opacity(0.2)
     }
     
     private let height: CGFloat = 44
@@ -1675,7 +1689,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .today ? .weekyiiOnPrimary : .textSecondary)
+                .foregroundColor(selectedSection == .today ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1693,7 +1707,7 @@ private struct SectionToggleView: View {
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .week ? .weekyiiOnPrimary : .textSecondary)
+                .foregroundColor(selectedSection == .week ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1737,7 +1751,7 @@ private struct SectionToggleView: View {
                     // 边框
                     .overlay(
                         Capsule()
-                            .strokeBorder(isLotr ? Color.clear : Color.white.opacity(0.2), lineWidth: isLotr ? 0 : 0.5)
+                            .strokeBorder(indicatorRim, lineWidth: skin.gildedFill != nil ? 1 : (isLotr ? 0 : 0.5))
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
                     )
@@ -1749,7 +1763,7 @@ private struct SectionToggleView: View {
         .background(
             // 底层背景胶囊 - 带内阴影效果
             Capsule()
-                .fill(isLotr ? Color.clear : Color.backgroundSecondary.opacity(0.8))
+                .fill(isLotr ? Color.backgroundTertiary.opacity(0.55) : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
                     Capsule()
                         .strokeBorder(
@@ -2001,7 +2015,7 @@ private struct LotrRainNightBackground: View {
             ZStack {
                 if colorScheme == .dark {
                     LinearGradient(
-                        colors: [Color(hex: "#14171A"), Color(hex: "#111416"), Color(hex: "#0E1113"), Color(hex: "#0B0D0F")],
+                        colors: [Color(hex: "#151C23"), Color(hex: "#11171D"), Color(hex: "#0E1317"), Color(hex: "#0B0E11")],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -2089,6 +2103,34 @@ private struct LotrRainNightBackground: View {
             needle.addLine(to: CGPoint(x: centre.x - 2.5, y: centre.y))
             needle.closeSubpath()
             context.fill(needle, with: .color(ink))
+
+            // The Anduin, running south between the ranges.
+            var river = Path()
+            river.move(to: CGPoint(x: canvas.width * 0.54, y: baseY - 120))
+            river.addCurve(
+                to: CGPoint(x: canvas.width * 0.57, y: baseY - 10),
+                control1: CGPoint(x: canvas.width * 0.51, y: baseY - 80),
+                control2: CGPoint(x: canvas.width * 0.62, y: baseY - 50)
+            )
+            river.addCurve(
+                to: CGPoint(x: canvas.width * 0.67, y: baseY + 70),
+                control1: CGPoint(x: canvas.width * 0.53, y: baseY + 20),
+                control2: CGPoint(x: canvas.width * 0.63, y: baseY + 40)
+            )
+            context.stroke(river, with: .color(Color.taskRegular.opacity(0.8)), style: StrokeStyle(lineWidth: 1.1, lineCap: .round))
+
+            // Region names in spaced italic serif, as lettered on a map.
+            let names: [(String, CGFloat, CGFloat, CGFloat)] = [
+                ("ERIADOR", 0.18, -70, 9), ("GONDOR", 0.65, -60, 9),
+                ("THE SHIRE", 0.38, 24, 7), ("MORDOR", 0.82, 22, 7.5)
+            ]
+            for (name, fx, dy, size) in names {
+                let label = Text(verbatim: name)
+                    .font(.system(size: size, weight: .regular, design: .serif).italic())
+                    .tracking(size * 0.45)
+                    .foregroundColor(ink)
+                context.draw(label, at: CGPoint(x: canvas.width * fx, y: baseY + dy), anchor: .leading)
+            }
         }
     }
 

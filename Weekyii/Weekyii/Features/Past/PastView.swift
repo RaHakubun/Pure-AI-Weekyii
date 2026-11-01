@@ -815,6 +815,15 @@ struct PastCalendarDayLabel: View {
     let highlight: Highlight
     let summary: PastMonthDaySummary?
     let options: PastMonthMarkerOptions
+    @Environment(\.themeSkin) private var skin
+
+    /// 魔戒：选中日的数字压在绿皮面上，用皮面自己的墨色。
+    private var resolvedNumberColor: Color {
+        if highlight == .selected, let gilded = skin.gildedFill {
+            return gilded.ink.color
+        }
+        return numberColor
+    }
 
     private var visibleFace: PastDayFailureKind? {
         guard let failure = summary?.failure, options.showsFace(for: failure) else { return nil }
@@ -827,11 +836,20 @@ struct PastCalendarDayLabel: View {
                 ZStack {
                     switch highlight {
                     case .selected:
-                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .fill(Color.weekyiiPrimary)
+                        if let gilded = skin.gildedFill {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(gilded.gradient)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                        .strokeBorder(gilded.hairline.color, lineWidth: 1)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(Color.weekyiiPrimary)
+                        }
                     case .today:
                         RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .stroke(Color.weekyiiPrimary, lineWidth: 1.5)
+                            .stroke(skin.gildedFill != nil ? Color.weekyiiGilt : Color.weekyiiPrimary, lineWidth: 1.5)
                     case .none:
                         EmptyView()
                     }
@@ -839,7 +857,7 @@ struct PastCalendarDayLabel: View {
                     Text("\(dayNumber)")
                         .font(.body)
                         .fontWeight(isEmphasized ? .semibold : .regular)
-                        .foregroundStyle(numberColor)
+                        .foregroundStyle(resolvedNumberColor)
                 }
                 .frame(width: 38, height: 40)
 

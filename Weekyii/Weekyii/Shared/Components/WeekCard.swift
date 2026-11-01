@@ -28,7 +28,7 @@ struct WeekCard<Content: View>: View {
         } else if !useGradient, let card = skin.card {
             stack
                 .themedSurface(card, tint: cardTint, tintOpacity: cardTintOpacity)
-                .overlay(themedAccentBar(card), alignment: .top)
+                .overlay(themedAccentBar(card), alignment: card.ribbonAccent ? .topLeading : .top)
         } else {
             classicBody
         }
@@ -62,9 +62,25 @@ struct WeekCard<Content: View>: View {
     private func featureBody(_ feature: ThemeFeatureSkin) -> some View {
         stack
             .padding(.leading, feature.marginRule == nil ? 0 : Self.marginInset)
+            .padding(.top, feature.inscription == nil ? 0 : Self.inscriptionInset)
             .overlay(alignment: .leading) { marginRule(feature.marginRule) }
             .themedSurface(feature.surface)
-            .overlay(themedAccentBar(feature.surface), alignment: .top)
+            .overlay(alignment: .top) { inscriptionBand(feature.inscription) }
+            .overlay(themedAccentBar(feature.surface), alignment: feature.surface.ribbonAccent ? .topLeading : .top)
+    }
+
+    /// Room above the content for the inscription band.
+    private static var inscriptionInset: CGFloat { 8 }
+
+    /// Ring-letter band tooled along the top of the cover, inside the gilt frame.
+    @ViewBuilder
+    private func inscriptionBand(_ ink: ThemeHexPair?) -> some View {
+        if let ink {
+            ElvishInscriptionBand(seed: 7, color: ink.color, opacity: 0.55, lineWidth: 0.85)
+                .frame(height: 10)
+                .padding(.horizontal, 22)
+                .padding(.top, 13)
+        }
     }
 
     @ViewBuilder
@@ -90,7 +106,8 @@ struct WeekCard<Content: View>: View {
                 .overlay(alignment: .top) {
                     Rectangle().fill(Color.black.opacity(0.18)).frame(height: 1.5)
                 }
-                .frame(width: 9, height: 18)
+                .frame(width: 13, height: 21)
+                .padding(.leading, 18)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         } else if let color = accentColor {
@@ -429,6 +446,17 @@ struct WeekSectionHeader: View {
                             )
                         )
                         .frame(height: 1)
+                } else if let mark = section.ruleEndMark {
+                    // The rule runs out into a small ring.
+                    HStack(spacing: 4) {
+                        Rectangle()
+                            .fill(rule.color)
+                            .frame(height: section.ruleWidth)
+                        Ellipse()
+                            .strokeBorder(mark.color, lineWidth: 1.2)
+                            .frame(width: 10, height: 7)
+                    }
+                    .accessibilityHidden(true)
                 } else {
                     Rectangle()
                         .fill(rule.color)

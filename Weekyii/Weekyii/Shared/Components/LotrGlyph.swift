@@ -378,3 +378,95 @@ enum LotrTabIcon {
         return Image(uiImage: template)
     }
 }
+
+// MARK: - Ring inscription band
+
+/// A line of Elvish-looking letter strokes — stems, bowls and the small marks
+/// above them — in the manner of the fire-letters on the Ring. It is ornament
+/// only: the strokes are generated, never real Tengwar, so nothing is spelled.
+///
+/// The same `seed` always draws the same band, so it never reshuffles while a
+/// view re-renders. Stroke it with a thin line (0.8–1 pt) in gilt.
+struct ElvishInscription: Shape {
+    var seed: UInt64 = 7
+
+    func path(in rect: CGRect) -> Path {
+        var rng = SeededGenerator(seed: seed)
+        var path = Path()
+        let height = rect.height
+        let mid = rect.minY + height * 0.62
+        let bowlHeight = height * 0.42
+        let bowlWidth = max(2.4, height * 0.32)
+        var x = rect.minX + 2
+
+        while x < rect.maxX - bowlWidth * 2.5 {
+            let roll = rng.nextUnit()
+            let stemUp = rng.nextUnit() < 0.3
+            let stemDown = rng.nextUnit() < 0.35
+            let top = mid - bowlHeight - (stemUp ? height * 0.28 : 0)
+            let bottom = mid + (stemDown ? height * 0.3 : 0)
+            path.move(to: CGPoint(x: x, y: top))
+            path.addLine(to: CGPoint(x: x, y: bottom))
+
+            let bowls = roll < 0.6 ? 1 : 2
+            for index in 0..<bowls {
+                let bx = x + CGFloat(index) * bowlWidth
+                path.move(to: CGPoint(x: bx, y: mid - bowlHeight))
+                path.addCurve(
+                    to: CGPoint(x: bx, y: mid),
+                    control1: CGPoint(x: bx + bowlWidth, y: mid - bowlHeight),
+                    control2: CGPoint(x: bx + bowlWidth, y: mid)
+                )
+            }
+
+            if rng.nextUnit() < 0.55 {
+                let tx = x + bowlWidth * 0.5 + CGFloat(rng.nextUnit()) * bowlWidth * 0.6
+                let ty = mid - bowlHeight - height * 0.22
+                if rng.nextUnit() < 0.5 {
+                    path.addEllipse(in: CGRect(x: tx - 0.45, y: ty - 0.45, width: 0.9, height: 0.9))
+                } else {
+                    path.move(to: CGPoint(x: tx - bowlWidth * 0.45, y: ty + 0.4))
+                    path.addQuadCurve(
+                        to: CGPoint(x: tx + bowlWidth * 0.45, y: ty + 0.4),
+                        control: CGPoint(x: tx, y: ty - bowlWidth * 0.5)
+                    )
+                }
+            }
+
+            x += bowlWidth * (1.6 + CGFloat(bowls)) + (rng.nextUnit() < 0.18 ? bowlWidth * 1.3 : 0)
+        }
+        return path
+    }
+
+    /// SplitMix64: tiny, deterministic, good enough for ornament.
+    private struct SeededGenerator {
+        var state: UInt64
+
+        init(seed: UInt64) { state = seed &+ 0x9E37_79B9_7F4A_7C15 }
+
+        mutating func nextUnit() -> Double {
+            state = state &+ 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            z = z ^ (z >> 31)
+            return Double(z >> 11) / Double(1 << 53)
+        }
+    }
+}
+
+/// The inscription band as a ready-made view: a gilt hairline script that
+/// ignores hit testing and accessibility.
+struct ElvishInscriptionBand: View {
+    var seed: UInt64 = 7
+    var color: Color
+    var opacity: Double = 0.55
+    var lineWidth: CGFloat = 0.8
+
+    var body: some View {
+        ElvishInscription(seed: seed)
+            .stroke(color.opacity(opacity), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
