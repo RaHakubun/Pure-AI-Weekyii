@@ -443,6 +443,23 @@
         }
       }
     },
+    "cloud.accountSwitch.error.cloudHasNewerData" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The other iCloud account holds data written by a newer version of Weekyii. Nothing was changed. Update Weekyii and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个 iCloud 账户中有由更新版本 Weekyii 写入的数据，本次未做任何更改。请升级 Weekyii 后重试。"
+          }
+        }
+      }
+    },
     "cloud.accountSwitch.error.cloudOperationFailed" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8419,6 +8436,38 @@
         }
       }
     },
+    "settings.icloud.banner.account_signed_out" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not signed in to iCloud. Sync is paused."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未登录 iCloud，同步已暂停。"
+          }
+        }
+      }
+    },
+    "settings.icloud.banner.account_temporarily_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud is unreachable right now. Weekyii will retry automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时连不上 iCloud，稍后会自动重试。"
+          }
+        }
+      }
+    },
     "settings.icloud.banner.account_unavailable" : {
       "localizations" : {
         "en" : {
@@ -8483,22 +8532,6 @@
         }
       }
     },
-    "settings.icloud.banner.renew" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renew"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "续订"
-          }
-        }
-      }
-    },
     "settings.icloud.banner.locked" : {
       "localizations" : {
         "en" : {
@@ -8547,6 +8580,22 @@
         }
       }
     },
+    "settings.icloud.banner.renew" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renew"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "续订"
+          }
+        }
+      }
+    },
     "settings.icloud.banner.syncing" : {
       "localizations" : {
         "en" : {
@@ -8576,6 +8625,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "现已开放"
+          }
+        }
+      }
+    },
+    "settings.icloud.conflicts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conflicts in the last sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次同步的冲突"
+          }
+        }
+      }
+    },
+    "settings.icloud.conflicts.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld (this device's version kept)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 处（已保留本机版本）"
           }
         }
       }
@@ -8640,6 +8721,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "合并并优先保留本地修改"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.newer_data_message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud contains data this version cannot read, probably written by a newer version of Weekyii. So that nothing is deleted, Weekyii will not choose a source of truth yet. Update Weekyii, then turn iCloud sync back on."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 中有本版本无法读取的数据，可能由更新版本的 Weekyii 写入。为避免删除这些数据，暂时不能选择以哪份数据为准。请升级 Weekyii 后再开启同步。"
+          }
+        }
+      }
+    },
+    "settings.icloud.decision.newer_data_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update Weekyii first"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要先更新 Weekyii"
           }
         }
       }
@@ -9173,6 +9286,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步已暂停：VIP 未开通或已到期，本地数据不受影响"
+          }
+        }
+      }
+    },
+    "settings.icloud.status.newer_data" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update Weekyii to continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要更新 Weekyii 后才能继续"
           }
         }
       }

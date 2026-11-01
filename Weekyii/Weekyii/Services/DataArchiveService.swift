@@ -211,6 +211,10 @@ enum WeekyiiDataArchiveService {
         apply(payload.settings, to: settings)
         apply(payload.appState, to: appState)
         appState.bumpDataRevision()
+        // The store was replaced wholesale, so the view tree has to be rebuilt
+        // rather than patched. This is the one path where losing navigation
+        // state is the correct outcome.
+        appState.bumpStructureRevision()
         return Inspection(
             exportedAt: envelope.exportedAt,
             weekCount: payload.weeks.count,

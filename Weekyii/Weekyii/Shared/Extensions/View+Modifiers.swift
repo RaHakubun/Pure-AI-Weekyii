@@ -416,9 +416,18 @@ private struct StateTransitionRefreshModifier: ViewModifier {
     let action: () -> Void
 
     func body(content: Content) -> some View {
-        content.onChange(of: appState.stateTransitionRevision) { _, _ in
-            action()
-        }
+        content
+            .onChange(of: appState.stateTransitionRevision) { _, _ in
+                action()
+            }
+            // A sync writes business data through the same model context without
+            // moving `stateTransitionRevision`. Before, the page was rescued by
+            // the TabView being rebuilt on `dataRevision`; now that the tab's
+            // identity is stable, this is what keeps it from showing the
+            // pre-sync snapshot until the user leaves and comes back.
+            .onChange(of: appState.dataRevision) { _, _ in
+                action()
+            }
     }
 }
 

@@ -580,7 +580,7 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_openAccessEntitlementAndPreferenceControllerAreIndependentOfThemeUnlock() async {
+    func test_openAccessEntitlementAndSyncPreferenceAreIndependentOfThemeUnlock() async {
         let lockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
         lockedThemeSettings.premiumThemeUnlocked = false
         let unlockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
@@ -596,34 +596,20 @@ final class ModelTests: XCTestCase {
         let defaults = makeSuiteDefaults()
         let settings = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(settings)
-        let controller = CloudSyncPreferenceController(entitlementProvider: openAccessProvider)
 
-        let didEnable = await controller.setRequested(true, for: settings)
-        XCTAssertTrue(didEnable)
+        settings.setCloudSyncRequested(true)
         XCTAssertTrue(settings.cloudSyncRequested)
         XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, true)
 
-        let didDisable = await controller.setRequested(false, for: settings)
-        XCTAssertTrue(didDisable)
+        settings.setCloudSyncRequested(false)
         XCTAssertFalse(settings.cloudSyncRequested)
         XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
     }
 
-    @MainActor
-    func test_cloudSyncEntitlementProviderCanBeInjectedWithoutPaywallBehavior() async {
-        let defaults = makeSuiteDefaults()
-        let settings = UserSettings(defaults: defaults)
-        Self.retainedUserSettings.append(settings)
-        let controller = CloudSyncPreferenceController(
-            entitlementProvider: FixedCloudSyncEntitlementProvider(state: .notPurchased)
-        )
-
-        let saved = await controller.setRequested(true, for: settings)
-
-        XCTAssertFalse(saved)
-        XCTAssertFalse(settings.cloudSyncRequested)
-        XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
-    }
+    // The paywall gate lives in `CloudSyncCoordinator.setRequested` and is
+    // covered by `CloudSyncCoordinatorTests.test_...(.notPurchased)`. The
+    // former `CloudSyncPreferenceController` was a second, ungated path into
+    // the same flag; it is gone, so there is nothing left to test here.
 
     @MainActor
     func test_persistentStoreRemainsWritableAcrossReopen() throws {
@@ -4299,20 +4285,27 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    /// 蓝图 ships in the free list on purpose: the drafting language is part of
-    /// the house style, not a paid extra.
-    func test_blueprintThemeIsFreeAndDrawsItsOwnSheet() {
-        XCTAssertFalse(WeekTheme.blueprint.requiresVIP)
-        XCTAssertFalse(WeekTheme.blueprint.isPremiumTheme)
-        XCTAssertTrue(WeekTheme.freeThemes.contains(.blueprint))
+    /// 蓝图 is no longer offered. A stored selection resolves and persists as amber.
+    @MainActor
+    func test_blueprintThemeIsRemovedFromThePicker() {
+        XCTAssertFalse(WeekTheme.blueprint.isSelectable)
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.blueprint))
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.blueprint))
+        XCTAssertEqual(
+            WeekTheme.resolvedTheme(rawValue: WeekTheme.blueprint.rawValue, premiumThemeUnlocked: true),
+            .amber
+        )
 
-        let skin = WeekTheme.blueprint.skin
-        XCTAssertEqual(skin.typography.titleDesign, .monospaced)
-        XCTAssertNil(skin.typography.environmentDesign, "body text stays in the system design")
-        XCTAssertEqual(skin.badge?.kind, .legend)
-        XCTAssertEqual(skin.softShadows, false)
-        XCTAssertEqual(skin.backdrop, .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")))
-        XCTAssertEqual(WeekTheme.blueprint.visualStyle.barThickness(8), 6, accuracy: 0.001)
+        let defaults = makeSuiteDefaults()
+        defaults.set(WeekTheme.blueprint.rawValue, forKey: "selectedTheme")
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.selectedTheme, .amber)
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.amber.rawValue)
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), WeekTheme.amber.rawValue)
+
+        settings.selectedThemeRaw = WeekTheme.blueprint.rawValue
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.amber.rawValue)
     }
 
     /// `barScale` is a multiplier precisely so `.classic` stays untouched:

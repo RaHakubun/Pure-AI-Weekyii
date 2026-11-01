@@ -22,6 +22,12 @@ enum CloudSyncCoordinatorAccountState: Equatable, Sendable {
 enum CloudSyncInitialEnableDecision: Equatable, Sendable {
     case remoteEmpty
     case remoteNonempty
+    /// The zone holds records this build cannot decode (a newer `payloadVersion`,
+    /// an unknown kind, a damaged payload). Every source-of-truth choice is
+    /// destructive for them: merging or replacing the zone deletes them, and
+    /// "use iCloud" would apply an incomplete view over local data. So no choice
+    /// is offered until the app is updated.
+    case remoteHasNewerData
 }
 
 enum CloudSyncInitialEnableChoice: Equatable, Sendable {
@@ -59,6 +65,9 @@ nonisolated struct CloudAccountResolutionJournal: Codable, Equatable, Sendable {
 enum CloudAccountResolutionFailure: String, Codable, Error, Equatable, Sendable {
     case accountUnavailable
     case invalidCloudData
+    /// The target account's zone holds records this build cannot decode, so no
+    /// choice can be offered without destroying them.
+    case cloudHasNewerData
     case localDataUnavailable
     case recoveryPointFailed
     case cloudOperationFailed
@@ -70,6 +79,7 @@ enum CloudAccountResolutionFailure: String, Codable, Error, Equatable, Sendable 
         switch self {
         case .accountUnavailable: "cloud.accountSwitch.error.accountUnavailable"
         case .invalidCloudData: "cloud.accountSwitch.error.invalidCloudData"
+        case .cloudHasNewerData: "cloud.accountSwitch.error.cloudHasNewerData"
         case .localDataUnavailable: "cloud.accountSwitch.error.localDataUnavailable"
         case .recoveryPointFailed: "cloud.accountSwitch.error.recoveryPointFailed"
         case .cloudOperationFailed: "cloud.accountSwitch.error.cloudOperationFailed"
@@ -136,6 +146,7 @@ enum CloudSyncStatus: Equatable, Sendable {
         case .accountUnavailable: "account-unavailable"
         case .initialEnableDecisionRequired(.remoteEmpty): "initial-decision-remote-empty"
         case .initialEnableDecisionRequired(.remoteNonempty): "initial-decision-remote-nonempty"
+        case .initialEnableDecisionRequired(.remoteHasNewerData): "initial-decision-remote-newer-data"
         case .accountDecisionRequired: "account-decision-required"
         case .pausedAfterFailure: "paused-after-failure"
         }
@@ -349,6 +360,10 @@ final class CloudSyncCoordinator {
     private var completedSyncCycleCount: UInt64 = 0
     private var failureLatchCount: UInt64 = 0
     private var lastCompletedSyncCycleResult: CloudSyncRemoteTriggerResult = .noData
+    /// How many entities both sides changed in the last successful cycle. Local
+    /// wins those conflicts, so the remote edit is discarded; without a number
+    /// the user has no way to learn that it happened.
+    private(set) var lastConflictCount = 0
     private(set) var accountResolutionJournalUnavailable = false
     private var businessDataChanged: @MainActor () -> Void = {}
 
@@ -381,7 +396,8 @@ final class CloudSyncCoordinator {
             lastFailure: lastFailurePresentation,
             automaticRetrySuppressed: automaticRetrySuppressed,
             manualSyncAllowed: canManuallySync,
-            accountResolutionRequired: accountDecisionRequired
+            accountResolutionRequired: accountDecisionRequired,
+            lastConflictCount: lastConflictCount
         )
     }
 
@@ -427,7 +443,11 @@ final class CloudSyncCoordinator {
         self.localStore = localStore
         businessDataChanged = onBusinessDataChanged
         if settings.cloudSyncRequested {
-            status = .ready
+            // Not `.ready`: entitlement is resolved from StoreKit and has not run
+            // yet, so claiming "ready" would show a non-VIP user a healthy state
+            // for one turn before `handle(.appLaunch)` corrects it to `.locked`.
+            // `.checkingAccount` is what is actually true here.
+            if status == .disabled { status = .checkingAccount }
         }
     }
 
@@ -440,6 +460,7 @@ final class CloudSyncCoordinator {
             accountState = .unchecked
             requiresAccountDecision = false
             currentAccountRecordName = nil
+            lastConflictCount = 0
             return
         }
 
@@ -662,30 +683,25 @@ final class CloudSyncCoordinator {
             }
 
             // The prompt may have been open while another device changed the
-            // zone. Inspect again before accepting a source-of-truth decision.
-            let currentRecords: [CloudSyncRecord]
-            if choice == .useLocal {
-                currentRecords = [] // explicit local authority does not inspect before reset
-            } else {
-                if choice == .useCloud {
-                    try await recoveryPoint(WeekyiiPersistence.persistentStoreURL())
-                    guard isCurrent(generation) else { return }
-                }
-                let inspection = try await transport.inspectRemoteZone()
+            // zone. Inspect again before accepting a source-of-truth decision:
+            // every choice below either resets the zone or applies part of it, so
+            // a zone that gained a record this build cannot read must leave the
+            // decision where it is instead of acting on a stale view.
+            // (`useLocal` used to skip this read; it deletes the zone, so it is
+            // exactly the path that must not act blind.)
+            if choice == .useCloud {
+                try await recoveryPoint(WeekyiiPersistence.persistentStoreURL())
                 guard isCurrent(generation) else { return }
-                currentRecords = inspection.records
-                if pendingInitialDecision == .remoteEmpty && choice == .uploadLocal && !currentRecords.isEmpty {
-                    pendingInitialDecision = .remoteNonempty
-                    pendingInitialChoice = nil
-                    status = .initialEnableDecisionRequired(.remoteNonempty)
-                    return
-                }
-                if pendingInitialDecision == .remoteNonempty && currentRecords.isEmpty {
-                    pendingInitialDecision = .remoteEmpty
-                    pendingInitialChoice = nil
-                    status = .initialEnableDecisionRequired(.remoteEmpty)
-                    return
-                }
+            }
+            let inspection = try await transport.inspectRemoteZone()
+            guard isCurrent(generation) else { return }
+            let currentRecords = inspection.records
+            let refreshedDecision = Self.initialDecision(for: inspection)
+            if refreshedDecision != pendingInitialDecision {
+                pendingInitialDecision = refreshedDecision
+                pendingInitialChoice = nil
+                status = .initialEnableDecisionRequired(refreshedDecision)
+                return
             }
 
             if choice != .useLocal {
@@ -727,6 +743,11 @@ final class CloudSyncCoordinator {
                 clearPendingDecision()
                 return
             case (.remoteNonempty?, .merge):
+                // Reaching here means the inspection above found nothing this
+                // build cannot read. `resetCustomZone()` deletes every record in
+                // the zone, so that precondition is what keeps unreadable records
+                // alive; it is checked once, in `initialDecision(for:)`, so there
+                // is a single place to audit.
                 let remoteSnapshot = try Self.businessSnapshot(from: currentRecords)
                 let localSnapshot = try localStore.currentSnapshot()
                 let merge = try WeekyiiSnapshotMergeService.mergePreferringLocal(local: localSnapshot, remote: remoteSnapshot)
@@ -740,6 +761,17 @@ final class CloudSyncCoordinator {
                 guard isCurrent(generation) else { return }
                 _ = try await transport.ensureInfrastructure()
                 guard isCurrent(generation) else { return }
+            case (.remoteHasNewerData?, _):
+                // iCloud holds data written by a build newer than this one. Every
+                // choice deletes it or replaces local data with an incomplete view
+                // of it, so refuse and leave both sides untouched until the user
+                // updates. There is deliberately no in-app escape hatch: "reset
+                // this device's sync state" only clears local bookkeeping and does
+                // not touch iCloud, so it would not unblock a permanently damaged
+                // record either.
+                pendingInitialChoice = nil
+                status = .initialEnableDecisionRequired(.remoteHasNewerData)
+                return
             default:
                 // Choice does not fit the pending decision (e.g. a stale dialog
                 // after the decision kind flipped). Restore the prompt instead
@@ -867,6 +899,21 @@ final class CloudSyncCoordinator {
             let inspection = try await targetTransport.inspectRemoteZone()
             guard isAccountResolutionCurrent(generation, targetRecordName: targetRecordName) else { return accountResolutionContext }
             guard await verifyResolutionTarget(targetRecordName, generation: generation) else { return accountResolutionContext }
+            // A zone this build cannot fully read has no safe choice, so the
+            // context is reported as failed instead of offering buttons that would
+            // delete or half-apply it.
+            guard Self.isZoneFullyReadable(inspection) else {
+                accountResolutionContext = CloudAccountResolutionContext(
+                    previousAccountHash: previousHash,
+                    targetAccountHash: targetHash,
+                    localEntityCount: localSnapshot.entityKeys().count,
+                    targetCloudEntityCount: inspection.records.count,
+                    targetCloudIsEmpty: inspection.records.isEmpty,
+                    targetAccountAvailable: true,
+                    progress: .failed(.cloudHasNewerData)
+                )
+                return accountResolutionContext
+            }
             _ = try Self.businessSnapshot(from: inspection.records)
 
             pendingAccountResolutionTransport = targetTransport
@@ -944,6 +991,18 @@ final class CloudSyncCoordinator {
             case .disable:
                 return
             case .useLocal:
+                let inspection = try await boundTransport.inspectRemoteZone()
+                // The other two choices re-read the zone before consuming it; this
+                // one deletes it outright, so it needs the same proof. A context
+                // prepared while the zone was readable can go stale if another
+                // device writes a record this build cannot decode — and the
+                // confirmation count only covers records this build can read, so
+                // the user would be approving a smaller deletion than the one that
+                // would actually happen.
+                guard Self.isZoneFullyReadable(inspection) else {
+                    markAccountResolutionFailed(.cloudHasNewerData)
+                    return
+                }
                 let localBeforeReset = try localStore.currentSnapshot()
                 guard WeekyiiSnapshotRepository.validate(localBeforeReset).isEmpty else {
                     markAccountResolutionFailed(.localDataUnavailable)
@@ -990,6 +1049,14 @@ final class CloudSyncCoordinator {
 
             case .useCloud:
                 let inspection = try await boundTransport.inspectRemoteZone()
+                // Re-checked here, not only when the context was prepared: the
+                // sheet may have been open while another device wrote a record
+                // this build cannot read, and this branch replaces local data
+                // with the readable subset of the zone.
+                guard Self.isZoneFullyReadable(inspection) else {
+                    markAccountResolutionFailed(.cloudHasNewerData)
+                    return
+                }
                 let remoteSnapshot = try Self.businessSnapshot(from: inspection.records)
                 guard await verifyResolutionTarget(targetRecordName, generation: generation) else { return }
                 do {
@@ -1026,6 +1093,12 @@ final class CloudSyncCoordinator {
 
             case .merge:
                 let inspection = try await boundTransport.inspectRemoteZone()
+                // Same re-check as `.useCloud`, and the one that matters most:
+                // this branch calls `resetCustomZone()` below.
+                guard Self.isZoneFullyReadable(inspection) else {
+                    markAccountResolutionFailed(.cloudHasNewerData)
+                    return
+                }
                 let remoteSnapshot = try Self.businessSnapshot(from: inspection.records)
                 let localSnapshot = try localStore.currentSnapshot()
                 let merge = try WeekyiiSnapshotMergeService.mergePreferringLocal(local: localSnapshot, remote: remoteSnapshot)
@@ -1182,7 +1255,7 @@ final class CloudSyncCoordinator {
             if metadata?.lastSuccessfulSync == nil || metadata?.zoneInitialized != true {
                 let inspection = try await transport.inspectRemoteZone()
                 guard isCurrent(generation) else { return }
-                let decision: CloudSyncInitialEnableDecision = inspection.records.isEmpty ? .remoteEmpty : .remoteNonempty
+                let decision = Self.initialDecision(for: inspection)
                 pendingInitialDecision = decision
                 status = .initialEnableDecisionRequired(decision)
                 return
@@ -1251,6 +1324,7 @@ final class CloudSyncCoordinator {
                     let date = report.successTimestamp ?? now()
                     cycleResult = report.remoteAppliedUpserts > 0 || report.remoteDeletionsApplied > 0 ? .newData : .noData
                     lastSuccessfulSync = date
+                    lastConflictCount = report.conflicts
                     lastFailurePresentation = nil
                     automaticRetrySuppressed = false
                     latchedFailureReason = nil
@@ -1859,6 +1933,31 @@ final class CloudSyncCoordinator {
             }
         }
         return .other(error.localizedDescription)
+    }
+
+    /// The single place that decides which source-of-truth choices are safe.
+    ///
+    /// A record this build cannot decode must be counted, not ignored. It used to
+    /// be invisible here, which produced two bad outcomes: a zone holding only
+    /// unreadable records looked empty ("iCloud has no data"), and a zone holding
+    /// both kinds looked like an ordinary non-empty zone, so "merge" or "use this
+    /// device" would `resetCustomZone()` and delete the unreadable records with
+    /// no warning and no way back. Refusing the whole decision keeps the promise
+    /// that sync never deletes data it cannot read.
+    private static func initialDecision(for inspection: CloudSyncZoneInspection) -> CloudSyncInitialEnableDecision {
+        guard isZoneFullyReadable(inspection) else { return .remoteHasNewerData }
+        return inspection.records.isEmpty ? .remoteEmpty : .remoteNonempty
+    }
+
+    /// Shared precondition for every path that deletes or partially applies a
+    /// zone — the first-enable choices and the account-switch choices alike.
+    ///
+    /// `resetCustomZone()` deletes every record in the zone, and
+    /// `businessSnapshot(from: inspection.records)` silently ignores the records
+    /// it could not decode, so both destroy data written by a newer build. Callers
+    /// must prove the zone is fully readable before touching it.
+    private static func isZoneFullyReadable(_ inspection: CloudSyncZoneInspection) -> Bool {
+        inspection.undecodableRecordNames.isEmpty
     }
 
     /// CloudKit reports a missing custom zone as `.other(remoteZoneDeletedReason)`

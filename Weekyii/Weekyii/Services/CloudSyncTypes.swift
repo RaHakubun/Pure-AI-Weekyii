@@ -106,6 +106,10 @@ struct CloudSyncDiagnosticsSnapshot: Equatable, Sendable {
     let automaticRetrySuppressed: Bool
     let manualSyncAllowed: Bool
     let accountResolutionRequired: Bool
+    /// Entities both sides changed during the last successful cycle. The remote
+    /// edit is dropped in favour of this device's copy, so this is the only
+    /// signal the user gets that it happened.
+    let lastConflictCount: Int
 
     static func bannerKind(
         for status: CloudSyncStatus,

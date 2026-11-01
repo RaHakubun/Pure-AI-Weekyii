@@ -202,6 +202,9 @@ struct SettingsView: View {
                 Button(String(localized: "settings.icloud.decision.use_cloud"), role: .destructive) { resolveInitialCloudSync(.useCloud) }
                 Button(String(localized: "settings.icloud.decision.merge")) { resolveInitialCloudSync(.merge) }
                 Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteHasNewerData):
+                // No source-of-truth button: see CloudSyncInitialEnableDecision.
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
             default:
                 Button(String(localized: "action.cancel"), role: .cancel) { }
             }
@@ -916,6 +919,18 @@ struct SettingsView: View {
                 }
             }
 
+            if cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount > 0 {
+                LabeledContent(String(localized: "settings.icloud.conflicts", defaultValue: "上次同步的冲突")) {
+                    Text(String(
+                        format: String(localized: "settings.icloud.conflicts.value", defaultValue: "%lld 处（已保留本机版本）"),
+                        locale: Locale.current,
+                        Int64(cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount)
+                    ))
+                    .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("settings.icloud.conflicts")
+            }
+
             if let lastFailure = cloudSyncCoordinator.diagnosticsSnapshot.lastFailure {
                 LabeledContent(String(localized: "settings.icloud.last_failure")) {
                     Text(lastFailure.localizedDescription)
@@ -1083,6 +1098,7 @@ struct SettingsView: View {
         case .accountUnavailable: String(localized: "settings.icloud.status.account_unavailable")
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.status.first_upload")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.status.first_choice")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.status.newer_data", defaultValue: "需要更新版本")
         case .accountDecisionRequired: String(localized: "settings.icloud.status.account_decision")
         case .pausedAfterFailure: String(localized: "settings.icloud.status.paused")
         }
@@ -1106,6 +1122,7 @@ struct SettingsView: View {
         switch cloudSyncCoordinator.status {
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_title")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_title")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.decision.newer_data_title", defaultValue: "需要先更新 Weekyii")
         default: String(localized: "settings.icloud.decision.title")
         }
     }
@@ -1114,6 +1131,11 @@ struct SettingsView: View {
         switch cloudSyncCoordinator.status {
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_message")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_message")
+        case .initialEnableDecisionRequired(.remoteHasNewerData):
+            String(
+                localized: "settings.icloud.decision.newer_data_message",
+                defaultValue: "iCloud 中有本版本无法读取的数据，可能由更新版本的 Weekyii 写入。为避免删除这些数据，暂时不能选择以哪份数据为准。请升级 Weekyii 后再开启同步。"
+            )
         default: ""
         }
     }

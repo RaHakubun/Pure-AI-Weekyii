@@ -21,27 +21,8 @@ struct OpenAccessCloudSyncEntitlementProvider: CloudSyncEntitlementProviding {
     }
 }
 
-/// Applies explicit sync preference changes without coupling preference migration
-/// to entitlement resolution or local persistence availability.
-@MainActor
-struct CloudSyncPreferenceController {
-    private let entitlementProvider: any CloudSyncEntitlementProviding
-
-    init() {
-        self.entitlementProvider = OpenAccessCloudSyncEntitlementProvider()
-    }
-
-    init(entitlementProvider: any CloudSyncEntitlementProviding) {
-        self.entitlementProvider = entitlementProvider
-    }
-
-    @discardableResult
-    func setRequested(_ requested: Bool, for settings: UserSettings) async -> Bool {
-        if requested {
-            guard await entitlementProvider.currentState() == .entitled else { return false }
-        }
-
-        settings.setCloudSyncRequested(requested)
-        return true
-    }
-}
+// The former `CloudSyncPreferenceController` lived here with a no-argument
+// initialiser that granted access through `OpenAccessCloudSyncEntitlementProvider`.
+// Production never called it, so it was a ready-made way to flip the sync
+// preference while bypassing the paywall. Gating now happens in
+// `CloudSyncCoordinator.setRequested` against the real provider.
