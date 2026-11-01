@@ -58,8 +58,8 @@ extension WeekTheme {
         }
     }
 
-    static var vipThemes: [WeekTheme] { allCases.filter(\.requiresVIP) }
-    static var freeThemes: [WeekTheme] { allCases.filter { !$0.requiresVIP } }
+    static var vipThemes: [WeekTheme] { allCases.filter { $0.isSelectable && $0.requiresVIP } }
+    static var freeThemes: [WeekTheme] { allCases.filter { $0.isSelectable && !$0.requiresVIP } }
 }
 
 // MARK: - Access state

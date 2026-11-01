@@ -19,11 +19,14 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case neon
     case paper
     case terminal
-    /// Drafting-table skin: cool sheet, hairline rules, one construction-orange
-    /// accent. Free on purpose — it is the house style, not a paid extra.
+    /// Retired from 外观与主题. The case stays so a stored `"blueprint"` still
+    /// decodes; `resolvedTheme` and the settings list both send it to amber.
     case blueprint
 
     var id: String { rawValue }
+
+    /// Themes offered in 外观与主题. Blueprint is kept only so old selections decode.
+    var isSelectable: Bool { self != .blueprint }
 
     var displayName: String {
         switch self {
@@ -200,8 +203,14 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     /// `premiumThemeUnlocked` mirrors the resolved VIP access (written only by
     /// `PurchaseService`). A locked VIP theme falls back to amber for display while
     /// the user's stored choice is kept, so renewing restores it automatically.
+    /// Stored raw value written to defaults. A retired blueprint selection becomes amber.
+    static func canonicalStoredThemeRaw(_ raw: String) -> String {
+        raw == WeekTheme.blueprint.rawValue ? WeekTheme.amber.rawValue : raw
+    }
+
     static func resolvedTheme(rawValue: String?, premiumThemeUnlocked: Bool) -> WeekTheme {
         let requestedTheme = WeekTheme(rawValue: rawValue ?? "") ?? .amber
+        guard requestedTheme.isSelectable else { return .amber }
         guard requestedTheme.requiresVIP, !premiumThemeUnlocked else {
             return requestedTheme
         }

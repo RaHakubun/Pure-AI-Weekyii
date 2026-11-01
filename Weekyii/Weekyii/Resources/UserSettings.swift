@@ -204,7 +204,14 @@ final class UserSettings: ObservableObject {
     
     // Theme Settings
     @Published var selectedThemeRaw: String {
-        didSet { save() }
+        didSet {
+            let canonical = WeekTheme.canonicalStoredThemeRaw(selectedThemeRaw)
+            if canonical != selectedThemeRaw {
+                selectedThemeRaw = canonical
+                return
+            }
+            save()
+        }
     }
     @Published var appearanceModeRaw: String {
         didSet { save() }
@@ -335,7 +342,12 @@ final class UserSettings: ObservableObject {
         self.pastBrowseModeRaw = restoresBrowseModes
             ? defaults.string(forKey: Self.pastBrowseModeKey) ?? WeekBrowseMode.weekList.rawValue
             : WeekBrowseMode.weekList.rawValue
-        self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        let storedTheme = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        let canonicalTheme = WeekTheme.canonicalStoredThemeRaw(storedTheme)
+        self.selectedThemeRaw = canonicalTheme
+        if canonicalTheme != storedTheme {
+            defaults.set(canonicalTheme, forKey: "selectedTheme")
+        }
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false

@@ -1635,7 +1635,7 @@ private struct ThemeStatusArtworkGallery: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                ForEach(WeekTheme.allCases) { theme in
+                ForEach(WeekTheme.allCases.filter(\.isSelectable)) { theme in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(theme.displayName)
                             .font(.headline)
