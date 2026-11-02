@@ -11858,6 +11858,22 @@
         }
       }
     },
+    "theme.cat.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catnap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "猫猫"
+          }
+        }
+      }
+    },
     "theme.lotr.name" : {
       "localizations" : {
         "en" : {

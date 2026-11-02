@@ -464,6 +464,15 @@ struct TodayView: View {
                             .tracking(0.6)
                             .foregroundColor(.textSecondary)
                     }
+                } else if todaySkin.glyphs == .cat {
+                    HStack(spacing: 6) {
+                        CatGlyphView(glyph: .whisker)
+                            .frame(width: 15, height: 15)
+                            .foregroundColor(.textSecondary)
+                        Text(formatDate(day.dayId))
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
                 } else {
                     Text(formatDate(day.dayId))
                         .font(.bodyMedium)
@@ -1346,6 +1355,9 @@ struct TodayView: View {
             } else if userSettings.selectedTheme == .lotr {
                 LotrRainNightBackground(animationsActive: animationsActive)
                     .transition(.opacity)
+            } else if userSettings.selectedTheme == .cat {
+                CatNapBackground(animationsActive: animationsActive)
+                    .transition(.opacity)
             }
         }
         .ignoresSafeArea()
@@ -2180,6 +2192,81 @@ private struct LotrRainNightBackground: View {
     }
 }
 
+/// Sleeping cat for the lower corner: head tucked onto a round body, tail over the back.
+private struct CatNapCurl: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 140
+        let sy = rect.height / 120
+        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
+        }
+        var path = Path()
+        path.addEllipse(in: CGRect(x: q(38, 52).x, y: q(38, 52).y, width: 80 * sx, height: 64 * sy))
+        path.move(to: q(104, 90))
+        path.addCurve(to: q(128, 46), control1: q(132, 88), control2: q(140, 60))
+        path.addCurve(to: q(108, 38), control1: q(120, 32), control2: q(110, 28))
+        path.addEllipse(in: CGRect(x: q(22, 28).x, y: q(22, 28).y, width: 54 * sx, height: 48 * sy))
+        path.move(to: q(34, 40))
+        path.addLine(to: q(26, 12))
+        path.addLine(to: q(46, 38))
+        path.move(to: q(44, 36))
+        path.addLine(to: q(58, 10))
+        path.addLine(to: q(64, 40))
+        path.move(to: q(36, 46))
+        path.addCurve(to: q(46, 47), control1: q(39, 40), control2: q(43, 40))
+        path.move(to: q(50, 45))
+        path.addCurve(to: q(60, 47), control1: q(53, 39), control2: q(57, 39))
+        return path
+    }
+}
+
+/// A faint carpet line and a curled cat in the lower trailing corner.
+/// `animationsActive == false` holds the cat at its resting scale.
+private struct CatNapBackground: View {
+    let animationsActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
+
+    var body: some View {
+        Group {
+            if shouldAnimate {
+                TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                    scene(time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            } else {
+                scene(time: 0)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func scene(time: TimeInterval) -> some View {
+        let breath = 1 + 0.02 * CGFloat(sin(time * 0.6))
+        let ink = Color.textSecondary.opacity(colorScheme == .dark ? 0.34 : 0.26)
+        return GeometryReader { proxy in
+            let size = proxy.size
+            let carpetY = size.height * 0.9
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: size.width * 0.04, y: carpetY))
+                    path.addLine(to: CGPoint(x: size.width * 0.96, y: carpetY + 0.4))
+                }
+                .stroke(Color.textTertiary.opacity(colorScheme == .dark ? 0.28 : 0.35), style: StrokeStyle(lineWidth: 1, lineCap: .round))
+
+                CatNapCurl()
+                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                    .frame(width: 118, height: 102)
+                    .scaleEffect(breath, anchor: .bottom)
+                    .position(x: size.width - 78, y: carpetY - 36)
+            }
+        }
+    }
+}
+
 // MARK: - Expired Day Presentation
 
 /// Outcome card shown once today has expired. It distinguishes a started day
@@ -2363,7 +2450,8 @@ private struct TodayExpiredCompletedList: View {
                         onTapTask(task)
                     } label: {
                         HStack(spacing: WeekSpacing.sm) {
-                            Image(systemName: "checkmark.circle")
+                            CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 17)
+                                .font(.body)
                                 .foregroundColor(.accentGreen)
                             Text(task.title)
                                 .font(.bodyMedium)

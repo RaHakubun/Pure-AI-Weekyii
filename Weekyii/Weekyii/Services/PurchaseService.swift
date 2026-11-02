@@ -51,7 +51,7 @@ extension WeekTheme {
     /// Lord of the Rings theme's decorative styling.
     var requiresVIP: Bool {
         switch self {
-        case .lotr, .brutal, .neon, .paper, .terminal:
+        case .lotr, .cat, .brutal, .neon, .paper, .terminal:
             return true
         default:
             return false

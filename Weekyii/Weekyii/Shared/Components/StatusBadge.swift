@@ -51,6 +51,23 @@ struct StatusBadge: View {
             Text(verbatim: "[\(status.displayName)]")
                 .font(.caption2.weight(.bold))
                 .foregroundColor(status.color)
+        case .catEars:
+            Text(status.displayName)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(status.color.opacity(0.2))
+                .foregroundColor(status.color)
+                .clipShape(Capsule())
+                .overlay(alignment: .top) {
+                    CatEarPair()
+                        .fill(status.color.opacity(0.85))
+                        .frame(width: 22, height: 7)
+                        .offset(y: -4)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
         case .waxSeal:
             HStack(spacing: 7) {
                 ZStack {
@@ -91,5 +108,28 @@ struct StatusBadge: View {
             }
             .foregroundColor(status.color)
         }
+    }
+}
+
+/// Two ears sitting on the top edge of a status tag. The overlay does not
+/// change the badge's layout size, so the status row keeps its height.
+private struct CatEarPair: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        func ear(_ left: CGFloat, _ tip: CGFloat, _ right: CGFloat) {
+            path.move(to: CGPoint(x: rect.minX + rect.width * left, y: rect.maxY))
+            path.addQuadCurve(
+                to: CGPoint(x: rect.minX + rect.width * tip, y: rect.minY),
+                control: CGPoint(x: rect.minX + rect.width * (left * 0.45 + tip * 0.55), y: rect.minY + rect.height * 0.15)
+            )
+            path.addQuadCurve(
+                to: CGPoint(x: rect.minX + rect.width * right, y: rect.maxY),
+                control: CGPoint(x: rect.minX + rect.width * (right * 0.45 + tip * 0.55), y: rect.minY + rect.height * 0.15)
+            )
+            path.closeSubpath()
+        }
+        ear(0.08, 0.28, 0.46)
+        ear(0.54, 0.74, 0.94)
+        return path
     }
 }

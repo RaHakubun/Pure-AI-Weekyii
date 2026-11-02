@@ -22,6 +22,7 @@ struct WeekLogo: View {
     @Environment(\.themeSkin) private var skin
 
     private var isLotr: Bool { skin.glyphs == .lotr }
+    private var isCat: Bool { skin.glyphs == .cat }
 
     private var logoGradient: LinearGradient {
         if isLotr {
@@ -73,6 +74,11 @@ extension WeekLogo {
             ElvishInscriptionBand(seed: 11, color: Color(hex: "#B59A62"), opacity: 0.5, lineWidth: 0.7)
                 .frame(width: size.fontSize * 3.6, height: max(6, size.fontSize * 0.24))
                 .offset(y: max(5, size.fontSize * 0.2))
+        } else if isCat {
+            CatTailInscription()
+                .stroke(Color(hex: "#8A6A55").opacity(0.55), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                .frame(width: size.fontSize * 2.4, height: max(8, size.fontSize * 0.28))
+                .offset(y: max(6, size.fontSize * 0.22))
         }
     }
 }
@@ -88,7 +94,7 @@ struct WeekLogoWithIcon: View {
     
     var body: some View {
         HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "calendar")
+            CatCoveredSymbol(systemName: "calendar", pointSize: size.fontSize)
                 .font(.system(size: size.fontSize))
                 .foregroundStyle(Color.weekyiiPrimary)
             

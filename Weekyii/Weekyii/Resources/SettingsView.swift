@@ -2619,6 +2619,8 @@ private struct ThemePaletteMark: View {
             paperMark
         case .terminal:
             terminalMark
+        case .cat:
+            catMark
         case .blueprint:
             blueprintMark
         default:
@@ -2639,6 +2641,22 @@ private struct ThemePaletteMark: View {
 
     private var classicMark: some View {
         splitBase(theme.primaryColor, theme.accentColor)
+    }
+
+    /// Cream paper, a loafing cat in pencil, and one paw in the lower-right.
+    private var catMark: some View {
+        ZStack {
+            Color(hex: "#F7F1E8")
+            CatGlyphView(glyph: .loaf)
+                .foregroundStyle(Color(hex: "#5E463A"))
+                .frame(width: 22, height: 22)
+                .offset(y: -1)
+            CatGlyphView(glyph: .paw)
+                .foregroundStyle(Color(hex: "#8A6A55"))
+                .frame(width: 8, height: 8)
+                .offset(x: 9, y: 9)
+        }
+        .frame(width: 30, height: 30)
     }
 
     /// Antique gold | shadow black, with a small gold ring in the lower-right.
@@ -3887,7 +3905,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "settings.about.days_started"),
                     tint: .accentOrange
                 ) {
-                    Image(systemName: "sun.max")
+                    CatCoveredSymbol(systemName: "sun.max", pointSize: 18)
                 }
                 AboutStatTile(
                     value: stats.completedTasks.formatted(),
@@ -3895,7 +3913,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "settings.about.stats.completed", defaultValue: "完成任务"),
                     tint: .accentGreen
                 ) {
-                    Image(systemName: "checkmark.circle")
+                    CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 18)
                 }
                 AboutStatTile(
                     value: "\(Int((stats.completionRate * 100).rounded()))",
@@ -3912,7 +3930,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "stats.focus_hours"),
                     tint: .taskLeisure
                 ) {
-                    Image(systemName: "clock")
+                    CatCoveredSymbol(systemName: "clock", pointSize: 18)
                 }
             }
 
@@ -4045,6 +4063,7 @@ private struct AboutOrnament: View {
 
 private struct AboutDayDot: View {
     let mark: AboutWeekyiiStats.WeekdayMark
+    @Environment(\.themeSkin) private var skin
 
     var body: some View {
         ZStack {
@@ -4059,9 +4078,15 @@ private struct AboutDayDot: View {
                     )
                     .frame(width: 30, height: 30)
                     .weekSoftShadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white)
+                if skin.glyphs == .cat {
+                    CatGlyphView(glyph: .paw)
+                        .foregroundStyle(.white)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                }
             } else {
                 Circle()
                     .stroke(Color.textTertiary.opacity(mark.isFuture ? 0.55 : 0.3), lineWidth: 1)

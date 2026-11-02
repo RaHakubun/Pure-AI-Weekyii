@@ -19,6 +19,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case neon
     case paper
     case terminal
+    case cat
     /// Retired from 外观与主题. The case stays so a stored `"blueprint"` still
     /// decodes; `resolvedTheme` and the settings list both send it to amber.
     case blueprint
@@ -44,6 +45,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
         case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
+        case .cat: return String(localized: "theme.cat.name", defaultValue: "猫猫")
         case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
         }
     }
@@ -67,7 +69,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             return .terminal
         case .blueprint:
             return .drafting
-        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr:
+        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr, .cat:
             return .classic
         }
     }
@@ -572,6 +574,8 @@ enum ThemeBadgeKind: Equatable {
     /// A wax seal in the status colour with the status glyph pressed in,
     /// followed by the label (魔戒).
     case waxSeal
+    /// A rounded tag with two cat ears on top (猫猫).
+    case catEars
     /// Map-legend key: a short colour sample before the label (蓝图).
     case legend
 }
@@ -634,6 +638,8 @@ struct ThemeSectionSkin: Equatable {
 enum ThemeGlyphSet: Equatable {
     /// Hand-drawn forge, ring and elven glyphs (魔戒), see `LotrGlyph`.
     case lotr
+    /// Hand-drawn cat line art (猫猫), see `CatGlyph`.
+    case cat
 }
 
 enum ThemeBackdrop: Equatable {
@@ -647,6 +653,8 @@ enum ThemeBackdrop: Equatable {
     /// Vellum: short scattered fibres, a darkened edge and an optional warm
     /// light falling from the top (魔戒).
     case vellum(fibre: ThemeHexPair, vignette: ThemeHexPair, topLight: ThemeHexPair)
+    /// Sparse paw prints scattered across the page (猫猫).
+    case pawTrail(ThemeHexPair)
 }
 
 /// The `WeekRadius` scale for a skin. Every page reads its corner radii through
@@ -724,6 +732,7 @@ extension WeekTheme {
         case .terminal: return .terminal
         case .blueprint: return .drafting
         case .lotr: return .lotr
+        case .cat: return .cat
         case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight:
             return .classic
         }
@@ -1063,6 +1072,104 @@ extension ThemeSkin {
             onSuccess: ThemeHexPair("#FFFFFF", "#06202B"),
             backdrop: .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")),
             softShadows: false
+        )
+    }()
+
+    /// 猫猫: a notebook page with a sleepy cat drawn in pencil. The page stays
+    /// cream paper (light) or a warm dark desk (dark). Cards are sheets of
+    /// paper, task rows are sticky notes, and the focus panel is the cat's
+    /// cushion. Nothing here is a typeface joke — the cat is the drawing.
+    ///
+    /// The inner line on a card stays a second pencil rule. A paw-print field
+    /// would need a new surface token; the scattered paws live on the page
+    /// backdrop instead, where they cannot compete with the text.
+    static let cat: ThemeSkin = {
+        let pencil = ThemeHexPair("#C4B09A", "#5C4E42")
+        let ink = ThemeHexPair("#2E2620", "#F0E7DA")
+        let wash = ThemeHexPair("#E7D9C8", "#3E342C")
+        return ThemeSkin(
+            typography: .classic,
+            // Keep 8 / 12 / 16 / 24. The cat's roundness is in the stroke, not a new radius scale.
+            radii: nil,
+            card: ThemeSurfaceSkin(
+                cornerRadius: 10,
+                borderWidth: 1,
+                border: pencil,
+                // A sheet slightly warmer than the page, so the pencil outline encloses paper.
+                fill: ThemeHexPair("#FFFBF4", "#211C17"),
+                // A second, fainter rule just inside the first: the inner edge of the sheet.
+                ornament: wash,
+                edges: .all
+            ),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 8,
+                    borderWidth: 0.75,
+                    border: ThemeHexPair("#D4C4B0", "#4A3F36"),
+                    edges: .all
+                ),
+                // The type bar is a short cat tail: narrow, with a rounded end.
+                barWidth: 3,
+                barCornerRadius: 1.5,
+                themesBuiltInTypes: true
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 12,
+                    borderWidth: 1,
+                    border: pencil,
+                    // Warmer than the card, so the focus panel reads as the cushion the cat is on.
+                    fill: ThemeHexPair("#F3E4D0", "#3A2E24"),
+                    edges: .all
+                ),
+                ink: ink,
+                secondaryInk: ThemeHexPair("#63564B", "#C2B3A3"),
+                label: ThemeLabelSkin(kind: .plain, ink: ink),
+                action: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ink,
+                    border: pencil,
+                    borderWidth: 1,
+                    glows: false
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .capsule,
+                    // Cream on the light milk-tea fill (dark ink is only ~3:1 there);
+                    // dark ink on the light tan fill used at night.
+                    ink: ThemeHexPair("#FFFBF4", "#2E2620"),
+                    fill: ThemeHexPair("#8A6A55", "#D3B49B"),
+                    border: ThemeHexPair("#A8866E", "#E4CBBA"),
+                    borderWidth: 0.5,
+                    glows: false
+                ),
+                // A curled tail along the top of the cushion. Colour only; the curve is drawn by the cover.
+                inscription: ThemeHexPair("#8A6A55", "#D3B49B")
+            ),
+            badge: ThemeBadgeSkin(kind: .catEars),
+            section: ThemeSectionSkin(
+                count: .plain,
+                rule: pencil,
+                showsIcon: true,
+                ruleWidth: 1,
+                // The rule ends in a small paw, drawn in the existing end-mark slot.
+                ruleEndMark: ThemeHexPair("#8A6A55", "#D3B49B")
+            ),
+            // Light mode's brand brown is too dark for dark ink (~3:1); cream clears 4.5:1.
+            // Dark mode's brand tan is light, so the ink stays dark.
+            onPrimary: ThemeHexPair("#FFFBF4", "#2E2620"),
+            // Mint in both appearances is light enough for the same dark ink.
+            onSuccess: ThemeHexPair("#2E2620", "#16130F"),
+            backdrop: .pawTrail(ThemeHexPair("#8A6A55", "#D3B49B")),
+            // The cat is soft. Keep the diffuse shadows the flat themes turn off.
+            softShadows: true,
+            glyphs: .cat,
+            // A pencil box instead of a saturated tile. No fill, border a step lighter than the rule.
+            icon: ThemeIconSkin(
+                cornerRadius: 7,
+                borderWidth: 1,
+                border: ThemeHexPair("#D9C8B4", "#6B5C50"),
+                fill: nil
+            )
         )
     }()
 }
@@ -1778,6 +1885,56 @@ private struct WeekThemePalettePair {
                     taskDDLBg: "#2A0F0F",
                     taskLeisure: "#9D8CFF",
                     taskLeisureBg: "#171334"
+                )
+            )
+        case .cat:
+            // 奶油纸上的铅笔猫。浅色是暖纸、墨棕字、奶茶棕作为品牌色；深色把同一套
+            // 棕色压进一张深色书桌。三文鱼粉、薄荷、樱粉只作点缀，不铺底。
+            // 正文对底色：浅色 13.2:1 / 6.3:1，深色 15.1:1 / 9.1:1。
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#8A6A55",
+                    primaryLight: "#A8866E",
+                    primaryDark: "#5E463A",
+                    accentOrange: "#D98E7B",
+                    accentOrangeLight: "#E8B4A6",
+                    accentGreen: "#7E9A7B",
+                    accentGreenLight: "#A8C0A4",
+                    accentPink: "#D98BA6",
+                    backgroundPrimary: "#F7F1E8",
+                    backgroundSecondary: "#FFFBF4",
+                    backgroundTertiary: "#EFE6D9",
+                    textPrimary: "#2E2620",
+                    textSecondary: "#63564B",
+                    textTertiary: "#95836F",
+                    taskRegular: "#4A6B7C",
+                    taskRegularBg: "#DDE7EC",
+                    taskDDL: "#B5644E",
+                    taskDDLBg: "#F3DED6",
+                    taskLeisure: "#7E6BA8",
+                    taskLeisureBg: "#E8E2F3"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#D3B49B",
+                    primaryLight: "#E4CBBA",
+                    primaryDark: "#8A6A55",
+                    accentOrange: "#E8A795",
+                    accentOrangeLight: "#F0C4B6",
+                    accentGreen: "#A6BFA2",
+                    accentGreenLight: "#C5D6C2",
+                    accentPink: "#E8A9BF",
+                    backgroundPrimary: "#16130F",
+                    backgroundSecondary: "#211C17",
+                    backgroundTertiary: "#2C2620",
+                    textPrimary: "#F0E7DA",
+                    textSecondary: "#C2B3A3",
+                    textTertiary: "#93816F",
+                    taskRegular: "#93B6C9",
+                    taskRegularBg: "#1B2A33",
+                    taskDDL: "#E29279",
+                    taskDDLBg: "#35211B",
+                    taskLeisure: "#B3A2D6",
+                    taskLeisureBg: "#2A2438"
                 )
             )
         case .blueprint:

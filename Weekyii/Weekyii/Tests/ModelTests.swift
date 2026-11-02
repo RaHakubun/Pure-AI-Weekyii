@@ -326,7 +326,9 @@ final class KillTimeFireTests: XCTestCase {
         // Render actual drawing code at a fixed phase. Attachments make color,
         // clipping, text contrast and the entire intensity range reviewable.
         for isDark in [false, true] {
-            for (batch, themes) in [Array(WeekTheme.allCases.prefix(7)), Array(WeekTheme.allCases.suffix(7))].enumerated() {
+            let themesInOrder = Array(WeekTheme.allCases)
+            let batches = [Array(themesInOrder.prefix(8)), Array(themesInOrder.suffix(themesInOrder.count - 8))]
+            for (batch, themes) in batches.enumerated() {
                 let atlas = VStack(spacing: 8) {
                     ForEach(themes) { theme in
                         HStack(spacing: 8) {
@@ -2648,8 +2650,8 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_vipThemesAreTheFiveDedicatedThemes() {
-        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .brutal, .neon, .paper, .terminal])
+    func test_vipThemesAreTheSixDedicatedThemes() {
+        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .cat, .brutal, .neon, .paper, .terminal])
         XCTAssertTrue(WeekTheme.freeThemes.allSatisfy { !$0.requiresVIP })
         // The decorative LOTR styling stays tied to `isPremiumTheme` only.
         XCTAssertEqual(WeekTheme.allCases.filter(\.isPremiumTheme), [.lotr])
@@ -4152,7 +4154,7 @@ final class ModelTests: XCTestCase {
         XCTAssertNotNil(skin.feature?.inscription)
         XCTAssertNotNil(skin.section?.ruleEndMark)
         XCTAssertNotNil(skin.gildedFill)
-        for theme in WeekTheme.allCases where theme != .lotr {
+        for theme in WeekTheme.allCases where ![.lotr, .cat].contains(theme) {
             XCTAssertNil(theme.skin.gildedFill, "\(theme.rawValue) must keep its flat primary fill")
             XCTAssertNil(theme.skin.feature?.inscription, "\(theme.rawValue) must not carry the ring inscription")
         }
@@ -4166,10 +4168,68 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(LotrGlyph(systemName: "square.grid.2x2"), .phial)
         XCTAssertEqual(LotrGlyph(status: .execute), .beacon)
         // No other theme opts into the hand-drawn glyph set.
-        for theme in WeekTheme.allCases where theme != .lotr {
+        for theme in WeekTheme.allCases where ![.lotr, .cat].contains(theme) {
             XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
             XCTAssertNotEqual(theme.skin.row?.themesBuiltInTypes, true, "\(theme.rawValue) must keep stored type colours")
         }
+    }
+
+    func test_themeSkin_catDrawsLineArtComponents() {
+        let skin = WeekTheme.cat.skin
+        XCTAssertNotEqual(skin, .classic)
+        XCTAssertNotNil(skin.card)
+        XCTAssertNotNil(skin.row)
+        XCTAssertNotNil(skin.feature?.inscription)
+        XCTAssertNotNil(skin.section?.ruleEndMark)
+        XCTAssertEqual(skin.badge?.kind, .catEars)
+        XCTAssertTrue(skin.softShadows)
+        XCTAssertEqual(skin.glyphs, .cat)
+        XCTAssertNotNil(skin.icon)
+        if case .pawTrail = skin.backdrop {} else {
+            XCTFail("猫猫 pages must carry the paw-trail backdrop")
+        }
+        XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
+        XCTAssertNil(skin.gildedFill)
+        for theme in WeekTheme.allCases where ![.lotr, .cat].contains(theme) {
+            XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
+            XCTAssertNotEqual(theme.skin.badge?.kind, .catEars, "\(theme.rawValue) must not grow cat ears")
+        }
+    }
+
+    func test_catThemeRequiresUnlock() {
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "cat", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "cat", premiumThemeUnlocked: true), .cat)
+        XCTAssertTrue(WeekTheme.vipThemes.contains(.cat))
+    }
+
+    func test_catGlyphCoversEveryCallSite() {
+        XCTAssertEqual(CatGlyph(systemName: "target"), .loaf)
+        XCTAssertEqual(CatGlyph(systemName: "sun.max"), .loaf)
+        XCTAssertEqual(CatGlyph(systemName: "clock"), .saucer)
+        XCTAssertEqual(CatGlyph(systemName: "hourglass"), .saucer)
+        XCTAssertEqual(CatGlyph(systemName: "clock.arrow.circlepath"), .curl)
+        XCTAssertEqual(CatGlyph(systemName: "calendar"), .cushion)
+        XCTAssertEqual(CatGlyph(systemName: "square.grid.2x2"), .box)
+        XCTAssertEqual(CatGlyph(systemName: "gearshape"), .whisker)
+        XCTAssertEqual(CatGlyph(systemName: "checkmark.circle"), .stretch)
+        XCTAssertEqual(CatGlyph(systemName: "flame"), .yawn)
+        XCTAssertEqual(CatGlyph(systemName: "leaf"), .yarnBall)
+        XCTAssertEqual(CatGlyph(systemName: "snowflake"), .curl)
+        XCTAssertNil(CatGlyph(systemName: "star"))
+        XCTAssertEqual(CatGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .paw)
+        XCTAssertEqual(CatGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .fishBone)
+        XCTAssertEqual(CatGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .yarnBall)
+        XCTAssertNil(CatGlyph(builtInType: .leisure, iconName: "star"))
+        XCTAssertEqual(CatGlyph(status: .empty), .curl)
+        XCTAssertEqual(CatGlyph(status: .draft), .yawn)
+        XCTAssertEqual(CatGlyph(status: .execute), .loaf)
+        XCTAssertEqual(CatGlyph(status: .completed), .stretch)
+        XCTAssertEqual(CatGlyph(status: .expired), .curl)
+    }
+
+    func test_catGlyphsAreDistinctLineArt() {
+        XCTAssertEqual(CatGlyph.allCases.count, 12)
+        XCTAssertEqual(Set(CatGlyph.allCases.map(\.rawValue)).count, 12)
     }
 
     func test_killTimeFirePalette_doesNotFollowTheTheme() {

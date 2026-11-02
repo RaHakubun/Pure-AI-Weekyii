@@ -70,7 +70,9 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     /// 其他主题保持原来的圆角卡片与内容色描边。
     @ViewBuilder
     private var tileSurface: some View {
-        if skin.glyphs == .lotr, let card = skin.card {
+        if skin.glyphs == .cat, let card = skin.card {
+            shapedFaces.themedSurface(card)
+        } else if skin.glyphs == .lotr, let card = skin.card {
             // 每块瓦片用自己模块的颜色染纸，四个模块并排时才像一叠不同颜色的纸，
             // 而不是四张一样的白卡。
             shapedFaces.themedSurface(

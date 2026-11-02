@@ -164,6 +164,8 @@ struct ContentView: View {
         } icon: {
             if userSettings.selectedTheme.skin.glyphs == .lotr, let glyph = LotrGlyph(systemName: systemImage) {
                 LotrTabIcon.image(glyph, fallbackSystemName: systemImage)
+            } else if userSettings.selectedTheme.skin.glyphs == .cat, let glyph = CatGlyph(systemName: systemImage) {
+                CatTabIcon.image(glyph, fallbackSystemName: systemImage)
             } else {
                 Image(systemName: systemImage)
                     .symbolVariant(.none)

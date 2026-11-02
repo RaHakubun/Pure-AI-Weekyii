@@ -144,7 +144,18 @@ struct KillTimeSlider: View {
     /// 魔戒：滑块是一枚金戒（纸色戒心 + 锻金戒圈）；其他主题保持白色圆点。
     @ViewBuilder
     private var thumb: some View {
-        if skin.glyphs == .lotr {
+        if skin.glyphs == .cat {
+            ZStack {
+                Circle()
+                    .fill(Color.backgroundSecondary)
+                CatGlyphView(glyph: .paw)
+                    .foregroundStyle(Color.weekyiiPrimary)
+                    .padding(5)
+                Circle()
+                    .strokeBorder(Color.weekyiiPrimary.opacity(0.45), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(isDragging ? 0.22 : 0.14), radius: isDragging ? 4 : 2, x: 0, y: 1)
+        } else if skin.glyphs == .lotr {
             ZStack {
                 Ellipse()
                     .fill(Color.backgroundSecondary)

@@ -23,6 +23,8 @@ struct ThemeStatusArtwork: View {
                 SunsetStatusIllustration(renderingMode: renderingMode)
             case .lotr:
                 LotrStatusIllustration(renderingMode: renderingMode)
+            case .cat:
+                CatStatusIllustration(renderingMode: renderingMode)
             case .amber, .ocean, .forest, .rose, .lavender, .graphite, .mint, .midnight:
                 NarrativeThemeStatusIllustration(theme: theme, renderingMode: renderingMode)
             case .brutal, .neon, .paper, .terminal, .blueprint:
@@ -113,7 +115,7 @@ private struct NarrativeThemeStatusIllustration: View {
             MintGreenhouseScene(size: size, time: time)
         case .midnight:
             MidnightAuroraScene(size: size, time: time)
-        case .sunset, .lotr, .brutal, .neon, .paper, .terminal, .blueprint:
+        case .sunset, .lotr, .cat, .brutal, .neon, .paper, .terminal, .blueprint:
             Color.clear
         }
     }
@@ -1435,6 +1437,123 @@ private struct SunsetStatusIllustration: View {
                 }
         }
         .blendMode(.screen)
+    }
+}
+
+/// A cat loafing on a windowsill. The window is a line drawing; the sky is a
+/// flat wash. The body breathes, and the tail swings once every four seconds.
+private struct CatStatusIllustration: View {
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                GeometryReader { proxy in
+                    scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            }
+        } else {
+            GeometryReader { proxy in
+                scene(size: proxy.size, time: 0)
+            }
+        }
+    }
+
+    private func scene(size: CGSize, time: TimeInterval) -> some View {
+        let breath = 1 + 0.02 * CGFloat(sin(time * 0.6))
+        let wag = CGFloat(sin(time * .pi / 2))
+        let dark = colorScheme == .dark
+        let sky = Color(hex: dark ? "#2C241C" : "#F3E0D2")
+        let ink = Color(hex: dark ? "#E4CBBA" : "#5E463A")
+        let frame = Color(hex: dark ? "#D3B49B" : "#8A6A55")
+        let sillY = size.height * 0.72
+
+        return ZStack {
+            sky
+
+            Path { path in
+                let inset = min(size.width, size.height) * 0.08
+                let rect = CGRect(x: inset, y: inset * 0.6, width: size.width - inset * 2, height: sillY - inset)
+                path.addRect(rect)
+                path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+                path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+            }
+            .stroke(frame.opacity(0.85), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: sillY))
+                path.addLine(to: CGPoint(x: size.width, y: sillY + 0.6))
+            }
+            .stroke(frame.opacity(0.7), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+
+            ZStack {
+                CatWindowCat()
+                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                CatWindowTail(wag: wag)
+                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: min(size.width * 0.78, 168), height: 62)
+            .scaleEffect(breath, anchor: .bottom)
+            .position(x: size.width * 0.52, y: sillY - 22)
+        }
+    }
+}
+
+/// Side-view loaf on the sill. Drawn in a 280×120 box, then fitted to the frame.
+/// The tail is its own shape so the tip can swing.
+private struct CatWindowCat: Shape {
+    func path(in rect: CGRect) -> Path {
+        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x / 280 * rect.width, y: rect.minY + y / 120 * rect.height)
+        }
+        var path = Path()
+        path.move(to: q(70, 78))
+        path.addCurve(to: q(168, 62), control1: q(96, 48), control2: q(136, 46))
+        path.addCurve(to: q(196, 28), control1: q(178, 46), control2: q(176, 34))
+        path.addLine(to: q(188, 8))
+        path.addLine(to: q(210, 30))
+        path.addLine(to: q(226, 10))
+        path.addLine(to: q(228, 36))
+        path.addCurve(to: q(246, 78), control1: q(258, 42), control2: q(262, 64))
+        path.addCurve(to: q(168, 108), control1: q(236, 96), control2: q(206, 112))
+        path.addCurve(to: q(70, 78), control1: q(120, 118), control2: q(72, 108))
+        path.move(to: q(214, 46))
+        path.addCurve(to: q(232, 48), control1: q(220, 40), control2: q(226, 40))
+        path.move(to: q(240, 58))
+        path.addLine(to: q(268, 52))
+        path.move(to: q(242, 66))
+        path.addLine(to: q(270, 66))
+        path.move(to: q(238, 74))
+        path.addLine(to: q(264, 80))
+        path.move(to: q(196, 104))
+        path.addCurve(to: q(224, 108), control1: q(202, 94), control2: q(218, 94))
+        return path
+    }
+}
+
+private struct CatWindowTail: Shape {
+    var wag: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x / 280 * rect.width, y: rect.minY + y / 120 * rect.height)
+        }
+        let lift = wag * 14
+        var path = Path()
+        path.move(to: q(78, 70))
+        path.addCurve(to: q(36, 28 - lift), control1: q(40, 66), control2: q(18, 48 - lift * 0.4))
+        path.addCurve(to: q(52, 36 - lift * 0.3), control1: q(46, 16 - lift), control2: q(58, 22 - lift * 0.2))
+        return path
     }
 }
 

@@ -506,7 +506,7 @@ struct PastView: View {
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "clock.arrow.circlepath")
+                CatCoveredSymbol(systemName: "clock.arrow.circlepath", pointSize: 60)
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
                 
@@ -553,7 +553,8 @@ private struct PastWeekCard: View {
             WeekCard(accentColor: week.expiredTasksCount > 0 ? .taskDDL : .accentGreen) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
-                        Image(systemName: "calendar.badge.checkmark")
+                        CatCoveredSymbol(systemName: "calendar.badge.checkmark", pointSize: 18)
+                            .font(.body)
                             .foregroundColor(.weekyiiPrimary)
                         Text(week.relativeWeekLabel(referenceDate: Date()))
                             .font(.titleSmall)
@@ -567,7 +568,7 @@ private struct PastWeekCard: View {
                     }
 
                     HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "clock")
+                        CatCoveredSymbol(systemName: "clock", pointSize: 13)
                             .font(.caption)
                             .foregroundColor(.textSecondary)
                         Text(formatDateRange())
@@ -592,7 +593,7 @@ private struct PastWeekCard: View {
 
                         Spacer()
 
-                        Image(systemName: "checkmark.seal.fill")
+                        CatCoveredSymbol(systemName: "checkmark.seal.fill", pointSize: 32)
                             .font(.system(size: 32))
                             .foregroundColor(.accentGreen.opacity(0.3))
                     }

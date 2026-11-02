@@ -63,17 +63,13 @@ struct TaskRowView: View {
 
     private var rowContent: some View {
         HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
-            // Left Accent Bar
-            RoundedRectangle(cornerRadius: 2)
+            // Left Accent Bar. Cat narrows it into the tail-shaped bar from the row skin.
+            RoundedRectangle(cornerRadius: rowSkin.glyphs == .cat ? 1.5 : 2)
                 .fill(taskType.color(in: rowSkin))
-                .frame(width: 4, height: 28)
+                .frame(width: rowSkin.glyphs == .cat ? 3 : 4, height: 28)
                 .padding(.top, 2)
 
-            // Icon：始终用任务类型自己的那一套图标，主题不重画它。
-            Image(systemName: taskType.iconName)
-                .font(.headline)
-                .foregroundColor(taskType.color(in: rowSkin))
-                .frame(width: 24)
+            typeIcon
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
@@ -114,6 +110,24 @@ struct TaskRowView: View {
         }
     }
     
+    /// Built-in type icons stay on the system symbol for every theme except cat,
+    /// which draws its own line mark in the same 24 pt slot.
+    @ViewBuilder
+    private var typeIcon: some View {
+        if rowSkin.glyphs == .cat,
+           let glyph = CatGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+            CatGlyphView(glyph: glyph)
+                .frame(width: 18, height: 18)
+                .foregroundColor(taskType.color(in: rowSkin))
+                .frame(width: 24)
+        } else {
+            Image(systemName: taskType.iconName)
+                .font(.headline)
+                .foregroundColor(taskType.color(in: rowSkin))
+                .frame(width: 24)
+        }
+    }
+
     @ViewBuilder
     private var titleView: some View {
         if let titleAccessibilityIdentifier {

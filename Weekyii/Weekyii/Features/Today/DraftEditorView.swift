@@ -118,7 +118,7 @@ struct DraftEditorView: View {
                         y: 2
                     )
 
-                Image(systemName: isThawed ? "flame.fill" : "snowflake")
+                CatCoveredSymbol(systemName: isThawed ? "flame.fill" : "snowflake", pointSize: 16)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                     .contentTransition(.symbolEffect(.replace))

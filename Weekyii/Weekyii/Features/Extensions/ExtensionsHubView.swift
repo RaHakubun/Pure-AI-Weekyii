@@ -1955,11 +1955,18 @@ private struct HubModuleLabel: View {
     private var standardLabel: some View {
         HStack(spacing: 6) {
             if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(tint)
-                    .frame(width: 24, height: 24)
-                    .background(tint.opacity(0.12), in: Circle())
+                Group {
+                    if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
+                        CatGlyphView(glyph: glyph)
+                            .frame(width: 13, height: 13)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                }
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.12), in: Circle())
             }
             Text(title)
                 .font(.caption2.weight(.medium))

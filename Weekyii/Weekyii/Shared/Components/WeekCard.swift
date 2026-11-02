@@ -76,10 +76,20 @@ struct WeekCard<Content: View>: View {
     @ViewBuilder
     private func inscriptionBand(_ ink: ThemeHexPair?) -> some View {
         if let ink {
-            ElvishInscriptionBand(seed: 7, color: ink.color, opacity: 0.55, lineWidth: 0.85)
-                .frame(height: 10)
-                .padding(.horizontal, 22)
-                .padding(.top, 13)
+            Group {
+                if skin.glyphs == .cat {
+                    CatTailInscription()
+                        .stroke(
+                            ink.color.opacity(0.7),
+                            style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round)
+                        )
+                } else {
+                    ElvishInscriptionBand(seed: 7, color: ink.color, opacity: 0.55, lineWidth: 0.85)
+                }
+            }
+            .frame(height: 10)
+            .padding(.horizontal, 22)
+            .padding(.top, 13)
         }
     }
 
@@ -447,14 +457,20 @@ struct WeekSectionHeader: View {
                         )
                         .frame(height: 1)
                 } else if let mark = section.ruleEndMark {
-                    // The rule runs out into a small ring.
+                    // The rule runs out into a small mark: a ring, or a paw for the cat skin.
                     HStack(spacing: 4) {
                         Rectangle()
                             .fill(rule.color)
                             .frame(height: section.ruleWidth)
-                        Ellipse()
-                            .strokeBorder(mark.color, lineWidth: 1.2)
-                            .frame(width: 10, height: 7)
+                        if skin.glyphs == .cat {
+                            CatPawMark()
+                                .stroke(mark.color, style: StrokeStyle(lineWidth: 1.05, lineCap: .round, lineJoin: .round))
+                                .frame(width: 10, height: 7)
+                        } else {
+                            Ellipse()
+                                .strokeBorder(mark.color, lineWidth: 1.2)
+                                .frame(width: 10, height: 7)
+                        }
                     }
                     .accessibilityHidden(true)
                 } else {

@@ -101,6 +101,11 @@ struct TaskCard: View {
             LotrGlyphView(glyph: glyph)
                 .frame(width: 14, height: 14)
                 .foregroundColor(taskType.color(in: skin))
+        } else if skin.glyphs == .cat,
+                  let glyph = CatGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+            CatGlyphView(glyph: glyph)
+                .frame(width: 14, height: 14)
+                .foregroundColor(taskType.color(in: skin))
         } else {
             Image(systemName: taskType.iconName)
                 .foregroundColor(taskType.color)
@@ -137,7 +142,7 @@ struct TaskCard: View {
             // 时间信息
             if let startedAt = task.startedAt {
                 HStack(spacing: WeekSpacing.xs) {
-                    Image(systemName: "clock")
+                    CatCoveredSymbol(systemName: "clock", pointSize: 12)
                         .font(.captionSmall)
                     Text(formatTime(startedAt))
                         .font(.caption)

@@ -346,6 +346,9 @@ struct ThemedSymbol: View {
         if skin.glyphs == .lotr, let resolved = glyph ?? LotrGlyph(systemName: systemName) {
             LotrGlyphView(glyph: resolved)
                 .frame(width: size, height: size)
+        } else if skin.glyphs == .cat, let resolved = CatGlyph(systemName: systemName) {
+            CatGlyphView(glyph: resolved)
+                .frame(width: size, height: size)
         } else {
             Image(systemName: systemName)
         }
