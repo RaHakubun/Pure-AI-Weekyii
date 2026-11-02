@@ -28,7 +28,7 @@ struct WeekCard<Content: View>: View {
         } else if !useGradient, let card = skin.card {
             stack
                 .themedSurface(card, tint: cardTint, tintOpacity: cardTintOpacity)
-                .overlay(themedAccentBar(card), alignment: card.ribbonAccent ? .topLeading : .top)
+                .overlay(themedAccentBar(card), alignment: ribbonAlignment(card))
         } else {
             classicBody
         }
@@ -71,7 +71,7 @@ struct WeekCard<Content: View>: View {
             .overlay(alignment: .leading) { marginRule(feature.marginRule) }
             .themedSurface(feature.surface)
             .overlay(alignment: .top) { inscriptionBand(feature.inscription) }
-            .overlay(themedAccentBar(feature.surface), alignment: feature.surface.ribbonAccent ? .topLeading : .top)
+            .overlay(themedAccentBar(feature.surface), alignment: ribbonAlignment(feature.surface))
             // Behind the panel, so only the tips of the ears and the loop of the
             // tail show past its edges. Backgrounds are not clipped to the panel.
             .background(alignment: .topTrailing) { catEars(feature.catEars) }
@@ -136,6 +136,11 @@ struct WeekCard<Content: View>: View {
         }
     }
 
+    private func ribbonAlignment(_ surface: ThemeSurfaceSkin) -> Alignment {
+        guard surface.ribbonAccent else { return .top }
+        return surface.ribbonTrailing ? .topTrailing : .topLeading
+    }
+
     @ViewBuilder
     private func themedAccentBar(_ surface: ThemeSurfaceSkin) -> some View {
         if surface.hidesAccentBar && surface.tintsWithAccent {
@@ -149,7 +154,7 @@ struct WeekCard<Content: View>: View {
                     Rectangle().fill(Color.black.opacity(0.18)).frame(height: 1.5)
                 }
                 .frame(width: 13, height: 21)
-                .padding(.leading, 18)
+                .padding(surface.ribbonTrailing ? .trailing : .leading, surface.ribbonTrailing ? 48 : 18)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         } else if let color = accentColor {
@@ -427,6 +432,14 @@ struct WeekFeatureActionModifier: ViewModifier {
                 .background(fill)
                 .overlay(Rectangle().strokeBorder(border, lineWidth: look.borderWidth))
                 .rotationEffect(.degrees(-4))
+        case .roundedRect:
+            content
+                .foregroundColor(ink)
+                .background(fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(border, lineWidth: look.borderWidth)
+                )
         case .bracket:
             HStack(spacing: 0) {
                 Text(verbatim: "[")

@@ -40,8 +40,8 @@ struct TaskRowView: View {
                 .padding(.horizontal, 12)
                 .themedSurface(
                     row.surface,
-                    tint: row.typeChip ? taskType.color(in: rowSkin) : nil,
-                    tintOpacity: 0.07
+                    tint: row.typeChip && row.rowWashOpacity > 0 ? taskType.color(in: rowSkin) : nil,
+                    tintOpacity: row.rowWashOpacity
                 )
                 .contentShape(Rectangle())
                 .compositingGroup()
@@ -125,20 +125,31 @@ struct TaskRowView: View {
     /// the leading bar (猫猫).
     private var typeChip: some View {
         let color = taskType.color(in: rowSkin)
+        let row = rowSkin.row
+        let size = row?.chipSize ?? 32
+        let radius = row?.chipCornerRadius ?? 11
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         return ZStack {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(color.opacity(0.16))
+            shape.fill(color.opacity(row?.chipFillOpacity ?? 0.16))
+            if (row?.chipBorderOpacity ?? 0) > 0 {
+                shape.strokeBorder(color.opacity(row?.chipBorderOpacity ?? 0), lineWidth: 1)
+            }
             if rowSkin.glyphs == .cat,
                let glyph = CatGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
                 CatGlyphView(glyph: glyph)
                     .frame(width: 19, height: 19)
+            } else if rowSkin.drawsMiddleEarthGlyphs,
+                      let glyph = LotrGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+                // 指环王：盖印式方章里压中土纹样。
+                LotrGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
             } else {
                 Image(systemName: taskType.iconName)
                     .font(.system(size: 15, weight: .semibold))
             }
         }
         .foregroundColor(color)
-        .frame(width: 32, height: 32)
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 

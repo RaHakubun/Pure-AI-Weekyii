@@ -343,7 +343,7 @@ struct ThemedSymbol: View {
     @Environment(\.themeSkin) private var skin
 
     var body: some View {
-        if skin.glyphs == .lotr, let resolved = glyph ?? LotrGlyph(systemName: systemName) {
+        if skin.drawsMiddleEarthGlyphs, let resolved = glyph ?? LotrGlyph(systemName: systemName) {
             LotrGlyphView(glyph: resolved)
                 .frame(width: size, height: size)
         } else if skin.glyphs == .cat, let resolved = CatGlyph(systemName: systemName) {

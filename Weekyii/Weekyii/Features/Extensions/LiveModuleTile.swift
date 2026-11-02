@@ -77,6 +77,13 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
                 tint: currentTint,
                 tintOpacity: colorScheme == .dark ? 0.10 : 0.09
             )
+        } else if skin.glyphs == .ring, let card = skin.card {
+            // 指环王：只淡淡带一点模块色，黑金之外不再加别的颜色。
+            shapedFaces.themedSurface(
+                card,
+                tint: currentTint,
+                tintOpacity: colorScheme == .dark ? 0.12 : 0.10
+            )
         } else if skin.glyphs == .lotr, let card = skin.card {
             // 每块瓦片用自己模块的颜色染纸，四个模块并排时才像一叠不同颜色的纸，
             // 而不是四张一样的白卡。

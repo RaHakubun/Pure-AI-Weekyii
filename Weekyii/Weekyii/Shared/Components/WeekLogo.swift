@@ -33,6 +33,10 @@ struct WeekLogo: View {
                 endPoint: .bottom
             )
         }
+        if skin.glyphs == .ring {
+            // 指环王：单一锻金，自上而下。
+            return RingGilt.gradient
+        }
         if isCat {
             // Ginger fur, lighter at the top like a sunlit back.
             return LinearGradient(

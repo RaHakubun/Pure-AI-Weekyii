@@ -96,7 +96,7 @@ struct TaskCard: View {
 
     @ViewBuilder
     private var taskTypeIcon: some View {
-        if skin.glyphs == .lotr,
+        if skin.drawsMiddleEarthGlyphs,
            let glyph = LotrGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
             LotrGlyphView(glyph: glyph)
                 .frame(width: 14, height: 14)

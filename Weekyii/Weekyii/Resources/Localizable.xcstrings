@@ -11924,6 +11924,22 @@
         }
       }
     },
+    "theme.ring.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lord of the Rings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指环王"
+          }
+        }
+      }
+    },
     "theme.terminal.name" : {
       "comment" : "",
       "extractionState" : "manual",

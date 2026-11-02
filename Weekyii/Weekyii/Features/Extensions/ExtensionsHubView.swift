@@ -1922,7 +1922,7 @@ private struct HubModuleLabel: View {
     @Environment(\.themeSkin) private var skin
 
     var body: some View {
-        if skin.glyphs == .lotr, let section = skin.section, !overImage {
+        if skin.drawsMiddleEarthGlyphs, let section = skin.section, !overImage {
             bookLabel(section)
         } else {
             standardLabel

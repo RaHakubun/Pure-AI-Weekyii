@@ -430,12 +430,12 @@ struct TodayView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
-                        Text(todaySkin.glyphs == .lotr
+                        Text(todaySkin.drawsMiddleEarthGlyphs
                              ? String(localized: "today.days_journeyed")
                              : String(localized: "today.days_started"))
                             .font(.caption)
                             .foregroundColor(.textSecondary)
-                        if todaySkin.glyphs == .lotr {
+                        if todaySkin.drawsMiddleEarthGlyphs {
                             Text("\(appState.daysStartedCount)")
                                 .font(.system(size: 30, weight: .semibold, design: .serif))
                                 .monospacedDigit()
@@ -454,7 +454,7 @@ struct TodayView: View {
                     .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
-                if todaySkin.glyphs == .lotr {
+                if todaySkin.drawsMiddleEarthGlyphs {
                     HStack(spacing: 6) {
                         LotrGlyphView(glyph: .quill)
                             .frame(width: 15, height: 15)
@@ -1349,6 +1349,9 @@ struct TodayView: View {
             } else if userSettings.selectedTheme == .cat {
                 CatSunbeamBackground(animationsActive: animationsActive)
                     .transition(.opacity)
+            } else if userSettings.selectedTheme == .ring {
+                RingStudyBackground(animationsActive: animationsActive)
+                    .transition(.opacity)
             }
         }
         .ignoresSafeArea()
@@ -1656,7 +1659,16 @@ private struct SectionToggleView: View {
     let onSelect: (TodaySection) -> Void
     @Environment(\.themeSkin) private var skin
 
-    private var isLotr: Bool { skin.glyphs == .lotr }
+    /// 魔戒 and 指环王 draw a flat book surface: no gloss, no inner shadow.
+    private var isLotr: Bool { skin.drawsMiddleEarthGlyphs }
+    /// 指环王 keeps its 8 / 6 pt radius scale instead of a capsule.
+    private var isRing: Bool { skin.glyphs == .ring }
+    private var trackShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: isRing ? 8 : height / 2, style: .continuous)
+    }
+    private var indicatorShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: isRing ? 6 : (height - 6) / 2, style: .continuous)
+    }
 
     private var indicatorColors: [Color] {
         if let gilded = skin.gildedFill {
@@ -1724,7 +1736,7 @@ private struct SectionToggleView: View {
                 let indicatorX = progress * halfWidth
                 
                 // 滑动的高亮胶囊 - 带渐变
-                Capsule()
+                indicatorShape
                     .fill(
                         LinearGradient(
                             colors: indicatorColors,
@@ -1736,7 +1748,7 @@ private struct SectionToggleView: View {
                     .offset(x: indicatorX + 2, y: 3)
                     // 顶部高光（魔戒是平的金箔，不加高光）
                     .overlay(
-                        Capsule()
+                        indicatorShape
                             .fill(
                                 LinearGradient(
                                     colors: isLotr ? [Color.clear] : [
@@ -1753,7 +1765,7 @@ private struct SectionToggleView: View {
                     )
                     // 边框
                     .overlay(
-                        Capsule()
+                        indicatorShape
                             .strokeBorder(indicatorRim, lineWidth: skin.gildedFill != nil ? 1 : (isLotr ? 0 : 0.5))
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
@@ -1765,10 +1777,10 @@ private struct SectionToggleView: View {
         )
         .background(
             // 底层背景胶囊 - 带内阴影效果
-            Capsule()
+            trackShape
                 .fill(isLotr ? Color.backgroundTertiary.opacity(0.55) : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
-                    Capsule()
+                    trackShape
                         .strokeBorder(
                             LinearGradient(
                                 colors: isLotr
@@ -1786,14 +1798,14 @@ private struct SectionToggleView: View {
                 )
                 // 内阴影模拟
                 .overlay(
-                    Capsule()
+                    trackShape
                         .stroke(Color.black.opacity(isLotr ? 0 : 0.08), lineWidth: 2)
                         .blur(radius: 2)
-                        .mask(Capsule().fill(Color.black))
+                        .mask(trackShape.fill(Color.black))
                         .offset(y: 1)
                 )
         )
-        .clipShape(Capsule())
+        .clipShape(trackShape)
         .frame(height: height)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress)
     }
@@ -2273,6 +2285,120 @@ private struct CatSunbeamBackground: View {
                 }
             }
         }
+    }
+}
+
+/// 指环王：浅色是一张羊皮纸，下三分之一压着墨线山脉、虚线古道与罗盘；
+/// 深色是暖黑书房，顶上一团烛光，纸上只剩淡金的地图线。
+private struct RingStudyBackground: View {
+    let animationsActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
+
+    var body: some View {
+        Group {
+            if shouldAnimate {
+                TimelineView(.animation(minimumInterval: 1.0 / 8.0)) { timeline in
+                    scene(time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            } else {
+                scene(time: 0)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func scene(time: TimeInterval) -> some View {
+        let isDark = colorScheme == .dark
+        // 烛光只在深色里轻轻呼吸。
+        let flicker = 0.88 + 0.12 * CGFloat(sin(time * 1.3) * 0.6 + sin(time * 3.1) * 0.4)
+        ZStack {
+            if isDark {
+                RadialGradient(
+                    colors: [Color(hex: "#E0B86A").opacity(0.14 * Double(flicker)), Color(hex: "#E0B86A").opacity(0)],
+                    center: UnitPoint(x: 0.5, y: 0),
+                    startRadius: 0,
+                    endRadius: 380
+                )
+            } else {
+                // 羊皮纸边缘微暗。
+                RadialGradient(
+                    colors: [Color.clear, Color(hex: "#8C7A5A").opacity(0.10)],
+                    center: .center,
+                    startRadius: 220,
+                    endRadius: 620
+                )
+            }
+            Canvas { context, size in
+                drawMap(in: &context, size: size, isDark: isDark)
+            }
+        }
+    }
+
+    private func drawMap(in context: inout GraphicsContext, size: CGSize, isDark: Bool) {
+        let ink = isDark ? Color(hex: "#8C7240").opacity(0.22) : Color(hex: "#5E584E").opacity(0.16)
+        let w = size.width
+        let h = size.height
+        let base = h * 0.86
+
+        // 山脉：一串尖峰，每座带三道阴影排线。
+        let peaks: [(x: CGFloat, height: CGFloat, width: CGFloat)] = [
+            (0.06, 0.07, 0.10), (0.16, 0.10, 0.12), (0.28, 0.06, 0.09),
+            (0.62, 0.08, 0.11), (0.74, 0.12, 0.13), (0.88, 0.07, 0.10),
+        ]
+        for peak in peaks {
+            let cx = w * peak.x
+            let ph = h * peak.height
+            let half = w * peak.width / 2
+            var ridge = Path()
+            ridge.move(to: CGPoint(x: cx - half, y: base))
+            ridge.addLine(to: CGPoint(x: cx, y: base - ph))
+            ridge.addLine(to: CGPoint(x: cx + half, y: base))
+            context.stroke(ridge, with: .color(ink), style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+            var hatch = Path()
+            for step in 1...3 {
+                let t = CGFloat(step) / 4
+                let top = CGPoint(x: cx + half * t * 0.35, y: base - ph * (1 - t * 0.35))
+                hatch.move(to: top)
+                hatch.addLine(to: CGPoint(x: top.x + half * 0.28, y: base - ph * 0.08))
+            }
+            context.stroke(hatch, with: .color(ink.opacity(0.8)), lineWidth: 0.7)
+        }
+
+        // 虚线古道，从左下蜿蜒到右侧。
+        var road = Path()
+        road.move(to: CGPoint(x: 0, y: h * 0.95))
+        road.addCurve(
+            to: CGPoint(x: w, y: h * 0.90),
+            control1: CGPoint(x: w * 0.35, y: h * 0.86),
+            control2: CGPoint(x: w * 0.6, y: h * 1.0)
+        )
+        context.stroke(road, with: .color(ink), style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [4, 5]))
+
+        // 罗盘：右上角一枚细线罗盘。
+        let compass = CGPoint(x: w * 0.84, y: isDark ? h * 0.72 : h * 0.70)
+        let r: CGFloat = 22
+        context.stroke(
+            Path(ellipseIn: CGRect(x: compass.x - r, y: compass.y - r, width: r * 2, height: r * 2)),
+            with: .color(ink),
+            lineWidth: 0.8
+        )
+        var star = Path()
+        for index in 0..<4 {
+            let angle = CGFloat(index) * .pi / 2 - .pi / 2
+            let tip = CGPoint(x: compass.x + cos(angle) * r * 1.25, y: compass.y + sin(angle) * r * 1.25)
+            let left = CGPoint(x: compass.x + cos(angle - .pi / 2) * 4, y: compass.y + sin(angle - .pi / 2) * 4)
+            let right = CGPoint(x: compass.x + cos(angle + .pi / 2) * 4, y: compass.y + sin(angle + .pi / 2) * 4)
+            star.move(to: left)
+            star.addLine(to: tip)
+            star.addLine(to: right)
+        }
+        context.stroke(star, with: .color(ink), lineWidth: 0.8)
     }
 }
 
