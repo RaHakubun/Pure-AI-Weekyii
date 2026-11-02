@@ -4174,25 +4174,38 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_themeSkin_catDrawsLineArtComponents() {
+    func test_themeSkin_catDrawsSunnyNapComponents() {
         let skin = WeekTheme.cat.skin
         XCTAssertNotEqual(skin, .classic)
-        XCTAssertNotNil(skin.card)
-        XCTAssertNotNil(skin.row)
-        XCTAssertNotNil(skin.feature?.inscription)
+        // 午睡橘猫: rounded type, borderless cushion cards tinted by their accent.
+        XCTAssertEqual(skin.typography.titleDesign, .rounded)
+        XCTAssertEqual(skin.typography.bodyDesign, .rounded)
+        XCTAssertEqual(skin.card?.borderWidth, 0)
+        XCTAssertEqual(skin.card?.tintsWithAccent, true)
+        XCTAssertEqual(skin.card?.hidesAccentBar, true)
+        // Task rows: type-colour wash with the icon in a chip.
+        XCTAssertEqual(skin.row?.typeChip, true)
+        XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
+        // The focus panel is the cat: ginger fur, ears and tail, no inscription.
+        XCTAssertNotNil(skin.feature?.catEars)
+        XCTAssertNil(skin.feature?.inscription)
+        if case .gradient = skin.feature?.surface.material {} else {
+            XCTFail("猫猫 focus panel must be a ginger gradient")
+        }
+        XCTAssertEqual(skin.badge?.kind, .softPill)
+        XCTAssertEqual(skin.section?.count, .capsule)
+        XCTAssertEqual(skin.section?.ruleDotted, true)
         XCTAssertNotNil(skin.section?.ruleEndMark)
-        XCTAssertEqual(skin.badge?.kind, .catEars)
+        XCTAssertEqual(skin.icon?.tintsFill, true)
+        XCTAssertNotNil(skin.gildedFill)
+        XCTAssertEqual(skin.backdrop, .none)
         XCTAssertTrue(skin.softShadows)
         XCTAssertEqual(skin.glyphs, .cat)
-        XCTAssertNotNil(skin.icon)
-        if case .pawTrail = skin.backdrop {} else {
-            XCTFail("猫猫 pages must carry the paw-trail backdrop")
-        }
-        XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
-        XCTAssertNil(skin.gildedFill)
-        for theme in WeekTheme.allCases where ![.lotr, .cat].contains(theme) {
-            XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
-            XCTAssertNotEqual(theme.skin.badge?.kind, .catEars, "\(theme.rawValue) must not grow cat ears")
+        for theme in WeekTheme.allCases where theme != .cat {
+            XCTAssertNotEqual(theme.skin.glyphs, .cat, "\(theme.rawValue) must not draw cat glyphs")
+            XCTAssertNil(theme.skin.feature?.catEars, "\(theme.rawValue) must not grow cat ears")
+            XCTAssertNotEqual(theme.skin.badge?.kind, .softPill, "\(theme.rawValue) must keep its own badge")
+            XCTAssertNotEqual(theme.skin.row?.typeChip, true, "\(theme.rawValue) must keep its type bar")
         }
     }
 
@@ -4203,33 +4216,42 @@ final class ModelTests: XCTestCase {
     }
 
     func test_catGlyphCoversEveryCallSite() {
-        XCTAssertEqual(CatGlyph(systemName: "target"), .loaf)
-        XCTAssertEqual(CatGlyph(systemName: "sun.max"), .loaf)
-        XCTAssertEqual(CatGlyph(systemName: "clock"), .saucer)
-        XCTAssertEqual(CatGlyph(systemName: "hourglass"), .saucer)
+        XCTAssertEqual(CatGlyph(systemName: "target"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "sun.max"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "flame"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "clock"), .alarm)
+        XCTAssertEqual(CatGlyph(systemName: "hourglass"), .alarm)
         XCTAssertEqual(CatGlyph(systemName: "clock.arrow.circlepath"), .curl)
-        XCTAssertEqual(CatGlyph(systemName: "calendar"), .cushion)
-        XCTAssertEqual(CatGlyph(systemName: "square.grid.2x2"), .box)
-        XCTAssertEqual(CatGlyph(systemName: "gearshape"), .whisker)
-        XCTAssertEqual(CatGlyph(systemName: "checkmark.circle"), .stretch)
-        XCTAssertEqual(CatGlyph(systemName: "flame"), .yawn)
-        XCTAssertEqual(CatGlyph(systemName: "leaf"), .yarnBall)
         XCTAssertEqual(CatGlyph(systemName: "snowflake"), .curl)
+        XCTAssertEqual(CatGlyph(systemName: "square.grid.2x2"), .box)
+        XCTAssertEqual(CatGlyph(systemName: "gearshape"), .bell)
+        XCTAssertEqual(CatGlyph(systemName: "checkmark.circle"), .bone)
+        XCTAssertEqual(CatGlyph(systemName: "leaf"), .yarn)
+        // A plain calendar stays an SF Symbol; only the 未来 tab redraws it.
+        XCTAssertNil(CatGlyph(systemName: "calendar"))
+        XCTAssertEqual(CatGlyph(tabSystemName: "calendar"), .gaze)
+        XCTAssertEqual(CatGlyph(tabSystemName: "sun.max"), .face)
+        XCTAssertEqual(CatGlyph(tabSystemName: "clock.arrow.circlepath"), .curl)
+        XCTAssertEqual(CatGlyph(tabSystemName: "square.grid.2x2"), .box)
+        XCTAssertEqual(CatGlyph(tabSystemName: "gearshape"), .bell)
         XCTAssertNil(CatGlyph(systemName: "star"))
         XCTAssertEqual(CatGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .paw)
-        XCTAssertEqual(CatGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .fishBone)
-        XCTAssertEqual(CatGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .yarnBall)
+        XCTAssertEqual(CatGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .alarm)
+        XCTAssertEqual(CatGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .yarn)
         XCTAssertNil(CatGlyph(builtInType: .leisure, iconName: "star"))
         XCTAssertEqual(CatGlyph(status: .empty), .curl)
-        XCTAssertEqual(CatGlyph(status: .draft), .yawn)
-        XCTAssertEqual(CatGlyph(status: .execute), .loaf)
-        XCTAssertEqual(CatGlyph(status: .completed), .stretch)
+        XCTAssertEqual(CatGlyph(status: .draft), .doze)
+        XCTAssertEqual(CatGlyph(status: .execute), .face)
+        XCTAssertEqual(CatGlyph(status: .completed), .bone)
         XCTAssertEqual(CatGlyph(status: .expired), .curl)
     }
 
-    func test_catGlyphsAreDistinctLineArt() {
-        XCTAssertEqual(CatGlyph.allCases.count, 12)
-        XCTAssertEqual(Set(CatGlyph.allCases.map(\.rawValue)).count, 12)
+    func test_catGlyphsAreDistinctSilhouettes() {
+        XCTAssertEqual(CatGlyph.allCases.count, 11)
+        XCTAssertEqual(Set(CatGlyph.allCases.map(\.rawValue)).count, 11)
+        for glyph in CatGlyph.allCases {
+            XCTAssertFalse(glyph.layers.isEmpty, "\(glyph.rawValue) must draw something")
+        }
     }
 
     func test_killTimeFirePalette_doesNotFollowTheTheme() {

@@ -1440,8 +1440,10 @@ private struct SunsetStatusIllustration: View {
     }
 }
 
-/// A cat loafing on a windowsill. The window is a line drawing; the sky is a
-/// flat wash. The body breathes, and the tail swings once every four seconds.
+/// 午睡橘猫: a flat sunny room. A window with the sun (night: a crescent moon
+/// and stars), a beam of light falling across the floor onto a cushion, and a
+/// curled ginger cat asleep on it with a few floating "z". The cat breathes and
+/// the z drift up. Drawn in a 318 × 104 design space, scaled to fill the frame.
 private struct CatStatusIllustration: View {
     let renderingMode: ThemeStatusArtworkRenderingMode
 
@@ -1456,104 +1458,169 @@ private struct CatStatusIllustration: View {
     var body: some View {
         if shouldAnimate {
             TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
-                GeometryReader { proxy in
-                    scene(size: proxy.size, time: timeline.date.timeIntervalSinceReferenceDate)
-                }
+                scene(time: timeline.date.timeIntervalSinceReferenceDate)
             }
         } else {
-            GeometryReader { proxy in
-                scene(size: proxy.size, time: 0)
-            }
+            scene(time: 0)
         }
     }
 
-    private func scene(size: CGSize, time: TimeInterval) -> some View {
-        let breath = 1 + 0.02 * CGFloat(sin(time * 0.6))
-        let wag = CGFloat(sin(time * .pi / 2))
+    private struct Colors {
+        let wallTop, wallBottom, floor, skyTop, skyBottom, windowFrame, beam: Color
+        let cushion, cushionShade, fur, stripe, face, snore: Color
+
+        init(dark: Bool) {
+            wallTop = Color(hex: dark ? "#2A211B" : "#FBE9D7")
+            wallBottom = Color(hex: dark ? "#221B16" : "#F6DCC4")
+            floor = Color(hex: dark ? "#1E1814" : "#F0D2B8")
+            skyTop = Color(hex: dark ? "#1C2840" : "#CFE6EF")
+            skyBottom = Color(hex: dark ? "#2C3A56" : "#EAF4F2")
+            windowFrame = Color(hex: dark ? "#3A2E25" : "#FFFDF9")
+            beam = Color(hex: dark ? "#F7E7C6" : "#FFF6E6")
+            cushion = Color(hex: dark ? "#5C3B33" : "#E8B3A1")
+            cushionShade = Color(hex: dark ? "#4A2F29" : "#DC9D88")
+            fur = Color(hex: dark ? "#D9824A" : "#EE9558")
+            stripe = Color(hex: dark ? "#A85A2C" : "#C96A33")
+            face = Color(hex: "#3A2015")
+            snore = Color(hex: dark ? "#C7B5A4" : "#A99686")
+        }
+    }
+
+    private func scene(time: TimeInterval) -> some View {
         let dark = colorScheme == .dark
-        let sky = Color(hex: dark ? "#2C241C" : "#F3E0D2")
-        let ink = Color(hex: dark ? "#E4CBBA" : "#5E463A")
-        let frame = Color(hex: dark ? "#D3B49B" : "#8A6A55")
-        let sillY = size.height * 0.72
+        let colors = Colors(dark: dark)
+        let breath = 1 + 0.03 * CGFloat(sin(time * 1.2))
+        return Canvas { context, size in
+            // Aspect fill: the room always covers the frame, centred.
+            let scale = max(size.width / 318, size.height / 104)
+            context.translateBy(x: (size.width - 318 * scale) / 2, y: (size.height - 104 * scale) / 2)
+            context.scaleBy(x: scale, y: scale)
 
-        return ZStack {
-            sky
+            // Wall and floor.
+            let wall = Path(CGRect(x: -40, y: -20, width: 398, height: 104))
+            context.fill(wall, with: .linearGradient(
+                Gradient(colors: [colors.wallTop, colors.wallBottom]),
+                startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: 84)
+            ))
+            context.fill(Path(CGRect(x: -40, y: 84, width: 398, height: 40)), with: .color(colors.floor))
 
-            Path { path in
-                let inset = min(size.width, size.height) * 0.08
-                let rect = CGRect(x: inset, y: inset * 0.6, width: size.width - inset * 2, height: sillY - inset)
-                path.addRect(rect)
-                path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-                path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-                path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-                path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+            // Window.
+            let window = CGRect(x: 192, y: 10, width: 96, height: 56)
+            let frame = Path(roundedRect: window.insetBy(dx: -4, dy: -4), cornerRadius: 10)
+            context.fill(frame, with: .color(colors.windowFrame))
+            let pane = Path(roundedRect: window, cornerRadius: 7)
+            context.fill(pane, with: .linearGradient(
+                Gradient(colors: [colors.skyTop, colors.skyBottom]),
+                startPoint: CGPoint(x: 0, y: window.minY), endPoint: CGPoint(x: 0, y: window.maxY)
+            ))
+            var sky = context
+            sky.clip(to: pane)
+            if dark {
+                // A crescent: a full disc with a second disc cut out of it.
+                sky.drawLayer { layer in
+                    layer.fill(Path(ellipseIn: CGRect(x: 252, y: 18, width: 18, height: 18)), with: .color(Color(hex: "#F7E7C6")))
+                    layer.blendMode = .destinationOut
+                    layer.fill(Path(ellipseIn: CGRect(x: 258, y: 14, width: 17, height: 17)), with: .color(.black))
+                }
+                for (x, y, r) in [(206.0, 22.0, 1.1), (222.0, 46.0, 0.8), (240.0, 16.0, 0.9), (278.0, 50.0, 1.0), (232.0, 30.0, 0.7)] {
+                    let twinkle = 0.6 + 0.4 * sin(time * 1.3 + x)
+                    sky.fill(
+                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                        with: .color(Color(hex: "#F7E7C6").opacity(twinkle))
+                    )
+                }
+            } else {
+                sky.fill(Path(ellipseIn: CGRect(x: 250, y: 18, width: 22, height: 22)), with: .color(Color(hex: "#FFE3A3")))
+                sky.fill(
+                    Path(roundedRect: CGRect(x: 204, y: 44, width: 30, height: 7), cornerRadius: 3.5),
+                    with: .color(.white.opacity(0.85))
+                )
             }
-            .stroke(frame.opacity(0.85), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+            // Mullions.
+            var mullions = Path()
+            mullions.move(to: CGPoint(x: window.midX, y: window.minY))
+            mullions.addLine(to: CGPoint(x: window.midX, y: window.maxY))
+            mullions.move(to: CGPoint(x: window.minX, y: window.midY))
+            mullions.addLine(to: CGPoint(x: window.maxX, y: window.midY))
+            context.stroke(mullions, with: .color(colors.windowFrame), lineWidth: 3)
 
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: sillY))
-                path.addLine(to: CGPoint(x: size.width, y: sillY + 0.6))
+            // The beam of light falling from the window onto the cushion.
+            var beam = Path()
+            beam.move(to: CGPoint(x: 192, y: 66))
+            beam.addLine(to: CGPoint(x: 288, y: 66))
+            beam.addLine(to: CGPoint(x: 226, y: 100))
+            beam.addLine(to: CGPoint(x: 96, y: 100))
+            beam.closeSubpath()
+            context.fill(beam, with: .linearGradient(
+                Gradient(colors: [colors.beam.opacity(dark ? 0.10 : 0.70), colors.beam.opacity(0)]),
+                startPoint: CGPoint(x: 240, y: 66), endPoint: CGPoint(x: 160, y: 104)
+            ))
+
+            // Cushion.
+            context.fill(Path(ellipseIn: CGRect(x: 92, y: 78, width: 124, height: 22)), with: .color(colors.cushionShade))
+            context.fill(Path(ellipseIn: CGRect(x: 96, y: 74, width: 116, height: 18)), with: .color(colors.cushion))
+
+            // The cat, breathing from the cushion up.
+            var cat = context
+            cat.translateBy(x: 0, y: 82)
+            cat.scaleBy(x: 1, y: breath)
+            cat.translateBy(x: 0, y: -82)
+
+            // Tail wrapped round the front.
+            var tail = Path()
+            tail.move(to: CGPoint(x: 192, y: 72))
+            tail.addCurve(to: CGPoint(x: 150, y: 84), control1: CGPoint(x: 204, y: 84), control2: CGPoint(x: 176, y: 88))
+            tail.addCurve(to: CGPoint(x: 140, y: 85), control1: CGPoint(x: 146, y: 84), control2: CGPoint(x: 143, y: 86))
+            // Body.
+            cat.fill(Path(ellipseIn: CGRect(x: 120, y: 54, width: 80, height: 30)), with: .color(colors.fur))
+            // Stripes over the back.
+            var stripes = Path()
+            for x in [154.0, 166.0, 178.0] {
+                stripes.move(to: CGPoint(x: x - 3, y: 56))
+                stripes.addQuadCurve(to: CGPoint(x: x + 1, y: 64), control: CGPoint(x: x + 2, y: 58))
             }
-            .stroke(frame.opacity(0.7), style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+            cat.stroke(stripes, with: .color(colors.stripe), style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
+            cat.stroke(tail, with: .color(colors.fur), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            var tailTip = Path()
+            tailTip.move(to: CGPoint(x: 146, y: 85))
+            tailTip.addLine(to: CGPoint(x: 140, y: 85))
+            cat.stroke(tailTip, with: .color(colors.stripe), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            // Head tucked on the leading end, with two ears.
+            var ears = Path()
+            ears.move(to: CGPoint(x: 113, y: 62))
+            ears.addLine(to: CGPoint(x: 114, y: 47))
+            ears.addLine(to: CGPoint(x: 124, y: 56))
+            ears.closeSubpath()
+            ears.move(to: CGPoint(x: 130, y: 55))
+            ears.addLine(to: CGPoint(x: 140, y: 47))
+            ears.addLine(to: CGPoint(x: 142, y: 62))
+            ears.closeSubpath()
+            cat.fill(ears, with: .color(colors.fur))
+            cat.fill(Path(ellipseIn: CGRect(x: 110, y: 53, width: 34, height: 28)), with: .color(colors.fur))
+            // Closed eyes and a small nose.
+            var eyes = Path()
+            eyes.move(to: CGPoint(x: 116, y: 66))
+            eyes.addQuadCurve(to: CGPoint(x: 123, y: 66), control: CGPoint(x: 119.5, y: 69))
+            eyes.move(to: CGPoint(x: 131, y: 66))
+            eyes.addQuadCurve(to: CGPoint(x: 138, y: 66), control: CGPoint(x: 134.5, y: 69))
+            cat.stroke(eyes, with: .color(colors.face), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            cat.fill(Path(ellipseIn: CGRect(x: 125.5, y: 70, width: 3, height: 2.2)), with: .color(colors.face))
 
-            ZStack {
-                CatWindowCat()
-                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
-                CatWindowTail(wag: wag)
-                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+            // Floating z z z, drifting up and fading out in turn.
+            for index in 0..<3 {
+                let phase = (time * 0.35 + Double(index) / 3).truncatingRemainder(dividingBy: 1)
+                let rise = CGFloat(phase) * 10
+                let alpha = time == 0 ? 0.85 - Double(index) * 0.2 : sin(phase * .pi)
+                let x = 104 - CGFloat(index) * 9
+                let y = 42 - CGFloat(index) * 9 - rise
+                context.draw(
+                    Text(verbatim: "z")
+                        .font(.system(size: 11 - CGFloat(index) * 1.5, weight: .heavy, design: .rounded))
+                        .foregroundColor(colors.snore.opacity(alpha)),
+                    at: CGPoint(x: x, y: y)
+                )
             }
-            .frame(width: min(size.width * 0.78, 168), height: 62)
-            .scaleEffect(breath, anchor: .bottom)
-            .position(x: size.width * 0.52, y: sillY - 22)
         }
-    }
-}
-
-/// Side-view loaf on the sill. Drawn in a 280×120 box, then fitted to the frame.
-/// The tail is its own shape so the tip can swing.
-private struct CatWindowCat: Shape {
-    func path(in rect: CGRect) -> Path {
-        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x / 280 * rect.width, y: rect.minY + y / 120 * rect.height)
-        }
-        var path = Path()
-        path.move(to: q(70, 78))
-        path.addCurve(to: q(168, 62), control1: q(96, 48), control2: q(136, 46))
-        path.addCurve(to: q(196, 28), control1: q(178, 46), control2: q(176, 34))
-        path.addLine(to: q(188, 8))
-        path.addLine(to: q(210, 30))
-        path.addLine(to: q(226, 10))
-        path.addLine(to: q(228, 36))
-        path.addCurve(to: q(246, 78), control1: q(258, 42), control2: q(262, 64))
-        path.addCurve(to: q(168, 108), control1: q(236, 96), control2: q(206, 112))
-        path.addCurve(to: q(70, 78), control1: q(120, 118), control2: q(72, 108))
-        path.move(to: q(214, 46))
-        path.addCurve(to: q(232, 48), control1: q(220, 40), control2: q(226, 40))
-        path.move(to: q(240, 58))
-        path.addLine(to: q(268, 52))
-        path.move(to: q(242, 66))
-        path.addLine(to: q(270, 66))
-        path.move(to: q(238, 74))
-        path.addLine(to: q(264, 80))
-        path.move(to: q(196, 104))
-        path.addCurve(to: q(224, 108), control1: q(202, 94), control2: q(218, 94))
-        return path
-    }
-}
-
-private struct CatWindowTail: Shape {
-    var wag: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x / 280 * rect.width, y: rect.minY + y / 120 * rect.height)
-        }
-        let lift = wag * 14
-        var path = Path()
-        path.move(to: q(78, 70))
-        path.addCurve(to: q(36, 28 - lift), control1: q(40, 66), control2: q(18, 48 - lift * 0.4))
-        path.addCurve(to: q(52, 36 - lift * 0.3), control1: q(46, 16 - lift), control2: q(58, 22 - lift * 0.2))
-        return path
     }
 }
 

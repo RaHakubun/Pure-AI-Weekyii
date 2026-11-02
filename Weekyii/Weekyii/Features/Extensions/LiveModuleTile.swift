@@ -71,7 +71,12 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     @ViewBuilder
     private var tileSurface: some View {
         if skin.glyphs == .cat, let card = skin.card {
-            shapedFaces.themedSurface(card)
+            // 猫猫：软垫卡片用模块自己的颜色淡淡染一层，不加色条。
+            shapedFaces.themedSurface(
+                card,
+                tint: currentTint,
+                tintOpacity: colorScheme == .dark ? 0.10 : 0.09
+            )
         } else if skin.glyphs == .lotr, let card = skin.card {
             // 每块瓦片用自己模块的颜色染纸，四个模块并排时才像一叠不同颜色的纸，
             // 而不是四张一样的白卡。

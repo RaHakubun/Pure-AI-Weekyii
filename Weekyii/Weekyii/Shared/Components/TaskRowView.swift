@@ -38,7 +38,11 @@ struct TaskRowView: View {
             rowContent
                 .padding(.vertical, 10)
                 .padding(.horizontal, 12)
-                .themedSurface(row.surface)
+                .themedSurface(
+                    row.surface,
+                    tint: row.typeChip ? taskType.color(in: rowSkin) : nil,
+                    tintOpacity: 0.07
+                )
                 .contentShape(Rectangle())
                 .compositingGroup()
         } else {
@@ -61,15 +65,22 @@ struct TaskRowView: View {
         }
     }
 
-    private var rowContent: some View {
-        HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
-            // Left Accent Bar. Cat narrows it into the tail-shaped bar from the row skin.
-            RoundedRectangle(cornerRadius: rowSkin.glyphs == .cat ? 1.5 : 2)
-                .fill(taskType.color(in: rowSkin))
-                .frame(width: rowSkin.glyphs == .cat ? 3 : 4, height: 28)
-                .padding(.top, 2)
+    /// The type colour washes the row and the icon sits in a chip (猫猫).
+    private var usesTypeChip: Bool { rowSkin.row?.typeChip == true }
 
-            typeIcon
+    private var rowContent: some View {
+        HStack(alignment: usesTypeChip ? .center : .firstTextBaseline, spacing: usesTypeChip ? 10 : WeekSpacing.sm) {
+            if usesTypeChip {
+                typeChip
+            } else {
+                // Left Accent Bar.
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(taskType.color(in: rowSkin))
+                    .frame(width: 4, height: 28)
+                    .padding(.top, 2)
+
+                typeIcon
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
@@ -110,8 +121,29 @@ struct TaskRowView: View {
         }
     }
     
+    /// The type icon in a 32 pt rounded chip of the type colour, in place of
+    /// the leading bar (猫猫).
+    private var typeChip: some View {
+        let color = taskType.color(in: rowSkin)
+        return ZStack {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(color.opacity(0.16))
+            if rowSkin.glyphs == .cat,
+               let glyph = CatGlyph(builtInType: taskType.baseKind, iconName: taskType.iconName) {
+                CatGlyphView(glyph: glyph)
+                    .frame(width: 19, height: 19)
+            } else {
+                Image(systemName: taskType.iconName)
+                    .font(.system(size: 15, weight: .semibold))
+            }
+        }
+        .foregroundColor(color)
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+    }
+
     /// Built-in type icons stay on the system symbol for every theme except cat,
-    /// which draws its own line mark in the same 24 pt slot.
+    /// which draws its own mark in the same 24 pt slot.
     @ViewBuilder
     private var typeIcon: some View {
         if rowSkin.glyphs == .cat,

@@ -37,14 +37,19 @@ struct WeekCard<Content: View>: View {
     /// Skins that tint their paper take the caller's accent as a wash, so the
     /// cards on one page stop looking like one flat sheet.
     private var cardTint: Color? {
-        guard skin.card?.tintsWithAccent == true else { return nil }
-        return accentColor?.weekPaperDye
+        guard let card = skin.card, card.tintsWithAccent else { return nil }
+        // A cushion takes the accent as it is; paper takes it as a dye.
+        return card.hidesAccentBar ? accentColor : accentColor?.weekPaperDye
     }
 
     /// Dark paper needs a heavier wash to read at all; light paper turns muddy
     /// past about a quarter.
     private var cardTintOpacity: Double {
-        colorScheme == .dark ? 0.18 : 0.22
+        if skin.card?.hidesAccentBar == true {
+            // A soft wash on a cushion, not a dyed sheet.
+            return colorScheme == .dark ? 0.10 : 0.09
+        }
+        return colorScheme == .dark ? 0.18 : 0.22
     }
 
     private var stack: some View {
@@ -67,6 +72,40 @@ struct WeekCard<Content: View>: View {
             .themedSurface(feature.surface)
             .overlay(alignment: .top) { inscriptionBand(feature.inscription) }
             .overlay(themedAccentBar(feature.surface), alignment: feature.surface.ribbonAccent ? .topLeading : .top)
+            // Behind the panel, so only the tips of the ears and the loop of the
+            // tail show past its edges. Backgrounds are not clipped to the panel.
+            .background(alignment: .topTrailing) { catEars(feature.catEars) }
+            .background(alignment: .bottomTrailing) { catTail(feature.catEars) }
+    }
+
+    /// Two ears peeking over the top trailing edge of the panel (猫猫).
+    @ViewBuilder
+    private func catEars(_ cat: ThemeCatEars?) -> some View {
+        if let cat {
+            ZStack {
+                CatEarPairShape().fill(cat.fur.color)
+                CatEarPairShape(inner: true).fill(cat.innerEar.color)
+            }
+            .frame(width: 74, height: 20)
+            .padding(.trailing, 34)
+            .offset(y: -16)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// A tail that drops out from under the bottom edge and curls back up (猫猫).
+    @ViewBuilder
+    private func catTail(_ cat: ThemeCatEars?) -> some View {
+        if let cat {
+            CatTailShape()
+                .stroke(cat.tail.color, style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
+                .frame(width: 60, height: 30)
+                .padding(.trailing, 26)
+                .offset(y: 24)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     /// Room above the content for the inscription band.
@@ -76,17 +115,7 @@ struct WeekCard<Content: View>: View {
     @ViewBuilder
     private func inscriptionBand(_ ink: ThemeHexPair?) -> some View {
         if let ink {
-            Group {
-                if skin.glyphs == .cat {
-                    CatTailInscription()
-                        .stroke(
-                            ink.color.opacity(0.7),
-                            style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round)
-                        )
-                } else {
-                    ElvishInscriptionBand(seed: 7, color: ink.color, opacity: 0.55, lineWidth: 0.85)
-                }
-            }
+            ElvishInscriptionBand(seed: 7, color: ink.color, opacity: 0.55, lineWidth: 0.85)
             .frame(height: 10)
             .padding(.horizontal, 22)
             .padding(.top, 13)
@@ -109,7 +138,10 @@ struct WeekCard<Content: View>: View {
 
     @ViewBuilder
     private func themedAccentBar(_ surface: ThemeSurfaceSkin) -> some View {
-        if let color = accentColor, surface.ribbonAccent {
+        if surface.hidesAccentBar && surface.tintsWithAccent {
+            // The accent is already the surface wash.
+            EmptyView()
+        } else if let color = accentColor, surface.ribbonAccent {
             // A silk bookmark hanging from the top rule.
             BookmarkRibbonShape()
                 .fill(color)
@@ -224,6 +256,24 @@ struct WeekCard<Content: View>: View {
             }
             .allowsHitTesting(false)
         }
+    }
+}
+
+/// A row of round dots filling the rect, `dotSize` across with a gap of the
+/// same size between them (猫猫 section rule).
+struct DottedRuleShape: Shape {
+    var dotSize: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let d = max(1, min(dotSize, rect.height))
+        let step = d * 2.2
+        var x = rect.minX
+        while x + d <= rect.maxX {
+            path.addEllipse(in: CGRect(x: x, y: rect.midY - d / 2, width: d, height: d))
+            x += step
+        }
+        return path
     }
 }
 
@@ -457,15 +507,13 @@ struct WeekSectionHeader: View {
                         )
                         .frame(height: 1)
                 } else if let mark = section.ruleEndMark {
-                    // The rule runs out into a small mark: a ring, or a paw for the cat skin.
-                    HStack(spacing: 4) {
-                        Rectangle()
-                            .fill(rule.color)
-                            .frame(height: section.ruleWidth)
+                    // The rule runs out into a small mark: a ring, or a filled paw for the cat skin.
+                    HStack(spacing: 5) {
+                        ruleLine(section, color: rule.color)
                         if skin.glyphs == .cat {
-                            CatPawMark()
-                                .stroke(mark.color, style: StrokeStyle(lineWidth: 1.05, lineCap: .round, lineJoin: .round))
-                                .frame(width: 10, height: 7)
+                            CatGlyphView(glyph: .paw)
+                                .frame(width: 12, height: 12)
+                                .foregroundStyle(mark.color)
                         } else {
                             Ellipse()
                                 .strokeBorder(mark.color, lineWidth: 1.2)
@@ -474,11 +522,23 @@ struct WeekSectionHeader: View {
                     }
                     .accessibilityHidden(true)
                 } else {
-                    Rectangle()
-                        .fill(rule.color)
-                        .frame(height: section.ruleWidth)
+                    ruleLine(section, color: rule.color)
                 }
             }
+        }
+    }
+
+    /// The header rule: a solid line, or a row of round dots (猫猫).
+    @ViewBuilder
+    private func ruleLine(_ section: ThemeSectionSkin, color: Color) -> some View {
+        if section.ruleDotted {
+            DottedRuleShape(dotSize: section.ruleWidth)
+                .fill(color)
+                .frame(height: section.ruleWidth)
+        } else {
+            Rectangle()
+                .fill(color)
+                .frame(height: section.ruleWidth)
         }
     }
 
@@ -525,6 +585,14 @@ struct WeekSectionHeader: View {
                 .font(.system(size: 19, weight: .semibold, design: .serif))
                 .monospacedDigit()
                 .foregroundColor(tint)
+        case .capsule:
+            Text(verbatim: "\(count)")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(tint)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(tint.opacity(0.14), in: Capsule())
         }
     }
 }

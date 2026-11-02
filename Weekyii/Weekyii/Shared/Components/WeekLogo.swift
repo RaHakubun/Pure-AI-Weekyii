@@ -33,6 +33,14 @@ struct WeekLogo: View {
                 endPoint: .bottom
             )
         }
+        if isCat {
+            // Ginger fur, lighter at the top like a sunlit back.
+            return LinearGradient(
+                colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
         return LinearGradient(
             colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight],
             startPoint: .leading,
@@ -45,12 +53,24 @@ struct WeekLogo: View {
         self.animated = animated
     }
     
+    @ViewBuilder
+    private var wordmark: some View {
+        if isCat {
+            // A round, upright wordmark; the ears sit on the W.
+            Text("Weekyii")
+                .font(.system(size: size.fontSize * 1.05, weight: .heavy, design: .rounded))
+        } else {
+            Text("Weekyii")
+                .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
+                .italic()
+        }
+    }
+
     var body: some View {
-        Text("Weekyii")
-            .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
-            .italic()
+        wordmark
             .foregroundStyle(logoGradient)
             .overlay(alignment: .bottom) { inscription }
+            .overlay(alignment: .topLeading) { catEars }
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
@@ -74,11 +94,20 @@ extension WeekLogo {
             ElvishInscriptionBand(seed: 11, color: Color(hex: "#B59A62"), opacity: 0.5, lineWidth: 0.7)
                 .frame(width: size.fontSize * 3.6, height: max(6, size.fontSize * 0.24))
                 .offset(y: max(5, size.fontSize * 0.2))
-        } else if isCat {
-            CatTailInscription()
-                .stroke(Color(hex: "#8A6A55").opacity(0.55), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
-                .frame(width: size.fontSize * 2.4, height: max(8, size.fontSize * 0.28))
-                .offset(y: max(6, size.fontSize * 0.22))
+        }
+    }
+
+    /// 猫猫：两只耳朵立在 "W" 的两个尖上。只是叠加层，不改变字标尺寸。
+    @ViewBuilder
+    fileprivate var catEars: some View {
+        if isCat {
+            CatEarPairShape()
+                .fill(Color.weekyiiPrimaryLight)
+                .frame(width: size.fontSize * 0.95, height: size.fontSize * 0.3)
+                .padding(.leading, size.fontSize * 0.04)
+                .offset(y: -size.fontSize * 0.08)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 }

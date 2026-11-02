@@ -49,11 +49,27 @@ struct KillTimeSlider: View {
     /// Track thickness follows the active theme. `.classic` scales by 1.0, so the
     /// ten original themes keep the 4pt track they have always had.
     private var themedTrackHeight: CGFloat {
-        WeekTheme.activeTheme.visualStyle.barThickness(trackHeight)
+        // 猫猫：一条软乎乎的 10 pt 橘色轨道。
+        if skin.glyphs == .cat { return 10 }
+        return WeekTheme.activeTheme.visualStyle.barThickness(trackHeight)
     }
 
     private var themedTrackCornerRadius: CGFloat {
-        WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedTrackHeight)
+        if skin.glyphs == .cat { return 5 }
+        return WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedTrackHeight)
+    }
+
+    private var trackFill: AnyShapeStyle {
+        if skin.glyphs == .cat {
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+        }
+        return AnyShapeStyle(Color.weekyiiPrimary)
     }
 
     // MARK: Body
@@ -122,13 +138,13 @@ struct KillTimeSlider: View {
         ZStack(alignment: .leading) {
             // 背景轨道
             RoundedRectangle(cornerRadius: themedTrackCornerRadius)
-                .fill(Color.secondary.opacity(0.2))
+                .fill(skin.glyphs == .cat ? Color.backgroundTertiary : Color.secondary.opacity(0.2))
                 .frame(height: themedTrackHeight)
                 .padding(.horizontal, thumbRadius)
 
             // 进度填充（从轨道起点到 thumb 中心）
             RoundedRectangle(cornerRadius: themedTrackCornerRadius)
-                .fill(Color.weekyiiPrimary)
+                .fill(trackFill)
                 .frame(width: max(0, thumbCenterX - thumbRadius), height: themedTrackHeight)
                 .offset(x: thumbRadius)
 
@@ -145,14 +161,15 @@ struct KillTimeSlider: View {
     @ViewBuilder
     private var thumb: some View {
         if skin.glyphs == .cat {
+            // 猫猫：一只白色肉垫爪，橘色描边，粉色肉球。
             ZStack {
                 Circle()
-                    .fill(Color.backgroundSecondary)
-                CatGlyphView(glyph: .paw)
-                    .foregroundStyle(Color.weekyiiPrimary)
-                    .padding(5)
+                    .fill(Color.white)
                 Circle()
-                    .strokeBorder(Color.weekyiiPrimary.opacity(0.45), lineWidth: 1)
+                    .strokeBorder(Color.weekyiiPrimary, lineWidth: 2)
+                ToeBeansShape()
+                    .fill(Color(hex: "#F2A7A0"))
+                    .padding(thumbDiameter * 0.22)
             }
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0.14), radius: isDragging ? 4 : 2, x: 0, y: 1)
         } else if skin.glyphs == .lotr {
@@ -357,4 +374,27 @@ private struct KillTimeRuler: View {
         }
     }
     return PreviewWrapper()
+}
+
+/// Four small toe beans over one heel pad, for the cat slider thumb.
+private struct ToeBeansShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        func bean(_ cx: CGFloat, _ cy: CGFloat, _ rx: CGFloat, _ ry: CGFloat) {
+            path.addEllipse(in: CGRect(
+                x: rect.minX + (cx - rx) * w,
+                y: rect.minY + (cy - ry) * h,
+                width: rx * 2 * w,
+                height: ry * 2 * h
+            ))
+        }
+        bean(0.14, 0.38, 0.11, 0.13)
+        bean(0.37, 0.18, 0.11, 0.13)
+        bean(0.63, 0.18, 0.11, 0.13)
+        bean(0.86, 0.38, 0.11, 0.13)
+        bean(0.50, 0.72, 0.25, 0.21)
+        return path
+    }
 }

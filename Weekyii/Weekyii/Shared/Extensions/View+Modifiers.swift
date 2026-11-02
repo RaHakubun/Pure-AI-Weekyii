@@ -77,6 +77,8 @@ struct ThemedSurfaceModifier: ViewModifier {
             if case .leather(let top, let bottom) = skin.material {
                 LinearGradient(colors: [top.color, bottom.color], startPoint: .top, endPoint: .bottom)
                 LeatherGrain()
+            } else if case .gradient(let top, let bottom) = skin.material {
+                LinearGradient(colors: [top.color, bottom.color], startPoint: .topLeading, endPoint: .bottomTrailing)
             } else {
                 skin.fill?.color ?? fallbackFill
                 if let tint {
@@ -325,47 +327,7 @@ struct ThemeBackdropOverlay: View {
             draftingGrid(ink)
         case .vellum(let fibre, let vignette, let topLight):
             vellum(fibre: fibre, vignette: vignette, topLight: topLight)
-        case .pawTrail(let ink):
-            pawTrail(ink)
         }
-    }
-
-    /// Twenty-six filled pencil paws from a fixed seed. The fill stays at or
-    /// under 6% in light and 5% in dark. A hairline at that opacity disappeared;
-    /// a filled pad is faint and still readable as a paw.
-    private func pawTrail(_ ink: ThemeHexPair) -> some View {
-        let color = ink.color
-        let alpha = colorScheme == .dark ? 0.05 : 0.06
-        return Canvas { context, canvas in
-            var seed: UInt64 = 0xC47A11025EED11D1
-            func next() -> CGFloat {
-                seed = seed &* 6364136223846793005 &+ 1442695040888963407
-                return CGFloat((seed >> 33) % 10_000) / 10_000
-            }
-            for _ in 0..<26 {
-                let x = next() * canvas.width
-                let y = next() * canvas.height
-                let scale = 16 + next() * 12
-                let angle = (next() - 0.5) * .pi
-                var paw = Path()
-                func toe(_ fx: CGFloat, _ fy: CGFloat) {
-                    let radius = scale * 0.13
-                    let cx = fx * scale
-                    let cy = fy * scale
-                    paw.addEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
-                }
-                toe(-0.32, -0.46)
-                toe(-0.10, -0.60)
-                toe(0.14, -0.58)
-                toe(0.36, -0.42)
-                paw.addEllipse(in: CGRect(x: -scale * 0.28, y: -scale * 0.06, width: scale * 0.56, height: scale * 0.42))
-                let transform = CGAffineTransform(translationX: x, y: y).rotated(by: angle)
-                context.fill(paw.applying(transform), with: .color(color.opacity(alpha)))
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 
     /// Short scattered fibres, a darkened edge and a warm light from the top.

@@ -464,15 +464,6 @@ struct TodayView: View {
                             .tracking(0.6)
                             .foregroundColor(.textSecondary)
                     }
-                } else if todaySkin.glyphs == .cat {
-                    HStack(spacing: 6) {
-                        CatGlyphView(glyph: .whisker)
-                            .frame(width: 15, height: 15)
-                            .foregroundColor(.textSecondary)
-                        Text(formatDate(day.dayId))
-                            .font(.bodyMedium)
-                            .foregroundColor(.textSecondary)
-                    }
                 } else {
                     Text(formatDate(day.dayId))
                         .font(.bodyMedium)
@@ -1356,7 +1347,7 @@ struct TodayView: View {
                 LotrRainNightBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             } else if userSettings.selectedTheme == .cat {
-                CatNapBackground(animationsActive: animationsActive)
+                CatSunbeamBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
         }
@@ -2192,37 +2183,10 @@ private struct LotrRainNightBackground: View {
     }
 }
 
-/// Sleeping cat for the lower corner: head tucked onto a round body, tail over the back.
-private struct CatNapCurl: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 140
-        let sy = rect.height / 120
-        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
-        }
-        var path = Path()
-        path.addEllipse(in: CGRect(x: q(38, 52).x, y: q(38, 52).y, width: 80 * sx, height: 64 * sy))
-        path.move(to: q(104, 90))
-        path.addCurve(to: q(128, 46), control1: q(132, 88), control2: q(140, 60))
-        path.addCurve(to: q(108, 38), control1: q(120, 32), control2: q(110, 28))
-        path.addEllipse(in: CGRect(x: q(22, 28).x, y: q(22, 28).y, width: 54 * sx, height: 48 * sy))
-        path.move(to: q(34, 40))
-        path.addLine(to: q(26, 12))
-        path.addLine(to: q(46, 38))
-        path.move(to: q(44, 36))
-        path.addLine(to: q(58, 10))
-        path.addLine(to: q(64, 40))
-        path.move(to: q(36, 46))
-        path.addCurve(to: q(46, 47), control1: q(39, 40), control2: q(43, 40))
-        path.move(to: q(50, 45))
-        path.addCurve(to: q(60, 47), control1: q(53, 39), control2: q(57, 39))
-        return path
-    }
-}
-
-/// A faint carpet line and a curled cat in the lower trailing corner.
-/// `animationsActive == false` holds the cat at its resting scale.
-private struct CatNapBackground: View {
+/// The room the cat naps in. Light: warm sunbeams falling diagonally from the
+/// top trailing window. Dark: a few faint stars and a ginger lamp glow in the
+/// top trailing corner. `animationsActive == false` holds the light still.
+private struct CatSunbeamBackground: View {
     let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -2232,7 +2196,7 @@ private struct CatNapBackground: View {
     var body: some View {
         Group {
             if shouldAnimate {
-                TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { timeline in
                     scene(time: timeline.date.timeIntervalSinceReferenceDate)
                 }
             } else {
@@ -2244,24 +2208,69 @@ private struct CatNapBackground: View {
         .accessibilityHidden(true)
     }
 
+    @ViewBuilder
     private func scene(time: TimeInterval) -> some View {
-        let breath = 1 + 0.02 * CGFloat(sin(time * 0.6))
-        let ink = Color.textSecondary.opacity(colorScheme == .dark ? 0.34 : 0.26)
-        return GeometryReader { proxy in
-            let size = proxy.size
-            let carpetY = size.height * 0.9
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: size.width * 0.04, y: carpetY))
-                    path.addLine(to: CGPoint(x: size.width * 0.96, y: carpetY + 0.4))
-                }
-                .stroke(Color.textTertiary.opacity(colorScheme == .dark ? 0.28 : 0.35), style: StrokeStyle(lineWidth: 1, lineCap: .round))
+        // A slow swell, so the light feels like it moves with passing clouds.
+        let swell = 0.85 + 0.15 * CGFloat(sin(time * 0.35))
+        if colorScheme == .dark {
+            nightRoom(swell: swell, time: time)
+        } else {
+            sunnyRoom(swell: swell)
+        }
+    }
 
-                CatNapCurl()
-                    .stroke(ink, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
-                    .frame(width: 118, height: 102)
-                    .scaleEffect(breath, anchor: .bottom)
-                    .position(x: size.width - 78, y: carpetY - 36)
+    private func sunnyRoom(swell: CGFloat) -> some View {
+        Canvas { context, size in
+            let beam = Color(hex: "#FFF6E6")
+            // Three bands of light, each a slanted strip entering from the top trailing edge.
+            let bands: [(start: CGFloat, width: CGFloat, alpha: Double)] = [
+                (0.50, 0.16, 0.85), (0.72, 0.09, 0.65), (0.86, 0.05, 0.5),
+            ]
+            let slant = size.height * 0.55
+            for band in bands {
+                let x0 = size.width * band.start
+                let w = size.width * band.width
+                var strip = Path()
+                strip.move(to: CGPoint(x: x0, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w - slant, y: size.height))
+                strip.addLine(to: CGPoint(x: x0 - slant, y: size.height))
+                strip.closeSubpath()
+                context.fill(
+                    strip,
+                    with: .linearGradient(
+                        Gradient(colors: [beam.opacity(band.alpha * Double(swell)), beam.opacity(0)]),
+                        startPoint: CGPoint(x: x0, y: 0),
+                        endPoint: CGPoint(x: x0 - slant * 0.7, y: size.height * 0.75)
+                    )
+                )
+            }
+        }
+    }
+
+    private func nightRoom(swell: CGFloat, time: TimeInterval) -> some View {
+        ZStack {
+            RadialGradient(
+                colors: [Color(hex: "#F29A5E").opacity(0.16 * Double(swell)), Color(hex: "#F29A5E").opacity(0)],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 360
+            )
+            Canvas { context, size in
+                var seed: UInt64 = 0xCA7_5EA7_57A2_2025
+                func next() -> CGFloat {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return CGFloat((seed >> 33) % 10_000) / 10_000
+                }
+                for index in 0..<22 {
+                    let x = next() * size.width
+                    // Stars stay in the upper part of the page, where the window is.
+                    let y = next() * size.height * 0.45
+                    let r = 0.6 + next() * 0.9
+                    let twinkle = 0.55 + 0.45 * sin(time * 0.8 + Double(index))
+                    let star = Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+                    context.fill(star, with: .color(Color(hex: "#F7E7C6").opacity(0.22 * twinkle)))
+                }
             }
         }
     }

@@ -2643,18 +2643,17 @@ private struct ThemePaletteMark: View {
         splitBase(theme.primaryColor, theme.accentColor)
     }
 
-    /// Cream paper, a loafing cat in pencil, and one paw in the lower-right.
+    /// Ginger fur with a cream cat face die-cut on it.
     private var catMark: some View {
         ZStack {
-            Color(hex: "#F7F1E8")
-            CatGlyphView(glyph: .loaf)
-                .foregroundStyle(Color(hex: "#5E463A"))
-                .frame(width: 22, height: 22)
-                .offset(y: -1)
-            CatGlyphView(glyph: .paw)
-                .foregroundStyle(Color(hex: "#8A6A55"))
-                .frame(width: 8, height: 8)
-                .offset(x: 9, y: 9)
+            LinearGradient(
+                colors: [Color(hex: "#EE9558"), Color(hex: "#D46A32")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            CatGlyphView(glyph: .face)
+                .foregroundStyle(Color(hex: "#FFFDF9"))
+                .frame(width: 20, height: 20)
         }
         .frame(width: 30, height: 30)
     }
@@ -3413,8 +3412,13 @@ struct SettingsIcon: View {
     /// a grid of saturated tiles. Filled symbols fall back to their outline so
     /// every stamp has the same weight as the line work around it.
     private func stamped(_ chip: ThemeIconSkin) -> some View {
-        ZStack {
-            if let fill = chip.fill {
+        let ink = themedColor ?? color
+        return ZStack {
+            if chip.tintsFill {
+                // A soft wash of the row's own tint behind a glyph in that tint (猫猫).
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(ink.opacity(0.14))
+            } else if let fill = chip.fill {
                 RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
                     .fill(fill.color)
             }
@@ -3422,9 +3426,15 @@ struct SettingsIcon: View {
                 RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
                     .strokeBorder(border.color, lineWidth: chip.borderWidth)
             }
-            Image(systemName: outlineName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(themedColor ?? color)
+            if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
+                CatGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else {
+                Image(systemName: chip.tintsFill ? icon : outlineName)
+                    .font(.system(size: 14, weight: chip.tintsFill ? .semibold : .medium))
+                    .foregroundStyle(ink)
+            }
         }
         .frame(width: 28, height: 28)
     }
