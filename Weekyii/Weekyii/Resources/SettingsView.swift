@@ -42,7 +42,9 @@ struct SettingsView: View {
     
     var body: some View {
         NavigationStack {
-            settingsHome
+            // 真机 1 MB 主线程栈：settingsHome 曾嵌 9 个 NavigationLink opaque 目的地，
+            // Beta/Release（-O WMO）下 demangle 递归会打穿栈（1.2 (5)）。body 只持 AnyView，子页擦除在独立函数里。
+            erasedSettingsHome()
             .navigationTitle(String(localized: "settings.title"))
             .tint(.weekyiiPrimary)
         }
@@ -237,189 +239,228 @@ struct SettingsView: View {
         }
     }
 
+    @inline(never)
+    private func erasedSettingsHome() -> AnyView {
+        AnyView(settingsHome)
+    }
+
     private var settingsHome: some View {
-        List { Group {
-            Section {
-                NavigationLink {
-                    VIPServiceView()
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "vip.title", defaultValue: "VIP 服务"),
-                        value: vipStatusSummary,
-                        icon: "crown.fill",
-                        tint: .orange,
-                        themedTint: .weekyiiGilt
-                    )
-                }
-                .accessibilityIdentifier("settings.vip")
+        List {
+            Group {
+                settingsHomeUpperSectionsErased()
+                settingsHomeLowerSectionsErased()
             }
-
-            Section {
-                NavigationLink {
-                    appearanceSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "外观与主题",
-                        value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
-                        icon: "paintpalette.fill",
-                        tint: .purple,
-                        themedTint: .weekyiiPrimary
-                    )
-                }
-                .accessibilityIdentifier("settings.row.appearance")
-
-                NavigationLink {
-                    languageSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.language.title", defaultValue: "语言"),
-                        value: settings.languageOverride.displayName,
-                        icon: "globe",
-                        tint: .cyan,
-                        themedTint: .taskRegular
-                    )
-                }
-                .accessibilityIdentifier("settings.row.language")
-            } header: {
-                SettingsSectionHeader(title: "个性化")
-            }
-
-            Section {
-                NavigationLink {
-                    todayRhythmSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "今日节奏",
-                        value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
-                        icon: "timer",
-                        tint: .orange,
-                        themedTint: .accentOrange
-                    )
-                }
-                .accessibilityIdentifier("settings.row.todayRhythm")
-
-                NavigationLink {
-                    taskTypeSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
-                        value: "\(activeTaskTypeDefinitions.count) 个类型",
-                        icon: "tag.fill",
-                        tint: .teal,
-                        themedTint: .accentGreen
-                    )
-                }
-                .accessibilityIdentifier("settings.row.taskTypes")
-
-                NavigationLink {
-                    pastSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.section.past", defaultValue: "过去"),
-                        value: settings.pastMonthMarkerOptions.summaryText,
-                        icon: "clock.arrow.circlepath",
-                        tint: .indigo,
-                        themedTint: .taskRegular
-                    )
-                }
-                .accessibilityIdentifier("settings.row.past")
-
-                NavigationLink {
-                    futureSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "未来",
-                        value: settings.weekStartsOnMonday ? "周一开始" : nil,
-                        icon: "calendar.badge.clock",
-                        tint: .blue,
-                        themedTint: .taskLeisure
-                    )
-                }
-                .accessibilityIdentifier("settings.row.future")
-            } header: {
-                SettingsSectionHeader(title: "使用方式")
-            }
-
-            Section {
-                NavigationLink {
-                    SuspendedSettingsView()
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.suspended.header", defaultValue: "悬置箱"),
-                        value: String(
-                            format: String(localized: "settings.suspended.entry.value", defaultValue: "默认 %d 天"),
-                            settings.suspendedDefaultCountdownDays
-                        ),
-                        icon: "hourglass",
-                        tint: .suspendedModuleTint,
-                        themedTint: .weekyiiGilt
-                    )
-                }
-                .accessibilityIdentifier("settings.row.suspended")
-
-                NavigationLink {
-                    ProjectSettingsView()
-                } label: {
-                    SettingsNavigationRow(
-                        title: "项目",
-                        value: "默认 \(settings.defaultProjectDurationDays) 天",
-                        icon: "folder.fill",
-                        tint: .brown,
-                        themedTint: .accentOrange
-                    )
-                }
-                .accessibilityIdentifier("settings.row.projects")
-            } header: {
-                SettingsSectionHeader(title: "扩展")
-            }
-
-            Section {
-                NavigationLink {
-                    dataSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "数据与安全",
-                        icon: "lock.shield.fill",
-                        tint: .indigo,
-                        themedTint: .textSecondary
-                    )
-                }
-                .accessibilityIdentifier("settings.row.data")
-            } header: {
-                SettingsSectionHeader(title: "数据")
-            }
-
-            Section {
-                NavigationLink {
-                    AboutWeekyiiPage()
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
-                        value: AboutWeekyiiPage.appVersion,
-                        icon: "info.circle.fill",
-                        tint: .mint,
-                        themedTint: .accentGreen
-                    )
-                }
-                .accessibilityIdentifier("settings.row.about")
-
-                NavigationLink {
-                    developerSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "开发者与诊断",
-                        icon: "hammer.fill",
-                        tint: .gray,
-                        themedTint: .textTertiary
-                    )
-                }
-                .accessibilityIdentifier("settings.row.developer")
-            } header: {
-                SettingsSectionHeader(title: "应用")
-            }
-        }.themedListRows() }.themedGroupedList()
+            .themedListRows()
+        }
+        .themedGroupedList()
         .listStyle(.insetGrouped)
     }
+
+    @inline(never)
+    private func settingsHomeUpperSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedVIPServicePage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "vip.title", defaultValue: "VIP 服务"),
+                            value: vipStatusSummary,
+                            icon: "crown.fill",
+                            tint: .orange,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.vip")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAppearanceSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "外观与主题",
+                            value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
+                            icon: "paintpalette.fill",
+                            tint: .purple,
+                            themedTint: .weekyiiPrimary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.appearance")
+
+                    NavigationLink {
+                        erasedLanguageSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.language.title", defaultValue: "语言"),
+                            value: settings.languageOverride.displayName,
+                            icon: "globe",
+                            tint: .cyan,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.language")
+                } header: {
+                    SettingsSectionHeader(title: "个性化")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedTodayRhythmSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "今日节奏",
+                            value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
+                            icon: "timer",
+                            tint: .orange,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.todayRhythm")
+
+                    NavigationLink {
+                        erasedTaskTypeSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
+                            value: "\(activeTaskTypeDefinitions.count) 个类型",
+                            icon: "tag.fill",
+                            tint: .teal,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.taskTypes")
+
+                    NavigationLink {
+                        erasedPastSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.section.past", defaultValue: "过去"),
+                            value: settings.pastMonthMarkerOptions.summaryText,
+                            icon: "clock.arrow.circlepath",
+                            tint: .indigo,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.past")
+
+                    NavigationLink {
+                        erasedFutureSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "未来",
+                            value: settings.weekStartsOnMonday ? "周一开始" : nil,
+                            icon: "calendar.badge.clock",
+                            tint: .blue,
+                            themedTint: .taskLeisure
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.future")
+                } header: {
+                    SettingsSectionHeader(title: "使用方式")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedSuspendedSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.suspended.header", defaultValue: "悬置箱"),
+                            value: String(
+                                format: String(localized: "settings.suspended.entry.value", defaultValue: "默认 %d 天"),
+                                settings.suspendedDefaultCountdownDays
+                            ),
+                            icon: "hourglass",
+                            tint: .suspendedModuleTint,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.suspended")
+
+                    NavigationLink {
+                        erasedProjectSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "项目",
+                            value: "默认 \(settings.defaultProjectDurationDays) 天",
+                            icon: "folder.fill",
+                            tint: .brown,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.projects")
+                } header: {
+                    SettingsSectionHeader(title: "扩展")
+                }
+            }
+        )
+    }
+
+    @inline(never)
+    private func settingsHomeLowerSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedDataSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "数据与安全",
+                            icon: "lock.shield.fill",
+                            tint: .indigo,
+                            themedTint: .textSecondary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.data")
+                } header: {
+                    SettingsSectionHeader(title: "数据")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAboutWeekyiiPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
+                            value: AboutWeekyiiPage.appVersion,
+                            icon: "info.circle.fill",
+                            tint: .mint,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.about")
+
+                    NavigationLink {
+                        erasedDeveloperSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "开发者与诊断",
+                            icon: "hammer.fill",
+                            tint: .gray,
+                            themedTint: .textTertiary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.developer")
+                } header: {
+                    SettingsSectionHeader(title: "应用")
+                }
+            }
+        )
+    }
+
+    @inline(never) private func erasedVIPServicePage() -> AnyView { AnyView(VIPServiceView()) }
+    @inline(never) private func erasedAppearanceSettingsPage() -> AnyView { AnyView(appearanceSettingsPage) }
+    @inline(never) private func erasedLanguageSettingsPage() -> AnyView { AnyView(languageSettingsPage) }
+    @inline(never) private func erasedTodayRhythmSettingsPage() -> AnyView { AnyView(todayRhythmSettingsPage) }
+    @inline(never) private func erasedTaskTypeSettingsPage() -> AnyView { AnyView(taskTypeSettingsPage) }
+    @inline(never) private func erasedPastSettingsPage() -> AnyView { AnyView(pastSettingsPage) }
+    @inline(never) private func erasedFutureSettingsPage() -> AnyView { AnyView(futureSettingsPage) }
+    @inline(never) private func erasedSuspendedSettingsPage() -> AnyView { AnyView(SuspendedSettingsView()) }
+    @inline(never) private func erasedProjectSettingsPage() -> AnyView { AnyView(ProjectSettingsView()) }
+    @inline(never) private func erasedDataSettingsPage() -> AnyView { AnyView(dataSettingsPage) }
+    @inline(never) private func erasedAboutWeekyiiPage() -> AnyView { AnyView(AboutWeekyiiPage()) }
+    @inline(never) private func erasedDeveloperSettingsPage() -> AnyView { AnyView(developerSettingsPage) }
 
     private var todayRhythmSettingsPage: some View {
         Form { Group {

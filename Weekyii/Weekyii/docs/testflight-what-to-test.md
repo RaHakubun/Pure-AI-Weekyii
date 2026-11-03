@@ -3,13 +3,13 @@
 用于 App Store Connect → TestFlight → 构建版本 → 测试内容。
 每次发版替换顶部的版本号，并增删对应模块即可。
 
-当前版本：**1.2 (5)** · 主要语言：简体中文
+当前版本：**1.2 (6)** · 主要语言：简体中文
 
 ---
 
 ## 简体中文（可直接粘贴）
 
-1.2 (5) 来了。这一版把「外观」做成了一个真正的主题世界——魔戒重做成西界红皮书，猫猫和指环王两个新主题上线；同时把 iCloud 同步又拧紧了一圈。
+1.2 (6) 来了。这一版把「外观」做成了一个真正的主题世界——魔戒重做成西界红皮书，猫猫和指环王两个新主题上线；同时把 iCloud 同步又拧紧了一圈。
 
 请通过 TestFlight **直接覆盖更新，不要卸载**。更新后先确认旧数据、旧的主题选择都还在，再往下测。本版不改动数据结构，升级无感过渡。
 
@@ -33,14 +33,14 @@
 1. 如果你之前选的是「蓝图」，更新后应自动落到「琥珀」，且不再出现在主题列表里。
 2. 选别的主题、重启 App，选择应被记住。
 
-### 四、VIP 与内购（沙盒）
+### 四、VIP 与内购（沙箱）
 
-个性化主题、iCloud 同步与灵动模式属于 VIP。请用沙盒账号走一遍真实购买路径。
+这一版是 Beta 配置，**在 TestFlight 里会自动获得 VIP，不需要购买**。所以你会直接看到 VIP 主题和 iCloud 同步可用。
 
-1. 打开 VIP 页，确认月 / 季 / 年 / 终身四档都显示价格，年订阅带 14 天免费试用说明。
-2. 购买一档（沙盒不会真实扣款），确认主题立刻解锁、iCloud 同步可用。
-3. 点「恢复购买」，确认能恢复已购权益；换一台设备登录同一 Apple Account，权益应自动带过去。
-4. 若某一档没有显示价格或试用，请截图说明是哪一档。
+1. 先确认 VIP 状态：设置页「VIP 服务」应显示已开通，七个 VIP 主题（魔戒 / 猫猫 / 指环王 / 粗野 / 霓虹 / 纸感 / 终端）都能直接选。
+2. 打开 VIP 页，确认月 / 季 / 年 / 终身四档都显示价格，年订阅标着 2 周免费试用。
+3. 想顺带验证购买流程的话，可以走一次沙箱购买（不会真实扣款），确认购买后权益仍然正常、主题不解锁异常。
+4. 点「恢复购买」，确认不报错；哪一档没显示价格或没显示试用，截图告诉我是哪一档。
 
 ### 五、iCloud 同步（本轮重点）
 
@@ -53,12 +53,12 @@
 
 ### 六、数据与覆盖安装（老规矩）
 
-1. 从 1.2 (4) 覆盖安装：周、日、任务、项目、附件、习惯、设置、主题选择，一个都不该少。
+1. 从上一版（1.2 (4) 或 1.2 (5)）覆盖安装：周、日、任务、项目、附件、习惯、设置、主题选择，一个都不该少。
 2. 开启 iCloud 的两台设备都覆盖安装，再各自改一次数据，确认双向同步。
 
 ### 反馈时请附上
 
-设备型号与系统版本、构建号 1.2 (5)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。上一版启动崩溃的修复就在这条链路上，任何闪退都请立刻反馈。
+设备型号与系统版本、构建号 1.2 (6)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。上一版启动崩溃的修复就在这条链路上，任何闪退都请立刻反馈。
 
 ---
 
@@ -72,7 +72,7 @@
 
 ## English (optional — fill if the app ships an English localization)
 
-1.2 (5) is here. This release turns appearance into a real theme world — the Lord of the Rings theme is rebuilt as the Red Book of Westmarch, and two new themes arrive: Catnap and the One Ring. iCloud sync also gets another round of hardening.
+1.2 (6) is here. This release turns appearance into a real theme world — the Lord of the Rings theme is rebuilt as the Red Book of Westmarch, and two new themes arrive: Catnap and the One Ring. iCloud sync also gets another round of hardening.
 
 Please update **directly over the previous build — do not uninstall**. Confirm your data and theme choice survived, then work through the list. No data-schema changes.
 
@@ -119,7 +119,7 @@ Personalised themes, iCloud sync and Flexible mode are VIP features. Please walk
 
 ### When reporting
 
-Include device model and OS version, build number 1.2 (5), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. The previous launch-crash fix lives on this same path — report any crash immediately.
+Include device model and OS version, build number 1.2 (6), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. The previous launch-crash fix lives on this same path — report any crash immediately.
 
 ---
 

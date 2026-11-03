@@ -30,7 +30,7 @@
 | 生产 APNs | `production` | 必须从归档 entitlement 验证 |
 | 发布版本来源 | App + Widget Release / Beta build setting | 不以测试 target 的版本为准 |
 | 发布 Scheme | `Weekyii Beta`（Beta 配置，手动签名） | `Weekyii.xcodeproj/xcshareddata/xcschemes/Weekyii Beta.xcscheme` |
-| 内购商品 | `com.fluentdesign.Weekyii.vip.monthly` / `.quarterly` / `.yearly`（14 天试用）/ `.lifetime`（¥198） | `Services/PurchaseService.swift`、`Resources/Weekyii.storekit` |
+| 内购商品 | `com.fluentdesign.Weekyii.vip.monthly`（¥12）/ `.quarterly`（¥28）/ `.yearly`（¥68，含 2 周免费试用）/ `.lifetime`（¥198） | `Services/PurchaseService.swift`、`Resources/Weekyii.storekit` |
 
 ### 不可破坏的约束
 
@@ -172,7 +172,6 @@ rg 'TEST SUCCEEDED|TEST FAILED|Executed .* tests' \
 xcodebuild archive \
   -project Weekyii.xcodeproj \
   -scheme "Weekyii Beta" \
-  -configuration Release \
   -destination 'generic/platform=iOS' \
   -derivedDataPath /tmp/weekyii-release-YYYYMMDD-archive-derived \
   -archivePath /tmp/weekyii-release-YYYYMMDD-X.Y-Z.xcarchive \
@@ -182,7 +181,20 @@ xcodebuild archive \
 
 `OTHER_SWIFT_FLAGS='-Xfrontend -disable-sandbox'` **不能省**。这台机器上命令行构建时 `swift-plugin-server` 无法嵌套 `sandbox_apply`，所有宏（`@Model` / `@Observable` / `@Query` / `#Preview`）会展开失败，报成百上千条 `external macro implementation type ... malformed response`，再连出「type 'X' does not conform to PersistentModel」之类的假错误。2026-11-03 归档就漏了这个参数，误判为代码错误。
 
-用 `Weekyii Beta` scheme：它走 Beta 配置（手动签名 + App Store profile），是 1.2 (3) 起实际走通的上传路径；`Weekyii` scheme 走 Release 配置，归档后同样要核对本文下面的签名与 entitlement。`-configuration Release` 只是兜底，实际以 scheme 的 ArchiveAction 为准。
+**不要传 `-configuration`。** 让 scheme 的 `ArchiveAction` 决定配置：`Weekyii Beta` 的 ArchiveAction 是 `Beta`，`Weekyii` 的是 `Release`。命令行显式传 `-configuration Release` 会覆盖 scheme 的设定，编出来的包里没有 `WEEKYII_BETA`，TestFlight 测试员就拿不到自动 VIP——2026-11-03 的 1.2 (5) 就是这么传错的（scheme 名叫 Beta，实际按 Release 编）。
+
+用 `Weekyii Beta` scheme：它走 Beta 配置（手动签名 + App Store profile + `WEEKYII_BETA` 编译条件），是 TestFlight 的正确路径。Beta 配置与 Release 的签名、entitlements、provisioning profile 完全一致，上传不受影响，差别只在编译条件。
+
+归档后必须验证 `WEEKYII_BETA` 真的进了二进制：
+
+```bash
+# 日志里应出现 -DWEEKYII_BETA（Weekyii 与 WeekyiiWidget 各 3 处）
+grep -c "WEEKYII_BETA" /tmp/weekyii-release-YYYYMMDD-archive.log     # 应为 6
+# 二进制应引用 StoreKit 的 AppTransaction（Release 编出来是 0）
+nm -u /tmp/weekyii-release-YYYYMMDD-X.Y-Z.xcarchive/Products/Applications/Weekyii.app/Weekyii | grep -c AppTransaction
+```
+
+两条任一为 0，就说明配置传错了，别上传。
 
 日志必须出现 `** ARCHIVE SUCCEEDED **`。
 
