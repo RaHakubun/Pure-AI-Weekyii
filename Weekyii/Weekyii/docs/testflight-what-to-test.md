@@ -3,112 +3,123 @@
 用于 App Store Connect → TestFlight → 构建版本 → 测试内容。
 每次发版替换顶部的版本号，并增删对应模块即可。
 
-当前版本：**1.2 (1)** · 主要语言：简体中文
+当前版本：**1.2 (5)** · 主要语言：简体中文
 
 ---
 
 ## 简体中文（可直接粘贴）
 
-1.2 来了，这是一次「看起来完全不一样」的大改版——新主题、新小组件、新 Live Activity，都在这一版。
+1.2 (5) 来了。这一版把「外观」做成了一个真正的主题世界——魔戒重做成西界红皮书，猫猫和指环王两个新主题上线；同时把 iCloud 同步又拧紧了一圈。
 
-请通过 TestFlight **直接覆盖更新，不要卸载**。更新后先确认旧数据都还在，再跟着下面的清单体验新东西。本版不改动任何数据结构，升级无感过渡。
+请通过 TestFlight **直接覆盖更新，不要卸载**。更新后先确认旧数据、旧的主题选择都还在，再往下测。本版不改动数据结构，升级无感过渡。
 
-### 一、换上你的主题：五个世界，五种脾气
+### 一、魔戒：西界红皮书
 
-设置页的主题（默认 + 粗野 / 霓虹 / 纸感 / 终端）现在由全新的 ThemeSkin 驱动——圆角、阴影、页面底色、选中态和排版全部跟着主题走，不再是「只换了个颜色」。
+魔戒主题整块重做：电影道具感的图标、羊皮纸与皮面材质、蜡封、丝带书签，卡片带四面墨框，任务行回到账本线。
 
-1. 依次切换每个主题，逛一遍「今日」「本周」「扩展」「悬置箱」「设置」，感受每个主题独有的气质。
-2. 每个主题在浅色、深色模式下各看一遍，确认文字清晰，没有看不清的浅色字。
-3. 「今日」页的状态插图全部重绘：切主题时看看它是否跟着变身、有没有错位或残留旧图。
-4. 开着「减少动效」的话，插图与磁贴动画应该都静止。
-5. 换完主题回到桌面，小组件应该和 App 里一个脾气。
+1. 切到「魔戒」，依次看「今日」「本周」「扩展」「过去」「设置」，确认羊皮纸底纹、墨框与书页瓦片都在，不是只换了配色。
+2. 切到深色模式，确认是「伊希尔丁之夜」那一套，而不是简单反色。
+3. 「今日」页的截止时间火焰、蜡封、状态插图是否协调，有没有压字或错位。
+4. 拖动截止时间滑块，火焰应即时跟随，取消后回到原值。
 
-### 二、小组件：放在桌面上的今日全景
+### 二、两个新主题：猫猫 / 指环王
 
-主屏和锁屏小组件都重做了。现在小组件上能看到截止时间、日界提示、即将开始的任务和任务类型颜色——不打开 App，一眼知道今天要干什么。
+1. 「猫猫」：午睡橘猫主题，检查插图、卡片底色与文字对比度，浅色 / 深色各看一遍。
+2. 「指环王」：至尊戒·黑金，黑漆底加单一金色，检查金色描边在深色下是否过亮、浅色下是否发灰。
+3. 两个主题都要确认：图标、圆角、阴影确实跟着变，而不只是换色。
 
-1. 重新添加各尺寸小组件，确认加载正常、没有占位空壳。
-2. 把小组件和 App 内「今日」页对照，信息应该一致。
-3. 完成一个任务，看小组件是否及时刷新。
+### 三、蓝图主题退役
 
-### 三、Live Activity / 灵动岛：计时活着，操作不打断
+1. 如果你之前选的是「蓝图」，更新后应自动落到「琥珀」，且不再出现在主题列表里。
+2. 选别的主题、重启 App，选择应被记住。
 
-启动一天后，锁屏和灵动岛上的倒计时、时间环会实时走动，临近截止自动变色提醒。更顺手的是：「完成」「移到明天」在灵动岛上点一下就能办，带确认步骤，全程不用打开 App。
+### 四、VIP 与内购（沙盒）
 
-1. 启动一天，观察倒计时、时间环实时走动。
-2. 依次确认正常 / 即将截止 / 已逾期三种状态；超过截止时间应自动切到逾期态。
-3. 直接在 Live Activity / 灵动岛上点「完成」「移到明天」（不要打开 App），然后再打开 App，核对任务状态、队列顺序和统计数字。
-4. 留意任务类型的名称、图标、颜色，以及下一个任务和待办数量的显示。
+个性化主题、iCloud 同步与灵动模式属于 VIP。请用沙盒账号走一遍真实购买路径。
 
-### 四、两个让你更顺的修复
+1. 打开 VIP 页，确认月 / 季 / 年 / 终身四档都显示价格，年订阅带 14 天免费试用说明。
+2. 购买一档（沙盒不会真实扣款），确认主题立刻解锁、iCloud 同步可用。
+3. 点「恢复购买」，确认能恢复已购权益；换一台设备登录同一 Apple Account，权益应自动带过去。
+4. 若某一档没有显示价格或试用，请截图说明是哪一档。
 
-1. 执行队列更稳了：连续完成多个任务、经过 done focus 和 repair，队列不再乱序或重复。
-2. 焦点卡的「推迟」「交换」按钮不再中英混杂，跟随 App 当前语言。
+### 五、iCloud 同步（本轮重点）
 
-### 五、数据与同步（老规矩）
+这一轮修的是「同步不该悄悄弄坏数据」。
 
-1. 从 1.1 (5) 覆盖安装：周、日、任务、项目、附件、习惯、设置，一个都不该少。
-2. iCloud 双设备回归：新建 / 编辑 / 删除任务和项目，另一端应自动同步；带附件的任务在另一台设备能正常打开。
+1. 两台设备新增 / 编辑 / 删除任务、项目、心印，另一端应自动收敛，不出现重复或回滚。
+2. 断开网络改几条，再联网，确认改动补传、没有互相覆盖。
+3. 在设置里切换 iCloud 账号：应弹二次确认，切完后本地数据不丢，旧账号的数据不被写进新账号。
+4. 带附件的任务在另一台设备应能正常打开（附件按内容哈希校验）。
+
+### 六、数据与覆盖安装（老规矩）
+
+1. 从 1.2 (4) 覆盖安装：周、日、任务、项目、附件、习惯、设置、主题选择，一个都不该少。
+2. 开启 iCloud 的两台设备都覆盖安装，再各自改一次数据，确认双向同步。
 
 ### 反馈时请附上
 
-设备型号与系统版本、构建号 1.2 (1)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。这一版好不好看、好不好用，你们说了算。
+设备型号与系统版本、构建号 1.2 (5)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。上一版启动崩溃的修复就在这条链路上，任何闪退都请立刻反馈。
 
 ---
 
 ## 已知问题（可选，按需保留或删除）
 
-- 如发现英文环境下个别新增文案仍显示中文，请反馈具体位置，本地化仍在收尾。
-- iCloud 同步为自动开启、无开关；未登录 iCloud 时 App 仍可正常本地使用。
+- 蓝图主题已退役，旧选择会自动归到琥珀。
+- iCloud 同步属于 VIP 能力，未购买时本地使用不受影响。
+- 模拟器与真机的栈大小不同（8 MB vs 1 MB），启动类问题只能靠真机验证。
 
 ---
 
 ## English (optional — fill if the app ships an English localization)
 
-1.2 is here — a build that looks completely different. New themes, new widgets, new Live Activity, all in one update.
+1.2 (5) is here. This release turns appearance into a real theme world — the Lord of the Rings theme is rebuilt as the Red Book of Westmarch, and two new themes arrive: Catnap and the One Ring. iCloud sync also gets another round of hardening.
 
-Please update **directly over the previous build — do not uninstall**. Confirm your old data is intact first, then walk through the list below. No data-schema changes in this build.
+Please update **directly over the previous build — do not uninstall**. Confirm your data and theme choice survived, then work through the list. No data-schema changes.
 
-### 1. Make it yours: five worlds, five moods
+### 1. The Red Book of Westmarch
 
-Every theme (default plus Brutalist / Neon / Paper / Terminal) is now driven by a new ThemeSkin — corner radius, shadows, surfaces, selected state and typography all follow the theme, not just the palette.
+The Lord of the Rings theme is rebuilt: prop-style glyphs, parchment and leather surfaces, a wax seal, a ribbon bookmark, ink borders on cards, ledger rules back in task rows.
 
-1. Switch through each theme and visit Today / Week / Extensions / Suspended Box / Settings; feel the personality of each one.
-2. Check each theme in light and dark appearance; text must stay readable.
-3. The Today status artwork is fully redrawn — watch it transform with the theme, with no misplacement or stale artwork.
-4. With "Reduce motion" on, artwork and tile animations must stop.
-5. After switching themes, the home-screen widget should match the app.
+1. Switch to "Ringbearer" and visit Today / Week / Extensions / Past / Settings; parchment, ink borders and page tiles must all be there — not just a palette swap.
+2. Switch to dark appearance: it should be the Ithildin night set, not a plain inversion.
+3. Check the deadline flame, wax seal and status artwork on Today — no overlapping text, no misalignment.
+4. Drag the deadline slider: the flame must follow immediately; cancelling restores the previous value.
 
-### 2. Widgets: your day, on the home screen
+### 2. Two new themes: Catnap and Lord of the Rings
 
-Home-screen and lock-screen widgets are redesigned. They now show deadline, day boundary, upcoming tasks and task-type colours — a glance is enough to know what today asks of you.
+1. "Catnap" — a napping ginger cat theme. Check artwork, card surfaces and contrast in both appearances.
+2. "Lord of the Rings" — black lacquer with a single gold. Check the gold strokes are neither blown out in dark nor muddy in light.
+3. Both must change glyphs, radii and shadows, not only colours.
 
-1. Re-add each widget size; they must load with no placeholder content.
-2. Compare the widget against the in-app Today screen; information must match.
-3. Complete a task and check the widget refreshes promptly.
+### 3. Blueprint retired
 
-### 3. Live Activity / Dynamic Island: time that moves, actions that don't interrupt
+1. If you had "Blueprint" selected, you should land on "Amber" after updating, and Blueprint should no longer be listed.
+2. Pick another theme, relaunch, and confirm the choice persists.
 
-After starting a day, the lock-screen Live Activity and Dynamic Island tick in real time and shift to a due-soon look as the deadline nears. Best of all: "Done" and "Move to tomorrow" work right from the island, with a confirm step, without ever opening the app.
+### 4. VIP and purchases (sandbox)
 
-1. Start a day and watch the countdown, ring and bar move in real time.
-2. Confirm normal / due-soon / overdue phases; past the deadline it must switch automatically.
-3. Use "Done" and "Move to tomorrow" directly from the Live Activity / Dynamic Island (without opening the app), then open the app and verify task state, queue order and counters.
-4. Watch the task type name, icon, colour, next task and pending count.
+Personalised themes, iCloud sync and Flexible mode are VIP features. Please walk the real purchase flow with a sandbox account.
 
-### 4. Two fixes that make things smoother
+1. Open the VIP page: monthly / quarterly / yearly / lifetime must all show prices; yearly carries the 14-day free trial note.
+2. Buy one plan (sandbox does not charge you) and confirm themes unlock immediately and sync becomes available.
+3. Tap "Restore Purchases"; then sign in on a second device with the same Apple Account — the entitlement should follow.
+4. If any plan shows no price or no trial, screenshot which one.
 
-1. The execution queue is steadier: order stays stable after completing several tasks and going through done focus and repair.
-2. Focus-card "Postpone" / "Swap" buttons follow the app language, no more mixed strings.
+### 5. iCloud sync (focus of this release)
 
-### 5. Data & sync (as always)
+1. Create / edit / delete tasks, projects and MindStamps on two devices; both sides must converge with no duplicates or rollbacks.
+2. Go offline, make changes, come back online: changes must upload without overwriting each other.
+3. Switch the iCloud account in Settings: a second confirmation appears, local data survives, and the old account's data is not written into the new one.
+4. Attachments must open on the other device (blobs are verified by content hash).
 
-1. Install over 1.1 (5): weeks, days, tasks, projects, attachments, habits and settings — nothing should go missing.
-2. iCloud two-device regression: create / edit / delete tasks and projects; the other device must converge; attachments must open on the other device.
+### 6. Data and over-install (as always)
+
+1. Install over 1.2 (4): weeks, days, tasks, projects, attachments, habits, settings and theme choice — nothing should go missing.
+2. On both iCloud devices, install over the previous build, then change data on each side and confirm two-way sync.
 
 ### When reporting
 
-Include device model and OS version, build number 1.2 (1), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. Whether this build looks and feels right is your call.
+Include device model and OS version, build number 1.2 (5), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. The previous launch-crash fix lives on this same path — report any crash immediately.
 
 ---
 
