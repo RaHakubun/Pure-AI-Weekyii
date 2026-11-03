@@ -9,16 +9,19 @@ struct WeekCard<Content: View>: View {
     let useGradient: Bool
     let accentColor: Color?
     let shadow: WeekShadow
+    let quenyaStatus: Bool
     
     init(
         useGradient: Bool = false,
         accentColor: Color? = nil,
         shadow: WeekShadow = .light,
+        quenyaStatus: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.useGradient = useGradient
         self.accentColor = accentColor
         self.shadow = shadow
+        self.quenyaStatus = quenyaStatus
         self.content = content()
     }
     
@@ -27,11 +30,17 @@ struct WeekCard<Content: View>: View {
             featureBody(feature)
         } else if !useGradient, let card = skin.card {
             stack
-                .themedSurface(card, tint: cardTint, tintOpacity: cardTintOpacity)
+                .themedSurface(statusSurface(card), tint: cardTint, tintOpacity: cardTintOpacity)
                 .overlay(themedAccentBar(card), alignment: ribbonAlignment(card))
         } else {
             classicBody
         }
+    }
+
+    private func statusSurface(_ card: ThemeSurfaceSkin) -> ThemeSurfaceSkin {
+        var result = card
+        result.translucentBottom = quenyaStatus && skin.isQuenya
+        return result
     }
 
     /// Skins that tint their paper take the caller's accent as a wash, so the

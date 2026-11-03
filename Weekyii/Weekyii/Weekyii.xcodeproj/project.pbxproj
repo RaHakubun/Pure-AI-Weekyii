@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A6E100012F9B4E5100CAFE01 /* Cinzel.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */; };
+		A6E100032F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */; };
+		A6E100052F9B4E5100CAFE01 /* OFL-Cinzel.txt in Resources */ = {isa = PBXBuildFile; fileRef = A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */; };
+		A6E100072F9B4E5100CAFE01 /* OFL-Alcarin.txt in Resources */ = {isa = PBXBuildFile; fileRef = A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */; };
 		E1F000012FA0000100AAA001 /* PurchaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000022FA0000100AAA001 /* PurchaseService.swift */; };
 		E1F000032FA0000100AAA001 /* VIPServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000042FA0000100AAA001 /* VIPServiceView.swift */; };
 		DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */; };
@@ -198,6 +202,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/Cinzel.ttf"; sourceTree = "<group>"; };
+		A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/AlcarinTengwar-Regular.otf"; sourceTree = "<group>"; };
+		A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL-Cinzel.txt"; sourceTree = "<group>"; };
+		A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL-Alcarin.txt"; sourceTree = "<group>"; };
 		E1F000022FA0000100AAA001 /* PurchaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseService.swift; sourceTree = "<group>"; };
 		E1F000042FA0000100AAA001 /* VIPServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VIPServiceView.swift; sourceTree = "<group>"; };
 		E1F000052FA0000100AAA001 /* Weekyii.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Weekyii.storekit; sourceTree = "<group>"; };
@@ -535,6 +543,10 @@
 		944E58302F2B593A00DB2DEE /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */,
+				A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */,
+				A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */,
+				A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */,
 				944E582D2F2B593A00DB2DEE /* Assets.xcassets */,
 				180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */,
 				944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */,
@@ -874,6 +886,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6E100012F9B4E5100CAFE01 /* Cinzel.ttf in Resources */,
+				A6E100032F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf in Resources */,
+				A6E100052F9B4E5100CAFE01 /* OFL-Cinzel.txt in Resources */,
+				A6E100072F9B4E5100CAFE01 /* OFL-Alcarin.txt in Resources */,
 				944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */,
 				944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */,
 				D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,

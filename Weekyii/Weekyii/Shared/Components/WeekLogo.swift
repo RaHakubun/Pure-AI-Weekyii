@@ -55,7 +55,10 @@ struct WeekLogo: View {
     
     @ViewBuilder
     private var wordmark: some View {
-        if isCat {
+        if skin.isQuenya {
+            Text("Weekyii")
+                .font(.custom("Cinzel-Regular", size: size.fontSize * 1.05))
+        } else if isCat {
             // A round, upright wordmark; the ears sit on the W.
             Text("Weekyii")
                 .font(.system(size: size.fontSize * 1.05, weight: .heavy, design: .rounded))

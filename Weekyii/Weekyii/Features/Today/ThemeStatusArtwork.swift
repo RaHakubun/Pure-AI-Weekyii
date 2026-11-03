@@ -21,7 +21,7 @@ struct ThemeStatusArtwork: View {
             switch theme {
             case .sunset:
                 SunsetStatusIllustration(renderingMode: renderingMode)
-            case .lotr, .ring:
+            case .lotr, .ring, .quenya:
                 LotrStatusIllustration(renderingMode: renderingMode)
             case .cat:
                 CatStatusIllustration(renderingMode: renderingMode)

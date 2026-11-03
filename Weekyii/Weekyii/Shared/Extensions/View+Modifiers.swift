@@ -74,7 +74,13 @@ struct ThemedSurfaceModifier: ViewModifier {
     @ViewBuilder
     private var fillLayer: some View {
         ZStack {
-            if case .leather(let top, let bottom) = skin.material {
+            if skin.translucentBottom {
+                let fill = skin.fill?.color ?? fallbackFill
+                LinearGradient(stops: [.init(color: fill, location: 0),
+                                       .init(color: fill, location: 0.70),
+                                       .init(color: fill.opacity(0.35), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            } else if case .leather(let top, let bottom) = skin.material {
                 LinearGradient(colors: [top.color, bottom.color], startPoint: .top, endPoint: .bottom)
                 LeatherGrain()
             } else if case .gradient(let top, let bottom) = skin.material {

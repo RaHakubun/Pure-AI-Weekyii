@@ -20,6 +20,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case paper
     case terminal
     case cat
+    case quenya
     /// Retired identifier, kept only to decode and migrate existing selections.
     case ring
     /// Retired from 外观与主题. The case stays so a stored `"blueprint"` still
@@ -48,6 +49,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
         case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
         case .cat: return String(localized: "theme.cat.name", defaultValue: "猫猫")
+        case .quenya: return String(localized: "theme.quenya.name", defaultValue: "昆雅")
         case .ring: return String(localized: "theme.ring.name", defaultValue: "指环王")
         case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
         }
@@ -62,6 +64,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     /// personalised themes override it to ship a different visual language.
     var visualStyle: ThemeVisualStyle {
         switch self {
+        case .quenya: return .classic
         case .brutal:
             return .brutalist
         case .neon:
@@ -477,6 +480,8 @@ struct ThemeSurfaceSkin: Equatable {
     /// The caller's accent only tints the surface: no 40 × 4 bar on the top edge
     /// (猫猫). Has no effect unless `tintsWithAccent` is also set.
     var hidesAccentBar: Bool = false
+    /// Allows a background decoration to show subtly through the bottom of a status card.
+    var translucentBottom: Bool = false
 }
 
 /// Green leather with a gilt hairline for filled, selected controls (魔戒).
@@ -763,6 +768,9 @@ struct ThemeSkin: Equatable {
     /// flat primary fill. `nil` keeps the primary fill and `onPrimary` ink.
     var gildedFill: ThemeGildedFill? = nil
 
+    /// Quenya-only decorative elements; no effect on other themes.
+    var isQuenya: Bool = false
+
     static let classic = ThemeSkin()
 
     /// Whether glyph call sites draw the Middle-earth set (`LotrGlyph`).
@@ -783,6 +791,7 @@ extension WeekTheme {
         case .blueprint: return .drafting
         case .lotr: return .lotr
         case .cat: return .cat
+        case .quenya: return .quenya
         case .ring: return .lotr
         case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight:
             return .classic
@@ -1062,6 +1071,36 @@ extension ThemeSkin {
             onSuccess: ThemeHexPair("#FFFFFF", "#06202B"),
             backdrop: .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")),
             softShadows: false
+        )
+    }()
+
+    /// 昆雅: parchment by day, warm hearth-shadow at night.
+    static let quenya: ThemeSkin = {
+        let ink = ThemeHexPair("#F8EEDB", "#F8EEDB")
+        let gold = ThemeHexPair("#C49A58", "#DBB66D")
+        return ThemeSkin(
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 18),
+            card: ThemeSurfaceSkin(cornerRadius: 16, borderWidth: 1,
+                border: ThemeHexPair("#CBBD9D", "#69523A"),
+                fill: ThemeHexPair("#F7F1E5", "#29201A")),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 16, borderWidth: 1,
+                    border: ThemeHexPair("#A78346", "#9D7944"),
+                    material: .gradient(top: ThemeHexPair("#493D2B", "#47352A"),
+                                        bottom: ThemeHexPair("#33271D", "#33271D"))),
+                ink: ink,
+                secondaryInk: ThemeHexPair("#D9C8AE", "#D9C8AE"),
+                label: ThemeLabelSkin(kind: .plain, ink: gold),
+                action: ThemeActionLook(kind: .roundedRect, ink: ink, glows: false),
+                primaryAction: ThemeActionLook(kind: .roundedRect,
+                    ink: ThemeHexPair("#251B13", "#251B13"), fill: gold, glows: false)
+            ),
+            badge: ThemeBadgeSkin(kind: .outline),
+            section: ThemeSectionSkin(count: .itemCaption, showsIcon: false),
+            onPrimary: ThemeHexPair("#FFFFFF", "#251B13"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#251B13"),
+            softShadows: false,
+            isQuenya: true
         )
     }()
 
@@ -1849,6 +1888,25 @@ private struct WeekThemePalettePair {
                     taskLeisure: "#9D8CFF",
                     taskLeisureBg: "#171334"
                 )
+            )
+        case .quenya:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#80602E", primaryLight: "#AD884A", primaryDark: "#684B24",
+                    accentOrange: "#AD7043", accentOrangeLight: "#D2A77A",
+                    accentGreen: "#73815B", accentGreenLight: "#A0AC89", accentPink: "#B98573",
+                    backgroundPrimary: "#E9DFCB", backgroundSecondary: "#F7F1E5", backgroundTertiary: "#E4D7BE",
+                    textPrimary: "#302A22", textSecondary: "#756B5B", textTertiary: "#988B77",
+                    taskRegular: "#758268", taskRegularBg: "#E9ECDD", taskDDL: "#A3745E", taskDDLBg: "#F0E2D8",
+                    taskLeisure: "#8D7E60", taskLeisureBg: "#EDE6D8"),
+                dark: WeekThemePalette(
+                    primary: "#DBB66D", primaryLight: "#E9CA8D", primaryDark: "#A78045",
+                    accentOrange: "#D49562", accentOrangeLight: "#E5B58C",
+                    accentGreen: "#A6B88C", accentGreenLight: "#C0CEA8", accentPink: "#D7A38E",
+                    backgroundPrimary: "#1B1512", backgroundSecondary: "#29201A", backgroundTertiary: "#342820",
+                    textPrimary: "#F0E5D4", textSecondary: "#C5B29A", textTertiary: "#998672",
+                    taskRegular: "#A6B797", taskRegularBg: "#283023", taskDDL: "#D5A28D", taskDDLBg: "#392720",
+                    taskLeisure: "#C0AC83", taskLeisureBg: "#302A21")
             )
         case .cat:
             // 午睡橘猫。浅色是晒着太阳的奶油色房间，橘猫毛色作品牌色；深色是傍晚的

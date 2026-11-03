@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+private struct QuenyaFocusAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
 private enum TodaySection: Int {
     case today
     case week
@@ -325,6 +332,23 @@ struct TodayView: View {
                 erasedKillTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
+            .backgroundPreferenceValue(QuenyaFocusAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if todaySkin.isQuenya, let anchor {
+                        let bounds = proxy[anchor]
+                        Image("QuenyaNarsil")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: bounds.width * 1.3)
+                            .scaleEffect(x: -1, y: 1)
+                            .rotationEffect(.degrees(-31))
+                            .position(x: bounds.minX + bounds.width * 0.43,
+                                      y: bounds.minY + bounds.height * 0.4)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
         }
         .overlay(alignment: .bottom) {
@@ -419,7 +443,7 @@ struct TodayView: View {
     
     @ViewBuilder
     private func statusCard(for day: DayModel) -> some View {
-        WeekCard(accentColor: day.status.color) {
+        WeekCard(accentColor: day.status.color, quenyaStatus: day.status == .execute && day.focusTask != nil) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
@@ -464,9 +488,18 @@ struct TodayView: View {
                             .foregroundColor(.textSecondary)
                     }
                 } else {
-                    Text(formatDate(day.dayId))
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            Text(formatDate(day.dayId))
+                            Text("· sí").italic().foregroundColor(.weekyiiPrimary)
+                        }
                         .font(.bodyMedium)
                         .foregroundColor(.textSecondary)
+                    } else {
+                        Text(formatDate(day.dayId))
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
                 }
             }
         }
@@ -485,6 +518,9 @@ struct TodayView: View {
         HStack(spacing: WeekSpacing.xs) {
             ThemedSectionIcon(systemName: "clock.fill", tint: .accentOrange)
             ThemedSectionTitle(title: String(localized: "killtime.title"))
+            if todaySkin.isQuenya {
+                Text("· lúmë").font(.caption).italic().foregroundColor(.weekyiiPrimary)
+            }
             Spacer(minLength: WeekSpacing.sm)
             if isEditable {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -624,7 +660,8 @@ struct TodayView: View {
             // (WeekCard pads by WeekSpacing.lg and clips). Normal flames stay
             // below the track; urgent flames can rise into the space above it.
             .backgroundPreferenceValue(KillTimeLayoutAnchorKey.self) { anchors in
-                if isEditable {
+                // 昆雅保留火焰，即使截止时间卡当前不可编辑。
+                if isEditable || todaySkin.isQuenya {
                     GeometryReader { proxy in
                         // Measured in the content's space; the flames extend by
                         // WeekSpacing.lg to the card edges, so add it back.
@@ -738,7 +775,21 @@ struct TodayView: View {
         if let focusTask = day.focusTask {
             WeekCard(useGradient: true) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                                .layoutPriority(1)
+                            Spacer(minLength: 4)
+                            Text("\u{E02E}\u{E046}\u{E022}\u{E046}\u{E010} \u{E024}\u{E02C}\u{E044}\u{E022}\u{E040} \u{E022}\u{E02C}\u{E04C}\u{E011}\u{E046}\u{E010}\u{E051} \u{E02E}\u{E04A}\u{E011}\u{E046}\u{E00C}\u{E044}\u{E02E}\u{E046}\u{E022}\u{E015}\u{E04A}")
+                                .font(.custom("AlcarinTengwar-Regular", size: 15))
+                                .foregroundColor(.weekyiiPrimaryLight)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .accessibilityHidden(true)
+                        }
+                    } else {
+                        WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                    }
                     
                     HStack(alignment: .firstTextBaseline) {
                         Text(focusTask.title)
@@ -842,6 +893,7 @@ struct TodayView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .anchorPreference(key: QuenyaFocusAnchorKey.self, value: .bounds) { $0 }
         }
         
         if day.executionMode == .flexible {

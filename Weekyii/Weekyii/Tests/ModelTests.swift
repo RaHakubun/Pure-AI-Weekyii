@@ -4456,6 +4456,21 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(ThemeSymbolVariant.square.symbolVariants, .square)
     }
 
+    func test_quenyaThemeHasIndependentWarmPaletteAndFocusSkin() {
+        XCTAssertEqual(WeekTheme(rawValue: "quenya"), .quenya)
+        XCTAssertTrue(WeekTheme.quenya.isSelectable)
+        XCTAssertTrue(WeekTheme.quenya.skin.isQuenya)
+        XCTAssertFalse(WeekTheme.amber.skin.isQuenya)
+        XCTAssertNotNil(WeekTheme.quenya.skin.card)
+        XCTAssertNotNil(WeekTheme.quenya.skin.feature)
+        let light = WeekTheme.quenya.palette(for: .light, systemIsDark: false)
+        let dark = WeekTheme.quenya.palette(for: .dark, systemIsDark: true)
+        XCTAssertEqual(light.backgroundPrimary, "#E9DFCB")
+        XCTAssertEqual(light.backgroundSecondary, "#F7F1E5")
+        XCTAssertEqual(dark.backgroundPrimary, "#1B1512")
+        XCTAssertEqual(dark.backgroundSecondary, "#29201A")
+    }
+
     func test_themePalette_everyThemeHasCompleteHexValuesInBothAppearances() {
         // Adding a theme means hand-writing 40 hex values; this catches typos
         // and missed fields across every theme, past and future.
