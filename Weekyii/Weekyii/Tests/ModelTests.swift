@@ -8342,3 +8342,35 @@ final class PastDayFailureRuleTests: XCTestCase {
         XCTAssertEqual(restored.pastMonthMarkerOptions, .default)
     }
 }
+
+final class ProjectDetailWeekTests: XCTestCase {
+    @MainActor
+    func test_groupsUseAnchoredMondayThroughSundayAcrossYearsAndCountMixedStates() throws {
+        let monday = try XCTUnwrap(WeekyiiDayId.date(from: "2026-12-28"))
+        let sunday = monday.addingDays(6)
+        let nextMonday = monday.addingDays(7)
+        let completed = TaskItem(title: "Done", order: 0, zone: .complete)
+        let open = TaskItem(title: "Open", order: 1, zone: .draft)
+        let sameDay = ProjectTaskLedgerSection(date: sunday, tasks: [completed, open], isExpandedByDefault: false, expiredCount: 2)
+        let earlierDay = ProjectTaskLedgerSection(date: monday.addingDays(1), tasks: [], isExpandedByDefault: false, expiredCount: 1)
+        let nextWeek = ProjectTaskLedgerSection(date: nextMonday, tasks: [], isExpandedByDefault: true, expiredCount: 1)
+
+        let weeks = ProjectDetailWeek.groups(from: [nextWeek, sameDay, earlierDay])
+        XCTAssertEqual(weeks.count, 2)
+        XCTAssertEqual(weeks[0].start.dayId, "2026-12-28")
+        XCTAssertEqual(weeks[0].end.dayId, "2027-01-03")
+        XCTAssertEqual(weeks[0].days.map(\.isoWeekday), [1, 2, 3, 4, 5, 6, 7])
+        XCTAssertEqual(weeks[0].section(on: sunday)?.id, sunday.dayId)
+        XCTAssertNil(weeks[0].section(on: monday))
+        XCTAssertEqual(weeks[0].completedCount, 1)
+        XCTAssertEqual(weeks[0].expiredCount, 3)
+        XCTAssertEqual(weeks[0].openCount, 1)
+        XCTAssertEqual(weeks[0].sections.map(\.id), [earlierDay.id, sameDay.id])
+        XCTAssertEqual(weeks[1].start.dayId, "2027-01-04")
+        XCTAssertEqual(weeks[1].expiredCount, 1)
+    }
+
+    func test_emptySectionsProduceNoWeeks() {
+        XCTAssertTrue(ProjectDetailWeek.groups(from: []).isEmpty)
+    }
+}
