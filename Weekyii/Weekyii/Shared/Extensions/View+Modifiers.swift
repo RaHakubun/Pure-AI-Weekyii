@@ -271,7 +271,7 @@ private struct WeekPageSurfaceModifier: ViewModifier {
         if let card = skin.card {
             content.themedSurface(
                 card,
-                tint: tint?.weekPaperDye,
+                tint: skin.glyphs == .lotr ? nil : tint?.weekPaperDye,
                 tintOpacity: colorScheme == .dark ? 0.18 : 0.22
             )
         } else {

@@ -2609,7 +2609,7 @@ private struct ThemePaletteMark: View {
     @ViewBuilder
     private var markArtwork: some View {
         switch theme {
-        case .lotr:
+        case .lotr, .ring:
             lotrMark
         case .brutal:
             brutalMark
@@ -2621,8 +2621,6 @@ private struct ThemePaletteMark: View {
             terminalMark
         case .cat:
             catMark
-        case .ring:
-            ringMark
         case .blueprint:
             blueprintMark
         default:
@@ -2670,28 +2668,6 @@ private struct ThemePaletteMark: View {
             }
             .stroke(Color(hex: "#E9C979"), lineWidth: 1.6)
         }
-    }
-
-    /// 指环王：一块黑漆，正中一枚单金戒。
-    private var ringMark: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#342E27"), Color(hex: "#16130F")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            Ellipse()
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [Color(hex: "#E8D29C"), Color(hex: "#A8874F"), Color(hex: "#7E6232")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 2.4
-                )
-                .frame(width: 15, height: 14)
-        }
-        .frame(width: 30, height: 30)
     }
 
     /// Two hard-edged squares: an outlined white block over a solid offset shadow.
@@ -3436,7 +3412,7 @@ struct SettingsIcon: View {
     /// a grid of saturated tiles. Filled symbols fall back to their outline so
     /// every stamp has the same weight as the line work around it.
     private func stamped(_ chip: ThemeIconSkin) -> some View {
-        let ink = themedColor ?? color
+        let ink = skin.glyphs == .lotr ? Color.weekyiiPrimary : (themedColor ?? color)
         return ZStack {
             if chip.tintsFill {
                 // A soft wash of the row's own tint behind a glyph in that tint (猫猫).
@@ -3452,6 +3428,10 @@ struct SettingsIcon: View {
             }
             if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
                 CatGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else if skin.glyphs == .lotr, let glyph = LotrGlyph(systemName: icon) {
+                LotrGlyphView(glyph: glyph)
                     .frame(width: 17, height: 17)
                     .foregroundStyle(ink)
             } else {

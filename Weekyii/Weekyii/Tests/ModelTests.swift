@@ -2650,8 +2650,8 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_vipThemesAreTheSevenDedicatedThemes() {
-        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .cat, .ring, .brutal, .neon, .paper, .terminal])
+    func test_vipThemesAreTheSixDedicatedThemes() {
+        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .cat, .brutal, .neon, .paper, .terminal])
         XCTAssertTrue(WeekTheme.freeThemes.allSatisfy { !$0.requiresVIP })
         // The decorative LOTR styling stays tied to `isPremiumTheme` only.
         XCTAssertEqual(WeekTheme.allCases.filter(\.isPremiumTheme), [.lotr])
@@ -4120,46 +4120,27 @@ final class ModelTests: XCTestCase {
     func test_themeSkin_lotrDrawsForgedComponents() {
         let skin = WeekTheme.lotr.skin
         XCTAssertNotEqual(skin, .classic)
-        XCTAssertNotNil(skin.card)
-        // Sections are lighter sheets closed by an ink rule on all four sides,
-        // carrying a bookmark ribbon.
-        XCTAssertEqual(skin.card?.edges, .all)
+        XCTAssertEqual(skin.card?.cornerRadius, 18)
         XCTAssertNil(skin.card?.shadow)
-        XCTAssertEqual(skin.card?.ribbonAccent, true)
-        XCTAssertNotNil(skin.row)
-        // Task rows stay ledger lines: bottom rule only.
         XCTAssertEqual(skin.row?.surface.edges, .bottomRule)
         XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
-        // The focus panel is the red-book leather cover with a tooled gilt frame, no forge glow.
+        XCTAssertEqual(skin.row?.typeChip, true)
+        XCTAssertEqual(skin.row?.chipSize, 32)
         XCTAssertNotNil(skin.feature)
-        if case .leather = skin.feature?.surface.material {} else {
-            XCTFail("魔戒 focus panel must be drawn as leather")
+        if case .gradient = skin.feature?.surface.material {} else {
+            XCTFail("魔戒 focus panel must use a subdued gradient")
         }
-        XCTAssertNotNil(skin.feature?.surface.tooling)
-        XCTAssertNil(skin.feature?.surface.innerGlow)
+        XCTAssertNil(skin.feature?.surface.tooling)
+        XCTAssertNil(skin.feature?.inscription)
         XCTAssertEqual(skin.feature?.primaryAction.glows, false)
         XCTAssertEqual(skin.badge?.kind, .waxSeal)
-        XCTAssertEqual(skin.section?.count, .serif)
-        XCTAssertEqual(skin.section?.showsIcon, true)
-        XCTAssertNotNil(skin.section?.rubric)
-        XCTAssertNotNil(skin.section?.countInk)
-        if case .vellum = skin.backdrop {} else {
-            XCTFail("魔戒 pages must carry the vellum backdrop")
-        }
+        XCTAssertEqual(skin.section?.count, .capsule)
+        XCTAssertEqual(skin.backdrop, .none)
         XCTAssertFalse(skin.softShadows)
         XCTAssertEqual(skin.glyphs, .lotr)
-        // 红皮书抄本: map-frame inner rule on the paper, ring-letter band on the
-        // cover, a ring closing each header rule, gilt-rimmed leather selection.
-        XCTAssertNotNil(skin.card?.ornament)
-        XCTAssertNotNil(skin.feature?.inscription)
-        XCTAssertNotNil(skin.section?.ruleEndMark)
         XCTAssertNotNil(skin.gildedFill)
-        for theme in WeekTheme.allCases where ![.lotr, .cat, .ring].contains(theme) {
-            XCTAssertNil(theme.skin.gildedFill, "\(theme.rawValue) must keep its flat primary fill")
-            XCTAssertNil(theme.skin.feature?.inscription, "\(theme.rawValue) must not carry the ring inscription")
-        }
         XCTAssertNotNil(skin.onPrimary)
-        // Built-in task types and status seals map onto film props.
+        XCTAssertTrue(skin.drawsMiddleEarthGlyphs)
         XCTAssertEqual(LotrGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .sting)
         XCTAssertEqual(LotrGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .mountDoom)
         XCTAssertEqual(LotrGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .pipe)
@@ -4167,11 +4148,23 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(LotrGlyph(systemName: "clock.arrow.circlepath"), .redBook)
         XCTAssertEqual(LotrGlyph(systemName: "square.grid.2x2"), .phial)
         XCTAssertEqual(LotrGlyph(status: .execute), .beacon)
-        // No other theme opts into the hand-drawn glyph set.
         for theme in WeekTheme.allCases where ![.lotr, .cat, .ring].contains(theme) {
             XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
-            XCTAssertNotEqual(theme.skin.row?.themesBuiltInTypes, true, "\(theme.rawValue) must keep stored type colours")
+            XCTAssertNotEqual(theme.skin.row?.themesBuiltInTypes, true)
         }
+    }
+
+    func test_lotrPaletteUsesStoneAndBasalt() {
+        let light = WeekTheme.lotr.palette(for: .light, systemIsDark: true)
+        let dark = WeekTheme.lotr.palette(for: .dark, systemIsDark: false)
+        XCTAssertEqual(light.backgroundPrimary, "#EEEDE8")
+        XCTAssertEqual(light.backgroundSecondary, "#FCFBF8")
+        XCTAssertEqual(light.textPrimary, "#292720")
+        XCTAssertEqual(light.primary, "#80642D")
+        XCTAssertEqual(dark.backgroundPrimary, "#11100F")
+        XCTAssertEqual(dark.backgroundSecondary, "#1C1A18")
+        XCTAssertEqual(dark.textPrimary, "#ECE6DB")
+        XCTAssertEqual(dark.primary, "#CBA552")
     }
 
     func test_themeSkin_catDrawsSunnyNapComponents() {
@@ -4205,57 +4198,36 @@ final class ModelTests: XCTestCase {
             XCTAssertNotEqual(theme.skin.glyphs, .cat, "\(theme.rawValue) must not draw cat glyphs")
             XCTAssertNil(theme.skin.feature?.catEars, "\(theme.rawValue) must not grow cat ears")
             XCTAssertNotEqual(theme.skin.badge?.kind, .softPill, "\(theme.rawValue) must keep its own badge")
-            if theme != .ring {
+            if theme != .ring && theme != .lotr {
                 XCTAssertNotEqual(theme.skin.row?.typeChip, true, "\(theme.rawValue) must keep its type bar")
             }
         }
     }
 
-    func test_themeSkin_ringIsOneLacquerAndOneGold() {
-        let skin = WeekTheme.ring.skin
-        XCTAssertNotEqual(skin, .classic)
-        XCTAssertNotEqual(skin, WeekTheme.lotr.skin, "指环王 is a new theme, not a 魔戒 variant")
-        XCTAssertEqual(skin.glyphs, .ring)
-        XCTAssertTrue(skin.drawsMiddleEarthGlyphs)
-        XCTAssertTrue(WeekTheme.lotr.skin.drawsMiddleEarthGlyphs)
-        XCTAssertFalse(WeekTheme.cat.skin.drawsMiddleEarthGlyphs)
-        // Tight, quiet radii: 4 / 6 / 8 / 10.
-        XCTAssertEqual(skin.radii, ThemeRadii(small: 4, medium: 6, large: 8, xlarge: 10))
-        XCTAssertEqual(skin.card?.cornerRadius, 8)
-        XCTAssertEqual(skin.card?.ribbonAccent, true)
-        XCTAssertEqual(skin.card?.ribbonTrailing, true)
-        // Feature panel: black lacquer, one gold.
-        XCTAssertEqual(skin.feature?.surface.cornerRadius, 10)
-        XCTAssertEqual(skin.feature?.surface.tooling, RingGilt.base)
-        XCTAssertNil(skin.feature?.inscription)
-        XCTAssertNil(skin.feature?.catEars)
-        XCTAssertEqual(skin.feature?.action.kind, .roundedRect)
-        XCTAssertEqual(skin.feature?.primaryAction.kind, .roundedRect)
-        // Task rows are ruled stamps, no row wash.
-        XCTAssertEqual(skin.row?.typeChip, true)
-        XCTAssertEqual(skin.row?.chipSize, 30)
-        XCTAssertEqual(skin.row?.chipCornerRadius, 6)
-        XCTAssertEqual(skin.row?.chipBorderOpacity, 0.35)
-        XCTAssertEqual(skin.row?.rowWashOpacity, 0)
-        XCTAssertEqual(skin.badge?.kind, .waxSeal)
-        XCTAssertNotNil(skin.gildedFill)
-        // Only ring uses the trailing ribbon and rounded-rect actions.
-        for theme in WeekTheme.allCases where theme != .ring {
-            XCTAssertNotEqual(theme.skin.glyphs, .ring)
-            XCTAssertNotEqual(theme.skin.card?.ribbonTrailing, true, "\(theme.rawValue) keeps its ribbon on the leading side")
-            XCTAssertNotEqual(theme.skin.feature?.action.kind, .roundedRect)
-        }
-        // Cat keeps its old chip geometry through the new defaults.
-        XCTAssertEqual(WeekTheme.cat.skin.row?.chipSize, 32)
-        XCTAssertEqual(WeekTheme.cat.skin.row?.chipCornerRadius, 11)
-        XCTAssertEqual(WeekTheme.cat.skin.row?.rowWashOpacity, 0.07)
+    func test_retiredRingThemeMigratesToLotr() {
+        XCTAssertFalse(WeekTheme.ring.isSelectable)
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.ring))
+        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("ring"), "lotr")
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: true), .lotr)
+        XCTAssertEqual(WeekTheme.ring.skin, WeekTheme.lotr.skin)
+        XCTAssertEqual(
+            WeekTheme.ring.widgetThemeSnapshot(appearanceMode: .system).darkBackgroundHex,
+            WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system).darkBackgroundHex
+        )
     }
 
-    func test_ringThemeRequiresUnlock() {
-        XCTAssertTrue(WeekTheme.ring.requiresVIP)
-        XCTAssertFalse(WeekTheme.ring.isPremiumTheme)
-        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: false), .amber)
-        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: true), .ring)
+    @MainActor
+    func test_retiredRingStoredSelectionIsMigrated() {
+        let defaults = makeSuiteDefaults()
+        defaults.set("ring", forKey: "selectedTheme")
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.selectedThemeRaw, "lotr")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "lotr")
+        settings.selectedThemeRaw = "ring"
+        XCTAssertEqual(settings.selectedThemeRaw, "lotr")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "lotr")
     }
 
     func test_catThemeRequiresUnlock() {
@@ -4334,11 +4306,11 @@ final class ModelTests: XCTestCase {
     func test_lotrThemedTypeColor_onlyReplacesUntouchedBuiltInColours() {
         XCTAssertEqual(
             WeekTheme.lotr.themedTypeColorHex(storedHex: "#8B5A83", baseKind: .leisure, isDark: true),
-            "#A0B78A"
+            "#CBA552"
         )
         XCTAssertEqual(
             WeekTheme.lotr.themedTypeColorHex(storedHex: "#8b5a83", baseKind: .leisure, isDark: false),
-            "#536448"
+            "#80642D"
         )
         // A colour the user picked is kept.
         XCTAssertEqual(
@@ -4927,8 +4899,8 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system)
 
         XCTAssertEqual(snapshot.primaryHex, WeekTheme.lotr.primaryThemeHex)
-        XCTAssertEqual(snapshot.darkBackgroundHex, "#1B232A")
-        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#E6E0D0")
+        XCTAssertEqual(snapshot.darkBackgroundHex, "#1C1A18")
+        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#ECE6DB")
     }
 
     func test_liveActivityThemeSnapshot_resolvesLockPaletteForForcedDarkMode() {
@@ -4967,10 +4939,10 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system)
         let darkLockPalette = snapshot.resolvedLockPalette(prefersDarkLock: true)
 
-        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E6E0D0")
-        XCTAssertEqual(snapshot.islandKeylineHex, "#C2D6C6")
-        XCTAssertEqual(darkLockPalette.backgroundHex, "#1B232A")
-        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#E6E0D0")
+        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#ECE6DB")
+        XCTAssertEqual(snapshot.islandKeylineHex, "#DFC078")
+        XCTAssertEqual(darkLockPalette.backgroundHex, "#1C1A18")
+        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#ECE6DB")
     }
 
     func test_widgetSnapshotStore_roundTrip() throws {

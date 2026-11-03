@@ -20,7 +20,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case paper
     case terminal
     case cat
-    /// 指环王: the One Ring. Black lacquer and a single gold, see `ThemeSkin.ring`.
+    /// Retired identifier, kept only to decode and migrate existing selections.
     case ring
     /// Retired from 外观与主题. The case stays so a stored `"blueprint"` still
     /// decodes; `resolvedTheme` and the settings list both send it to amber.
@@ -28,8 +28,8 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Themes offered in 外观与主题. Blueprint is kept only so old selections decode.
-    var isSelectable: Bool { self != .blueprint }
+    /// Retired identifiers remain decodable, but are not offered in settings.
+    var isSelectable: Bool { self != .blueprint && self != .ring }
 
     var displayName: String {
         switch self {
@@ -208,13 +208,18 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     /// `premiumThemeUnlocked` mirrors the resolved VIP access (written only by
     /// `PurchaseService`). A locked VIP theme falls back to amber for display while
     /// the user's stored choice is kept, so renewing restores it automatically.
-    /// Stored raw value written to defaults. A retired blueprint selection becomes amber.
+    /// Migrate retired selections before checking the current VIP entitlement.
     static func canonicalStoredThemeRaw(_ raw: String) -> String {
-        raw == WeekTheme.blueprint.rawValue ? WeekTheme.amber.rawValue : raw
+        switch raw {
+        case WeekTheme.blueprint.rawValue: return WeekTheme.amber.rawValue
+        case WeekTheme.ring.rawValue: return WeekTheme.lotr.rawValue
+        default: return raw
+        }
     }
 
     static func resolvedTheme(rawValue: String?, premiumThemeUnlocked: Bool) -> WeekTheme {
-        let requestedTheme = WeekTheme(rawValue: rawValue ?? "") ?? .amber
+        let canonical = canonicalStoredThemeRaw(rawValue ?? "")
+        let requestedTheme = WeekTheme(rawValue: canonical) ?? .amber
         guard requestedTheme.isSelectable else { return .amber }
         guard requestedTheme.requiresVIP, !premiumThemeUnlocked else {
             return requestedTheme
@@ -488,24 +493,6 @@ struct ThemeGildedFill: Equatable {
     }
 }
 
-/// 指环王's only metal. Every gold line in that theme reads these three
-/// stops, so the cover, logo, slider, artwork and calendar are one gold.
-enum RingGilt {
-    static let highlight = ThemeHexPair("#D9C08A", "#E8D29C")
-    static let base = ThemeHexPair("#A8874F", "#C9AD72")
-    static let shadow = ThemeHexPair("#7E6232", "#8C7240")
-    /// The fire letters on the ring and the glow on Mount Doom. Never a fill.
-    static let ember = ThemeHexPair("#D2643A", "#E0784A")
-
-    static var gradient: LinearGradient {
-        LinearGradient(
-            colors: [highlight.color, base.color, shadow.color],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-}
-
 enum ThemeSurfaceEdges: Equatable {
     /// Border all round the rounded rect.
     case all
@@ -700,10 +687,6 @@ enum ThemeGlyphSet: Equatable {
     case lotr
     /// Die-cut cat silhouettes (猫猫), see `CatGlyph`.
     case cat
-    /// The same Middle-earth props as `.lotr`, drawn by `LotrGlyph`, for 指环王.
-    /// A separate set so 指环王 can differ from 魔戒 where a view draws its own
-    /// ornament (logo, slider, backdrop) while sharing every glyph.
-    case ring
 }
 
 enum ThemeBackdrop: Equatable {
@@ -781,7 +764,7 @@ struct ThemeSkin: Equatable {
     static let classic = ThemeSkin()
 
     /// Whether glyph call sites draw the Middle-earth set (`LotrGlyph`).
-    var drawsMiddleEarthGlyphs: Bool { glyphs == .lotr || glyphs == .ring }
+    var drawsMiddleEarthGlyphs: Bool { glyphs == .lotr }
 
     /// Skin of the theme currently stored in shared defaults. Views should prefer
     /// `@Environment(\.themeSkin)`, which re-renders them when the theme changes.
@@ -798,7 +781,7 @@ extension WeekTheme {
         case .blueprint: return .drafting
         case .lotr: return .lotr
         case .cat: return .cat
-        case .ring: return .ring
+        case .ring: return .lotr
         case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight:
             return .classic
         }
@@ -806,227 +789,57 @@ extension WeekTheme {
 }
 
 extension ThemeSkin {
-    /// 魔戒: the Red Book of Westmarch. Pages are vellum (light) or a Gondor
-    /// archive after dusk (dark); sections are panels of lighter paper closed by
-    /// a rule on all four sides, task rows are ledger lines, and the focus panel
-    /// is the book's red leather cover with a tooled gilt frame, the only object
-    /// that floats. Status is a wax seal, the accent bar a bookmark ribbon.
-    ///
-    /// Two rules keep it from becoming a fantasy skin:
-    /// - The structural ink is weathered limestone, not warm brown. Rules have to
-    ///   read as carved stone so the page looks ruled rather than aged.
-    /// - Gilt is scarce. It appears on the cover tooling, the cover's actions and
-    ///   a selected state — never as a page-wide wash, or it turns into a
-    ///   cheap gold-plated RPG menu.
+    /// 魔戒 · 玄铁与古金: neutral stone in light mode and basalt at night.
+    /// The original animated ring and Mount Doom artwork stays independent.
     static let lotr: ThemeSkin = {
-        let rule = ThemeHexPair("#8E8A7E", "#3E4A54")
-        let gilt = ThemeHexPair("#B59A62", "#C4A86E")
-        let ink = ThemeHexPair("#222724", "#E6E0D0")
+        let line = ThemeHexPair("#DED9CE", "#443A2A")
+        let ink = ThemeHexPair("#292720", "#ECE6DB")
+        let muted = ThemeHexPair("#6F6A60", "#B0A798")
+        let gold = ThemeHexPair("#80642D", "#CBA552")
+        let selection = ThemeHexPair("#866629", "#CBA552")
+        let onGold = ThemeHexPair("#FFFDF6", "#211A0D")
         return ThemeSkin(
-            typography: .classic,
-            radii: nil,
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .semibold, bodyDesign: .default),
+            radii: ThemeRadii(small: 8, medium: 12, large: 16, xlarge: 20),
             card: ThemeSurfaceSkin(
-                cornerRadius: 4,
-                borderWidth: 1,
-                border: rule,
-                // A sheet of paper lighter than the page it lies on, so the four
-                // rules enclose something instead of outlining empty vellum.
-                fill: ThemeHexPair("#F4EEDF", "#1B232A"),
-                // A second, fainter rule just inside the first: the frame of a map.
-                ornament: ThemeHexPair("#737A78", "#C9D3D6"),
-                edges: .all,
-                ribbonAccent: true,
-                tintsWithAccent: true
+                cornerRadius: 18, borderWidth: 1, border: line,
+                fill: ThemeHexPair("#FCFBF8", "#1C1A18")
             ),
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(
-                    cornerRadius: 0,
-                    borderWidth: 0.5,
-                    border: ThemeHexPair("#61737A78", "#21C9D3D6"),
-                    fill: ThemeHexPair("#00000000"),
-                    edges: .bottomRule
+                    cornerRadius: 0, borderWidth: 0.5, border: line,
+                    fill: ThemeHexPair("#00000000"), edges: .bottomRule
                 ),
-                barWidth: 3,
-                barCornerRadius: 1.5,
-                themesBuiltInTypes: true
+                barWidth: 0, barCornerRadius: 0, themesBuiltInTypes: true,
+                typeChip: true, chipSize: 32, chipCornerRadius: 9,
+                chipFillOpacity: 0.10, chipBorderOpacity: 0, rowWashOpacity: 0
             ),
             feature: ThemeFeatureSkin(
                 surface: ThemeSurfaceSkin(
-                    cornerRadius: 8,
-                    borderWidth: 0.5,
-                    border: ThemeHexPair("#592A0D06"),
-                    shadow: ThemeShadowSkin(color: ThemeHexPair("#4D280C04", "#8C000000"), radius: 7, x: 0, y: 3),
-                    edges: .all,
-                    material: .leather(top: ThemeHexPair("#6A281C", "#55201A"), bottom: ThemeHexPair("#3A140D", "#250F0A")),
-                    tooling: gilt
+                    cornerRadius: 18, borderWidth: 1, border: line,
+                    material: .gradient(
+                        top: ThemeHexPair("#F5F2EB", "#221F1C"),
+                        bottom: ThemeHexPair("#F5F2EB", "#151413")
+                    )
                 ),
-                ink: ThemeHexPair("#F2EAD6"),
-                secondaryInk: ThemeHexPair("#D2C0A0"),
-                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#C4A874")),
+                ink: ink, secondaryInk: muted,
+                label: ThemeLabelSkin(kind: .spaced, ink: gold),
                 action: ThemeActionLook(
-                    kind: .capsule,
-                    ink: ThemeHexPair("#EADFC2"),
-                    border: ThemeHexPair("#8CC4A874"),
-                    borderWidth: 1
+                    kind: .capsule, ink: ink, fill: ThemeHexPair("#E5E1D8", "#373431"),
+                    border: line, borderWidth: 1, glows: false
                 ),
                 primaryAction: ThemeActionLook(
-                    kind: .capsule,
-                    ink: ThemeHexPair("#1B1F1D"),
-                    fill: ThemeHexPair("#C4A874"),
-                    border: ThemeHexPair("#DCC48F"),
-                    borderWidth: 0.5,
-                    glows: false
-                ),
-                inscription: ThemeHexPair("#C4A874")
-            ),
-            badge: ThemeBadgeSkin(kind: .waxSeal),
-            section: ThemeSectionSkin(
-                count: .serif,
-                rule: rule,
-                ruleFades: false,
-                showsIcon: true,
-                iconInk: ink,
-                countInk: ink,
-                rubric: ThemeHexPair("#805044", "#C98A74"),
-                titleTracking: 2,
-                ruleWidth: 1,
-                ruleEndMark: gilt
-            ),
-            onPrimary: ThemeHexPair("#F2EAD6", "#12181E"),
-            onSuccess: ThemeHexPair("#FFFFFF", "#14110C"),
-            // Paper fibres and a stone vignette; the warm light from the top of
-            // the page is the candle, and it is the only warm thing in the dark.
-            backdrop: .vellum(
-                fibre: ThemeHexPair("#175C625E", "#1ABFC8C0"),
-                vignette: ThemeHexPair("#2E4A4C48", "#59000000"),
-                topLight: ThemeHexPair("#00000000", "#1FE0A050")
-            ),
-            softShadows: false,
-            glyphs: .lotr,
-            // A ruled stamp instead of a coloured chip: the icon is drawn in the
-            // same ink as the text it introduces, never in a system tint.
-            icon: ThemeIconSkin(
-                cornerRadius: 3,
-                borderWidth: 0.75,
-                border: ThemeHexPair("#808E8A7E", "#993E4A54"),
-                fill: nil
-            ),
-            gildedFill: ThemeGildedFill(
-                top: ThemeHexPair("#3E5A48", "#355344"),
-                bottom: ThemeHexPair("#263B30", "#243A2F"),
-                ink: ThemeHexPair("#F2EAD6", "#EFE8D6"),
-                hairline: ThemeHexPair("#8CE3CC94", "#99C4A86E")
-            )
-        )
-    }()
-
-    /// 指环王: the One Ring. One material and one metal on every page: black
-    /// lacquer for everything that is selected or primary (focus panel,
-    /// segmented indicator, primary buttons, selected day), and a single gold,
-    /// `RingGilt`, for every line of metal (cover tooling, logo, slider ring,
-    /// the ring in the artwork, today's ring on the calendar). Paper pages,
-    /// one radius scale (4 / 6 / 8 / 10) and ruled stamps for every icon chip.
-    /// Fire letters appear only on the ring itself.
-    static let ring: ThemeSkin = {
-        let rule = ThemeHexPair("#8C8475", "#3E392F")
-        let ink = ThemeHexPair("#1E1B17", "#EDE4D0")
-        let gilt = RingGilt.base
-        let lacquerTop = ThemeHexPair("#342E27", "#2E2820")
-        let lacquerBottom = ThemeHexPair("#16130F", "#0B0A08")
-        return ThemeSkin(
-            typography: .classic,
-            radii: ThemeRadii(small: 4, medium: 6, large: 8, xlarge: 10),
-            card: ThemeSurfaceSkin(
-                cornerRadius: 8,
-                borderWidth: 1,
-                border: rule,
-                fill: ThemeHexPair("#F7F2E7", "#1A1815"),
-                // The inner frame of a map, faint.
-                ornament: ThemeHexPair("#8C8475", "#C9BBA0"),
-                edges: .all,
-                ribbonAccent: true,
-                ribbonTrailing: true
-            ),
-            row: ThemeRowSkin(
-                surface: ThemeSurfaceSkin(
-                    cornerRadius: 0,
-                    borderWidth: 0.5,
-                    border: ThemeHexPair("#528C8475", "#24DCC8A0"),
-                    fill: ThemeHexPair("#00000000"),
-                    edges: .bottomRule
-                ),
-                barWidth: 0,
-                barCornerRadius: 0,
-                themesBuiltInTypes: true,
-                typeChip: true,
-                chipSize: 30,
-                chipCornerRadius: 6,
-                chipFillOpacity: 0.08,
-                chipBorderOpacity: 0.35,
-                rowWashOpacity: 0
-            ),
-            feature: ThemeFeatureSkin(
-                surface: ThemeSurfaceSkin(
-                    cornerRadius: 10,
-                    borderWidth: 0.5,
-                    border: ThemeHexPair("#66000000", "#59C9AD72"),
-                    shadow: ThemeShadowSkin(color: ThemeHexPair("#47000000", "#99000000"), radius: 8, x: 0, y: 3),
-                    edges: .all,
-                    material: .leather(top: lacquerTop, bottom: lacquerBottom),
-                    tooling: gilt
-                ),
-                ink: ThemeHexPair("#F3E9D2"),
-                secondaryInk: ThemeHexPair("#CDBE9E", "#C4B596"),
-                label: ThemeLabelSkin(kind: .spaced, ink: gilt),
-                action: ThemeActionLook(
-                    kind: .roundedRect,
-                    ink: ThemeHexPair("#F3E9D2"),
-                    border: ThemeHexPair("#8CA8874F", "#8CC9AD72"),
-                    borderWidth: 1,
-                    glows: false
-                ),
-                primaryAction: ThemeActionLook(
-                    kind: .roundedRect,
-                    ink: ThemeHexPair("#1C1913"),
-                    fill: ThemeHexPair("#C2A468", "#C9AD72"),
-                    border: RingGilt.highlight,
-                    borderWidth: 0.5,
-                    glows: false
+                    kind: .capsule, ink: onGold, fill: selection, glows: false
                 )
             ),
             badge: ThemeBadgeSkin(kind: .waxSeal),
-            section: ThemeSectionSkin(
-                count: .serif,
-                rule: rule,
-                ruleFades: false,
-                showsIcon: true,
-                iconInk: ink,
-                countInk: ink,
-                rubric: ThemeHexPair("#8A6B35", "#D4B77A"),
-                titleTracking: 2,
-                ruleWidth: 1,
-                ruleEndMark: gilt
-            ),
-            onPrimary: ThemeHexPair("#F3E9D2", "#14110C"),
-            onSuccess: ThemeHexPair("#FFFFFF", "#14110C"),
-            backdrop: .vellum(
-                fibre: ThemeHexPair("#145E584E", "#0FDCC8A0"),
-                vignette: ThemeHexPair("#264A4C48", "#73000000"),
-                topLight: ThemeHexPair("#00000000", "#1AE0AA5A")
-            ),
-            softShadows: false,
-            glyphs: .ring,
-            icon: ThemeIconSkin(
-                cornerRadius: 6,
-                borderWidth: 0.75,
-                border: ThemeHexPair("#998C8475", "#B33E392F"),
-                fill: nil
-            ),
+            section: ThemeSectionSkin(count: .capsule, rule: line, showsIcon: true, iconInk: gold, countInk: muted),
+            onPrimary: onGold, onSuccess: onGold, backdrop: .none, softShadows: false,
+            glyphs: .lotr,
+            icon: ThemeIconSkin(cornerRadius: 9, borderWidth: 0, fill: ThemeHexPair("#F1EBE0", "#29241B")),
             gildedFill: ThemeGildedFill(
-                top: lacquerTop,
-                bottom: lacquerBottom,
-                ink: ThemeHexPair("#F3E9D2"),
-                hairline: ThemeHexPair("#99A8874F", "#B3C9AD72")
+                top: selection, bottom: selection, ink: onGold,
+                hairline: ThemeHexPair("#00000000")
             )
         )
     }()
@@ -1827,57 +1640,26 @@ private struct WeekThemePalettePair {
                 )
             )
         case .lotr:
-            // 红皮书抄本 / 伊希尔丁之夜. Light is parchment ruled in weathered
-            // limestone, coal-black ink, Shire-forest green carrying the brand and
-            // rust-red rubrics. Dark is Gondor's blue-grey stone under moonlight:
-            // silver-grey ink, elven sage for the brand. Gilt stays scarce — the
-            // Ring, the red cover, a selected state — never a background wash.
-            //
-            // Task types: Gondor blue-grey (regular), rust (DDL), moss (leisure).
             return WeekThemePalettePair(
                 light: WeekThemePalette(
-                    primary: "#263B30",
-                    primaryLight: "#3E5A48",
-                    primaryDark: "#16241D",
-                    accentOrange: "#805044",
-                    accentOrangeLight: "#A06B5C",
-                    accentGreen: "#536448",
-                    accentGreenLight: "#7A8C6C",
-                    accentPink: "#8A6F62",
-                    backgroundPrimary: "#E9DFC8",
-                    backgroundSecondary: "#F4EEDF",
-                    backgroundTertiary: "#DDD2B8",
-                    textPrimary: "#222724",
-                    textSecondary: "#5B5F58",
-                    textTertiary: "#8A8C84",
-                    taskRegular: "#26384A",
-                    taskRegularBg: "#D5DCE2",
-                    taskDDL: "#805044",
-                    taskDDLBg: "#EBD8CE",
-                    taskLeisure: "#536448",
-                    taskLeisureBg: "#DCE3D0"
+                    primary: "#80642D", primaryLight: "#9A7C43", primaryDark: "#60491F",
+                    accentOrange: "#80642D", accentOrangeLight: "#9A7C43",
+                    accentGreen: "#80642D", accentGreenLight: "#9A7C43", accentPink: "#80642D",
+                    backgroundPrimary: "#EEEDE8", backgroundSecondary: "#FCFBF8", backgroundTertiary: "#E5E1D8",
+                    textPrimary: "#292720", textSecondary: "#6F6A60", textTertiary: "#81796D",
+                    taskRegular: "#80642D", taskRegularBg: "#F1EBE0",
+                    taskDDL: "#80642D", taskDDLBg: "#F1EBE0",
+                    taskLeisure: "#80642D", taskLeisureBg: "#F1EBE0"
                 ),
                 dark: WeekThemePalette(
-                    primary: "#A3BFAA",
-                    primaryLight: "#C2D6C6",
-                    primaryDark: "#2C4437",
-                    accentOrange: "#C98A74",
-                    accentOrangeLight: "#DBA592",
-                    accentGreen: "#A0B78A",
-                    accentGreenLight: "#B9CCA6",
-                    accentPink: "#B08D7C",
-                    backgroundPrimary: "#12181E",
-                    backgroundSecondary: "#1B232A",
-                    backgroundTertiary: "#252F38",
-                    textPrimary: "#E6E0D0",
-                    textSecondary: "#A3AAA6",
-                    textTertiary: "#737C7A",
-                    taskRegular: "#93AECA",
-                    taskRegularBg: "#1C2833",
-                    taskDDL: "#C98A74",
-                    taskDDLBg: "#33221D",
-                    taskLeisure: "#A0B78A",
-                    taskLeisureBg: "#212A1E"
+                    primary: "#CBA552", primaryLight: "#DFC078", primaryDark: "#997A3A",
+                    accentOrange: "#CBA552", accentOrangeLight: "#DFC078",
+                    accentGreen: "#CBA552", accentGreenLight: "#DFC078", accentPink: "#CBA552",
+                    backgroundPrimary: "#11100F", backgroundSecondary: "#1C1A18", backgroundTertiary: "#29251D",
+                    textPrimary: "#ECE6DB", textSecondary: "#B0A798", textTertiary: "#A0988A",
+                    taskRegular: "#CBA552", taskRegularBg: "#29241B",
+                    taskDDL: "#CBA552", taskDDLBg: "#29241B",
+                    taskLeisure: "#CBA552", taskLeisureBg: "#29241B"
                 )
             )
         case .brutal:
@@ -2119,55 +1901,7 @@ private struct WeekThemePalettePair {
                 )
             )
         case .ring:
-            // 指环王。浅色是旧纸上的墨与金；深色是熄了灯的书房，金色提亮一档。
-            // 主色在浅色是黑漆（选中、主按钮），在深色换成金，保证作为文字和描边时可读。
-            // 正文对卡片：浅色 15.4:1 / 6.3:1，深色 14.0:1 / 7.7:1。
-            return WeekThemePalettePair(
-                light: WeekThemePalette(
-                    primary: "#2C2721",
-                    primaryLight: "#4A4238",
-                    primaryDark: "#16130F",
-                    accentOrange: "#8A6B35",
-                    accentOrangeLight: "#C9AD72",
-                    accentGreen: "#5E6E4E",
-                    accentGreenLight: "#8A9878",
-                    accentPink: "#9A6A5A",
-                    backgroundPrimary: "#ECE5D6",
-                    backgroundSecondary: "#F7F2E7",
-                    backgroundTertiary: "#E0D7C4",
-                    textPrimary: "#1E1B17",
-                    textSecondary: "#5E584E",
-                    textTertiary: "#8D8679",
-                    taskRegular: "#3A4E66",
-                    taskRegularBg: "#DDE2E8",
-                    taskDDL: "#9A4A34",
-                    taskDDLBg: "#EED9CF",
-                    taskLeisure: "#5E6E4E",
-                    taskLeisureBg: "#E1E5D6"
-                ),
-                dark: WeekThemePalette(
-                    primary: "#D4B77A",
-                    primaryLight: "#E8D29C",
-                    primaryDark: "#8C7240",
-                    accentOrange: "#C9AD72",
-                    accentOrangeLight: "#E8D29C",
-                    accentGreen: "#A9BA92",
-                    accentGreenLight: "#C2CFAF",
-                    accentPink: "#C79A88",
-                    backgroundPrimary: "#0F0E0C",
-                    backgroundSecondary: "#1A1815",
-                    backgroundTertiary: "#25221D",
-                    textPrimary: "#EDE4D0",
-                    textSecondary: "#B5AA93",
-                    textTertiary: "#7E7565",
-                    taskRegular: "#9AB0C8",
-                    taskRegularBg: "#1C222A",
-                    taskDDL: "#D99478",
-                    taskDDLBg: "#33221B",
-                    taskLeisure: "#A9BA92",
-                    taskLeisureBg: "#20251B"
-                )
-            )
+            return forTheme(.lotr)
         case .blueprint:
             return WeekThemePalettePair(
                 light: WeekThemePalette(

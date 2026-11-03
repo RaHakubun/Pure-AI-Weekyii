@@ -16,7 +16,6 @@ struct KillTimeSlider: View {
     var onEditingChanged: ((Bool) -> Void)? = nil
 
     @Environment(\.themeSkin) private var skin
-    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: Layout
 
@@ -52,14 +51,11 @@ struct KillTimeSlider: View {
     private var themedTrackHeight: CGFloat {
         // 猫猫：一条软乎乎的 10 pt 橘色轨道。
         if skin.glyphs == .cat { return 10 }
-        // 指环王：6 pt 漆轨。
-        if skin.glyphs == .ring { return 6 }
         return WeekTheme.activeTheme.visualStyle.barThickness(trackHeight)
     }
 
     private var themedTrackCornerRadius: CGFloat {
         if skin.glyphs == .cat { return 5 }
-        if skin.glyphs == .ring { return 3 }
         return WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedTrackHeight)
     }
 
@@ -70,25 +66,6 @@ struct KillTimeSlider: View {
                     colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary],
                     startPoint: .leading,
                     endPoint: .trailing
-                )
-            )
-        }
-        if skin.glyphs == .ring {
-            // 浅色：黑漆填充；深色：锻金填充。
-            if colorScheme == .dark {
-                return AnyShapeStyle(
-                    LinearGradient(
-                        colors: [RingGilt.highlight.color, RingGilt.base.color],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [Color(hex: "#342E27"), Color(hex: "#16130F")],
-                    startPoint: .top,
-                    endPoint: .bottom
                 )
             )
         }
@@ -195,16 +172,6 @@ struct KillTimeSlider: View {
                     .padding(thumbDiameter * 0.22)
             }
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0.14), radius: isDragging ? 4 : 2, x: 0, y: 1)
-        } else if skin.glyphs == .ring {
-            // 指环王：纸色戒心 + 单金戒圈。
-            ZStack {
-                Ellipse()
-                    .fill(Color.backgroundSecondary)
-                Ellipse()
-                    .strokeBorder(RingGilt.gradient, lineWidth: 3.4)
-            }
-            .scaleEffect(x: 1.18, y: 1)
-            .shadow(color: .black.opacity(isDragging ? 0.28 : 0.18), radius: isDragging ? 4 : 2, x: 0, y: 1)
         } else if skin.glyphs == .lotr {
             ZStack {
                 Ellipse()

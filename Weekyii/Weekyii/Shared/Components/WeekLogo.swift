@@ -26,16 +26,12 @@ struct WeekLogo: View {
 
     private var logoGradient: LinearGradient {
         if isLotr {
-            // Forged gold, lit from above.
+            // Quiet, readable antique gold in both appearances.
             return LinearGradient(
-                colors: [Color(hex: "#F4DFA6"), Color(hex: "#C9A45C"), Color(hex: "#8A6630")],
+                colors: [Color.weekyiiPrimary, Color.weekyiiPrimary],
                 startPoint: .top,
                 endPoint: .bottom
             )
-        }
-        if skin.glyphs == .ring {
-            // 指环王：单一锻金，自上而下。
-            return RingGilt.gradient
         }
         if isCat {
             // Ginger fur, lighter at the top like a sunlit back.
@@ -73,7 +69,6 @@ struct WeekLogo: View {
     var body: some View {
         wordmark
             .foregroundStyle(logoGradient)
-            .overlay(alignment: .bottom) { inscription }
             .overlay(alignment: .topLeading) { catEars }
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
@@ -90,17 +85,6 @@ struct WeekLogo: View {
 }
 
 extension WeekLogo {
-    /// 魔戒：字标下方一道极淡的金色戒文，像至尊戒上的火焰文字。
-    /// 只是叠加层，不改变字标的尺寸与布局。
-    @ViewBuilder
-    fileprivate var inscription: some View {
-        if isLotr {
-            ElvishInscriptionBand(seed: 11, color: Color(hex: "#B59A62"), opacity: 0.5, lineWidth: 0.7)
-                .frame(width: size.fontSize * 3.6, height: max(6, size.fontSize * 0.24))
-                .offset(y: max(5, size.fontSize * 0.2))
-        }
-    }
-
     /// 猫猫：两只耳朵立在 "W" 的两个尖上。只是叠加层，不改变字标尺寸。
     @ViewBuilder
     fileprivate var catEars: some View {

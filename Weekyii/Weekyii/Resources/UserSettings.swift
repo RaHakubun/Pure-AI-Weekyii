@@ -208,7 +208,6 @@ final class UserSettings: ObservableObject {
             let canonical = WeekTheme.canonicalStoredThemeRaw(selectedThemeRaw)
             if canonical != selectedThemeRaw {
                 selectedThemeRaw = canonical
-                return
             }
             save()
         }

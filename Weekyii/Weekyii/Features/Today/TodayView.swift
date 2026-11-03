@@ -641,7 +641,7 @@ struct TodayView: View {
                                 trackHeight: bottom - trackY
                             )
                         }
-                        if let deadline {
+                        if let deadline, userSettings.selectedTheme != .lotr {
                             KillTimeFlameBackground(
                                 deadline: deadline,
                                 animationsActive: animationsActive,
@@ -1343,14 +1343,8 @@ struct TodayView: View {
             if userSettings.selectedTheme == .sunset {
                 SunsetWaterReflectionBackground(animationsActive: animationsActive)
                     .transition(.opacity)
-            } else if userSettings.selectedTheme == .lotr {
-                LotrRainNightBackground(animationsActive: animationsActive)
-                    .transition(.opacity)
             } else if userSettings.selectedTheme == .cat {
                 CatSunbeamBackground(animationsActive: animationsActive)
-                    .transition(.opacity)
-            } else if userSettings.selectedTheme == .ring {
-                RingStudyBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
         }
@@ -1661,13 +1655,11 @@ private struct SectionToggleView: View {
 
     /// 魔戒 and 指环王 draw a flat book surface: no gloss, no inner shadow.
     private var isLotr: Bool { skin.drawsMiddleEarthGlyphs }
-    /// 指环王 keeps its 8 / 6 pt radius scale instead of a capsule.
-    private var isRing: Bool { skin.glyphs == .ring }
     private var trackShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: isRing ? 8 : height / 2, style: .continuous)
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
     }
     private var indicatorShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: isRing ? 6 : (height - 6) / 2, style: .continuous)
+        RoundedRectangle(cornerRadius: (height - 6) / 2, style: .continuous)
     }
 
     private var indicatorColors: [Color] {
@@ -2011,193 +2003,6 @@ private struct SunsetWaterReflectionBackground: View {
     }
 }
 
-/// 当下 backdrop for 魔戒. Light: a vellum page with an ink-drawn map range
-/// (peaks with hatching, a dashed road and a compass) along the lower third,
-/// no rain. Dark: the rain night over layered mountains, warmed to sit under
-/// the candle-lit study.
-private struct LotrRainNightBackground: View {
-    let animationsActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let horizonY = size.height * 0.6
-
-            ZStack {
-                if colorScheme == .dark {
-                    LinearGradient(
-                        colors: [Color(hex: "#151C23"), Color(hex: "#11171D"), Color(hex: "#0E1317"), Color(hex: "#0B0E11")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-
-                    mountainLayer(size: size, y: horizonY - 34, opacity: 0.55, offset: 0)
-                    mountainLayer(size: size, y: horizonY - 12, opacity: 0.75, offset: 24)
-
-                    // distant call: a tiny warm beacon near golden-left valley
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color(hex: "#B59A62"))
-                        .frame(width: 3, height: 12)
-                        .blur(radius: 0.4)
-                        .position(x: size.width * 0.362, y: horizonY - 8)
-
-                    coldRain(size: size, fromY: horizonY - 120)
-                } else {
-                    Color.backgroundPrimary
-                    inkMap(size: size)
-                        .opacity(0.38)
-                }
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    /// Thrór's-map style range: open peaks, hatching on the shaded flank, a
-    /// dashed road and a compass rose, all in secondary ink.
-    private func inkMap(size: CGSize) -> some View {
-        let ink = Color.textSecondary
-        let baseY = size.height * 0.84
-        let peaks: [(CGFloat, CGFloat, CGFloat)] = [
-            (0.10, 10, 22), (0.20, -2, 30), (0.30, 14, 20), (0.41, -6, 34), (0.53, 10, 24),
-            (0.63, -12, 38), (0.75, 6, 26), (0.85, -4, 30), (0.94, 12, 20)
-        ]
-        return Canvas { context, canvas in
-            for (fx, dy, height) in peaks {
-                let x = canvas.width * fx
-                let top = baseY - height + dy
-                let half = height * 0.9
-                var peak = Path()
-                peak.move(to: CGPoint(x: x - half, y: top + height))
-                peak.addLine(to: CGPoint(x: x, y: top))
-                peak.addLine(to: CGPoint(x: x + half, y: top + height))
-                context.stroke(peak, with: .color(ink), style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
-                for step in 1...4 {
-                    let t = CGFloat(step) / 5
-                    var hatch = Path()
-                    let start = CGPoint(x: x + half * t * 0.9, y: top + height * t * 0.9 + 2)
-                    hatch.move(to: start)
-                    hatch.addLine(to: CGPoint(x: start.x - half * 0.18, y: start.y + height * 0.22))
-                    context.stroke(hatch, with: .color(ink), lineWidth: 0.8)
-                }
-            }
-
-            var road = Path()
-            let roadY = baseY + 46
-            road.move(to: CGPoint(x: canvas.width * 0.05, y: roadY))
-            road.addCurve(
-                to: CGPoint(x: canvas.width * 0.54, y: roadY - 6),
-                control1: CGPoint(x: canvas.width * 0.23, y: roadY - 14),
-                control2: CGPoint(x: canvas.width * 0.36, y: roadY + 10)
-            )
-            road.addCurve(
-                to: CGPoint(x: canvas.width * 0.95, y: roadY),
-                control1: CGPoint(x: canvas.width * 0.72, y: roadY - 18),
-                control2: CGPoint(x: canvas.width * 0.85, y: roadY - 8)
-            )
-            context.stroke(road, with: .color(ink), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, dash: [3, 4]))
-
-            let centre = CGPoint(x: canvas.width * 0.12, y: baseY - 52)
-            var compass = Path()
-            compass.addEllipse(in: CGRect(x: centre.x - 11, y: centre.y - 11, width: 22, height: 22))
-            compass.move(to: CGPoint(x: centre.x, y: centre.y - 16))
-            compass.addLine(to: CGPoint(x: centre.x, y: centre.y + 16))
-            compass.move(to: CGPoint(x: centre.x - 16, y: centre.y))
-            compass.addLine(to: CGPoint(x: centre.x + 16, y: centre.y))
-            context.stroke(compass, with: .color(ink), lineWidth: 0.9)
-            var needle = Path()
-            needle.move(to: CGPoint(x: centre.x, y: centre.y - 11))
-            needle.addLine(to: CGPoint(x: centre.x + 2.5, y: centre.y))
-            needle.addLine(to: CGPoint(x: centre.x, y: centre.y + 11))
-            needle.addLine(to: CGPoint(x: centre.x - 2.5, y: centre.y))
-            needle.closeSubpath()
-            context.fill(needle, with: .color(ink))
-
-            // The Anduin, running south between the ranges.
-            var river = Path()
-            river.move(to: CGPoint(x: canvas.width * 0.54, y: baseY - 120))
-            river.addCurve(
-                to: CGPoint(x: canvas.width * 0.57, y: baseY - 10),
-                control1: CGPoint(x: canvas.width * 0.51, y: baseY - 80),
-                control2: CGPoint(x: canvas.width * 0.62, y: baseY - 50)
-            )
-            river.addCurve(
-                to: CGPoint(x: canvas.width * 0.67, y: baseY + 70),
-                control1: CGPoint(x: canvas.width * 0.53, y: baseY + 20),
-                control2: CGPoint(x: canvas.width * 0.63, y: baseY + 40)
-            )
-            context.stroke(river, with: .color(Color.taskRegular.opacity(0.8)), style: StrokeStyle(lineWidth: 1.1, lineCap: .round))
-
-            // Region names in spaced italic serif, as lettered on a map.
-            let names: [(String, CGFloat, CGFloat, CGFloat)] = [
-                ("ERIADOR", 0.18, -70, 9), ("GONDOR", 0.65, -60, 9),
-                ("THE SHIRE", 0.38, 24, 7), ("MORDOR", 0.82, 22, 7.5)
-            ]
-            for (name, fx, dy, size) in names {
-                let label = Text(verbatim: name)
-                    .font(.system(size: size, weight: .regular, design: .serif).italic())
-                    .tracking(size * 0.45)
-                    .foregroundColor(ink)
-                context.draw(label, at: CGPoint(x: canvas.width * fx, y: baseY + dy), anchor: .leading)
-            }
-        }
-    }
-
-    private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -20, y: size.height))
-            path.addLine(to: CGPoint(x: -20, y: y + 40))
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.28, y: y - 22),
-                control1: CGPoint(x: size.width * 0.05, y: y + 10),
-                control2: CGPoint(x: size.width * 0.18, y: y - 26)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.58, y: y + 6),
-                control1: CGPoint(x: size.width * 0.36, y: y - 16),
-                control2: CGPoint(x: size.width * 0.46, y: y + 14)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width + 20, y: y - 12),
-                control1: CGPoint(x: size.width * 0.71, y: y - 14),
-                control2: CGPoint(x: size.width * 0.89, y: y - 20)
-            )
-            path.addLine(to: CGPoint(x: size.width + 20, y: size.height))
-            path.closeSubpath()
-        }
-        .fill(Color.black.opacity(opacity))
-        .offset(x: offset)
-    }
-
-    private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvas in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let columns = 24
-                for idx in 0..<columns {
-                    let x = (CGFloat(idx) + 0.5) / CGFloat(columns) * canvas.width
-                    let phase = Double(idx) * 0.37
-                    let drift = CGFloat(sin(t * 0.65 + phase)) * (reduceMotion ? 0.5 : 2.3)
-                    let dropTop = fromY + CGFloat((idx % 4) * 6) + CGFloat((t * 38 + phase * 30).truncatingRemainder(dividingBy: 16))
-                    let dropHeight: CGFloat = 14 + CGFloat(idx % 3) * 2
-                    let rect = CGRect(x: x + drift, y: dropTop, width: 1.0, height: dropHeight)
-                    let path = Path(roundedRect: rect, cornerRadius: 1)
-                    context.fill(path, with: .color(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.1)))
-                }
-            }
-        }
-    }
-}
-
-/// The room the cat naps in. Light: warm sunbeams falling diagonally from the
-/// top trailing window. Dark: a few faint stars and a ginger lamp glow in the
-/// top trailing corner. `animationsActive == false` holds the light still.
 private struct CatSunbeamBackground: View {
     let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -2285,120 +2090,6 @@ private struct CatSunbeamBackground: View {
                 }
             }
         }
-    }
-}
-
-/// 指环王：浅色是一张羊皮纸，下三分之一压着墨线山脉、虚线古道与罗盘；
-/// 深色是暖黑书房，顶上一团烛光，纸上只剩淡金的地图线。
-private struct RingStudyBackground: View {
-    let animationsActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
-
-    var body: some View {
-        Group {
-            if shouldAnimate {
-                TimelineView(.animation(minimumInterval: 1.0 / 8.0)) { timeline in
-                    scene(time: timeline.date.timeIntervalSinceReferenceDate)
-                }
-            } else {
-                scene(time: 0)
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private func scene(time: TimeInterval) -> some View {
-        let isDark = colorScheme == .dark
-        // 烛光只在深色里轻轻呼吸。
-        let flicker = 0.88 + 0.12 * CGFloat(sin(time * 1.3) * 0.6 + sin(time * 3.1) * 0.4)
-        ZStack {
-            if isDark {
-                RadialGradient(
-                    colors: [Color(hex: "#E0B86A").opacity(0.14 * Double(flicker)), Color(hex: "#E0B86A").opacity(0)],
-                    center: UnitPoint(x: 0.5, y: 0),
-                    startRadius: 0,
-                    endRadius: 380
-                )
-            } else {
-                // 羊皮纸边缘微暗。
-                RadialGradient(
-                    colors: [Color.clear, Color(hex: "#8C7A5A").opacity(0.10)],
-                    center: .center,
-                    startRadius: 220,
-                    endRadius: 620
-                )
-            }
-            Canvas { context, size in
-                drawMap(in: &context, size: size, isDark: isDark)
-            }
-        }
-    }
-
-    private func drawMap(in context: inout GraphicsContext, size: CGSize, isDark: Bool) {
-        let ink = isDark ? Color(hex: "#8C7240").opacity(0.22) : Color(hex: "#5E584E").opacity(0.16)
-        let w = size.width
-        let h = size.height
-        let base = h * 0.86
-
-        // 山脉：一串尖峰，每座带三道阴影排线。
-        let peaks: [(x: CGFloat, height: CGFloat, width: CGFloat)] = [
-            (0.06, 0.07, 0.10), (0.16, 0.10, 0.12), (0.28, 0.06, 0.09),
-            (0.62, 0.08, 0.11), (0.74, 0.12, 0.13), (0.88, 0.07, 0.10),
-        ]
-        for peak in peaks {
-            let cx = w * peak.x
-            let ph = h * peak.height
-            let half = w * peak.width / 2
-            var ridge = Path()
-            ridge.move(to: CGPoint(x: cx - half, y: base))
-            ridge.addLine(to: CGPoint(x: cx, y: base - ph))
-            ridge.addLine(to: CGPoint(x: cx + half, y: base))
-            context.stroke(ridge, with: .color(ink), style: StrokeStyle(lineWidth: 1, lineJoin: .round))
-            var hatch = Path()
-            for step in 1...3 {
-                let t = CGFloat(step) / 4
-                let top = CGPoint(x: cx + half * t * 0.35, y: base - ph * (1 - t * 0.35))
-                hatch.move(to: top)
-                hatch.addLine(to: CGPoint(x: top.x + half * 0.28, y: base - ph * 0.08))
-            }
-            context.stroke(hatch, with: .color(ink.opacity(0.8)), lineWidth: 0.7)
-        }
-
-        // 虚线古道，从左下蜿蜒到右侧。
-        var road = Path()
-        road.move(to: CGPoint(x: 0, y: h * 0.95))
-        road.addCurve(
-            to: CGPoint(x: w, y: h * 0.90),
-            control1: CGPoint(x: w * 0.35, y: h * 0.86),
-            control2: CGPoint(x: w * 0.6, y: h * 1.0)
-        )
-        context.stroke(road, with: .color(ink), style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [4, 5]))
-
-        // 罗盘：右上角一枚细线罗盘。
-        let compass = CGPoint(x: w * 0.84, y: isDark ? h * 0.72 : h * 0.70)
-        let r: CGFloat = 22
-        context.stroke(
-            Path(ellipseIn: CGRect(x: compass.x - r, y: compass.y - r, width: r * 2, height: r * 2)),
-            with: .color(ink),
-            lineWidth: 0.8
-        )
-        var star = Path()
-        for index in 0..<4 {
-            let angle = CGFloat(index) * .pi / 2 - .pi / 2
-            let tip = CGPoint(x: compass.x + cos(angle) * r * 1.25, y: compass.y + sin(angle) * r * 1.25)
-            let left = CGPoint(x: compass.x + cos(angle - .pi / 2) * 4, y: compass.y + sin(angle - .pi / 2) * 4)
-            let right = CGPoint(x: compass.x + cos(angle + .pi / 2) * 4, y: compass.y + sin(angle + .pi / 2) * 4)
-            star.move(to: left)
-            star.addLine(to: tip)
-            star.addLine(to: right)
-        }
-        context.stroke(star, with: .color(ink), lineWidth: 0.8)
     }
 }
 

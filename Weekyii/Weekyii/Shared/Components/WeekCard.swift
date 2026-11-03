@@ -143,7 +143,10 @@ struct WeekCard<Content: View>: View {
 
     @ViewBuilder
     private func themedAccentBar(_ surface: ThemeSurfaceSkin) -> some View {
-        if surface.hidesAccentBar && surface.tintsWithAccent {
+        if skin.glyphs == .lotr {
+            // The basalt design keeps cards quiet; task type is shown in its chip.
+            EmptyView()
+        } else if surface.hidesAccentBar && surface.tintsWithAccent {
             // The accent is already the surface wash.
             EmptyView()
         } else if let color = accentColor, surface.ribbonAccent {
