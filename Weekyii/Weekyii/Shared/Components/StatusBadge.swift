@@ -64,33 +64,22 @@ struct StatusBadge: View {
             .foregroundStyle(status.color)
             .background(status.color.opacity(0.14), in: Capsule())
         case .waxSeal:
+            // 魔戒 · 玄铁与古金: a small stone disc with a gold glyph, then the
+            // status in bold antique gold. No filled seal, no rim shading.
             HStack(spacing: 7) {
                 ZStack {
                     Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [status.color.opacity(0.85), status.color],
-                                center: UnitPoint(x: 0.35, y: 0.3),
-                                startRadius: 0,
-                                endRadius: 13
-                            )
-                        )
+                        .fill(Color.taskRegularBg)
                     Circle()
-                        .strokeBorder(Color.black.opacity(0.18), lineWidth: 1)
-                    // The pressed rim a seal matrix leaves in the wax.
-                    Circle()
-                        .inset(by: 3)
-                        .stroke(Color.black.opacity(0.14), lineWidth: 0.75)
+                        .strokeBorder(skin.card?.border.color ?? Color.backgroundTertiary, lineWidth: 1)
                     LotrGlyphView(glyph: LotrGlyph(status: status))
-                        .frame(width: 14, height: 14)
-                        .foregroundColor(Color(hex: "#F7E9D0"))
+                        .frame(width: 13, height: 13)
+                        .foregroundColor(.weekyiiPrimary)
                 }
                 .frame(width: 24, height: 24)
-                .shadow(color: Color.black.opacity(0.25), radius: 0.75, x: 0, y: 0.75)
                 Text(status.displayName)
-                    .font(.caption.weight(.semibold))
-                    .tracking(0.8)
-                    .foregroundColor(status.color)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.weekyiiPrimary)
             }
         case .legend:
             HStack(spacing: 6) {

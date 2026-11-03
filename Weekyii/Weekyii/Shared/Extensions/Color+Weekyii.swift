@@ -654,6 +654,8 @@ enum ThemeCountKind: Equatable {
     case serif
     /// Heavy numeral on a soft capsule of the accent colour (猫猫).
     case capsule
+    /// Quiet "3 项" caption in the secondary ink (魔戒 · 玄铁与古金).
+    case itemCaption
 }
 
 struct ThemeSectionSkin: Equatable {
@@ -800,7 +802,7 @@ extension ThemeSkin {
         let onGold = ThemeHexPair("#FFFDF6", "#211A0D")
         return ThemeSkin(
             typography: ThemeTypography(titleDesign: .default, titleWeight: .semibold, bodyDesign: .default),
-            radii: ThemeRadii(small: 8, medium: 12, large: 16, xlarge: 20),
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 14),
             card: ThemeSurfaceSkin(
                 cornerRadius: 18, borderWidth: 1, border: line,
                 fill: ThemeHexPair("#FCFBF8", "#1C1A18")
@@ -811,21 +813,18 @@ extension ThemeSkin {
                     fill: ThemeHexPair("#00000000"), edges: .bottomRule
                 ),
                 barWidth: 0, barCornerRadius: 0, themesBuiltInTypes: true,
-                typeChip: true, chipSize: 32, chipCornerRadius: 9,
+                typeChip: true, chipSize: 30, chipCornerRadius: 8,
                 chipFillOpacity: 0.10, chipBorderOpacity: 0, rowWashOpacity: 0
             ),
             feature: ThemeFeatureSkin(
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 18, borderWidth: 1, border: line,
-                    material: .gradient(
-                        top: ThemeHexPair("#F5F2EB", "#221F1C"),
-                        bottom: ThemeHexPair("#F5F2EB", "#151413")
-                    )
+                    fill: ThemeHexPair("#F5F2EB", "#211E1A")
                 ),
                 ink: ink, secondaryInk: muted,
                 label: ThemeLabelSkin(kind: .spaced, ink: gold),
                 action: ThemeActionLook(
-                    kind: .capsule, ink: ink, fill: ThemeHexPair("#E5E1D8", "#373431"),
+                    kind: .capsule, ink: ink, fill: ThemeHexPair("#E5E1D8", "#29251D"),
                     border: line, borderWidth: 1, glows: false
                 ),
                 primaryAction: ThemeActionLook(
@@ -833,7 +832,8 @@ extension ThemeSkin {
                 )
             ),
             badge: ThemeBadgeSkin(kind: .waxSeal),
-            section: ThemeSectionSkin(count: .capsule, rule: line, showsIcon: true, iconInk: gold, countInk: muted),
+            // Plain bold title with a quiet "3 项" on the right: no icon, no rule.
+            section: ThemeSectionSkin(count: .itemCaption, countInk: muted),
             onPrimary: onGold, onSuccess: onGold, backdrop: .none, softShadows: false,
             glyphs: .lotr,
             icon: ThemeIconSkin(cornerRadius: 9, borderWidth: 0, fill: ThemeHexPair("#F1EBE0", "#29241B")),

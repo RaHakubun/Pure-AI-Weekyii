@@ -437,7 +437,7 @@ struct TodayView: View {
                             .foregroundColor(.textSecondary)
                         if todaySkin.drawsMiddleEarthGlyphs {
                             Text("\(appState.daysStartedCount)")
-                                .font(.system(size: 30, weight: .semibold, design: .serif))
+                                .font(.system(size: 28, weight: .bold))
                                 .monospacedDigit()
                                 .foregroundColor(.weekyiiPrimary)
                         } else {
@@ -457,11 +457,10 @@ struct TodayView: View {
                 if todaySkin.drawsMiddleEarthGlyphs {
                     HStack(spacing: 6) {
                         LotrGlyphView(glyph: .quill)
-                            .frame(width: 15, height: 15)
+                            .frame(width: 14, height: 14)
                             .foregroundColor(.textSecondary)
                         Text(formatDate(day.dayId))
-                            .font(.system(.subheadline, design: .serif))
-                            .tracking(0.6)
+                            .font(.subheadline)
                             .foregroundColor(.textSecondary)
                     }
                 } else {
@@ -641,7 +640,7 @@ struct TodayView: View {
                                 trackHeight: bottom - trackY
                             )
                         }
-                        if let deadline, userSettings.selectedTheme != .lotr {
+                        if let deadline {
                             KillTimeFlameBackground(
                                 deadline: deadline,
                                 animationsActive: animationsActive,
@@ -785,7 +784,9 @@ struct TodayView: View {
                             taskForPostpone = focusTask
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                ThemedSymbol(systemName: "calendar.badge.clock", size: 13)
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "calendar.badge.clock", size: 13)
+                                }
                                 Text("后移")
                             }
                             .font(.caption.weight(.semibold))
@@ -826,7 +827,9 @@ struct TodayView: View {
                             }
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                ThemedSymbol(systemName: "checkmark.circle.fill", size: 13)
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "checkmark.circle.fill", size: 13)
+                                }
                                 Text(String(localized: "action.done_focus"))
                             }
                             .font(.caption.weight(.semibold))
@@ -1770,13 +1773,13 @@ private struct SectionToggleView: View {
         .background(
             // 底层背景胶囊 - 带内阴影效果
             trackShape
-                .fill(isLotr ? Color.backgroundTertiary.opacity(0.55) : Color.backgroundSecondary.opacity(0.8))
+                .fill(isLotr ? Color.backgroundTertiary : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
                     trackShape
                         .strokeBorder(
                             LinearGradient(
                                 colors: isLotr
-                                    ? [Color.textTertiary, Color.textTertiary]
+                                    ? [Color.clear, Color.clear]
                                     : [
                                         Color.white.opacity(0.3),
                                         Color.white.opacity(0.1),

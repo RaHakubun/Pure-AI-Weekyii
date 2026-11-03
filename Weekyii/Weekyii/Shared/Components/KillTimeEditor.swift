@@ -44,6 +44,7 @@ struct KillTimeEditor: View {
     var rangeAnchorMinutes: Int? = nil
     let onChange: (Int, Int) -> Void
     var onEditingChanged: ((Bool) -> Void)? = nil
+    @Environment(\.themeSkin) private var skin
 
     // MARK: - Computed Properties
 
@@ -81,7 +82,7 @@ struct KillTimeEditor: View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             // 时间显示：点按大号时间即可用系统选择器精确输入
             Text(String(format: "%02d:%02d", hour, minute))
-                .font(.system(size: 40, weight: .semibold, design: .serif))
+                .font(.system(size: 40, weight: skin.glyphs == .lotr ? .bold : .semibold, design: skin.glyphs == .lotr ? .default : .serif))
                 .foregroundColor(.textPrimary)
                 .monospacedDigit()
                 .accessibilityIdentifier("killTimeDisplay")

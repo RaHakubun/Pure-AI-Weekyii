@@ -609,6 +609,40 @@ struct WeekSectionHeader: View {
                 .padding(.horizontal, 9)
                 .padding(.vertical, 3)
                 .background(tint.opacity(0.14), in: Capsule())
+        case .itemCaption:
+            Text(Self.itemCaption(count))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(skin.section?.countInk?.color ?? .textSecondary)
+        }
+    }
+
+    /// "3 项" / "3 items".
+    static func itemCaption(_ count: Int) -> String {
+        String(
+            format: String(localized: "section.count.items", defaultValue: "%lld 项"),
+            locale: Locale.current,
+            Int64(count)
+        )
+    }
+}
+
+/// The count beside a custom section title (draft area). It follows the same
+/// skin rule as `WeekSectionHeader`; classic themes keep the primary numeral.
+struct ThemedSectionCount: View {
+    let count: Int
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if skin.section?.count == .itemCaption {
+            Text(WeekSectionHeader.itemCaption(count))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(skin.section?.countInk?.color ?? .textSecondary)
+        } else {
+            Text("\(count)")
+                .font(.titleSmall)
+                .foregroundColor(.weekyiiPrimary)
         }
     }
 }
@@ -688,7 +722,10 @@ struct ThemedSectionIcon: View {
     @Environment(\.themeSkin) private var skin
 
     var body: some View {
-        if let section = skin.section, section.showsIcon {
+        if skin.section?.count == .itemCaption {
+            // 魔戒 · 玄铁与古金: section titles stand alone, like the cards' headers.
+            EmptyView()
+        } else if let section = skin.section, section.showsIcon {
             ThemedSymbol(systemName: systemName, size: 17)
                 .foregroundColor(section.iconInk?.color ?? tint)
         } else {

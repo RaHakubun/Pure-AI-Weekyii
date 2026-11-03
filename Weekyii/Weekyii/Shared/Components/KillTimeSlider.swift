@@ -51,11 +51,14 @@ struct KillTimeSlider: View {
     private var themedTrackHeight: CGFloat {
         // 猫猫：一条软乎乎的 10 pt 橘色轨道。
         if skin.glyphs == .cat { return 10 }
+        // 魔戒：6 pt 古金轨道。
+        if skin.glyphs == .lotr { return 6 }
         return WeekTheme.activeTheme.visualStyle.barThickness(trackHeight)
     }
 
     private var themedTrackCornerRadius: CGFloat {
         if skin.glyphs == .cat { return 5 }
+        if skin.glyphs == .lotr { return 3 }
         return WeekTheme.activeTheme.visualStyle.barCornerRadius(for: themedTrackHeight)
     }
 
@@ -157,7 +160,7 @@ struct KillTimeSlider: View {
         }
     }
 
-    /// 魔戒：滑块是一枚金戒（纸色戒心 + 锻金戒圈）；其他主题保持白色圆点。
+    /// 魔戒：滑块是一枚古金圆环；其他主题保持白色圆点。
     @ViewBuilder
     private var thumb: some View {
         if skin.glyphs == .cat {
@@ -173,21 +176,14 @@ struct KillTimeSlider: View {
             }
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0.14), radius: isDragging ? 4 : 2, x: 0, y: 1)
         } else if skin.glyphs == .lotr {
+            // 玄铁与古金：卡片色戒心 + 一圈哑光古金。
             ZStack {
-                Ellipse()
+                Circle()
                     .fill(Color.backgroundSecondary)
-                Ellipse()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [Color(hex: "#8A6630"), Color(hex: "#F4DFA6"), Color(hex: "#C9A45C"), Color(hex: "#6F4217")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 3.4
-                    )
+                Circle()
+                    .strokeBorder(Color.weekyiiPrimary, lineWidth: 3.5)
             }
-            .scaleEffect(x: 1.18, y: 1)
-            .shadow(color: .black.opacity(isDragging ? 0.28 : 0.18), radius: isDragging ? 4 : 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(isDragging ? 0.22 : 0.12), radius: isDragging ? 3 : 1.5, x: 0, y: 1)
         } else {
             Circle()
                 .fill(Color.white)

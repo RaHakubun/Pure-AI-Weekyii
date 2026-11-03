@@ -70,9 +70,7 @@ struct DraftEditorView: View {
         HStack(spacing: 2) {
             ThemedSectionTitle(title: presentationMode == .draft ? String(localized: "draft.title") : String(localized: "zone.draft"))
             Spacer()
-            Text("\(tasks.count)")
-                .font(.titleSmall)
-                .foregroundColor(.weekyiiPrimary)
+            ThemedSectionCount(count: tasks.count)
 
             if presentationMode == .flexibleExecution {
                 temperatureToggle

@@ -1932,7 +1932,8 @@ private struct HubModuleLabel: View {
     /// 红皮书：去掉彩色圆底，换成墨线道具图标；标题首字朱红，与页内其他标题一致。
     private func bookLabel(_ section: ThemeSectionSkin) -> some View {
         HStack(spacing: 7) {
-            if let icon {
+            // 玄铁与古金 keeps module captions as quiet text, like the section headers.
+            if let icon, section.count != .itemCaption {
                 ThemedSymbol(systemName: icon, size: 16)
                     .foregroundColor(section.iconInk?.color ?? tint)
                     .frame(width: 20, height: 20)

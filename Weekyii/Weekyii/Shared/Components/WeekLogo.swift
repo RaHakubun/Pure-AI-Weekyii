@@ -61,7 +61,7 @@ struct WeekLogo: View {
                 .font(.system(size: size.fontSize * 1.05, weight: .heavy, design: .rounded))
         } else {
             Text("Weekyii")
-                .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
+                .font(.system(size: size.fontSize * 1.05, weight: isLotr ? .bold : .semibold, design: .serif))
                 .italic()
         }
     }
