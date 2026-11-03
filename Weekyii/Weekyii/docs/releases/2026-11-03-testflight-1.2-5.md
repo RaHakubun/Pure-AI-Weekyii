@@ -29,7 +29,7 @@
   - 定性：**既有缺陷，非本版引入**。`Features/Week/WeekTopologyView.swift` 自 2026-10-21 `acce859` 起未改动，`Spacing+Weekyii` / `Typography+Weekyii` 自 1.2 (4) 基线 `a051142` 起未改动，本版没有触碰这段布局。
   - 现象：宽屏上聚焦某一天后，任务层落在 220pt 画布的可见区域之外，任务卡不进入无障碍树；窄屏（iPhone 17 Pro）可正常显示。
   - 处置：记录为已知问题，不阻断本次 TestFlight；修复属于产品改动，需单独立项（`focus()` 的 `taskClearEffectiveScale` 与 220pt 画布高度在宽屏下的关系）。
-- Archive signature / entitlement verification: <待填>
+- Archive signature / entitlement verification: 通过（详见下方 Distribution）
 - Real-device in-place upgrade: 未做（需账号主体真机覆盖安装 1.2 (4) → 1.3 (1)）
 - iCloud two-device regression: 未做（需两台同 Apple Account 设备）
 
@@ -40,9 +40,13 @@
 
 ## Distribution
 
-- Upload receipt: <待填>
-- App Store Connect build ID: 本机无法读取（无 `.p8`、无 fastlane/`asc` CLI、无 Transporter）
-- Export compliance result: 待填
-- Internal group: 待填
-- External group / Beta Review status: 待填
+- Archive: `/tmp/weekyii-release-20261103-1.2-5.xcarchive`（`** ARCHIVE SUCCEEDED **`，日志 `/tmp/weekyii-release-20261103-archive.log`）。
+- Archive signature / entitlement verification: 通过。App 与 Widget 均 `1.2 (5)`；`application-identifier = W8UNGRPC5N.com.fluentdesign.Weekyii`、`aps-environment = production`、CloudKit container、App Group 正确、`get-task-allow = false`、`beta-reports-active = true`。
+- IPA: `/tmp/weekyii-release-20261103-ipa/Weekyii.ipa`（导出成功，`** EXPORT SUCCEEDED **`，IPA 内 App/Widget 均 `1.2 (5)`，签名校验通过）。
+- **上传被阻断**：`xcodebuild -exportArchive`（destination = upload）报 `Failed to Use Accounts`。原因已定位：Xcode 本机已无已登录的 Apple ID —— `~/Library/Preferences/com.apple.dt.Xcode.plist` 的 `DVTDeveloperAccountManagerAppleIDLists → IDE.Identifiers.Prod` 是空数组，钥匙串里也没有 `Xcode-Username` 项。归档与导出都用本地手动签名 profile，所以只有上传这一步需要账号。
+- 解除方式（任选其一，需账号主体操作）：① 在 Xcode → Settings → Accounts 重新登录 Apple ID（含双重认证），之后重跑导出上传命令；② 提供 App Store Connect API Key（`.p8` + Key ID + Issuer ID），改用 `xcrun altool --upload-app` 上传；③ 直接把上面的 `Weekyii.ipa` 拖进 Xcode Organizer 或 Transporter 上传。
+- App Store Connect build ID: 未取得（本机无法读取 ASC）
+- Export compliance result: 待填（沿用「不属于上述任意一种算法」）
+- Internal group: 待填（`Apple haha`）
+- External group / Beta Review status: 待填（`外部体验者`）
 - Formal App Review status: 不适用
