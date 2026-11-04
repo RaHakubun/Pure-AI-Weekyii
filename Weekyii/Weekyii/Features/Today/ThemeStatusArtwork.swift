@@ -115,7 +115,7 @@ private struct NarrativeThemeStatusIllustration: View {
             MintGreenhouseScene(size: size, time: time)
         case .midnight:
             MidnightAuroraScene(size: size, time: time)
-        case .sunset, .lotr, .cat, .ring, .brutal, .neon, .paper, .terminal, .blueprint:
+        case .sunset, .lotr, .cat, .quenya, .ring, .brutal, .neon, .paper, .terminal, .blueprint:
             Color.clear
         }
     }
