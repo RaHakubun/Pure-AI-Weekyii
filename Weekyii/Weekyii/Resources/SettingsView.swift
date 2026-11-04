@@ -246,14 +246,17 @@ struct SettingsView: View {
 
     private var settingsHome: some View {
         List {
+            // Keep type erasure for the release-build stack fix, but apply row
+            // backgrounds to the links inside each erased group. Applying the
+            // modifier here styles the erased container rather than every row.
             Group {
                 settingsHomeUpperSectionsErased()
                 settingsHomeLowerSectionsErased()
             }
-            .themedListRows()
         }
         .themedGroupedList()
         .listStyle(.insetGrouped)
+        .modifier(CatSettingsNavigationBarModifier())
     }
 
     @inline(never)
@@ -273,6 +276,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.vip")
+                    .themedListRows()
                 }
 
                 Section {
@@ -288,6 +292,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.appearance")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedLanguageSettingsPage()
@@ -301,6 +306,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.language")
+                    .themedListRows()
                 } header: {
                     SettingsSectionHeader(title: "个性化")
                 }
@@ -318,6 +324,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.todayRhythm")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedTaskTypeSettingsPage()
@@ -331,6 +338,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.taskTypes")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedPastSettingsPage()
@@ -344,6 +352,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.past")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedFutureSettingsPage()
@@ -357,6 +366,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.future")
+                    .themedListRows()
                 } header: {
                     SettingsSectionHeader(title: "使用方式")
                 }
@@ -377,6 +387,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.suspended")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedProjectSettingsPage()
@@ -390,6 +401,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.projects")
+                    .themedListRows()
                 } header: {
                     SettingsSectionHeader(title: "扩展")
                 }
@@ -413,6 +425,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.data")
+                    .themedListRows()
                 } header: {
                     SettingsSectionHeader(title: "数据")
                 }
@@ -430,6 +443,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.about")
+                    .themedListRows()
 
                     NavigationLink {
                         erasedDeveloperSettingsPage()
@@ -442,6 +456,7 @@ struct SettingsView: View {
                         )
                     }
                     .accessibilityIdentifier("settings.row.developer")
+                    .themedListRows()
                 } header: {
                     SettingsSectionHeader(title: "应用")
                 }
@@ -2556,6 +2571,23 @@ private struct TaskTypeDefinitionEditorSheet: View {
         case .regular: return "按普通任务运行"
         case .ddl: return "按截止任务运行"
         case .leisure: return "按休闲任务运行"
+        }
+    }
+}
+
+/// Hide scrolled settings content behind the Catnap navigation bar instead of
+/// letting rows and section labels bleed through its translucent material.
+private struct CatSettingsNavigationBarModifier: ViewModifier {
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if skin.glyphs == .cat {
+            content
+                .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+        } else {
+            content
         }
     }
 }

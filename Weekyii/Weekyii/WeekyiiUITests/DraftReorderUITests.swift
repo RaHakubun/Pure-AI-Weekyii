@@ -9,6 +9,62 @@ import XCTest
 /// filter that we set in the production target, and they ignore their own
 /// outcome: success is "the file was written to /tmp/weekyii_shots/".
 final class ThemePickerScreenshotTests: XCTestCase {
+    /// Screenshots help verify grouped fills and the scrolled navigation bar.
+    func testCatSettingsGroupsAndNavigation() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let mineTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(mineTab.waitForExistence(timeout: 8))
+        mineTab.tap()
+
+        let appearance = app.descendants(matching: .any)
+            .matching(identifier: "settings.row.appearance").firstMatch
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        appearance.tap()
+
+        let cat = app.staticTexts["猫猫"].firstMatch
+        for _ in 0..<8 {
+            if cat.exists && cat.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(cat.isHittable, "猫猫主题应在主题列表中可选")
+        guard cat.isHittable else { return }
+        cat.tap()
+
+        let back = app.navigationBars.buttons.firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "猫猫")
+        ).firstMatch.waitForExistence(timeout: 5), "返回设置后应显示已选的猫猫主题")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(identifier: "settings.row.language").firstMatch.exists)
+
+        let top = XCTAttachment(screenshot: app.screenshot())
+        top.name = "cat-settings-top"
+        top.lifetime = .keepAlways
+        add(top)
+
+        app.swipeUp()
+        let data = app.descendants(matching: .any)
+            .matching(identifier: "settings.row.data").firstMatch
+        for _ in 0..<4 {
+            if data.exists && data.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(data.isHittable)
+        let scrolled = XCTAttachment(screenshot: app.screenshot())
+        scrolled.name = "cat-settings-scrolled"
+        scrolled.lifetime = .keepAlways
+        add(scrolled)
+        guard data.isHittable else { return }
+        data.tap()
+        XCTAssertTrue(app.navigationBars["数据与安全"].waitForExistence(timeout: 5))
+    }
+
     func test_themePickerRenders() throws {
         let app = XCUIApplication()
         addUIInterruptionMonitor(withDescription: "Notifications") { alert in
