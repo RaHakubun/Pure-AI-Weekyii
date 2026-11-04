@@ -1641,6 +1641,34 @@ final class CloudSyncCoordinatorTests: XCTestCase {
     }
 
     /// The re-entry is bounded: a zone that keeps vanishing must not spin.
+    /// Zone loss during the send/upsert phase returns per-record failures instead of
+    /// throwing from `fetchChanges`. The session must still re-enter first-enable
+    /// inspection instead of latching until manual sync.
+    func test_deletedRemoteZoneDuringSendReentersFirstEnableInspectionInsteadOfLatching() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.send])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteEmpty))
+        XCTAssertFalse(harness.coordinator.automaticRetrySuppressed)
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.accountRecordName))
+        XCTAssertFalse(metadata.automaticRetrySuppressed)
+        XCTAssertNil(metadata.lastFailure)
+        XCTAssertFalse(metadata.zoneInitialized)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 1)
+    }
+
     func test_repeatedZoneLossStopsAfterOneReentryAndFallsBackToAnOrdinaryFailure() async throws {
         let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
         let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
@@ -2004,6 +2032,7 @@ private enum ZoneLossPoint: Sendable {
     case infrastructure
     case inspect
     case fetch
+    case send
 }
 
 /// Simulates CloudKit deleting Weekyii's custom zone at a chosen point. Like the
@@ -2058,7 +2087,24 @@ private actor ZoneLossTransport: CloudSyncTransport {
         return try await base.fetchChanges(since: token)
     }
 
-    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] { await base.upsert(records) }
+    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] {
+        if schedule.first == .send {
+            schedule.removeFirst()
+            losses += 1
+            if let metadataStore, let accountRecordName {
+                try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+            }
+            return records.map { record in
+                CloudSyncRecordResult(
+                    entityKey: record.entityKey,
+                    outcome: .failed(.other(CloudKitFailureMapper.remoteZoneDeletedReason)),
+                    recordName: record.recordName
+                )
+            }
+        }
+        return await base.upsert(records)
+    }
+
     func delete(_ keys: [SyncEntityKey]) async -> [CloudSyncRecordResult] { await base.delete(keys) }
     func restoreTransportState(_ state: Data?) async { await base.restoreTransportState(state) }
     func persistedTransportState() async -> Data? { await base.persistedTransportState() }

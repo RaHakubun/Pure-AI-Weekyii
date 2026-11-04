@@ -1334,6 +1334,9 @@ final class CloudSyncCoordinator {
                 }
 
                 let failures = report.perRecordFailures.map(\.failure)
+                if failures.contains(where: Self.isRemoteZoneLoss) {
+                    throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
+                }
                 guard let retryFailure = failures.first.flatMap(retryFailureCandidate),
                       failures.allSatisfy({ retryFailureCandidate($0) != nil }),
                       retryNumber < retryPolicy.maximumRetries else {
@@ -1802,15 +1805,21 @@ final class CloudSyncCoordinator {
         lastFailurePresentation = nil
         lastSuccessfulSync = nil
         do {
-            try metadataStore.update(forAccountRecordName: accountRecordName) { metadata in
-                metadata.automaticRetrySuppressed = false
-                metadata.lastFailure = nil
-                metadata.lastFailureCategory = nil
-                metadata.lastFailureReason = nil
-            }
+            try metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
         } catch {
-            // The in-memory reset above is enough to re-enter the inspection; a
-            // metadata write failure must not turn this into a latch.
+            do {
+                try metadataStore.update(forAccountRecordName: accountRecordName) { metadata in
+                    metadata.automaticRetrySuppressed = false
+                    metadata.lastFailure = nil
+                    metadata.lastFailureCategory = nil
+                    metadata.lastFailureReason = nil
+                    metadata.zoneInitialized = false
+                    metadata.lastSuccessfulSync = nil
+                }
+            } catch {
+                // The in-memory reset above is enough to re-enter the inspection; a
+                // metadata write failure must not turn this into a latch.
+            }
         }
     }
 

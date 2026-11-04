@@ -372,11 +372,13 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
                 Task { await currentEngine.cancelOperations() }
             }
             if remoteZoneDeleted {
-                // Results already carry the zone-loss failure; the latch follows.
-                remoteZoneDeleted = false
-                engineStateData = nil
-                engine = nil
-                try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+                try resetAfterRemoteZoneLoss()
+                await activeAssetFiles?.cleanup()
+                activeAssetFiles = nil
+                let zoneLoss: CloudSyncFailure = .other(CloudKitFailureMapper.remoteZoneDeletedReason)
+                return keyByName.map { name, key in
+                    CloudSyncRecordResult(entityKey: key, outcome: .failed(zoneLoss), recordName: name)
+                }.sorted { $0.entityKey < $1.entityKey }
             }
             if let fetchFailure { throw CloudSyncTransportError.cloudFailure(fetchFailure) }
             try persistStagedEngineState()
@@ -432,11 +434,15 @@ actor CKSyncEngineTransport: CloudSyncTransport, CloudSyncCancellableTransport, 
     /// drops this transport and re-enters the session once, so the normal
     /// first-enable inspection asks the user which side wins before anything is
     /// uploaded again. Nothing is re-created silently.
-    private func handleRemoteZoneLoss() throws {
+    private func resetAfterRemoteZoneLoss() throws {
         remoteZoneDeleted = false
         engineStateData = nil
         engine = nil
         try metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+    }
+
+    private func handleRemoteZoneLoss() throws {
+        try resetAfterRemoteZoneLoss()
         throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
     }
 

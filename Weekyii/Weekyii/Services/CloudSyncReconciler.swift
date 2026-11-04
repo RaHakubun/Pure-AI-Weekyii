@@ -336,6 +336,10 @@ final class CloudSyncReconciler {
             }
         }
 
+        if failures.contains(where: { Self.isRemoteZoneLoss($0.failure) }) {
+            throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
+        }
+
         let completeSuccess = failures.isEmpty
         let acknowledgedSequence = try CloudSyncDurableInbox.decodeToken(batch.nextToken)
         guard isSessionCurrent() else { throw CloudSyncReconciliationError.sessionInvalidated }
@@ -666,6 +670,13 @@ final class CloudSyncReconciler {
         if remoteHash == nil { return result == nil || (result.map { if case .deleted = $0.outcome { return true }; return false } ?? false) }
         guard let result else { return false }
         if case .deleted = result.outcome { return true }
+        return false
+    }
+
+    private static func isRemoteZoneLoss(_ failure: CloudSyncFailure) -> Bool {
+        if case .other(let detail) = failure {
+            return detail == CloudKitFailureMapper.remoteZoneDeletedReason
+        }
         return false
     }
 
