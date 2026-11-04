@@ -4171,14 +4171,16 @@ final class ModelTests: XCTestCase {
     func test_themeSkin_catDrawsSunnyNapComponents() {
         let skin = WeekTheme.cat.skin
         XCTAssertNotEqual(skin, .classic)
-        // 橘猫: rounded cushions; the outline is transparent in light mode.
+        // 猫猫: rounded cushions with a soft outline in both appearances.
         XCTAssertEqual(skin.typography.titleDesign, .rounded)
         XCTAssertEqual(skin.typography.bodyDesign, .rounded)
         XCTAssertEqual(skin.card?.borderWidth, 1)
-        XCTAssertEqual(skin.card?.border.light, "#00FFFFFF")
-        XCTAssertEqual(skin.card?.border.dark, "#A97856")
-        XCTAssertEqual(skin.row?.surface.border.dark, "#A97856")
-        XCTAssertEqual(skin.feature?.surface.border.dark, "#C39672")
+        XCTAssertEqual(skin.card?.border.light, "#E9D8C9")
+        XCTAssertEqual(skin.card?.border.dark, "#8E6D56")
+        XCTAssertEqual(skin.row?.surface.border.dark, "#8E6D56")
+        XCTAssertEqual(skin.feature?.surface.border.dark, "#AA8267")
+        XCTAssertEqual(skin.feature?.action.ink.light, "#3A2015")
+        XCTAssertEqual(skin.feature?.action.fill?.light, "#ED9767")
         XCTAssertEqual(skin.card?.tintsWithAccent, true)
         XCTAssertEqual(skin.card?.hidesAccentBar, true)
         // Task rows: type-colour wash with the icon in a chip.
@@ -4486,9 +4488,12 @@ final class ModelTests: XCTestCase {
         let skin = WeekTheme.cat.skin
         let palette = WeekTheme.cat.palette(for: .dark, systemIsDark: true)
         XCTAssertGreaterThanOrEqual(contrast(skin.card!.border.dark, palette.backgroundSecondary), 3)
-        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.surface.border.dark, "#513928"), 3)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.surface.border.dark, "#493226"), 3)
         XCTAssertGreaterThanOrEqual(contrast(palette.textPrimary, palette.backgroundSecondary), 4.5)
-        XCTAssertGreaterThanOrEqual(contrast(palette.textSecondary, "#513928"), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textSecondary, "#493226"), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textTertiary, palette.backgroundSecondary), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.action.ink.light, skin.feature!.action.fill!.light), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.action.ink.dark, skin.feature!.action.fill!.dark), 4.5)
     }
 
     func test_quenyaThemeHasIndependentWarmPaletteAndFocusSkin() {

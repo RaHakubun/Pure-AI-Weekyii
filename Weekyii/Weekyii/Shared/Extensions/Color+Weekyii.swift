@@ -1106,7 +1106,7 @@ extension ThemeSkin {
 
     /// 猫猫 v2 "午睡橘猫": a sunny room with a ginger cat asleep in it. The page is
     /// warm cream (light) or a dusky room (dark). Cards are soft rounded cushions
-    /// with a visible warm outline in dark mode, task rows wear their type colour as a pale wash with the
+    /// with a subtle warm outline, task rows wear their type colour as a pale wash with the
     /// type glyph in a chip, and the focus panel is the cat itself: ginger fur,
     /// two ears peeking over the top edge and a tail curling out of the corner.
     /// Glyphs are die-cut cat silhouettes, see `CatGlyph`.
@@ -1121,7 +1121,7 @@ extension ThemeSkin {
             card: ThemeSurfaceSkin(
                 cornerRadius: 22,
                 borderWidth: 1,
-                border: ThemeHexPair("#00FFFFFF", "#A97856"),
+                border: ThemeHexPair("#E9D8C9", "#8E6D56"),
                 fill: ThemeHexPair("#FFFDF9", "#30251F"),
                 shadow: warmShadow,
                 edges: .all,
@@ -1133,7 +1133,7 @@ extension ThemeSkin {
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 16,
                     borderWidth: 1,
-                    border: ThemeHexPair("#00FFFFFF", "#A97856"),
+                    border: ThemeHexPair("#E8DDD1", "#8E6D56"),
                     edges: .all
                 ),
                 barWidth: 0,
@@ -1145,20 +1145,20 @@ extension ThemeSkin {
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 24,
                     borderWidth: 1,
-                    border: ThemeHexPair("#00FFFFFF", "#C39672"),
+                    border: ThemeHexPair("#D58258", "#AA8267"),
                     shadow: ThemeShadowSkin(color: ThemeHexPair("#40D46A32", "#66000000"), radius: 16, x: 0, y: 8),
-                    innerGlow: ThemeHexPair("#F6B27C", "#5A3E2C"),
+                    innerGlow: ThemeHexPair("#E29463", "#493226"),
                     edges: .all,
-                    material: .gradient(top: ThemeHexPair("#EE9558", "#513928"), bottom: ThemeHexPair("#D46A32", "#38271D"))
+                    material: .gradient(top: ThemeHexPair("#D87038", "#493226"), bottom: ThemeHexPair("#C35C2E", "#39281F"))
                 ),
                 ink: featureInk,
                 secondaryInk: ThemeHexPair("#E6FFFFFF", "#C7B5A4"),
                 label: ThemeLabelSkin(kind: .plain, ink: featureInk),
                 action: ThemeActionLook(
                     kind: .capsule,
-                    ink: featureInk,
-                    fill: ThemeHexPair("#33FFFFFF", "#24F5EBDD"),
-                    border: ThemeHexPair("#00FFFFFF", "#B98965"),
+                    ink: ThemeHexPair("#3A2015", "#F6E7D9"),
+                    fill: ThemeHexPair("#ED9767", "#654838"),
+                    border: ThemeHexPair("#ED9767", "#775340"),
                     borderWidth: 1,
                     glows: false
                 ),
@@ -1171,15 +1171,15 @@ extension ThemeSkin {
                     glows: false
                 ),
                 catEars: ThemeCatEars(
-                    fur: ThemeHexPair("#F2A26A", "#AD7651"),
-                    innerEar: ThemeHexPair("#F7B8A6", "#E6A58A"),
-                    tail: ThemeHexPair("#D46A32", "#AD7651")
+                    fur: ThemeHexPair("#F2A26A", "#A97655"),
+                    innerEar: ThemeHexPair("#F7B8A6", "#D7977D"),
+                    tail: ThemeHexPair("#D46A32", "#A97655")
                 )
             ),
             badge: ThemeBadgeSkin(kind: .softPill),
             section: ThemeSectionSkin(
                 count: .capsule,
-                rule: ThemeHexPair("#E3D3C2", "#A97856"),
+                rule: ThemeHexPair("#E3D3C2", "#876755"),
                 showsIcon: true,
                 iconInk: ginger,
                 countInk: ThemeHexPair("#C25E2A", "#F29A5E"),
@@ -1949,7 +1949,7 @@ private struct WeekThemePalettePair {
                     backgroundTertiary: "#403128",
                     textPrimary: "#F5EBDD",
                     textSecondary: "#C7B5A4",
-                    textTertiary: "#8F7E70",
+                    textTertiary: "#A99585",
                     taskRegular: "#9DB4CC",
                     taskRegularBg: "#1F2833",
                     taskDDL: "#F08C78",
