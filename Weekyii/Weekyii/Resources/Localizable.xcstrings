@@ -12171,13 +12171,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ginger Cat"
+            "value" : "Catnap"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "橘猫"
+            "value" : "猫猫"
           }
         }
       }

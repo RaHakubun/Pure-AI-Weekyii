@@ -48,7 +48,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
         case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
-        case .cat: return String(localized: "theme.cat.name", defaultValue: "橘猫")
+        case .cat: return String(localized: "theme.cat.name", defaultValue: "猫猫")
         case .quenya: return String(localized: "theme.quenya.name", defaultValue: "昆雅")
         case .ring: return String(localized: "theme.ring.name", defaultValue: "指环王")
         case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
