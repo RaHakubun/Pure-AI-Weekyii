@@ -51,14 +51,14 @@ extension WeekTheme {
     /// Lord of the Rings theme's decorative styling.
     var requiresVIP: Bool {
         switch self {
-        case .lotr, .cat, .ring, .brutal, .neon, .paper, .terminal:
+        case .lotr, .cat, .quenya, .ring, .brutal, .neon, .paper, .terminal:
             return true
         default:
             return false
         }
     }
 
-    static var vipThemes: [WeekTheme] { allCases.filter { $0.isSelectable && $0.requiresVIP } }
+    static var vipThemes: [WeekTheme] { [.quenya] + allCases.filter { $0 != .quenya && $0.isSelectable && $0.requiresVIP } }
     static var freeThemes: [WeekTheme] { allCases.filter { $0.isSelectable && !$0.requiresVIP } }
 }
 

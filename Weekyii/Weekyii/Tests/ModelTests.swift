@@ -2638,22 +2638,22 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(WeekTheme.lotr.isPremiumTheme)
     }
 
-    func test_lotrThemeRequiresUnlockBeforeUse() {
-        XCTAssertEqual(
-            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: false),
-            .amber
-        )
-        XCTAssertEqual(
-            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: true),
-            .lotr
-        )
+    func test_retiredLotrFallsBackRegardlessOfVIP() {
+        XCTAssertFalse(WeekTheme.lotr.isSelectable)
+        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("lotr"), "amber")
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "lotr", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "lotr", premiumThemeUnlocked: true), .amber)
     }
 
     @MainActor
-    func test_vipThemesAreTheSixDedicatedThemes() {
-        XCTAssertEqual(Set(WeekTheme.vipThemes), [.lotr, .cat, .brutal, .neon, .paper, .terminal])
+    func test_vipThemesBeginWithQuenyaAndExcludeRetiredThemes() {
+        XCTAssertEqual(WeekTheme.vipThemes, [.quenya, .brutal, .neon, .paper, .terminal, .cat])
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.quenya))
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.lotr))
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.lotr))
+        XCTAssertTrue(WeekTheme.quenya.requiresVIP)
         XCTAssertTrue(WeekTheme.freeThemes.allSatisfy { !$0.requiresVIP })
-        // The decorative LOTR styling stays tied to `isPremiumTheme` only.
+        // Legacy decorative flag is kept only for decoding old theme data.
         XCTAssertEqual(WeekTheme.allCases.filter(\.isPremiumTheme), [.lotr])
     }
 
@@ -4171,10 +4171,14 @@ final class ModelTests: XCTestCase {
     func test_themeSkin_catDrawsSunnyNapComponents() {
         let skin = WeekTheme.cat.skin
         XCTAssertNotEqual(skin, .classic)
-        // 午睡橘猫: rounded type, borderless cushion cards tinted by their accent.
+        // 橘猫: rounded cushions; the outline is transparent in light mode.
         XCTAssertEqual(skin.typography.titleDesign, .rounded)
         XCTAssertEqual(skin.typography.bodyDesign, .rounded)
-        XCTAssertEqual(skin.card?.borderWidth, 0)
+        XCTAssertEqual(skin.card?.borderWidth, 1)
+        XCTAssertEqual(skin.card?.border.light, "#00FFFFFF")
+        XCTAssertEqual(skin.card?.border.dark, "#A97856")
+        XCTAssertEqual(skin.row?.surface.border.dark, "#A97856")
+        XCTAssertEqual(skin.feature?.surface.border.dark, "#C39672")
         XCTAssertEqual(skin.card?.tintsWithAccent, true)
         XCTAssertEqual(skin.card?.hidesAccentBar, true)
         // Task rows: type-colour wash with the icon in a chip.
@@ -4205,12 +4209,12 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_retiredRingThemeMigratesToLotr() {
+    func test_retiredRingThemeMigratesToAmber() {
         XCTAssertFalse(WeekTheme.ring.isSelectable)
         XCTAssertFalse(WeekTheme.vipThemes.contains(.ring))
-        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("ring"), "lotr")
+        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("ring"), "amber")
         XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: false), .amber)
-        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: true), .lotr)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: true), .amber)
         XCTAssertEqual(WeekTheme.ring.skin, WeekTheme.lotr.skin)
         XCTAssertEqual(
             WeekTheme.ring.widgetThemeSnapshot(appearanceMode: .system).darkBackgroundHex,
@@ -4224,11 +4228,14 @@ final class ModelTests: XCTestCase {
         defaults.set("ring", forKey: "selectedTheme")
         let settings = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(settings)
-        XCTAssertEqual(settings.selectedThemeRaw, "lotr")
-        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "lotr")
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
         settings.selectedThemeRaw = "ring"
-        XCTAssertEqual(settings.selectedThemeRaw, "lotr")
-        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "lotr")
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
+        settings.selectedThemeRaw = "lotr"
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
     }
 
     func test_catThemeRequiresUnlock() {
@@ -4454,6 +4461,34 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(ThemeSymbolVariant.fill.symbolVariants, .fill)
         XCTAssertEqual(ThemeSymbolVariant.circle.symbolVariants, .circle)
         XCTAssertEqual(ThemeSymbolVariant.square.symbolVariants, .square)
+    }
+
+    func test_sunsetUsesNeutralPageBackgroundInBothAppearances() {
+        XCTAssertEqual(WeekTheme.sunset.palette(for: .light, systemIsDark: false).backgroundPrimary, "#F8F8F7")
+        XCTAssertEqual(WeekTheme.sunset.palette(for: .dark, systemIsDark: true).backgroundPrimary, "#171717")
+    }
+
+    func test_catDarkEdgesAndTextHaveReadableContrast() {
+        func luminance(_ hex: String) -> Double {
+            let value = Int(hex.dropFirst(), radix: 16)!
+            func linear(_ component: Int) -> Double {
+                let c = Double(component) / 255
+                return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear((value >> 16) & 255)
+                + 0.7152 * linear((value >> 8) & 255)
+                + 0.0722 * linear(value & 255)
+        }
+        func contrast(_ a: String, _ b: String) -> Double {
+            let x = luminance(a), y = luminance(b)
+            return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+        }
+        let skin = WeekTheme.cat.skin
+        let palette = WeekTheme.cat.palette(for: .dark, systemIsDark: true)
+        XCTAssertGreaterThanOrEqual(contrast(skin.card!.border.dark, palette.backgroundSecondary), 3)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.surface.border.dark, "#513928"), 3)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textPrimary, palette.backgroundSecondary), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textSecondary, "#513928"), 4.5)
     }
 
     func test_quenyaThemeHasIndependentWarmPaletteAndFocusSkin() {

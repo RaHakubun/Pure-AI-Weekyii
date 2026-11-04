@@ -835,7 +835,7 @@ private struct VIPBenefitCard: View {
         switch feature {
         case .themes:
             HStack(alignment: .center, spacing: 3) {
-                swatch(.lotr, height: 30)
+                swatch(.quenya, height: 30)
                 swatch(.neon, height: 38)
                 swatch(.paper, height: 30)
             }
@@ -878,15 +878,8 @@ private struct VIPBenefitCard: View {
 private struct VIPThemeCarousel: View {
     let palette: VIPPagePalette
 
-    /// Lotr sits second so the first screen shows a neighbour on both sides.
-    private let themes: [WeekTheme] = {
-        var list = WeekTheme.vipThemes
-        if let index = list.firstIndex(of: .lotr), list.count > 1 {
-            list.remove(at: index)
-            list.insert(.lotr, at: 1)
-        }
-        return list
-    }()
+    /// Match the VIP theme order shown in Settings.
+    private let themes = WeekTheme.vipThemes
 
     @State private var current: WeekTheme?
 
@@ -920,7 +913,7 @@ private struct VIPThemeCarousel: View {
                     // The initial binding value is ignored before the lazy stack has
                     // laid out, so centre the flagship theme on the next run loop.
                     guard current == nil else { return }
-                    Task { @MainActor in current = .lotr }
+                    Task { @MainActor in current = themes.first }
                 }
                 .scrollIndicators(.hidden)
                 .scrollClipDisabled()

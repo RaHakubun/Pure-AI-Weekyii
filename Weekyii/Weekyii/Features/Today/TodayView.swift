@@ -1051,7 +1051,7 @@ struct TodayView: View {
 
     @ViewBuilder
     /// The button floats directly over the themed scene. A solid backdrop band
-    /// here would not match theme backgrounds (e.g. the sunset reflection) and
+    /// here would not match animated theme backgrounds and
     /// read as a halo; the scroll content already reserves room underneath.
     private var floatingStartButtonOverlay: some View {
         WeekButton(
@@ -1397,10 +1397,7 @@ struct TodayView: View {
     private var todaySceneBackground: some View {
         ZStack {
             Color.backgroundPrimary
-            if userSettings.selectedTheme == .sunset {
-                SunsetWaterReflectionBackground(animationsActive: animationsActive)
-                    .transition(.opacity)
-            } else if userSettings.selectedTheme == .cat {
+            if userSettings.selectedTheme == .cat {
                 CatSunbeamBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
@@ -1857,206 +1854,6 @@ private struct SectionToggleView: View {
         .clipShape(trackShape)
         .frame(height: height)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress)
-    }
-}
-
-/// Lightweight animated scene used only by the Sunset theme on Today page.
-private struct SunsetWaterReflectionBackground: View {
-    let animationsActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var sunDrift = false
-
-    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let sunY = sunCenterY(for: size)
-            let waterlineY = waterline(for: size)
-
-            ZStack {
-                LinearGradient(
-                    colors: skyGradientColors,
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                horizonGlow(y: waterlineY, size: size)
-                sunDisk(y: sunY, size: size)
-                reflectedSun(y: sunY, waterlineY: waterlineY, size: size)
-                reflectionRipples(size: size, waterlineY: waterlineY)
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
-            .onAppear {
-                updateSunAnimation()
-            }
-            .onChange(of: shouldAnimate) { _, _ in
-                updateSunAnimation()
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var skyGradientColors: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color(hex: "#251414"),
-                Color(hex: "#3A1D1A"),
-                Color(hex: "#221917"),
-                Color(hex: "#141317")
-            ]
-        }
-        return [
-            Color(hex: "#FFE5D1"),
-            Color(hex: "#F9C39E"),
-            Color(hex: "#DF896B"),
-            Color(hex: "#B86A5C")
-        ]
-    }
-
-    private func waterline(for size: CGSize) -> CGFloat {
-        size.height * (colorScheme == .dark ? 0.52 : 0.56)
-    }
-
-    private func sunCenterY(for size: CGSize) -> CGFloat {
-        let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
-        guard shouldAnimate else { return base }
-        return base + (sunDrift ? 5 : -5)
-    }
-
-    private func updateSunAnimation() {
-        if shouldAnimate {
-            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
-                sunDrift = true
-            }
-        } else {
-            withAnimation(nil) {
-                sunDrift = false
-            }
-        }
-    }
-
-    private func sunCenterX(for size: CGSize) -> CGFloat {
-        size.width * 0.382
-    }
-
-    private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: colorScheme == .dark ? "#E5B099" : "#F2B28F")
-                            .opacity(colorScheme == .dark ? 0.08 : 0.13),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(height: 86)
-            .position(x: size.width / 2, y: y)
-    }
-
-    private func sunDisk(y: CGFloat, size: CGSize) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: colorScheme == .dark ? "#FA6D5B" : "#F16250"),
-                            Color(hex: colorScheme == .dark ? "#D84A3E" : "#C83D36")
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 74, height: 74)
-
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.2 : 0.24),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-                .frame(width: 40, height: 40)
-                .offset(y: -9)
-        }
-        .overlay(
-            Circle()
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                .frame(width: 74, height: 74)
-        )
-        .position(x: sunCenterX(for: size), y: y)
-    }
-
-    private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
-        let height: CGFloat = colorScheme == .dark ? 212 : 230
-        let reflectionTop = max(y + 24, waterlineY - 10)
-        return RoundedRectangle(cornerRadius: 70, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#F06B58").opacity(colorScheme == .dark ? 0.2 : 0.3),
-                        Color(hex: "#D34A3F").opacity(colorScheme == .dark ? 0.14 : 0.24),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(width: 84, height: height)
-            .blur(radius: 4)
-            .scaleEffect(x: 1.04, y: 1.0, anchor: .top)
-            .position(x: sunCenterX(for: size) + 10, y: reflectionTop + height / 2)
-    }
-
-    private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvasSize in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let lineCount = 13
-                let leftX = canvasSize.width * 0.06
-                let rightX = canvasSize.width * 0.94
-                let laneHeight = max((canvasSize.height - waterlineY) / CGFloat(lineCount + 2), 8)
-                let waveAmplitude: CGFloat = reduceMotion ? 0.8 : 3.8
-
-                for idx in 0..<lineCount {
-                    let progress = CGFloat(idx) / CGFloat(lineCount)
-                    let baseY = waterlineY + CGFloat(idx + 1) * laneHeight
-                    let phase = Double(idx) * 0.76
-                    let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
-                    let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
-                    let lineWidth = max(0.7, 2.1 - progress * 1.2)
-                    let alpha = max(0.02, 0.11 - Double(progress) * 0.08)
-
-                    var path = Path()
-                    path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
-                    path.addQuadCurve(
-                        to: CGPoint(x: rightX - xWave, y: baseY - yWave * 0.35),
-                        control: CGPoint(
-                            x: canvasSize.width * 0.5 + CGFloat(sin(t * 0.4 + phase * 1.4)) * 26,
-                            y: baseY + CGFloat(cos(t * 0.3 + phase)) * (waveAmplitude * 0.9)
-                        )
-                    )
-
-                    context.stroke(
-                        path,
-                        with: .color(Color(hex: "#FFD6B9").opacity(alpha)),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
-                }
-            }
-            .frame(width: size.width, height: size.height)
-            .blendMode(.plusLighter)
-        }
     }
 }
 

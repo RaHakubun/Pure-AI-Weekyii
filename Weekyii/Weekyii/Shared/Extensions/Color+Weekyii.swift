@@ -30,7 +30,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 
     /// Retired identifiers remain decodable, but are not offered in settings.
-    var isSelectable: Bool { self != .blueprint && self != .ring }
+    var isSelectable: Bool { self != .blueprint && self != .ring && self != .lotr }
 
     var displayName: String {
         switch self {
@@ -48,7 +48,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
         case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
         case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
-        case .cat: return String(localized: "theme.cat.name", defaultValue: "猫猫")
+        case .cat: return String(localized: "theme.cat.name", defaultValue: "橘猫")
         case .quenya: return String(localized: "theme.quenya.name", defaultValue: "昆雅")
         case .ring: return String(localized: "theme.ring.name", defaultValue: "指环王")
         case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
@@ -215,7 +215,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     static func canonicalStoredThemeRaw(_ raw: String) -> String {
         switch raw {
         case WeekTheme.blueprint.rawValue: return WeekTheme.amber.rawValue
-        case WeekTheme.ring.rawValue: return WeekTheme.lotr.rawValue
+        case WeekTheme.ring.rawValue, WeekTheme.lotr.rawValue: return WeekTheme.amber.rawValue
         default: return raw
         }
     }
@@ -1106,7 +1106,7 @@ extension ThemeSkin {
 
     /// 猫猫 v2 "午睡橘猫": a sunny room with a ginger cat asleep in it. The page is
     /// warm cream (light) or a dusky room (dark). Cards are soft rounded cushions
-    /// with no outline, task rows wear their type colour as a pale wash with the
+    /// with a visible warm outline in dark mode, task rows wear their type colour as a pale wash with the
     /// type glyph in a chip, and the focus panel is the cat itself: ginger fur,
     /// two ears peeking over the top edge and a tail curling out of the corner.
     /// Glyphs are die-cut cat silhouettes, see `CatGlyph`.
@@ -1120,9 +1120,9 @@ extension ThemeSkin {
             radii: ThemeRadii(small: 10, medium: 14, large: 20, xlarge: 24),
             card: ThemeSurfaceSkin(
                 cornerRadius: 22,
-                borderWidth: 0,
-                border: ThemeHexPair("#00FFFFFF"),
-                fill: ThemeHexPair("#FFFDF9", "#27201B"),
+                borderWidth: 1,
+                border: ThemeHexPair("#00FFFFFF", "#A97856"),
+                fill: ThemeHexPair("#FFFDF9", "#30251F"),
                 shadow: warmShadow,
                 edges: .all,
                 // The accent tints the cushion; no bar on the top edge.
@@ -1132,8 +1132,8 @@ extension ThemeSkin {
             row: ThemeRowSkin(
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 16,
-                    borderWidth: 0,
-                    border: ThemeHexPair("#00FFFFFF"),
+                    borderWidth: 1,
+                    border: ThemeHexPair("#00FFFFFF", "#A97856"),
                     edges: .all
                 ),
                 barWidth: 0,
@@ -1145,11 +1145,11 @@ extension ThemeSkin {
                 surface: ThemeSurfaceSkin(
                     cornerRadius: 24,
                     borderWidth: 1,
-                    border: ThemeHexPair("#00FFFFFF", "#40F29A5E"),
+                    border: ThemeHexPair("#00FFFFFF", "#C39672"),
                     shadow: ThemeShadowSkin(color: ThemeHexPair("#40D46A32", "#66000000"), radius: 16, x: 0, y: 8),
                     innerGlow: ThemeHexPair("#F6B27C", "#5A3E2C"),
                     edges: .all,
-                    material: .gradient(top: ThemeHexPair("#EE9558", "#3D2C21"), bottom: ThemeHexPair("#D46A32", "#2E2119"))
+                    material: .gradient(top: ThemeHexPair("#EE9558", "#513928"), bottom: ThemeHexPair("#D46A32", "#38271D"))
                 ),
                 ink: featureInk,
                 secondaryInk: ThemeHexPair("#E6FFFFFF", "#C7B5A4"),
@@ -1157,9 +1157,9 @@ extension ThemeSkin {
                 action: ThemeActionLook(
                     kind: .capsule,
                     ink: featureInk,
-                    fill: ThemeHexPair("#33FFFFFF", "#1FF5EBDD"),
-                    border: nil,
-                    borderWidth: 0,
+                    fill: ThemeHexPair("#33FFFFFF", "#24F5EBDD"),
+                    border: ThemeHexPair("#00FFFFFF", "#B98965"),
+                    borderWidth: 1,
                     glows: false
                 ),
                 primaryAction: ThemeActionLook(
@@ -1171,15 +1171,15 @@ extension ThemeSkin {
                     glows: false
                 ),
                 catEars: ThemeCatEars(
-                    fur: ThemeHexPair("#F2A26A", "#4D3628"),
-                    innerEar: ThemeHexPair("#F7B8A6", "#7A4E38"),
-                    tail: ThemeHexPair("#D46A32", "#4D3628")
+                    fur: ThemeHexPair("#F2A26A", "#AD7651"),
+                    innerEar: ThemeHexPair("#F7B8A6", "#E6A58A"),
+                    tail: ThemeHexPair("#D46A32", "#AD7651")
                 )
             ),
             badge: ThemeBadgeSkin(kind: .softPill),
             section: ThemeSectionSkin(
                 count: .capsule,
-                rule: ThemeHexPair("#E3D3C2", "#4A3D33"),
+                rule: ThemeHexPair("#E3D3C2", "#A97856"),
                 showsIcon: true,
                 iconInk: ginger,
                 countInk: ThemeHexPair("#C25E2A", "#F29A5E"),
@@ -1201,7 +1201,7 @@ extension ThemeSkin {
                 top: gingerLight,
                 bottom: ginger,
                 ink: ThemeHexPair("#FFFFFF", "#2A1A10"),
-                hairline: ThemeHexPair("#40FFFFFF", "#33FFFFFF")
+                hairline: ThemeHexPair("#40FFFFFF", "#80FFFFFF")
             )
         )
     }()
@@ -1548,7 +1548,7 @@ private struct WeekThemePalettePair {
                     accentGreen: "#4B8D78",
                     accentGreenLight: "#7CBBA5",
                     accentPink: "#CF6A74",
-                    backgroundPrimary: "#FFF0E8",
+                    backgroundPrimary: "#F8F8F7",
                     backgroundSecondary: "#FFF9F5",
                     backgroundTertiary: "#F5E1D7",
                     textPrimary: "#351D19",
@@ -1570,7 +1570,7 @@ private struct WeekThemePalettePair {
                     accentGreen: "#74BA9F",
                     accentGreenLight: "#94D0B6",
                     accentPink: "#E09AA4",
-                    backgroundPrimary: "#18110F",
+                    backgroundPrimary: "#171717",
                     backgroundSecondary: "#211714",
                     backgroundTertiary: "#2E1F1B",
                     textPrimary: "#F8E8E2",
@@ -1945,8 +1945,8 @@ private struct WeekThemePalettePair {
                     accentGreenLight: "#C1D9B0",
                     accentPink: "#F2A7A0",
                     backgroundPrimary: "#1B1613",
-                    backgroundSecondary: "#27201B",
-                    backgroundTertiary: "#332A23",
+                    backgroundSecondary: "#30251F",
+                    backgroundTertiary: "#403128",
                     textPrimary: "#F5EBDD",
                     textSecondary: "#C7B5A4",
                     textTertiary: "#8F7E70",
