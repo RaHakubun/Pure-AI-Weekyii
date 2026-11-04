@@ -16,6 +16,8 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(CloudSyncCoordinator.self) private var cloudSyncCoordinator
+    @Environment(PurchaseService.self) private var purchaseService
+    @State private var paywallFeature: VIPFeature?
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -34,24 +36,35 @@ struct SettingsView: View {
     @State private var pendingImportData: Data?
     @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
     @State private var showingImportConfirm = false
+    @State private var showingResetCloudSyncStateConfirm = false
     @State private var showingInitialCloudSyncDecision = false
     @State private var showingAutoStartEnableConfirm = false
     
     var body: some View {
         NavigationStack {
-            settingsHome
+            // 真机 1 MB 主线程栈：settingsHome 曾嵌 9 个 NavigationLink opaque 目的地，
+            // Beta/Release（-O WMO）下 demangle 递归会打穿栈（1.2 (5)）。body 只持 AnyView，子页擦除在独立函数里。
+            erasedSettingsHome()
             .navigationTitle(String(localized: "settings.title"))
             .tint(.weekyiiPrimary)
         }
         .onAppear {
+            // Re-evaluated on every appearance: the decision may have become
+            // pending while Settings was off screen.
+            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
             guard !hasInitializedPendingDefaultKillTime else { return }
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
-            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
         }
         .onChange(of: cloudSyncCoordinator.status) { _, _ in
             if isInitialCloudSyncDecisionRequired { showingInitialCloudSyncDecision = true }
+        }
+        .sheet(item: $paywallFeature) { feature in
+            NavigationStack {
+                VIPServiceView(highlightedFeature: feature, showsCloseButton: true)
+            }
+            .environment(purchaseService)
         }
         .onChange(of: reminderSignature) { _, _ in
             rescheduleTodayKillTimeReminderIfNeeded()
@@ -137,6 +150,9 @@ struct SettingsView: View {
                     return
                 }
                 do {
+                    // Replacing the store underneath sync would make the old
+                    // baselines delete/overwrite the restored data in iCloud.
+                    try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
                     try BackupRecoveryService.restoreSnapshot(named: latest.folderName, to: storeURL)
                     seedAlertMessage = "已回滚到 \(latest.folderName)。请立即重启应用。"
                 } catch {
@@ -144,7 +160,7 @@ struct SettingsView: View {
                 }
             }
         } message: {
-            Text("将直接替换当前数据库文件，可能丢失最新数据。")
+            Text("将直接替换当前数据库文件，可能丢失最新数据。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert("完整替换当前数据？", isPresented: $showingImportConfirm) {
             Button(String(localized: "action.cancel"), role: .cancel) {
@@ -155,7 +171,7 @@ struct SettingsView: View {
                 performPendingArchiveImport()
             }
         } message: {
-            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。")
+            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .fileExporter(
             isPresented: $showingArchiveExporter,
@@ -187,6 +203,9 @@ struct SettingsView: View {
                 Button(String(localized: "settings.icloud.decision.use_local")) { resolveInitialCloudSync(.useLocal) }
                 Button(String(localized: "settings.icloud.decision.use_cloud"), role: .destructive) { resolveInitialCloudSync(.useCloud) }
                 Button(String(localized: "settings.icloud.decision.merge")) { resolveInitialCloudSync(.merge) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteHasNewerData):
+                // No source-of-truth button: see CloudSyncInitialEnableDecision.
                 Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
             default:
                 Button(String(localized: "action.cancel"), role: .cancel) { }
@@ -220,129 +239,246 @@ struct SettingsView: View {
         }
     }
 
-    private var settingsHome: some View {
-        List {
-            Section("个性化") {
-                NavigationLink {
-                    appearanceSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "外观与主题",
-                        value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
-                        icon: "paintpalette.fill",
-                        tint: .purple
-                    )
-                }
-
-                NavigationLink {
-                    languageSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.language.title", defaultValue: "语言"),
-                        value: settings.languageOverride.displayName,
-                        icon: "globe",
-                        tint: .cyan
-                    )
-                }
-            }
-
-            Section("使用方式") {
-                NavigationLink {
-                    todayRhythmSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "今日节奏",
-                        value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
-                        icon: "timer",
-                        tint: .orange
-                    )
-                }
-
-                NavigationLink {
-                    taskTypeSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "任务管理",
-                        value: "\(activeTaskTypeDefinitions.count) 个类型",
-                        icon: "tag.fill",
-                        tint: .teal
-                    )
-                }
-
-                NavigationLink {
-                    pastSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.section.past", defaultValue: "过去"),
-                        value: settings.pastMonthMarkerOptions.summaryText,
-                        icon: "clock.arrow.circlepath",
-                        tint: .indigo
-                    )
-                }
-
-                NavigationLink {
-                    futureSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "未来",
-                        value: settings.weekStartsOnMonday ? "周一开始" : nil,
-                        icon: "calendar.badge.clock",
-                        tint: .blue
-                    )
-                }
-
-                NavigationLink {
-                    ProjectSettingsView()
-                } label: {
-                    SettingsNavigationRow(
-                        title: "项目",
-                        value: "默认 \(settings.defaultProjectDurationDays) 天",
-                        icon: "folder.fill",
-                        tint: .brown
-                    )
-                }
-            }
-
-            Section("数据") {
-                NavigationLink {
-                    dataSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "数据与安全",
-                        icon: "lock.shield.fill",
-                        tint: .indigo
-                    )
-                }
-            }
-
-            Section("应用") {
-                NavigationLink {
-                    AboutWeekyiiPage()
-                } label: {
-                    SettingsNavigationRow(
-                        title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
-                        value: AboutWeekyiiPage.appVersion,
-                        icon: "info.circle.fill",
-                        tint: .mint
-                    )
-                }
-
-                NavigationLink {
-                    developerSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "开发者与诊断",
-                        icon: "hammer.fill",
-                        tint: .gray
-                    )
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
+    @inline(never)
+    private func erasedSettingsHome() -> AnyView {
+        AnyView(settingsHome)
     }
 
+    private var settingsHome: some View {
+        List {
+            // Keep type erasure for the release-build stack fix, but apply row
+            // backgrounds to the links inside each erased group. Applying the
+            // modifier here styles the erased container rather than every row.
+            Group {
+                settingsHomeUpperSectionsErased()
+                settingsHomeLowerSectionsErased()
+            }
+        }
+        .themedGroupedList()
+        .listStyle(.insetGrouped)
+        .modifier(CatSettingsNavigationBarModifier())
+    }
+
+    @inline(never)
+    private func settingsHomeUpperSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedVIPServicePage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "vip.title", defaultValue: "VIP 服务"),
+                            value: vipStatusSummary,
+                            icon: "crown.fill",
+                            tint: .orange,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.vip")
+                    .themedListRows()
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAppearanceSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "外观与主题",
+                            value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
+                            icon: "paintpalette.fill",
+                            tint: .purple,
+                            themedTint: .weekyiiPrimary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.appearance")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedLanguageSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.language.title", defaultValue: "语言"),
+                            value: settings.languageOverride.displayName,
+                            icon: "globe",
+                            tint: .cyan,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.language")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "个性化")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedTodayRhythmSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "今日节奏",
+                            value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
+                            icon: "timer",
+                            tint: .orange,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.todayRhythm")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedTaskTypeSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
+                            value: "\(activeTaskTypeDefinitions.count) 个类型",
+                            icon: "tag.fill",
+                            tint: .teal,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.taskTypes")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedPastSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.section.past", defaultValue: "过去"),
+                            value: settings.pastMonthMarkerOptions.summaryText,
+                            icon: "clock.arrow.circlepath",
+                            tint: .indigo,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.past")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedFutureSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "未来",
+                            value: settings.weekStartsOnMonday ? "周一开始" : nil,
+                            icon: "calendar.badge.clock",
+                            tint: .blue,
+                            themedTint: .taskLeisure
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.future")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "使用方式")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedSuspendedSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.suspended.header", defaultValue: "悬置箱"),
+                            value: String(
+                                format: String(localized: "settings.suspended.entry.value", defaultValue: "默认 %d 天"),
+                                settings.suspendedDefaultCountdownDays
+                            ),
+                            icon: "hourglass",
+                            tint: .suspendedModuleTint,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.suspended")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedProjectSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "项目",
+                            value: "默认 \(settings.defaultProjectDurationDays) 天",
+                            icon: "folder.fill",
+                            tint: .brown,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.projects")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "扩展")
+                }
+            }
+        )
+    }
+
+    @inline(never)
+    private func settingsHomeLowerSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedDataSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "数据与安全",
+                            icon: "lock.shield.fill",
+                            tint: .indigo,
+                            themedTint: .textSecondary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.data")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "数据")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAboutWeekyiiPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
+                            value: AboutWeekyiiPage.appVersion,
+                            icon: "info.circle.fill",
+                            tint: .mint,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.about")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedDeveloperSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "开发者与诊断",
+                            icon: "hammer.fill",
+                            tint: .gray,
+                            themedTint: .textTertiary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.developer")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "应用")
+                }
+            }
+        )
+    }
+
+    @inline(never) private func erasedVIPServicePage() -> AnyView { AnyView(VIPServiceView()) }
+    @inline(never) private func erasedAppearanceSettingsPage() -> AnyView { AnyView(appearanceSettingsPage) }
+    @inline(never) private func erasedLanguageSettingsPage() -> AnyView { AnyView(languageSettingsPage) }
+    @inline(never) private func erasedTodayRhythmSettingsPage() -> AnyView { AnyView(todayRhythmSettingsPage) }
+    @inline(never) private func erasedTaskTypeSettingsPage() -> AnyView { AnyView(taskTypeSettingsPage) }
+    @inline(never) private func erasedPastSettingsPage() -> AnyView { AnyView(pastSettingsPage) }
+    @inline(never) private func erasedFutureSettingsPage() -> AnyView { AnyView(futureSettingsPage) }
+    @inline(never) private func erasedSuspendedSettingsPage() -> AnyView { AnyView(SuspendedSettingsView()) }
+    @inline(never) private func erasedProjectSettingsPage() -> AnyView { AnyView(ProjectSettingsView()) }
+    @inline(never) private func erasedDataSettingsPage() -> AnyView { AnyView(dataSettingsPage) }
+    @inline(never) private func erasedAboutWeekyiiPage() -> AnyView { AnyView(AboutWeekyiiPage()) }
+    @inline(never) private func erasedDeveloperSettingsPage() -> AnyView { AnyView(developerSettingsPage) }
+
     private var todayRhythmSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("执行方式") {
                 executionModeSettings
                 killTimeSettings
@@ -351,14 +487,7 @@ struct SettingsView: View {
             Section("提醒") {
                 reminderSettings
             }
-            Section {
-                suspendedReminderSettings
-            } header: {
-                Text(String(localized: "settings.suspended.section", defaultValue: "悬置箱提醒"))
-            } footer: {
-                Text(String(localized: "settings.suspended.section.footer", defaultValue: "悬置任务会按这里的节奏在到期前提醒你。到期后的处理方式在「任务管理 → 悬置箱」中设置。"))
-            }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("今日节奏")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -420,7 +549,7 @@ struct SettingsView: View {
     }
 
     private var languageSettingsPage: some View {
-        Form {
+        Form { Group {
             Section {
                 Picker(String(localized: "settings.language.title", defaultValue: "语言"), selection: Binding(
                     get: { settings.languageOverrideRaw },
@@ -438,50 +567,15 @@ struct SettingsView: View {
             } footer: {
                 Text(String(localized: "settings.language.footer", defaultValue: "更改后需要完全退出并重新打开 Weekyii 才会生效。"))
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle(String(localized: "settings.language.title", defaultValue: "语言"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var taskTypeSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("默认类型") {
                 taskTypeSettings
-            }
-            Section {
-                Stepper(value: Binding(
-                    get: { settings.suspendedDefaultCountdownDays },
-                    set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
-                ), in: 1...120) {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
-                        Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
-                        Spacer(minLength: 8)
-                        Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Picker(selection: Binding(
-                    get: { settings.suspendedExpiryPolicy },
-                    set: { settings.suspendedExpiryPolicy = $0 }
-                )) {
-                    ForEach(SuspendedExpiryPolicy.allCases) { policy in
-                        Text(policy.displayName).tag(policy)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "trash.slash.fill", color: .red)
-                        Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
-                    }
-                }
-            } header: {
-                Text(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
-                    Text(settings.suspendedExpiryPolicy.summary)
-                }
             }
             Section("类型管理") {
                 taskTypeManagementSettings
@@ -493,37 +587,37 @@ struct SettingsView: View {
                     }
                 }
             }
-        }
-        .navigationTitle("任务管理")
+        }.themedListRows() }.themedGroupedList()
+        .navigationTitle(String(localized: "settings.task_type.title", defaultValue: "任务类型"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var pastSettingsPage: some View {
-        Form { pastMarkerSection }
+        Form { Group { pastMarkerSection }.themedListRows() }.themedGroupedList()
             .navigationTitle(String(localized: "settings.section.past", defaultValue: "过去"))
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var futureSettingsPage: some View {
-        Form { futureSection }
+        Form { Group { futureSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("未来")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var dataSettingsPage: some View {
-        Form { dataPrivacySection }
+        Form { Group { dataPrivacySection }.themedListRows() }.themedGroupedList()
             .navigationTitle("数据与安全")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var developerSettingsPage: some View {
-        Form { developerSection }
+        Form { Group { developerSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("开发者与诊断")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var appearanceSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("显示模式") {
                 Picker(
                     "显示模式",
@@ -550,39 +644,28 @@ struct SettingsView: View {
             }
 
             Section {
-                ForEach(WeekTheme.allCases) { theme in
-                    let isLocked = theme.isPremiumTheme && !settings.premiumThemeUnlocked
-                    Button {
-                        guard canSelect(theme) else { return }
-                        settings.selectedThemeRaw = theme.rawValue
-                    } label: {
-                        HStack(spacing: 12) {
-                            ThemePaletteMark(theme: theme)
-
-                            Text(theme.displayName)
-                                .foregroundStyle(isLocked ? .secondary : .primary)
-
-                            Spacer()
-
-                            if isLocked {
-                                Image(systemName: "lock.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if settings.selectedTheme == theme {
-                                Image(systemName: "checkmark")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLocked)
+                ForEach(WeekTheme.freeThemes) { theme in
+                    themeRow(theme)
                 }
             } header: {
                 Text("主题")
             } footer: {
                 Text("每套主题仍保留独立的色彩与印象画。")
+            }
+
+            Section {
+                ForEach(WeekTheme.vipThemes) { theme in
+                    themeRow(theme)
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Text(String(localized: "settings.theme.vip.header", defaultValue: "VIP 主题"))
+                    VIPBadge()
+                }
+            } footer: {
+                Text(settings.hasVIPAccess
+                     ? String(localized: "settings.theme.vip.footer.unlocked", defaultValue: "VIP 主题拥有独立的视觉语言，小组件和灵动岛同步生效。")
+                     : String(localized: "settings.theme.vip.footer.locked", defaultValue: "开通 VIP 即可使用。到期后会切回琥珀主题，并保留你的选择，续费后自动恢复。"))
             }
 
             Section {
@@ -620,7 +703,7 @@ struct SettingsView: View {
             } footer: {
                 Text(String(localized: "settings.motion.footer", defaultValue: "“减少动效”开启后，磁贴轮换也会一并停止。改动立即生效。"))
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -892,6 +975,18 @@ struct SettingsView: View {
                 }
             }
 
+            if cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount > 0 {
+                LabeledContent(String(localized: "settings.icloud.conflicts", defaultValue: "上次同步的冲突")) {
+                    Text(String(
+                        format: String(localized: "settings.icloud.conflicts.value", defaultValue: "%lld 处（已保留本机版本）"),
+                        locale: Locale.current,
+                        Int64(cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount)
+                    ))
+                    .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("settings.icloud.conflicts")
+            }
+
             if let lastFailure = cloudSyncCoordinator.diagnosticsSnapshot.lastFailure {
                 LabeledContent(String(localized: "settings.icloud.last_failure")) {
                     Text(lastFailure.localizedDescription)
@@ -908,7 +1003,13 @@ struct SettingsView: View {
 
             Toggle(isOn: Binding(
                 get: { settings.cloudSyncRequested },
-                set: { requested in Task { await cloudSyncCoordinator.setRequested(requested) } }
+                set: { requested in
+                    if requested, !purchaseService.hasVIP {
+                        paywallFeature = .cloudSync
+                        return
+                    }
+                    Task { await cloudSyncCoordinator.setRequested(requested) }
+                }
             )) {
                 HStack(spacing: 12) {
                     SettingsIcon(icon: "arrow.triangle.2.circlepath.icloud", color: .blue)
@@ -919,6 +1020,45 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+
+            if case .locked = cloudSyncCoordinator.status, settings.cloudSyncRequested {
+                Button {
+                    paywallFeature = .cloudSync
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "crown.fill", color: .orange)
+                        Text(String(localized: "settings.icloud.renew", defaultValue: "续订会员以恢复 iCloud 同步"))
+                    }
+                }
+                .accessibilityIdentifier("settings.icloud.renew")
+            }
+
+            Button(role: .destructive) {
+                showingResetCloudSyncStateConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "arrow.counterclockwise.icloud", color: .red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.icloud.reset_state", defaultValue: "重置本机同步状态"))
+                        Text(String(localized: "settings.icloud.reset_state.subtitle", defaultValue: "不删除任何数据；关闭同步并清除本机同步记录"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .accessibilityIdentifier("settings.icloud.resetState")
+            .confirmationDialog(
+                String(localized: "settings.icloud.reset_state.title", defaultValue: "重置本机同步状态？"),
+                isPresented: $showingResetCloudSyncStateConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "settings.icloud.reset_state.confirm", defaultValue: "关闭同步并重置"), role: .destructive) {
+                    resetCloudSyncState()
+                }
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            } message: {
+                Text(String(localized: "settings.icloud.reset_state.message", defaultValue: "本机和 iCloud 中的数据都不会被删除。重新开启同步时，会重新检查 iCloud 并让你选择以哪份数据为准。仅在同步长期异常时使用。"))
             }
 
             Button {
@@ -1014,6 +1154,7 @@ struct SettingsView: View {
         case .accountUnavailable: String(localized: "settings.icloud.status.account_unavailable")
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.status.first_upload")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.status.first_choice")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.status.newer_data", defaultValue: "需要更新版本")
         case .accountDecisionRequired: String(localized: "settings.icloud.status.account_decision")
         case .pausedAfterFailure: String(localized: "settings.icloud.status.paused")
         }
@@ -1037,6 +1178,7 @@ struct SettingsView: View {
         switch cloudSyncCoordinator.status {
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_title")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_title")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.decision.newer_data_title", defaultValue: "需要先更新 Weekyii")
         default: String(localized: "settings.icloud.decision.title")
         }
     }
@@ -1045,6 +1187,11 @@ struct SettingsView: View {
         switch cloudSyncCoordinator.status {
         case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_message")
         case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_message")
+        case .initialEnableDecisionRequired(.remoteHasNewerData):
+            String(
+                localized: "settings.icloud.decision.newer_data_message",
+                defaultValue: "iCloud 中有本版本无法读取的数据，可能由更新版本的 Weekyii 写入。为避免删除这些数据，暂时不能选择以哪份数据为准。请升级 Weekyii 后再开启同步。"
+            )
         default: ""
         }
     }
@@ -1105,6 +1252,16 @@ struct SettingsView: View {
         }
     }
 
+    private func resetCloudSyncState() {
+        do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
+            Task { await cloudSyncCoordinator.setRequested(false) }
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.done", defaultValue: "已关闭 iCloud 同步并重置本机同步状态。需要时可重新开启。")
+        } catch {
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.failed", defaultValue: "重置失败：") + error.localizedDescription
+        }
+    }
+
     private func performPendingArchiveImport() {
         guard let data = pendingImportData else { return }
         do {
@@ -1143,17 +1300,19 @@ struct SettingsView: View {
             }
 
             if settings.developerSettingsEnabled {
+                #if DEBUG
                 Toggle(isOn: Binding(
-                    get: { settings.premiumThemeUnlocked },
-                    set: { settings.premiumThemeUnlocked = $0 }
+                    get: { purchaseService.developerOverrideEnabled },
+                    set: { purchaseService.developerOverrideEnabled = $0 }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
-                        Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
+                        Text(String(localized: "settings.developer.simulate_vip", defaultValue: "模拟 VIP"))
+                        Text(String(localized: "settings.developer.simulate_vip.subtitle", defaultValue: "仅开发版本可见，不代表真实购买状态"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
+                #endif
 
                 Stepper(value: Binding(
                     get: { settings.seedPastWeeks },
@@ -1305,7 +1464,8 @@ struct SettingsView: View {
                     } label: {
                         ExecutionModeOptionCard(
                             mode: mode,
-                            isSelected: displayedExecutionMode == mode
+                            isSelected: displayedExecutionMode == mode,
+                            requiresVIP: mode == .flexible && !settings.hasVIPAccess
                         )
                     }
                     .buttonStyle(.plain)
@@ -1341,6 +1501,9 @@ struct SettingsView: View {
     }
 
     private var executionModeApplicationDescription: String {
+        if settings.defaultExecutionMode == .flexible, !settings.hasVIPAccess {
+            return String(localized: "settings.execution.vip_expired", defaultValue: "VIP 未开通或已到期：今天已开始的任务流不受影响，之后启动的日子使用严格模式。续费后自动恢复灵动模式。")
+        }
         guard let today = todayDayModel() else {
             return "此选择会用于以后每一次启动任务流。"
         }
@@ -1369,6 +1532,10 @@ struct SettingsView: View {
     }
 
     private func applyExecutionMode(_ mode: ExecutionMode) {
+        if mode == .flexible, !settings.hasVIPAccess {
+            paywallFeature = .flexibleMode
+            return
+        }
         // Resolve the clock boundary before deciding whether "today" is still mutable.
         // This prevents a mode tap just after the daily deadline from reviving an expired day.
         _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
@@ -1599,7 +1766,7 @@ struct SettingsView: View {
                 SettingsIcon(icon: "sunrise.fill", color: .orange)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
-                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项，也用于悬置任务的早间提醒"))
+                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项；悬置箱的早间提醒也跟随这个时刻。"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1623,74 +1790,6 @@ struct SettingsView: View {
             .padding(.leading, 40)
         }
         .padding(.vertical, 4)
-    }
-
-    // MARK: - Suspended Task Reminder Settings
-    @ViewBuilder
-    private var suspendedReminderSettings: some View {
-        Toggle(isOn: Binding(
-            get: { settings.suspendedReminderEnabled },
-            set: { settings.suspendedReminderEnabled = $0 }
-        )) {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
-                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-
-        if settings.suspendedReminderEnabled {
-            Picker(selection: Binding(
-                get: { settings.suspendedReminderIntensityRaw },
-                set: { settings.suspendedReminderIntensityRaw = $0 }
-            )) {
-                ForEach(SuspendedReminderIntensity.allCases) { intensity in
-                    Text(intensity.displayName).tag(intensity.rawValue)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
-                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
-                }
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 12) {
-                Color.clear
-                    .frame(width: 28, height: 28)
-                Text(settings.suspendedReminderIntensity.summary)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-
-            if settings.suspendedReminderIntensity == .full {
-                Stepper(value: Binding(
-                    get: { settings.suspendedReminderAdvanceDays },
-                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
-                ), in: 1...14) {
-                    HStack(spacing: 12) {
-                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
-                        Text(String(
-                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
-                            settings.suspendedReminderAdvanceDays
-                        ))
-                    }
-                }
-            }
-
-            DatePicker(selection: suspendedEveningReminderDateBinding, displayedComponents: .hourAndMinute) {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
-                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
-                }
-            }
-            .datePickerStyle(.compact)
-        }
     }
 
     private var seedOptions: SeedOptions {
@@ -1796,7 +1895,52 @@ struct SettingsView: View {
     }
 
     private func canSelect(_ theme: WeekTheme) -> Bool {
-        !theme.isPremiumTheme || settings.premiumThemeUnlocked
+        !theme.requiresVIP || settings.hasVIPAccess
+    }
+
+    private func themeRow(_ theme: WeekTheme) -> some View {
+        let isLocked = !canSelect(theme)
+        return Button {
+            guard canSelect(theme) else {
+                paywallFeature = .themes
+                return
+            }
+            settings.selectedThemeRaw = theme.rawValue
+        } label: {
+            HStack(spacing: 12) {
+                ThemePaletteMark(theme: theme)
+
+                Text(theme.displayName)
+                    .foregroundStyle(isLocked ? .secondary : .primary)
+
+                Spacer()
+
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if settings.selectedTheme == theme {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var vipStatusSummary: String {
+        switch purchaseService.access.source {
+        case .none:
+            return purchaseService.showsTrialOffer
+                ? String(format: String(localized: "vip.summary.trial", defaultValue: "免费试用 %d 天"), purchaseService.trialDays ?? WeekyiiProduct.trialDays)
+                : String(localized: "vip.summary.inactive", defaultValue: "未开通")
+        case .betaTester:
+            return String(localized: "vip.summary.beta", defaultValue: "测试版已开通")
+        default:
+            return String(localized: "vip.summary.active", defaultValue: "已开通")
+        }
     }
 
     private func appearanceDisplayName(for mode: AppearanceMode) -> String {
@@ -1940,23 +2084,6 @@ struct SettingsView: View {
                 let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
                 settings.morningReminderHour = min(max(components.hour ?? 0, 0), 23)
                 settings.morningReminderMinute = min(max(components.minute ?? 0, 0), 59)
-            }
-        )
-    }
-
-    private var suspendedEveningReminderDateBinding: Binding<Date> {
-        Binding(
-            get: {
-                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
-                components.hour = settings.suspendedReminderEveningHour
-                components.minute = settings.suspendedReminderEveningMinute
-                components.second = 0
-                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
-            },
-            set: { newDate in
-                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
-                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
-                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
             }
         )
     }
@@ -2332,7 +2459,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            Form { Group {
                 Section {
                     HStack(spacing: 16) {
                         Image(systemName: iconName)
@@ -2421,7 +2548,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
                         }
                     }
                 }
-            }
+            }.themedListRows() }.themedGroupedList()
             .navigationTitle(definition == nil ? "新增任务类型" : "编辑任务类型")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2448,15 +2575,55 @@ private struct TaskTypeDefinitionEditorSheet: View {
     }
 }
 
+/// Hide scrolled settings content behind the Catnap navigation bar instead of
+/// letting rows and section labels bleed through its translucent material.
+private struct CatSettingsNavigationBarModifier: ViewModifier {
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if skin.glyphs == .cat {
+            content
+                .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+        } else {
+            content
+        }
+    }
+}
+
+/// Group titles in the settings list. A themed skin draws them with its own
+/// section typography — letterspaced ink with a rubricated initial (魔戒), so the
+/// page speaks the same language as the rest of the app. Classic themes keep the
+/// plain header.
+private struct SettingsSectionHeader: View {
+    let title: String
+
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let section = skin.section {
+            WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
+                .font(.footnote)
+                .tracking(section.titleTracking)
+                .textCase(nil)
+        } else {
+            Text(title)
+        }
+    }
+}
+
 private struct SettingsNavigationRow: View {
     let title: String
     var value: String? = nil
     let icon: String
     let tint: Color
+    /// Stamp ink on a themed skin; `nil` keeps `tint`.
+    var themedTint: Color? = nil
 
     var body: some View {
         HStack(spacing: 12) {
-            SettingsIcon(icon: icon, color: tint)
+            SettingsIcon(icon: icon, color: tint, themedColor: themedTint)
 
             Text(title)
 
@@ -2515,7 +2682,7 @@ private struct ThemePaletteMark: View {
     @ViewBuilder
     private var markArtwork: some View {
         switch theme {
-        case .lotr:
+        case .lotr, .ring:
             lotrMark
         case .brutal:
             brutalMark
@@ -2525,6 +2692,10 @@ private struct ThemePaletteMark: View {
             paperMark
         case .terminal:
             terminalMark
+        case .cat:
+            catMark
+        case .blueprint:
+            blueprintMark
         default:
             classicMark
         }
@@ -2543,6 +2714,21 @@ private struct ThemePaletteMark: View {
 
     private var classicMark: some View {
         splitBase(theme.primaryColor, theme.accentColor)
+    }
+
+    /// Ginger fur with a cream cat face die-cut on it.
+    private var catMark: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "#EE9558"), Color(hex: "#D46A32")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            CatGlyphView(glyph: .face)
+                .foregroundStyle(Color(hex: "#FFFDF9"))
+                .frame(width: 20, height: 20)
+        }
+        .frame(width: 30, height: 30)
     }
 
     /// Antique gold | shadow black, with a small gold ring in the lower-right.
@@ -2650,6 +2836,38 @@ private struct ThemePaletteMark: View {
                 path.addRect(cursor)
             }
             .fill(Color(hex: "#8CFFA8"))
+        }
+    }
+
+    /// A cyanotype tile: graph grid, with an orange corner bracket drawn like a
+    /// title-block crop mark.
+    private var blueprintMark: some View {
+        let grid = Path { path in
+            for x in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: x, y: 0, width: 0.6, height: 30))
+            }
+            for y in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: 0, y: y, width: 30, height: 0.6))
+            }
+        }
+
+        let bracket = Path { path in
+            path.move(to: CGPoint(x: 20, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 20))
+        }
+
+        return ZStack {
+            Rectangle().fill(Color(hex: "#0E2836"))
+
+            grid
+                .fill(Color(hex: "#6FB4D6").opacity(0.28))
+
+            bracket
+                .stroke(
+                    Color(hex: "#E08A5C"),
+                    style: StrokeStyle(lineWidth: 1.8, lineCap: .square, lineJoin: .miter)
+                )
         }
     }
 }
@@ -2760,7 +2978,7 @@ private struct ProjectSettingsView: View {
     }
 
     var body: some View {
-        Form {
+        Form { Group {
             Section {
                 Stepper(value: Binding(
                     get: { settings.defaultProjectDurationDays },
@@ -2851,7 +3069,7 @@ private struct ProjectSettingsView: View {
                     }
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("项目")
         .navigationBarTitleDisplayMode(.inline)
         .alert(String(localized: "alert.title"), isPresented: Binding(
@@ -2929,9 +3147,158 @@ private struct ProjectSettingsView: View {
     }
 }
 
+private struct SuspendedSettingsView: View {
+    @EnvironmentObject private var settings: UserSettings
+
+    var body: some View {
+        Form { Group {
+            Section {
+                reminderSettings
+            } header: {
+                Text(String(localized: "settings.suspended.reminder.section", defaultValue: "提醒"))
+            } footer: {
+                Text(String(
+                    localized: "settings.suspended.reminder.section.footer",
+                    defaultValue: "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。"
+                ))
+            }
+
+            Section {
+                countdownSettings
+                expiryPolicySettings
+            } header: {
+                Text(String(localized: "settings.suspended.behavior.section", defaultValue: "倒计时与到期"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
+                    Text(settings.suspendedExpiryPolicy.summary)
+                }
+            }
+        }.themedListRows() }.themedGroupedList()
+        .navigationTitle(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private var reminderSettings: some View {
+        Toggle(isOn: Binding(
+            get: { settings.suspendedReminderEnabled },
+            set: { settings.suspendedReminderEnabled = $0 }
+        )) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
+                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        if settings.suspendedReminderEnabled {
+            Picker(selection: Binding(
+                get: { settings.suspendedReminderIntensityRaw },
+                set: { settings.suspendedReminderIntensityRaw = $0 }
+            )) {
+                ForEach(SuspendedReminderIntensity.allCases) { intensity in
+                    Text(intensity.displayName).tag(intensity.rawValue)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
+                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Color.clear
+                    .frame(width: 28, height: 28)
+                Text(settings.suspendedReminderIntensity.summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            if settings.suspendedReminderIntensity == .full {
+                Stepper(value: Binding(
+                    get: { settings.suspendedReminderAdvanceDays },
+                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
+                ), in: 1...14) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
+                        Text(String(
+                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
+                            settings.suspendedReminderAdvanceDays
+                        ))
+                    }
+                }
+            }
+
+            DatePicker(selection: eveningReminderDateBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
+                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
+                }
+            }
+            .datePickerStyle(.compact)
+        }
+    }
+
+    private var countdownSettings: some View {
+        Stepper(value: Binding(
+            get: { settings.suspendedDefaultCountdownDays },
+            set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
+        ), in: 1...120) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
+                Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
+                Spacer(minLength: 8)
+                Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var expiryPolicySettings: some View {
+        Picker(selection: Binding(
+            get: { settings.suspendedExpiryPolicy },
+            set: { settings.suspendedExpiryPolicy = $0 }
+        )) {
+            ForEach(SuspendedExpiryPolicy.allCases) { policy in
+                Text(policy.displayName).tag(policy)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "trash.slash.fill", color: .red)
+                Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
+            }
+        }
+    }
+
+    private var eveningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.suspendedReminderEveningHour
+                components.minute = settings.suspendedReminderEveningMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
+                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+}
+
 private struct ExecutionModeOptionCard: View {
     let mode: ExecutionMode
     let isSelected: Bool
+    var requiresVIP = false
 
     private var accentColor: Color {
         mode == .strict ? .accentOrange : .weekyiiPrimary
@@ -2976,6 +3343,10 @@ private struct ExecutionModeOptionCard: View {
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+
+                if requiresVIP {
+                    VIPBadge()
+                }
             }
 
             Text(summary)
@@ -3090,24 +3461,77 @@ private struct PastMarkerSettingsPreview: View {
 struct SettingsIcon: View {
     let icon: String
     let color: Color
-    
+    /// Ink for the themed stamp. `nil` keeps `color`, so classic themes draw
+    /// exactly what they drew before.
+    var themedColor: Color? = nil
+
+    @Environment(\.themeSkin) private var skin
+
     var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(width: 28, height: 28)
-            .background(color)
-            .cornerRadius(WeekRadius.scaled(7))
+        if let chip = skin.icon {
+            stamped(chip)
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(color)
+                .cornerRadius(WeekRadius.scaled(7))
+        }
+    }
+
+    /// The themed chip: a hairline-ruled stamp whose glyph carries the row's own
+    /// ink, so a column of rows stays a single family of muted colours instead of
+    /// a grid of saturated tiles. Filled symbols fall back to their outline so
+    /// every stamp has the same weight as the line work around it.
+    private func stamped(_ chip: ThemeIconSkin) -> some View {
+        let ink = skin.glyphs == .lotr ? Color.weekyiiPrimary : (themedColor ?? color)
+        return ZStack {
+            if chip.tintsFill {
+                // A soft wash of the row's own tint behind a glyph in that tint (猫猫).
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(ink.opacity(0.14))
+            } else if let fill = chip.fill {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(fill.color)
+            }
+            if let border = chip.border {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .strokeBorder(border.color, lineWidth: chip.borderWidth)
+            }
+            if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
+                CatGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else if skin.glyphs == .lotr, let glyph = LotrGlyph(systemName: icon) {
+                LotrGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else {
+                Image(systemName: chip.tintsFill ? icon : outlineName)
+                    .font(.system(size: 14, weight: chip.tintsFill ? .semibold : .medium))
+                    .foregroundStyle(ink)
+            }
+        }
+        .frame(width: 28, height: 28)
+    }
+
+    /// `tag.fill` → `tag`, but only when the outline really exists.
+    private var outlineName: String {
+        let stripped = icon.replacingOccurrences(of: ".fill", with: "")
+        guard stripped != icon, UIImage(systemName: stripped) != nil else { return icon }
+        return stripped
     }
 }
 
 private struct RecoveryPointsView: View {
+    @EnvironmentObject private var settings: UserSettings
     @State private var snapshots: [BackupRecoveryService.SnapshotSummary] = []
     @State private var pendingSnapshot: BackupRecoveryService.SnapshotSummary?
     @State private var message: String?
 
     var body: some View {
-        List {
+        List { Group {
             if snapshots.isEmpty {
                 ContentUnavailableView("暂无本地恢复点", systemImage: "clock.arrow.circlepath", description: Text("应用启动和数据导入前会自动建立恢复点。"))
             } else {
@@ -3137,7 +3561,7 @@ private struct RecoveryPointsView: View {
                     Text("恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。")
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("本地恢复点")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }
@@ -3148,7 +3572,7 @@ private struct RecoveryPointsView: View {
             Button("取消", role: .cancel) { pendingSnapshot = nil }
             Button("完整恢复", role: .destructive) { restorePendingSnapshot() }
         } message: {
-            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。")
+            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { message != nil },
@@ -3168,6 +3592,7 @@ private struct RecoveryPointsView: View {
         guard let snapshot = pendingSnapshot else { return }
         pendingSnapshot = nil
         do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
             try BackupRecoveryService.restoreSnapshot(named: snapshot.folderName, to: WeekyiiPersistence.persistentStoreURL())
             message = "恢复完成。请立即完全退出并重新打开 Weekyii。"
         } catch {
@@ -3567,7 +3992,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "settings.about.days_started"),
                     tint: .accentOrange
                 ) {
-                    Image(systemName: "sun.max")
+                    CatCoveredSymbol(systemName: "sun.max", pointSize: 18)
                 }
                 AboutStatTile(
                     value: stats.completedTasks.formatted(),
@@ -3575,7 +4000,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "settings.about.stats.completed", defaultValue: "完成任务"),
                     tint: .accentGreen
                 ) {
-                    Image(systemName: "checkmark.circle")
+                    CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 18)
                 }
                 AboutStatTile(
                     value: "\(Int((stats.completionRate * 100).rounded()))",
@@ -3592,7 +4017,7 @@ private struct AboutWeekyiiPage: View {
                     label: String(localized: "stats.focus_hours"),
                     tint: .taskLeisure
                 ) {
-                    Image(systemName: "clock")
+                    CatCoveredSymbol(systemName: "clock", pointSize: 18)
                 }
             }
 
@@ -3725,6 +4150,7 @@ private struct AboutOrnament: View {
 
 private struct AboutDayDot: View {
     let mark: AboutWeekyiiStats.WeekdayMark
+    @Environment(\.themeSkin) private var skin
 
     var body: some View {
         ZStack {
@@ -3739,9 +4165,15 @@ private struct AboutDayDot: View {
                     )
                     .frame(width: 30, height: 30)
                     .weekSoftShadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white)
+                if skin.glyphs == .cat {
+                    CatGlyphView(glyph: .paw)
+                        .foregroundStyle(.white)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                }
             } else {
                 Circle()
                     .stroke(Color.textTertiary.opacity(mark.isFuture ? 0.55 : 0.3), lineWidth: 1)

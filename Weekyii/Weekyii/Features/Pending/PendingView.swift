@@ -358,7 +358,7 @@ struct PendingView: View {
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "calendar.badge.plus")
+                CatCoveredSymbol(systemName: "calendar.badge.plus", pointSize: 60)
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
                 
@@ -397,7 +397,7 @@ struct PendingView: View {
                     
                     Spacer()
                     
-                    Image(systemName: "calendar.badge.clock")
+                    CatCoveredSymbol(systemName: "calendar.badge.clock", pointSize: 40)
                         .font(.system(size: 40))
                         .foregroundColor(.accentOrange.opacity(0.3))
                 }
@@ -609,7 +609,7 @@ private struct PendingSelectedDaySection: View {
 
     private func emptyState(_ message: String) -> some View {
         HStack(alignment: .top, spacing: WeekSpacing.sm) {
-            Image(systemName: "calendar")
+            CatCoveredSymbol(systemName: "calendar", pointSize: 17)
                 .font(.body.weight(.medium))
                 .foregroundStyle(Color.textTertiary)
 

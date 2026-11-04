@@ -186,6 +186,8 @@ nonisolated actor CloudKitOutgoingAssetFiles {
 }
 
 nonisolated enum CloudKitFailureMapper {
+    static let remoteZoneDeletedReason = "Weekyii iCloud zone was deleted"
+
     static func map(_ error: Error, recordNames: [String: SyncEntityKey] = [:]) -> CloudSyncFailure {
         let nsError = error as NSError
         guard nsError.domain == CKErrorDomain, let code = CKError.Code(rawValue: nsError.code) else {
@@ -204,6 +206,11 @@ nonisolated enum CloudKitFailureMapper {
         case .invalidArguments: return .invalidArguments
         case .badContainer, .badDatabase, .missingEntitlement: return .badContainer
         case .serverRecordChanged: return .serverRecordChanged
+        // Saving with system fields of a record another device deleted. The
+        // reconciler treats it like a conflict: refetch, and if the server has
+        // no copy any more, resend as a new record. See CloudSyncReconciler.
+        case .unknownItem: return .serverRecordChanged
+        case .zoneNotFound, .userDeletedZone: return .other(remoteZoneDeletedReason)
         case .partialFailure:
             let perItem = nsError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] ?? [:]
             let failures = perItem.compactMap { recordID, itemError -> CloudSyncRecordFailure? in

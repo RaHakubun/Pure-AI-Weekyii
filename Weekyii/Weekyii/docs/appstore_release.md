@@ -1,7 +1,7 @@
 # Weekyii iOS 发布与 App Store 上架 SOP
 
 > 适用范围：Weekyii 的 TestFlight 测试构建、正式 App Store 提交、审核后的发布与后续更新。
-> 最后校准：2026-10-22；本文件以当前工程和实际走通的发布流程为准。Apple 后台界面会变化，以本文末尾 Apple 官方帮助链接为准。
+> 最后校准：2026-11-03；本文件以当前工程和实际走通的发布流程为准。Apple 后台界面会变化，以本文末尾 Apple 官方帮助链接为准。
 
 ## 0. 三个阶段不可混淆
 
@@ -28,7 +28,9 @@
 | Release Profile（App） | `Weekyii App Store CloudKit` | Release build setting |
 | Release Profile（Widget） | `Weekyii Widget App Store` | Release build setting |
 | 生产 APNs | `production` | 必须从归档 entitlement 验证 |
-| 发布版本来源 | App + Widget Release build setting | 不以测试 target 的版本为准 |
+| 发布版本来源 | App + Widget Release / Beta build setting | 不以测试 target 的版本为准 |
+| 发布 Scheme | `Weekyii Beta`（Beta 配置，手动签名） | `Weekyii.xcodeproj/xcshareddata/xcschemes/Weekyii Beta.xcscheme` |
+| 内购商品 | `com.fluentdesign.Weekyii.vip.monthly`（¥12）/ `.quarterly`（¥28）/ `.yearly`（¥68，含 2 周免费试用）/ `.lifetime`（¥198） | `Services/PurchaseService.swift`、`Resources/Weekyii.storekit` |
 
 ### 不可破坏的约束
 
@@ -81,18 +83,18 @@ Weekyii 是本地优先、可经 iCloud/CloudKit 同步的任务产品。以下�
 
 ## 4. 同步分支与工作区卫生
 
-所有发布从 `online-chatgpt-develop` 最新远端提交开始。不得把其他分支、未确认 stash 或本机 Xcode 状态混入。
+所有发布从当次 release record 记录的发布分支最新远端提交开始。1.2 (3) 起为 `notion-claude/feat-in-app-purchase`（1.2 (1) 之前为 `online-chatgpt-develop`）；换分支发布必须在 release record 里写明并说明原因。不得把未确认 stash 或本机 Xcode 状态混入。
 
 ```bash
 git status --short
 git branch --show-current
 git fetch origin
-git log --oneline --decorate -5 origin/online-chatgpt-develop
-git pull --ff-only origin online-chatgpt-develop
+git log --oneline --decorate -5 origin/<发布分支>
+git pull --ff-only origin <发布分支>
 git diff --check
 ```
 
-放行标准：当前分支是 `online-chatgpt-develop`；HEAD 与远端一致；不存在未解释的业务代码或资源改动。仅见 `UserInterfaceState.xcuserstate` 时保留但不暂存；若还有其他改动，先定位归属，不能默认提交。
+放行标准：当前分支是本次发布分支；HEAD 与同名远端一致；不存在未解释的业务代码或资源改动。仅见 `UserInterfaceState.xcuserstate` 时保留但不暂存；若还有其他改动，先定位归属，不能默认提交。
 
 ## 5. 版本号更新与提交
 
@@ -158,7 +160,7 @@ rg 'TEST SUCCEEDED|TEST FAILED|Executed .* tests' \
 | 隐私 | App Store Connect 隐私声明符合真实行为；Privacy Manifest 覆盖 Required Reason API；无未声明 tracking |
 | 权限 | 相册、通知等提示文字与功能一致；不请求无关权限 |
 | 账号 | 当前无 App 内登录；未来增加账号创建时必须提供账户删除能力 |
-| IAP | 上线数字内容解锁或订阅时必须使用 IAP，并在购买页与商店资料提供条款/隐私链接 |
+| IAP | 上线数字内容解锁或订阅时必须使用 IAP，并在购买页与商店资料提供条款/隐私链接。本工程声明 4 个商品（见第 1 节），ASC 必须逐一存在、ID 完全一致、协议已签；缺任意一档时 VIP 页与沙盒购买都会异常 |
 | 签名 | 无 `com.apple.security.temporary-exception.*` entitlement；生产归档含 production APNs 和正确 CloudKit/App Group |
 | 地区 | 所有已选地区的文案、隐私、价格、合规条件均满足；中国大陆上架前额外核对当地要求 |
 
@@ -169,13 +171,30 @@ rg 'TEST SUCCEEDED|TEST FAILED|Executed .* tests' \
 ```bash
 xcodebuild archive \
   -project Weekyii.xcodeproj \
-  -scheme Weekyii \
-  -configuration Release \
+  -scheme "Weekyii Beta" \
   -destination 'generic/platform=iOS' \
   -derivedDataPath /tmp/weekyii-release-YYYYMMDD-archive-derived \
   -archivePath /tmp/weekyii-release-YYYYMMDD-X.Y-Z.xcarchive \
+  OTHER_SWIFT_FLAGS='-Xfrontend -disable-sandbox' \
   > /tmp/weekyii-release-YYYYMMDD-archive.log 2>&1
 ```
+
+`OTHER_SWIFT_FLAGS='-Xfrontend -disable-sandbox'` **不能省**。这台机器上命令行构建时 `swift-plugin-server` 无法嵌套 `sandbox_apply`，所有宏（`@Model` / `@Observable` / `@Query` / `#Preview`）会展开失败，报成百上千条 `external macro implementation type ... malformed response`，再连出「type 'X' does not conform to PersistentModel」之类的假错误。2026-11-03 归档就漏了这个参数，误判为代码错误。
+
+**不要传 `-configuration`。** 让 scheme 的 `ArchiveAction` 决定配置：`Weekyii Beta` 的 ArchiveAction 是 `Beta`，`Weekyii` 的是 `Release`。命令行显式传 `-configuration Release` 会覆盖 scheme 的设定，编出来的包里没有 `WEEKYII_BETA`，TestFlight 测试员就拿不到自动 VIP——2026-11-03 的 1.2 (5) 就是这么传错的（scheme 名叫 Beta，实际按 Release 编）。
+
+用 `Weekyii Beta` scheme：它走 Beta 配置（手动签名 + App Store profile + `WEEKYII_BETA` 编译条件），是 TestFlight 的正确路径。Beta 配置与 Release 的签名、entitlements、provisioning profile 完全一致，上传不受影响，差别只在编译条件。
+
+归档后必须验证 `WEEKYII_BETA` 真的进了二进制：
+
+```bash
+# 日志里应出现 -DWEEKYII_BETA（Weekyii 与 WeekyiiWidget 各 3 处）
+grep -c "WEEKYII_BETA" /tmp/weekyii-release-YYYYMMDD-archive.log     # 应为 6
+# 二进制应引用 StoreKit 的 AppTransaction（Release 编出来是 0）
+nm -u /tmp/weekyii-release-YYYYMMDD-X.Y-Z.xcarchive/Products/Applications/Weekyii.app/Weekyii | grep -c AppTransaction
+```
+
+两条任一为 0，就说明配置传错了，别上传。
 
 日志必须出现 `** ARCHIVE SUCCEEDED **`。
 

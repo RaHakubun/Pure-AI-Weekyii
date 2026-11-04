@@ -368,7 +368,7 @@ private struct WeekTopologyEmptyState: View {
     var body: some View {
         WeekCard(accentColor: .weekyiiPrimary) {
             HStack(alignment: .center, spacing: WeekSpacing.md) {
-                Image(systemName: "calendar.badge.plus")
+                CatCoveredSymbol(systemName: "calendar.badge.plus", pointSize: 22)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(Color.weekyiiPrimary)
                     .frame(width: 44, height: 44)

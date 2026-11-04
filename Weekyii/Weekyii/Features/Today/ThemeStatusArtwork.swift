@@ -21,11 +21,13 @@ struct ThemeStatusArtwork: View {
             switch theme {
             case .sunset:
                 SunsetStatusIllustration(renderingMode: renderingMode)
-            case .lotr:
+            case .lotr, .ring, .quenya:
                 LotrStatusIllustration(renderingMode: renderingMode)
+            case .cat:
+                CatStatusIllustration(renderingMode: renderingMode)
             case .amber, .ocean, .forest, .rose, .lavender, .graphite, .mint, .midnight:
                 NarrativeThemeStatusIllustration(theme: theme, renderingMode: renderingMode)
-            case .brutal, .neon, .paper, .terminal:
+            case .brutal, .neon, .paper, .terminal, .blueprint:
                 GeometricStatusIllustration(theme: theme, renderingMode: renderingMode)
             }
         }
@@ -113,7 +115,7 @@ private struct NarrativeThemeStatusIllustration: View {
             MintGreenhouseScene(size: size, time: time)
         case .midnight:
             MidnightAuroraScene(size: size, time: time)
-        case .sunset, .lotr, .brutal, .neon, .paper, .terminal:
+        case .sunset, .lotr, .cat, .quenya, .ring, .brutal, .neon, .paper, .terminal, .blueprint:
             Color.clear
         }
     }
@@ -189,6 +191,8 @@ private struct GeometricStatusIllustration: View {
                 PaperStatusScene(size: size, time: time, palette: palette)
             case .terminal:
                 TerminalStatusScene(size: size, time: time, palette: palette)
+            case .blueprint:
+                DraftingStatusScene(size: size, time: time, palette: palette)
             default:
                 Color.clear
             }
@@ -460,6 +464,187 @@ private struct TerminalStatusScene: View {
             line = line + Text(verbatim: isLit ? "█" : "░").foregroundColor(isLit ? bright : dim)
         }
         return line + Text(verbatim: "]")
+    }
+}
+
+/// Drafting sheet: a floor plan in hairlines, a door leaf swinging to its stop,
+/// an architect's dimension rule and a title block. Flat ink, no elevation, one
+/// construction-orange marker. It shows no numbers: the artwork has no access to
+/// the day's real progress.
+private struct DraftingStatusScene: View {
+    let size: CGSize
+    let time: TimeInterval
+    let palette: ThemeArtworkPalette
+
+    var body: some View {
+        let grid = ArtworkGrid(size: size)
+        let ink = palette.primary
+        let soft = palette.primaryLight
+        let marker = palette.accent
+        let rule = palette.textSecondary
+        let swing = CGFloat((sin(time * 0.45 - Double.pi / 2) + 1) / 2)
+        let leafAngle = -CGFloat.pi / 2 - swing * CGFloat.pi / 2
+        let labelSize = max(5, 6.5 * grid.s)
+
+        ZStack(alignment: .topLeading) {
+            Canvas { context, canvas in
+                let grid = ArtworkGrid(size: canvas)
+                let thin = max(0.6, 1 * grid.s)
+                let wall = max(1.1, 1.5 * grid.s)
+
+                context.fill(Path(grid.bounds), with: .color(palette.backgroundSecondary))
+
+                // Sheet grid: 10-unit cells, a heavier rule every fifth.
+                var minor = Path()
+                for x in stride(from: CGFloat.zero, through: 260, by: 10) {
+                    minor.addRect(grid.rect(x, 0, 0.5, 88))
+                }
+                for y in stride(from: CGFloat.zero, through: 88, by: 10) {
+                    minor.addRect(grid.rect(0, y, 260, 0.5))
+                }
+                context.fill(minor, with: .color(soft.opacity(0.16)))
+
+                var major = Path()
+                for x in stride(from: CGFloat.zero, through: 260, by: 50) {
+                    major.addRect(grid.rect(x, 0, 1, 88))
+                }
+                for y in stride(from: CGFloat.zero, through: 88, by: 50) {
+                    major.addRect(grid.rect(0, y, 260, 1))
+                }
+                context.fill(major, with: .color(soft.opacity(0.3)))
+
+                // Plan: an outer wall, a partition with a door opening, a window.
+                var walls = Path()
+                walls.addRect(grid.rect(22, 14, 96, 54))
+                walls.move(to: grid.point(68, 14))
+                walls.addLine(to: grid.point(68, 38))
+                walls.move(to: grid.point(68, 52))
+                walls.addLine(to: grid.point(68, 68))
+                walls.move(to: grid.point(68, 44))
+                walls.addLine(to: grid.point(118, 44))
+                context.stroke(
+                    walls,
+                    with: .color(ink),
+                    style: StrokeStyle(lineWidth: wall, lineCap: .square, lineJoin: .miter)
+                )
+
+                var window = Path()
+                window.move(to: grid.point(34, 17.5))
+                window.addLine(to: grid.point(58, 17.5))
+                window.move(to: grid.point(34, 14))
+                window.addLine(to: grid.point(34, 17.5))
+                window.move(to: grid.point(58, 14))
+                window.addLine(to: grid.point(58, 17.5))
+                context.stroke(window, with: .color(soft), lineWidth: thin)
+
+                // Door: the arc is the drawn geometry, the leaf sweeps to its stop.
+                let hinge = grid.point(68, 52)
+                let radius = 14 * grid.s
+                var arc = Path()
+                arc.addArc(
+                    center: hinge,
+                    radius: radius,
+                    startAngle: .degrees(180),
+                    endAngle: .degrees(270),
+                    clockwise: false
+                )
+                context.stroke(arc, with: .color(soft.opacity(0.7)), lineWidth: thin)
+
+                let tip = CGPoint(
+                    x: hinge.x + cos(leafAngle) * radius,
+                    y: hinge.y + sin(leafAngle) * radius
+                )
+                var leaf = Path()
+                leaf.move(to: hinge)
+                leaf.addLine(to: tip)
+                context.stroke(leaf, with: .color(marker), style: StrokeStyle(lineWidth: wall, lineCap: .square))
+                context.fill(
+                    Path(ellipseIn: CGRect(
+                        x: tip.x - 1.6 * grid.s,
+                        y: tip.y - 1.6 * grid.s,
+                        width: 3.2 * grid.s,
+                        height: 3.2 * grid.s
+                    )),
+                    with: .color(marker)
+                )
+
+                var centerMark = Path()
+                centerMark.move(to: CGPoint(x: hinge.x - 3 * grid.s, y: hinge.y))
+                centerMark.addLine(to: CGPoint(x: hinge.x + 3 * grid.s, y: hinge.y))
+                centerMark.move(to: CGPoint(x: hinge.x, y: hinge.y - 3 * grid.s))
+                centerMark.addLine(to: CGPoint(x: hinge.x, y: hinge.y + 3 * grid.s))
+                context.stroke(centerMark, with: .color(rule.opacity(0.6)), lineWidth: thin)
+
+                // Dimension rule with slash ticks under the plan.
+                var dimension = Path()
+                dimension.move(to: grid.point(22, 76))
+                dimension.addLine(to: grid.point(118, 76))
+                dimension.move(to: grid.point(22, 68))
+                dimension.addLine(to: grid.point(22, 79))
+                dimension.move(to: grid.point(118, 68))
+                dimension.addLine(to: grid.point(118, 79))
+                context.stroke(
+                    dimension,
+                    with: .color(rule.opacity(0.55)),
+                    style: StrokeStyle(lineWidth: thin, lineCap: .square)
+                )
+
+                var ticks = Path()
+                for x in [CGFloat(22), CGFloat(118)] {
+                    ticks.move(to: grid.point(x - 2, 78))
+                    ticks.addLine(to: grid.point(x + 2, 74))
+                }
+                context.stroke(
+                    ticks,
+                    with: .color(marker),
+                    style: StrokeStyle(lineWidth: max(1, 1.4 * grid.s), lineCap: .square)
+                )
+
+                // Detail callout and title block.
+                var leader = Path()
+                leader.move(to: grid.point(187, 30))
+                leader.addLine(to: grid.point(124, 30))
+                leader.move(to: grid.point(124, 30))
+                leader.addLine(to: grid.point(124, 34))
+                context.stroke(
+                    leader,
+                    with: .color(rule.opacity(0.8)),
+                    style: StrokeStyle(lineWidth: thin, lineCap: .square)
+                )
+                context.stroke(grid.circle(196, 30, radius: 9), with: .color(ink), lineWidth: thin)
+                context.fill(grid.circle(124, 30, radius: 1.4), with: .color(marker))
+
+                let callout = context.resolve(
+                    Text(verbatim: "A")
+                        .font(.system(size: max(6, 8 * grid.s), weight: .semibold, design: .monospaced))
+                        .foregroundColor(ink)
+                )
+                context.draw(callout, at: grid.point(196, 30), anchor: .center)
+
+                var block = Path()
+                block.addRect(grid.rect(176, 62, 70, 20))
+                block.move(to: grid.point(176, 72))
+                block.addLine(to: grid.point(246, 72))
+                block.move(to: grid.point(212, 72))
+                block.addLine(to: grid.point(212, 82))
+                context.stroke(block, with: .color(soft.opacity(0.85)), lineWidth: thin)
+            }
+            .frame(width: size.width, height: size.height)
+
+            Text(verbatim: "WEEKYII")
+                .tracking(1.4)
+                .frame(width: 64 * grid.sx, alignment: .leading)
+                .position(x: 211 * grid.sx, y: 67 * grid.sy)
+            Text(verbatim: "PLAN 01")
+                .frame(width: 32 * grid.sx, alignment: .leading)
+                .position(x: 196 * grid.sx, y: 77 * grid.sy)
+            Text(verbatim: "1:100")
+                .frame(width: 32 * grid.sx, alignment: .leading)
+                .position(x: 231 * grid.sx, y: 77 * grid.sy)
+        }
+        .font(.system(size: labelSize, weight: .medium, design: .monospaced))
+        .foregroundColor(rule)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 }
 
@@ -1255,6 +1440,190 @@ private struct SunsetStatusIllustration: View {
     }
 }
 
+/// 午睡橘猫: a flat sunny room. A window with the sun (night: a crescent moon
+/// and stars), a beam of light falling across the floor onto a cushion, and a
+/// curled ginger cat asleep on it with a few floating "z". The cat breathes and
+/// the z drift up. Drawn in a 318 × 104 design space, scaled to fill the frame.
+private struct CatStatusIllustration: View {
+    let renderingMode: ThemeStatusArtworkRenderingMode
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var shouldAnimate: Bool {
+        renderingMode == .animated && !reduceMotion
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if shouldAnimate {
+            TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                scene(time: timeline.date.timeIntervalSinceReferenceDate)
+            }
+        } else {
+            scene(time: 0)
+        }
+    }
+
+    private struct Colors {
+        let wallTop, wallBottom, floor, skyTop, skyBottom, windowFrame, beam: Color
+        let cushion, cushionShade, fur, stripe, face, snore: Color
+
+        init(dark: Bool) {
+            wallTop = Color(hex: dark ? "#2A211B" : "#FBE9D7")
+            wallBottom = Color(hex: dark ? "#221B16" : "#F6DCC4")
+            floor = Color(hex: dark ? "#1E1814" : "#F0D2B8")
+            skyTop = Color(hex: dark ? "#1C2840" : "#CFE6EF")
+            skyBottom = Color(hex: dark ? "#2C3A56" : "#EAF4F2")
+            windowFrame = Color(hex: dark ? "#685042" : "#FFFDF9")
+            beam = Color(hex: dark ? "#F7E7C6" : "#FFF6E6")
+            cushion = Color(hex: dark ? "#765049" : "#E8B3A1")
+            cushionShade = Color(hex: dark ? "#51362F" : "#DC9D88")
+            fur = Color(hex: dark ? "#D9824A" : "#EE9558")
+            stripe = Color(hex: dark ? "#A85A2C" : "#C96A33")
+            face = Color(hex: "#3A2015")
+            snore = Color(hex: dark ? "#C7B5A4" : "#A99686")
+        }
+    }
+
+    private func scene(time: TimeInterval) -> some View {
+        let dark = colorScheme == .dark
+        let colors = Colors(dark: dark)
+        let breath = 1 + 0.03 * CGFloat(sin(time * 1.2))
+        return Canvas { context, size in
+            // Aspect fill: the room always covers the frame, centred.
+            let scale = max(size.width / 318, size.height / 104)
+            context.translateBy(x: (size.width - 318 * scale) / 2, y: (size.height - 104 * scale) / 2)
+            context.scaleBy(x: scale, y: scale)
+
+            // Wall and floor.
+            let wall = Path(CGRect(x: -40, y: -20, width: 398, height: 104))
+            context.fill(wall, with: .linearGradient(
+                Gradient(colors: [colors.wallTop, colors.wallBottom]),
+                startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: 84)
+            ))
+            context.fill(Path(CGRect(x: -40, y: 84, width: 398, height: 40)), with: .color(colors.floor))
+
+            // Window.
+            let window = CGRect(x: 192, y: 10, width: 96, height: 56)
+            let frame = Path(roundedRect: window.insetBy(dx: -4, dy: -4), cornerRadius: 10)
+            context.fill(frame, with: .color(colors.windowFrame))
+            let pane = Path(roundedRect: window, cornerRadius: 7)
+            context.fill(pane, with: .linearGradient(
+                Gradient(colors: [colors.skyTop, colors.skyBottom]),
+                startPoint: CGPoint(x: 0, y: window.minY), endPoint: CGPoint(x: 0, y: window.maxY)
+            ))
+            var sky = context
+            sky.clip(to: pane)
+            if dark {
+                // A crescent: a full disc with a second disc cut out of it.
+                sky.drawLayer { layer in
+                    layer.fill(Path(ellipseIn: CGRect(x: 252, y: 18, width: 18, height: 18)), with: .color(Color(hex: "#F7E7C6")))
+                    layer.blendMode = .destinationOut
+                    layer.fill(Path(ellipseIn: CGRect(x: 258, y: 14, width: 17, height: 17)), with: .color(.black))
+                }
+                for (x, y, r) in [(206.0, 22.0, 1.1), (222.0, 46.0, 0.8), (240.0, 16.0, 0.9), (278.0, 50.0, 1.0), (232.0, 30.0, 0.7)] {
+                    let twinkle = 0.6 + 0.4 * sin(time * 1.3 + x)
+                    sky.fill(
+                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                        with: .color(Color(hex: "#F7E7C6").opacity(twinkle))
+                    )
+                }
+            } else {
+                sky.fill(Path(ellipseIn: CGRect(x: 250, y: 18, width: 22, height: 22)), with: .color(Color(hex: "#FFE3A3")))
+                sky.fill(
+                    Path(roundedRect: CGRect(x: 204, y: 44, width: 30, height: 7), cornerRadius: 3.5),
+                    with: .color(.white.opacity(0.85))
+                )
+            }
+            // Mullions.
+            var mullions = Path()
+            mullions.move(to: CGPoint(x: window.midX, y: window.minY))
+            mullions.addLine(to: CGPoint(x: window.midX, y: window.maxY))
+            mullions.move(to: CGPoint(x: window.minX, y: window.midY))
+            mullions.addLine(to: CGPoint(x: window.maxX, y: window.midY))
+            context.stroke(mullions, with: .color(colors.windowFrame), lineWidth: 3)
+
+            // The beam of light falling from the window onto the cushion.
+            var beam = Path()
+            beam.move(to: CGPoint(x: 192, y: 66))
+            beam.addLine(to: CGPoint(x: 288, y: 66))
+            beam.addLine(to: CGPoint(x: 226, y: 100))
+            beam.addLine(to: CGPoint(x: 96, y: 100))
+            beam.closeSubpath()
+            context.fill(beam, with: .linearGradient(
+                Gradient(colors: [colors.beam.opacity(dark ? 0.10 : 0.70), colors.beam.opacity(0)]),
+                startPoint: CGPoint(x: 240, y: 66), endPoint: CGPoint(x: 160, y: 104)
+            ))
+
+            // Cushion.
+            context.fill(Path(ellipseIn: CGRect(x: 92, y: 78, width: 124, height: 22)), with: .color(colors.cushionShade))
+            context.fill(Path(ellipseIn: CGRect(x: 96, y: 74, width: 116, height: 18)), with: .color(colors.cushion))
+
+            // The cat, breathing from the cushion up.
+            var cat = context
+            cat.translateBy(x: 0, y: 82)
+            cat.scaleBy(x: 1, y: breath)
+            cat.translateBy(x: 0, y: -82)
+
+            // Tail wrapped round the front.
+            var tail = Path()
+            tail.move(to: CGPoint(x: 192, y: 72))
+            tail.addCurve(to: CGPoint(x: 150, y: 84), control1: CGPoint(x: 204, y: 84), control2: CGPoint(x: 176, y: 88))
+            tail.addCurve(to: CGPoint(x: 140, y: 85), control1: CGPoint(x: 146, y: 84), control2: CGPoint(x: 143, y: 86))
+            // Body.
+            cat.fill(Path(ellipseIn: CGRect(x: 120, y: 54, width: 80, height: 30)), with: .color(colors.fur))
+            // Stripes over the back.
+            var stripes = Path()
+            for x in [154.0, 166.0, 178.0] {
+                stripes.move(to: CGPoint(x: x - 3, y: 56))
+                stripes.addQuadCurve(to: CGPoint(x: x + 1, y: 64), control: CGPoint(x: x + 2, y: 58))
+            }
+            cat.stroke(stripes, with: .color(colors.stripe), style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
+            cat.stroke(tail, with: .color(colors.fur), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            var tailTip = Path()
+            tailTip.move(to: CGPoint(x: 146, y: 85))
+            tailTip.addLine(to: CGPoint(x: 140, y: 85))
+            cat.stroke(tailTip, with: .color(colors.stripe), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            // Head tucked on the leading end, with two ears.
+            var ears = Path()
+            ears.move(to: CGPoint(x: 113, y: 62))
+            ears.addLine(to: CGPoint(x: 114, y: 47))
+            ears.addLine(to: CGPoint(x: 124, y: 56))
+            ears.closeSubpath()
+            ears.move(to: CGPoint(x: 130, y: 55))
+            ears.addLine(to: CGPoint(x: 140, y: 47))
+            ears.addLine(to: CGPoint(x: 142, y: 62))
+            ears.closeSubpath()
+            cat.fill(ears, with: .color(colors.fur))
+            cat.fill(Path(ellipseIn: CGRect(x: 110, y: 53, width: 34, height: 28)), with: .color(colors.fur))
+            // Closed eyes and a small nose.
+            var eyes = Path()
+            eyes.move(to: CGPoint(x: 116, y: 66))
+            eyes.addQuadCurve(to: CGPoint(x: 123, y: 66), control: CGPoint(x: 119.5, y: 69))
+            eyes.move(to: CGPoint(x: 131, y: 66))
+            eyes.addQuadCurve(to: CGPoint(x: 138, y: 66), control: CGPoint(x: 134.5, y: 69))
+            cat.stroke(eyes, with: .color(colors.face), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            cat.fill(Path(ellipseIn: CGRect(x: 125.5, y: 70, width: 3, height: 2.2)), with: .color(colors.face))
+
+            // Floating z z z, drifting up and fading out in turn.
+            for index in 0..<3 {
+                let phase = (time * 0.35 + Double(index) / 3).truncatingRemainder(dividingBy: 1)
+                let rise = CGFloat(phase) * 10
+                let alpha = time == 0 ? 0.85 - Double(index) * 0.2 : sin(phase * .pi)
+                let x = 104 - CGFloat(index) * 9
+                let y = 42 - CGFloat(index) * 9 - rise
+                context.draw(
+                    Text(verbatim: "z")
+                        .font(.system(size: 11 - CGFloat(index) * 1.5, weight: .heavy, design: .rounded))
+                        .foregroundColor(colors.snore.opacity(alpha)),
+                    at: CGPoint(x: x, y: y)
+                )
+            }
+        }
+    }
+}
+
 // A no-green Middle-earth impression built around weathered gold, volcanic rock and embers.
 private struct LotrStatusIllustration: View {
     let renderingMode: ThemeStatusArtworkRenderingMode
@@ -1290,13 +1659,13 @@ private struct LotrStatusIllustration: View {
                     LinearGradient(
                         colors: colorScheme == .dark
                             ? [Color(hex: "#090909"), Color(hex: "#231512"), Color(hex: "#4B1E15")]
-                            : [Color(hex: "#E8DFD0"), Color(hex: "#B7A995"), Color(hex: "#755A48")],
+                            : [Color(hex: "#EBDDBF"), Color(hex: "#C9A47A"), Color(hex: "#7A4A30")],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
 
                     Circle()
-                        .fill(Color(hex: "#D94A2E").opacity(colorScheme == .dark ? 0.24 : 0.16))
+                        .fill(Color(hex: "#D94A2E").opacity(colorScheme == .dark ? 0.24 : 0.18))
                         .frame(width: 78, height: 78)
                         .blur(radius: 12)
                         .position(x: size.width * 0.76, y: size.height * 0.48)
@@ -1312,7 +1681,7 @@ private struct LotrStatusIllustration: View {
                         path.addLine(to: CGPoint(x: size.width + 8, y: size.height + 4))
                         path.closeSubpath()
                     }
-                    .fill(Color(hex: colorScheme == .dark ? "#08090A" : "#4B4642").opacity(0.94))
+                    .fill(Color(hex: colorScheme == .dark ? "#08090A" : "#3F332B").opacity(0.94))
 
                     Path { path in
                         path.move(to: CGPoint(x: size.width * 0.75, y: size.height * 0.42))
@@ -1323,20 +1692,60 @@ private struct LotrStatusIllustration: View {
                         )
                     }
                     .stroke(
-                        LinearGradient(colors: [Color(hex: "#FFB14E"), Color(hex: "#B52B1D")], startPoint: .top, endPoint: .bottom),
+                        LinearGradient(colors: [Color(hex: "#FFD27A"), Color(hex: "#FF8A3D"), Color(hex: "#B52B1D")], startPoint: .top, endPoint: .bottom),
                         style: StrokeStyle(lineWidth: 3.2, lineCap: .round)
                     )
+                    .shadow(color: Color(hex: "#FF8A3D").opacity(0.7), radius: 4)
+
+                    // Molten crater glow on the summit.
+                    Ellipse()
+                        .fill(Color(hex: "#FFB14E").opacity(colorScheme == .dark ? 0.55 : 0.45))
+                        .frame(width: 16, height: 6)
+                        .blur(radius: 3)
+                        .position(x: size.width * 0.73, y: size.height * 0.37)
+
+                    // Warm halo behind the ring.
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color(hex: "#F0C46A").opacity(colorScheme == .dark ? 0.34 : 0.24), .clear],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: 52
+                            )
+                        )
+                        .frame(width: 104, height: 104)
+                        .opacity(0.75 + Double(glint) * 0.25)
+                        .position(x: ringX, y: ringY)
 
                     WeatheredRingView(glint: glint, colorScheme: colorScheme)
                         .position(x: ringX, y: ringY)
 
+                    // Near hills in front of the ring's lower edge.
+                    Path { path in
+                        path.move(to: CGPoint(x: -4, y: size.height + 4))
+                        path.addLine(to: CGPoint(x: -4, y: size.height * 0.86))
+                        path.addQuadCurve(
+                            to: CGPoint(x: size.width * 0.3, y: size.height * 0.88),
+                            control: CGPoint(x: size.width * 0.14, y: size.height * 0.76)
+                        )
+                        path.addQuadCurve(
+                            to: CGPoint(x: size.width * 0.62, y: size.height * 0.9),
+                            control: CGPoint(x: size.width * 0.46, y: size.height * 0.98)
+                        )
+                        path.addLine(to: CGPoint(x: size.width * 0.62, y: size.height + 4))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(hex: colorScheme == .dark ? "#050506" : "#30271F").opacity(0.9))
+
                     Canvas { context, canvas in
-                        for index in 0..<8 {
+                        for index in 0..<14 {
                             let phase = time * 0.42 + Double(index) * 0.73
-                            let x = canvas.width * (0.55 + CGFloat((index * 11) % 37) / 100)
+                            let x = canvas.width * (0.5 + CGFloat((index * 11) % 43) / 100)
                             let rise = CGFloat((phase.truncatingRemainder(dividingBy: 1.0))) * canvas.height * 0.58
                             let y = canvas.height * 0.96 - rise
-                            let ember = Path(ellipseIn: CGRect(x: x, y: y, width: 1.8, height: 1.8))
+                            let side: CGFloat = index.isMultiple(of: 3) ? 2.4 : 1.8
+                            let ember = Path(ellipseIn: CGRect(x: x, y: y, width: side, height: side))
                             context.fill(ember, with: .color(Color(hex: index.isMultiple(of: 2) ? "#FFB14E" : "#D84C2F").opacity(0.58)))
                         }
                     }
@@ -1374,6 +1783,15 @@ private struct WeatheredRingView: View {
                 .stroke(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.18), lineWidth: 1)
                 .padding(3)
 
+            // Faint fire-letter inscription along the band.
+            Ellipse()
+                .stroke(
+                    Color(hex: "#FF9A3D").opacity(0.35 + Double(glint) * 0.35),
+                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, dash: [2.2, 2.6])
+                )
+                .padding(1)
+                .shadow(color: Color(hex: "#FF8A3D").opacity(0.8), radius: 2)
+
             Group {
                 Capsule().frame(width: 7, height: 1.2).rotationEffect(.degrees(16)).position(x: 18, y: 13)
                 Capsule().frame(width: 6, height: 1.2).rotationEffect(.degrees(-10)).position(x: 29, y: 9)
@@ -1403,7 +1821,7 @@ private struct ThemeStatusArtworkGallery: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                ForEach(WeekTheme.allCases) { theme in
+                ForEach(WeekTheme.allCases.filter(\.isSelectable)) { theme in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(theme.displayName)
                             .font(.headline)

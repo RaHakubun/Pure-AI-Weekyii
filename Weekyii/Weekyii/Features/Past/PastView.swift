@@ -382,7 +382,7 @@ struct PastView: View {
 
     private var analyticsSection: some View {
         VStack(spacing: WeekSpacing.md) {
-            pastSurface {
+            pastSurface(tint: .accentOrange) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
                         Text("趋势与洞察")
@@ -444,7 +444,7 @@ struct PastView: View {
     // MARK: - Empty State
 
     private var monthReviewCard: some View {
-        pastSurface {
+        pastSurface(tint: .accentGreen) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -497,16 +497,16 @@ struct PastView: View {
     }
 
     /// 保留过去页既有卡片与信息顺序，只统一其表面材质、圆角、边界和阴影。
-    private func pastSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func pastSurface<Content: View>(tint: Color? = nil, @ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(WeekSpacing.base)
-            .weekPageSurface()
+            .weekPageSurface(tint: tint)
     }
 
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "clock.arrow.circlepath")
+                CatCoveredSymbol(systemName: "clock.arrow.circlepath", pointSize: 60)
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
                 
@@ -550,10 +550,11 @@ private struct PastWeekCard: View {
         NavigationLink {
             PastWeekDetailView(week: week)
         } label: {
-            WeekCard {
+            WeekCard(accentColor: week.expiredTasksCount > 0 ? .taskDDL : .accentGreen) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
-                        Image(systemName: "calendar.badge.checkmark")
+                        CatCoveredSymbol(systemName: "calendar.badge.checkmark", pointSize: 18)
+                            .font(.body)
                             .foregroundColor(.weekyiiPrimary)
                         Text(week.relativeWeekLabel(referenceDate: Date()))
                             .font(.titleSmall)
@@ -567,7 +568,7 @@ private struct PastWeekCard: View {
                     }
 
                     HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "clock")
+                        CatCoveredSymbol(systemName: "clock", pointSize: 13)
                             .font(.caption)
                             .foregroundColor(.textSecondary)
                         Text(formatDateRange())
@@ -592,7 +593,7 @@ private struct PastWeekCard: View {
 
                         Spacer()
 
-                        Image(systemName: "checkmark.seal.fill")
+                        CatCoveredSymbol(systemName: "checkmark.seal.fill", pointSize: 32)
                             .font(.system(size: 32))
                             .foregroundColor(.accentGreen.opacity(0.3))
                     }
@@ -815,6 +816,15 @@ struct PastCalendarDayLabel: View {
     let highlight: Highlight
     let summary: PastMonthDaySummary?
     let options: PastMonthMarkerOptions
+    @Environment(\.themeSkin) private var skin
+
+    /// 魔戒：选中日的数字压在绿皮面上，用皮面自己的墨色。
+    private var resolvedNumberColor: Color {
+        if highlight == .selected, let gilded = skin.gildedFill {
+            return gilded.ink.color
+        }
+        return numberColor
+    }
 
     private var visibleFace: PastDayFailureKind? {
         guard let failure = summary?.failure, options.showsFace(for: failure) else { return nil }
@@ -827,11 +837,20 @@ struct PastCalendarDayLabel: View {
                 ZStack {
                     switch highlight {
                     case .selected:
-                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .fill(Color.weekyiiPrimary)
+                        if let gilded = skin.gildedFill {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(gilded.gradient)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                        .strokeBorder(gilded.hairline.color, lineWidth: 1)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(Color.weekyiiPrimary)
+                        }
                     case .today:
                         RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .stroke(Color.weekyiiPrimary, lineWidth: 1.5)
+                            .stroke(skin.gildedFill != nil ? Color.weekyiiGilt : Color.weekyiiPrimary, lineWidth: 1.5)
                     case .none:
                         EmptyView()
                     }
@@ -839,7 +858,7 @@ struct PastCalendarDayLabel: View {
                     Text("\(dayNumber)")
                         .font(.body)
                         .fontWeight(isEmphasized ? .semibold : .regular)
-                        .foregroundStyle(numberColor)
+                        .foregroundStyle(resolvedNumberColor)
                 }
                 .frame(width: 38, height: 40)
 

@@ -20,9 +20,14 @@ struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
     @Environment(CloudSyncCoordinator.self) private var cloudSyncCoordinator
+    @Environment(PurchaseService.self) private var purchaseService
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var selectedTab: MainTab = .today
     @State private var accountResolutionPresentation: AccountResolutionPresentation?
+    /// The first-enable decision used to live only on the Settings screen; a
+    /// relaunch left sync silently waiting with no hint on the main screen.
+    @State private var showingInitialSyncDecision = false
+    @State private var showingSyncPaywall = false
 
     private var visualIdentity: String {
         "\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)"
@@ -72,8 +77,10 @@ struct ContentView: View {
         }
         .environment(\.weekyiiReduceMotion, reduceMotion)
         // Theme and appearance changes already invalidate this view through UserSettings.
-        // Keeping them in the identity destroys every tab's NavigationStack on selection.
-        .id(appState.dataRevision)
+        // Keyed on `structureRevision`, not `dataRevision`: rebuilding the TabView
+        // discards every tab's navigation stack, which is right after an archive
+        // import or a factory reset but wrong every time a sync pulls data down.
+        .id(appState.structureRevision)
         .environment(
             \.taskTypePresentationCatalog,
             TaskTypePresentationCatalog(definitions: taskTypeDefinitions)
@@ -81,6 +88,35 @@ struct ContentView: View {
         .tint(.weekyiiPrimary)
         .safeAreaInset(edge: .top, spacing: 0) {
             cloudSyncStatusBanner
+        }
+        .confirmationDialog(
+            initialSyncDecisionTitle,
+            isPresented: $showingInitialSyncDecision,
+            titleVisibility: .visible
+        ) {
+            switch cloudSyncCoordinator.status {
+            case .initialEnableDecisionRequired(.remoteEmpty):
+                Button(String(localized: "settings.icloud.decision.upload_local")) { resolveInitialSync(.uploadLocal) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteNonempty):
+                Button(String(localized: "settings.icloud.decision.use_local")) { resolveInitialSync(.useLocal) }
+                Button(String(localized: "settings.icloud.decision.use_cloud"), role: .destructive) { resolveInitialSync(.useCloud) }
+                Button(String(localized: "settings.icloud.decision.merge")) { resolveInitialSync(.merge) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteHasNewerData):
+                // No source-of-truth button: see CloudSyncInitialEnableDecision.
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialSync(.cancel) }
+            default:
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            }
+        } message: {
+            Text(initialSyncDecisionMessage)
+        }
+        .sheet(isPresented: $showingSyncPaywall) {
+            NavigationStack {
+                VIPServiceView(highlightedFeature: .cloudSync, showsCloseButton: true)
+            }
+            .environment(purchaseService)
         }
         .sheet(item: $accountResolutionPresentation, onDismiss: {
             cloudSyncCoordinator.deferAccountResolutionPresentation()
@@ -126,8 +162,14 @@ struct ContentView: View {
         Label {
             Text(title)
         } icon: {
-            Image(systemName: systemImage)
-                .symbolVariant(.none)
+            if userSettings.selectedTheme.skin.drawsMiddleEarthGlyphs, let glyph = LotrGlyph(systemName: systemImage) {
+                LotrTabIcon.image(glyph, fallbackSystemName: systemImage)
+            } else if userSettings.selectedTheme.skin.glyphs == .cat, let glyph = CatGlyph(tabSystemName: systemImage) {
+                CatTabIcon.image(glyph, fallbackSystemName: systemImage)
+            } else {
+                Image(systemName: systemImage)
+                    .symbolVariant(.none)
+            }
         }
     }
 
@@ -164,6 +206,20 @@ struct ContentView: View {
                     }
                     .font(.subheadline.weight(.semibold))
                     .accessibilityIdentifier("cloud.sync.banner.review")
+                } else if kind == .initialDecision {
+                    Button(String(localized: "settings.icloud.banner.initial_decision.open", defaultValue: "选择")) {
+                        showingInitialSyncDecision = true
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("cloud.sync.banner.initialDecision")
+                } else if kind == .locked {
+                    // Expired or refunded VIP: offer renewal right here instead of
+                    // making the user switch sync off and on to reach the paywall.
+                    Button(String(localized: "settings.icloud.banner.renew", defaultValue: "续订")) {
+                        showingSyncPaywall = true
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("cloud.sync.banner.renew")
                 } else if diagnostics.manualSyncAllowed {
                     Button {
                         Task { await cloudSyncCoordinator.syncNow() }
@@ -190,9 +246,30 @@ struct ContentView: View {
         case .quotaExceeded: String(localized: "settings.icloud.banner.quota")
         case .paused: failure?.localizedDescription ?? CloudSyncFailurePresentation(reason: .other).localizedDescription
         case .offline: String(localized: "settings.icloud.banner.offline")
-        case .accountUnavailable: String(localized: "settings.icloud.banner.account_unavailable")
+        case .accountUnavailable: accountUnavailableBannerMessage
         case .locked: String(localized: "settings.icloud.banner.locked")
         case .syncing: String(localized: "settings.icloud.banner.syncing")
+        case .initialDecision:
+            // A decision withheld because iCloud holds records this build cannot
+            // read must say so; the generic "waiting for you to choose" text would
+            // point at a choice that is deliberately not offered.
+            cloudSyncCoordinator.status == .initialEnableDecisionRequired(.remoteHasNewerData)
+                ? String(localized: "settings.icloud.decision.newer_data_title", defaultValue: "需要先更新 Weekyii")
+                : String(localized: "settings.icloud.banner.initial_decision", defaultValue: "iCloud 同步已开启，等待你选择以哪份数据为准。")
+        }
+    }
+
+    /// "Not signed in" and "iCloud is momentarily unreachable" both surface as
+    /// `.accountUnavailable`, but only the first is something the user can fix.
+    /// The generic copy sent people to check an account that was fine.
+    private var accountUnavailableBannerMessage: String {
+        switch cloudSyncCoordinator.diagnosticsSnapshot.account {
+        case .noAccount:
+            String(localized: "settings.icloud.banner.account_signed_out", defaultValue: "未登录 iCloud，同步已暂停。")
+        case .temporarilyUnavailable, .unableToCheck:
+            String(localized: "settings.icloud.banner.account_temporarily_unavailable", defaultValue: "暂时连不上 iCloud，稍后会自动重试。")
+        case .unchecked, .available, .restricted:
+            String(localized: "settings.icloud.banner.account_unavailable")
         }
     }
 
@@ -203,7 +280,35 @@ struct ContentView: View {
         case .offline: "wifi.slash"
         case .accountUnavailable, .locked: "icloud.slash"
         case .syncing: "arrow.triangle.2.circlepath.icloud"
+        case .initialDecision: "questionmark.circle"
         }
+    }
+
+    private var initialSyncDecisionTitle: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_title")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_title")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.decision.newer_data_title", defaultValue: "需要先更新 Weekyii")
+        default: String(localized: "settings.icloud.decision.title")
+        }
+    }
+
+    private var initialSyncDecisionMessage: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_message")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_message")
+        case .initialEnableDecisionRequired(.remoteHasNewerData):
+            String(
+                localized: "settings.icloud.decision.newer_data_message",
+                defaultValue: "iCloud 中有本版本无法读取的数据，可能由更新版本的 Weekyii 写入。为避免删除这些数据，暂时不能选择以哪份数据为准。请升级 Weekyii 后再开启同步。"
+            )
+        default: ""
+        }
+    }
+
+    private func resolveInitialSync(_ choice: CloudSyncInitialEnableChoice) {
+        showingInitialSyncDecision = false
+        Task { await cloudSyncCoordinator.resolveInitialEnable(choice) }
     }
 
     private func presentAccountResolution() {
@@ -218,8 +323,15 @@ private struct CloudAccountResolutionSheet: View {
     @Environment(\.dismiss) private var dismiss
     let coordinator: CloudSyncCoordinator
     @State private var isResolving = false
+    @State private var confirmingUseLocal = false
 
     private var context: CloudAccountResolutionContext? { coordinator.accountResolutionContext }
+
+    /// "Use this device's data" deletes the new account's Weekyii zone before
+    /// uploading. When that zone holds data it is as destructive as "use iCloud".
+    private var useLocalDeletesCloudData: Bool {
+        (context?.targetCloudEntityCount ?? 0) > 0
+    }
 
     var body: some View {
         NavigationStack {
@@ -313,15 +425,35 @@ private struct CloudAccountResolutionSheet: View {
 
     private var resolutionActions: some View {
         VStack(spacing: 10) {
-            Button {
-                resolve(.useLocal)
+            Button(role: useLocalDeletesCloudData ? .destructive : nil) {
+                if useLocalDeletesCloudData {
+                    confirmingUseLocal = true
+                } else {
+                    resolve(.useLocal)
+                }
             } label: {
                 Label("cloud.accountSwitch.useLocal", systemImage: "iphone")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             .disabled(isResolving || !canResolveTarget)
             .accessibilityIdentifier("cloud.accountSwitch.useLocal")
+            .confirmationDialog(
+                String(localized: "cloud.accountSwitch.useLocal.confirm.title", defaultValue: "用本机数据覆盖这个 iCloud 账户？"),
+                isPresented: $confirmingUseLocal,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "cloud.accountSwitch.useLocal.confirm.action", defaultValue: "删除 iCloud 中的数据并上传本机"), role: .destructive) {
+                    resolve(.useLocal)
+                }
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            } message: {
+                Text(String(
+                    format: String(localized: "cloud.accountSwitch.useLocal.confirm.message", defaultValue: "这个 iCloud 账户里现有 %lld 项 Weekyii 数据，将被删除并替换为本机数据。此操作无法撤销。"),
+                    locale: Locale.current,
+                    Int64(context?.targetCloudEntityCount ?? 0)
+                ))
+            }
 
             Button {
                 resolve(.useCloud)
@@ -356,7 +488,18 @@ private struct CloudAccountResolutionSheet: View {
     }
 
     private var canResolveTarget: Bool {
-        context?.targetAccountAvailable == true && !coordinator.accountResolutionJournalUnavailable
+        context?.targetAccountAvailable == true
+            && !coordinator.accountResolutionJournalUnavailable
+            && !isResolutionBlockedByNewerData
+    }
+
+    /// Every choice on this sheet would delete the target zone or apply the part
+    /// of it this build can read. When the zone holds records it cannot read,
+    /// none of them is safe, so the buttons are disabled rather than left
+    /// looking available while the coordinator silently refuses the tap.
+    private var isResolutionBlockedByNewerData: Bool {
+        guard case .failed(.cloudHasNewerData)? = context?.progress else { return false }
+        return true
     }
 
     private func resolve(_ choice: CloudAccountResolutionChoice) {

@@ -211,7 +211,7 @@ final class TodayViewModel {
         }
 
         try DayStartService(modelContext: modelContext, appState: appState)
-            .start(day: day, at: timeProvider.now, executionMode: userSettings.defaultExecutionMode)
+            .start(day: day, at: timeProvider.now, executionMode: userSettings.effectiveDefaultExecutionMode)
         reconcileNotificationsAfterMutation(for: day)
         syncToday()
     }

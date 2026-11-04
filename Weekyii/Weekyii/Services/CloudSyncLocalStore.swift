@@ -21,7 +21,19 @@ final class SwiftDataCloudSyncLocalStore: CloudSyncLocalStore {
 
     /// Applies normalized business entities directly to the existing canonical
     /// ModelContext. It never touches UserSettings/AppState or replaces the store.
+    /// All-or-nothing. A failed save used to leave the half-applied graph in the
+    /// context, where the next ordinary save would persist it and the next cycle
+    /// would upload it as a local edit.
     func apply(_ snapshot: WeekyiiBusinessSnapshot) throws {
+        do {
+            try applyAndSave(snapshot)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    private func applyAndSave(_ snapshot: WeekyiiBusinessSnapshot) throws {
         let current = try currentSnapshot()
         guard current != snapshot else { return }
 

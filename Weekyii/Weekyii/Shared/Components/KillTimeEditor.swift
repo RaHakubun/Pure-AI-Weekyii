@@ -44,6 +44,7 @@ struct KillTimeEditor: View {
     var rangeAnchorMinutes: Int? = nil
     let onChange: (Int, Int) -> Void
     var onEditingChanged: ((Bool) -> Void)? = nil
+    @Environment(\.themeSkin) private var skin
 
     // MARK: - Computed Properties
 
@@ -81,7 +82,7 @@ struct KillTimeEditor: View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             // 时间显示：点按大号时间即可用系统选择器精确输入
             Text(String(format: "%02d:%02d", hour, minute))
-                .font(.system(size: 40, weight: .semibold, design: .serif))
+                .font(.system(size: 40, weight: skin.glyphs == .lotr ? .bold : .semibold, design: skin.glyphs == .lotr ? .default : .serif))
                 .foregroundColor(.textPrimary)
                 .monospacedDigit()
                 .accessibilityIdentifier("killTimeDisplay")
@@ -658,7 +659,9 @@ struct KillTimeFirePalette {
     /// Overall silhouette opacity — raised to make fire genuinely visible.
     let opacity: Double
 
-    init(theme _: WeekTheme, isDark: Bool) {
+    init(theme: WeekTheme, isDark: Bool) {
+        // 火焰是「时间压力」的状态色，不属于任何一套纸张配色：所有主题用同一组
+        // 温度梯度，换主题时它不该跟着变成土褐或墨绿。
         glow      = Color(hex: isDark ? "C03010" : "CC3A10")
         outer     = Color(hex: isDark ? "F04010" : "F25220")
         body      = Color(hex: isDark ? "FF8018" : "FF8C22")

@@ -102,7 +102,12 @@ enum TodayActivitySnapshotBuilder {
             liveTheme: theme.liveActivityThemeSnapshot(appearanceMode: appearanceMode),
             typeName: typeDefinition?.name,
             typeIconName: typeDefinition?.iconName,
-            typeColorHex: typeDefinition?.colorHex,
+            // The island is always dark, so a themed built-in colour uses the dark palette.
+            typeColorHex: theme.themedTypeColorHex(
+                storedHex: typeDefinition?.colorHex,
+                baseKind: typeDefinition?.baseKind ?? focus.taskType,
+                isDark: true
+            ),
             dayStartedAt: day.initiatedAt,
             nextTitle: day.frozenTasks.first?.title,
             // The language the app UI is actually running in (honours the in-app
@@ -471,6 +476,9 @@ final class AppHealthCoordinator: AppHealthCoordinating {
     private func attemptAutomaticStartIfEligible(canMarkNoTasksAsSkipped: Bool) {
         guard let settings = autoStartSettings,
               settings.autoStartConfiguration.isEnabled else { return }
+        // Flexible mode is VIP: wait for this launch's StoreKit resolution instead of
+        // trusting the persisted mirror. The minute tick retries shortly after.
+        if settings.defaultExecutionMode == .flexible, !settings.vipAccessResolved { return }
 
         let now = timeProvider.now
         let today = WeekyiiTimeZone.calendar.startOfDay(for: now)
@@ -514,9 +522,16 @@ final class AppHealthCoordinator: AppHealthCoordinating {
 
         do {
             try DayStartService(modelContext: modelContainer.mainContext, appState: appState)
-                .start(day: day, at: startTime, executionMode: settings.defaultExecutionMode)
+                .start(day: day, at: startTime, executionMode: settings.effectiveDefaultExecutionMode)
         } catch {
             recordAutoStartFailure("启动托管未能启动今日任务：\(error.localizedDescription)")
+            return
+        }
+
+        // The user never confirms this start, so announce the task it locked in.
+        let focusTitle = day.focusTask?.title ?? validDraftTasks.first?.title ?? ""
+        if !focusTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notificationService.notifyAutomaticStart(dayId: dayId, focusTitle: focusTitle)
         }
     }
 
@@ -603,7 +618,18 @@ struct WeekyiiApp: App {
         _appState = StateObject(wrappedValue: appState)
         let userSettings = UserSettings()
         _userSettings = StateObject(wrappedValue: userSettings)
-        _cloudSyncCoordinator = State(initialValue: CloudSyncCoordinator(settings: userSettings))
+        let cloudSyncCoordinator = CloudSyncCoordinator(
+            settings: userSettings,
+            entitlementProvider: StoreKitCloudSyncEntitlementProvider()
+        )
+        _cloudSyncCoordinator = State(initialValue: cloudSyncCoordinator)
+        if !Self.isRunningTests {
+            let purchaseService = PurchaseService.shared
+            purchaseService.onAccessChanged = { _ in
+                await cloudSyncCoordinator.entitlementDidChange()
+            }
+            purchaseService.start(settings: userSettings)
+        }
         if !Self.isUITesting && !Self.isRunningTests {
             Self.registerLiveActivityIntentBridge(appState: appState, userSettings: userSettings)
         }
@@ -643,6 +669,7 @@ struct WeekyiiApp: App {
                     .environmentObject(appState)
                     .environmentObject(userSettings)
                     .environment(cloudSyncCoordinator)
+                    .environment(PurchaseService.shared)
                     .modelContainer(modelContainer)
                     .preferredColorScheme(userSettings.effectiveColorScheme)
                     // Personalised themes restyle every SF Symbol at once via the
@@ -678,9 +705,15 @@ struct WeekyiiApp: App {
                         await cloudSyncCoordinator.handle(.appLaunch)
                         appDelegate.attach(coordinator: cloudSyncCoordinator)
                     }
+                    .onReceive(NotificationCenter.default.publisher(for: CloudSyncLocalReplacementGuard.didSuspendSyncNotification)) { _ in
+                        // Archive import / recovery restore already switched the
+                        // setting off; drop the coordinator's session and status too.
+                        Task { await cloudSyncCoordinator.setRequested(false) }
+                    }
                     .onChange(of: scenePhase) { _, newPhase in
                         guard !Self.isRunningTests else { return }
                         if newPhase == .active {
+                            Task { await PurchaseService.shared.refreshAccess() }
                             Task { await cloudSyncCoordinator.handle(.sceneActive) }
                             _ = appHealthCoordinator?.reconcile(trigger: .sceneActive, force: false)
                             refreshWidgetSnapshot(modelContainer: modelContainer)

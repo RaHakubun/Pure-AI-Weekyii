@@ -19,23 +19,60 @@ struct WeekLogo: View {
     let animated: Bool
     
     @State private var isAnimating = false
+    @Environment(\.themeSkin) private var skin
+
+    private var isLotr: Bool { skin.glyphs == .lotr }
+    private var isCat: Bool { skin.glyphs == .cat }
+
+    private var logoGradient: LinearGradient {
+        if isLotr {
+            // Quiet, readable antique gold in both appearances.
+            return LinearGradient(
+                colors: [Color.weekyiiPrimary, Color.weekyiiPrimary],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        if isCat {
+            // Ginger fur, lighter at the top like a sunlit back.
+            return LinearGradient(
+                colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        return LinearGradient(
+            colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
     
     init(size: Size = .large, animated: Bool = true) {
         self.size = size
         self.animated = animated
     }
     
+    @ViewBuilder
+    private var wordmark: some View {
+        if skin.isQuenya {
+            Text("Weekyii")
+                .font(.custom("Cinzel-Regular", size: size.fontSize * 1.05))
+        } else if isCat {
+            // A round, upright wordmark; the ears sit on the W.
+            Text("Weekyii")
+                .font(.system(size: size.fontSize * 1.05, weight: .heavy, design: .rounded))
+        } else {
+            Text("Weekyii")
+                .font(.system(size: size.fontSize * 1.05, weight: isLotr ? .bold : .semibold, design: .serif))
+                .italic()
+        }
+    }
+
     var body: some View {
-        Text("Weekyii")
-            .font(.system(size: size.fontSize * 1.05, weight: .semibold, design: .serif))
-            .italic()
-            .foregroundStyle(
-                LinearGradient(
-                    colors: [Color.weekyiiPrimary, Color.weekyiiPrimaryLight],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+        wordmark
+            .foregroundStyle(logoGradient)
+            .overlay(alignment: .topLeading) { catEars }
             .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.25), radius: 10, x: 0, y: 6)
             .offset(y: animated && isAnimating ? -3 : 3)
             .animation(
@@ -50,6 +87,22 @@ struct WeekLogo: View {
     }
 }
 
+extension WeekLogo {
+    /// 猫猫：两只耳朵立在 "W" 的两个尖上。只是叠加层，不改变字标尺寸。
+    @ViewBuilder
+    fileprivate var catEars: some View {
+        if isCat {
+            CatEarPairShape()
+                .fill(Color.weekyiiPrimaryLight)
+                .frame(width: size.fontSize * 0.95, height: size.fontSize * 0.3)
+                .padding(.leading, size.fontSize * 0.04)
+                .offset(y: -size.fontSize * 0.08)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 // MARK: - WeekLogoWithIcon - 带图标的品牌标识
 
 struct WeekLogoWithIcon: View {
@@ -61,7 +114,7 @@ struct WeekLogoWithIcon: View {
     
     var body: some View {
         HStack(spacing: WeekSpacing.sm) {
-            Image(systemName: "calendar")
+            CatCoveredSymbol(systemName: "calendar", pointSize: size.fontSize)
                 .font(.system(size: size.fontSize))
                 .foregroundStyle(Color.weekyiiPrimary)
             

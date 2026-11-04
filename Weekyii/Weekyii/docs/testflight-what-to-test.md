@@ -3,121 +3,123 @@
 用于 App Store Connect → TestFlight → 构建版本 → 测试内容。
 每次发版替换顶部的版本号，并增删对应模块即可。
 
-当前版本：**1.0 (5)** · 主要语言：简体中文
+当前版本：**1.2 (6)** · 主要语言：简体中文
 
 ---
 
 ## 简体中文（可直接粘贴）
 
-本次更新包含四块内容：**4 个全新个性化主题**、**设置页扩充**、**悬置箱提醒与到期处理**、**本周结构树绘制修复**。请重点测试以下场景。
+1.2 (6) 来了。这一版把「外观」做成了一个真正的主题世界——魔戒重做成西界红皮书，猫猫和指环王两个新主题上线；同时把 iCloud 同步又拧紧了一圈。
 
-### 一、4 个全新个性化主题
+请通过 TestFlight **直接覆盖更新，不要卸载**。更新后先确认旧数据、旧的主题选择都还在，再往下测。本版不改动数据结构，升级无感过渡。
 
-设置页新增「粗野 / 霓虹 / 纸感 / 终端」四个主题，它们不只是换配色，圆角、描边、阴影和图标形态都不同。
+### 一、魔戒：西界红皮书
 
-1. 在主题选择处依次切换到这四个主题，确认每个主题的整体观感确实不同，而不是只有颜色变化。
-2. 切到新主题后进入「今日」页，查看状态插图；再依次打开「本周」「扩展」「悬置箱」，确认文字与背景对比度清晰、没有看不清的浅色字。
-3. 每个新主题都分别在浅色与深色模式下各看一遍。
-4. 切换主题后回到桌面查看小组件，颜色应与 App 内一致。
-5. 开启「减少动效」后，状态插图与磁贴的动画应全部停止。
+魔戒主题整块重做：电影道具感的图标、羊皮纸与皮面材质、蜡封、丝带书签，卡片带四面墨框，任务行回到账本线。
 
-### 二、设置页新增项
+1. 切到「魔戒」，依次看「今日」「本周」「扩展」「过去」「设置」，确认羊皮纸底纹、墨框与书页瓦片都在，不是只换了配色。
+2. 切到深色模式，确认是「伊希尔丁之夜」那一套，而不是简单反色。
+3. 「今日」页的截止时间火焰、蜡封、状态插图是否协调，有没有压字或错位。
+4. 拖动截止时间滑块，火焰应即时跟随，取消后回到原值。
 
-1. **语言**：新增界面语言选项，切换后需要**完全退出并重新打开** Weekyii 才会生效，请确认提示与实际表现一致。
-2. **动效**：新增「减少动效」（停止主题背景、转场、磁贴翻转动画）与「模块磁贴自动轮换」两个开关，改动应立即生效；「减少动效」开启后磁贴轮换也应一并停止。
-3. **悬置箱**：新增默认倒计时、到期处理方式、到期提醒（开关 / 强度 / 提前天数 / 当晚提醒时刻）。
-4. **项目看板**：新增每行列数（2–6）、默认颜色、默认图标；列数调小后磁贴应变大，宽幅磁贴应自动收窄而不越界。
-5. **使用历程**：新增恢复点保留数量。
-6. 改完上述设置后，**强制退出 App 再重开**，所有设置应完整保留。
+### 二、两个新主题：猫猫 / 指环王
 
-### 三、悬置箱提醒与到期处理
+1. 「猫猫」：午睡橘猫主题，检查插图、卡片底色与文字对比度，浅色 / 深色各看一遍。
+2. 「指环王」：至尊戒·黑金，黑漆底加单一金色，检查金色描边在深色下是否过亮、浅色下是否发灰。
+3. 两个主题都要确认：图标、圆角、阴影确实跟着变，而不只是换色。
 
-1. 把「到期处理方式」设为**保留为逾期待处理**，让一个悬置任务过期：它应继续留在悬置箱并显示「已逾期 N 天」，且仍可续期 / 分配 / 删除。
-2. 改回**到期自动删除**，过期任务应直接消失、不留记录。
-3. 把「提醒强度」依次切到精简 / 标准 / 充分，确认实际收到提醒的时机与设置页的描述文字一致。
-4. 新建悬置任务时，倒计时默认值应等于设置里的「悬置箱默认倒计时」，且在保存前仍可单独调整。
-5. 关闭「到期提醒」后，不应再收到任何悬置任务的到期提醒。
+### 三、蓝图主题退役
 
-### 四、本周结构树（全屏视图）
+1. 如果你之前选的是「蓝图」，更新后应自动落到「琥珀」，且不再出现在主题列表里。
+2. 选别的主题、重启 App，选择应被记住。
 
-1. 打开本周结构树全屏视图：相邻日期的任务卡不应再互相压叠；紧凑日期卡的文字（如「14日 · 2」）不应折行或撞到角标。
-2. **请特别留意连线**：连接线不应穿过日期卡、分组节点或任务卡。
-3. 轻点某一天，应聚焦到该天的任务子树；不应出现「点了没反应」。
-4. 轻点任务卡，应显示任务详情，**不应**显示「任务已遗忘」。
-5. 已知限制：一天任务较多（≥4 个）时，子树装不下紧凑画布，需要拖动查看后续行。
+### 四、VIP 与内购（沙箱）
 
-### 五、其他改动
+这一版是 Beta 配置，**在 TestFlight 里会自动获得 VIP，不需要购买**。所以你会直接看到 VIP 主题和 iCloud 同步可用。
 
-1. 扩展页的模块磁贴应每隔几秒轮换展示真实内容；关闭「模块磁贴自动轮换」后应停止轮换。
-2. 关闭「开始仪式」后，确认警告提示应直接开始一天，不再弹出印章。
-3. 请留意 App 图标已更换。
-4. 沿用上一版：iCloud 自动同步请再做一次回归（新建 / 修改 / 删除任务、项目、呆胶布、悬置任务，另一端应自动出现相同变更；带附件的任务在另一台设备应能正常打开）。
-5. 从上一版（1.0 构建 4）**直接覆盖安装，不要卸载**：原有周、日、任务、项目、附件与全部设置应完整保留。
+1. 先确认 VIP 状态：设置页「VIP 服务」应显示已开通，七个 VIP 主题（魔戒 / 猫猫 / 指环王 / 粗野 / 霓虹 / 纸感 / 终端）都能直接选。
+2. 打开 VIP 页，确认月 / 季 / 年 / 终身四档都显示价格，年订阅标着 2 周免费试用。
+3. 想顺带验证购买流程的话，可以走一次沙箱购买（不会真实扣款），确认购买后权益仍然正常、主题不解锁异常。
+4. 点「恢复购买」，确认不报错；哪一档没显示价格或没显示试用，截图告诉我是哪一档。
+
+### 五、iCloud 同步（本轮重点）
+
+这一轮修的是「同步不该悄悄弄坏数据」。
+
+1. 两台设备新增 / 编辑 / 删除任务、项目、心印，另一端应自动收敛，不出现重复或回滚。
+2. 断开网络改几条，再联网，确认改动补传、没有互相覆盖。
+3. 在设置里切换 iCloud 账号：应弹二次确认，切完后本地数据不丢，旧账号的数据不被写进新账号。
+4. 带附件的任务在另一台设备应能正常打开（附件按内容哈希校验）。
+
+### 六、数据与覆盖安装（老规矩）
+
+1. 从上一版（1.2 (4) 或 1.2 (5)）覆盖安装：周、日、任务、项目、附件、习惯、设置、主题选择，一个都不该少。
+2. 开启 iCloud 的两台设备都覆盖安装，再各自改一次数据，确认双向同步。
 
 ### 反馈时请附上
 
-设备型号与系统版本、构建号 1.0 (5)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。
+设备型号与系统版本、构建号 1.2 (6)、复现步骤、截图或录屏；若崩溃请附上 TestFlight 的崩溃记录。上一版启动崩溃的修复就在这条链路上，任何闪退都请立刻反馈。
 
 ---
 
 ## 已知问题（可选，按需保留或删除）
 
-- 英文语言环境下，部分新增文案（主题名、设置项）仍显示中文，本地化尚未完成，正在修复中。
-- 本周结构树中，一天任务较多时子树需要拖动查看，属当前画布尺寸的物理限制。
-- iCloud 同步为自动开启、无开关；未登录 iCloud 时 App 仍可正常本地使用。
+- 蓝图主题已退役，旧选择会自动归到琥珀。
+- iCloud 同步属于 VIP 能力，未购买时本地使用不受影响。
+- 模拟器与真机的栈大小不同（8 MB vs 1 MB），启动类问题只能靠真机验证。
 
 ---
 
 ## English (optional — fill if the app ships an English localization)
 
-This update has four focus areas: **four new personalised themes**, **expanded settings**, **suspended-box reminders and expiry handling**, and **Week Topology drawing fixes**.
+1.2 (6) is here. This release turns appearance into a real theme world — the Lord of the Rings theme is rebuilt as the Red Book of Westmarch, and two new themes arrive: Catnap and the One Ring. iCloud sync also gets another round of hardening.
 
-### 1. Four new personalised themes
+Please update **directly over the previous build — do not uninstall**. Confirm your data and theme choice survived, then work through the list. No data-schema changes.
 
-Settings now offers "Brutal / Neon / Paper / Terminal". These change corner radius, borders, shadows and icon form — not just the palette.
+### 1. The Red Book of Westmarch
 
-1. Switch through all four and confirm each one looks genuinely different, not merely recoloured.
-2. Open Today to see the status artwork, then Week / Extensions / Suspended Box — check text contrast is readable everywhere.
-3. Check each new theme in both light and dark appearance.
-4. Check the home-screen widget matches the in-app theme.
-5. With "Reduce motion" on, status artwork and tile animations must stop.
+The Lord of the Rings theme is rebuilt: prop-style glyphs, parchment and leather surfaces, a wax seal, a ribbon bookmark, ink borders on cards, ledger rules back in task rows.
 
-### 2. New settings
+1. Switch to "Ringbearer" and visit Today / Week / Extensions / Past / Settings; parchment, ink borders and page tiles must all be there — not just a palette swap.
+2. Switch to dark appearance: it should be the Ithildin night set, not a plain inversion.
+3. Check the deadline flame, wax seal and status artwork on Today — no overlapping text, no misalignment.
+4. Drag the deadline slider: the flame must follow immediately; cancelling restores the previous value.
 
-1. **Language** — takes effect only after a full quit and relaunch; confirm the hint matches reality.
-2. **Motion** — "Reduce motion" and "Module tile auto-rotation"; changes apply immediately, and reduce motion should also stop tile rotation.
-3. **Suspended box** — default countdown, expiry policy, due reminders (toggle / intensity / advance days / evening time).
-4. **Project board** — columns per row (2–6), default colour, default icon. Fewer columns should enlarge tiles; wide tiles should narrow instead of overflowing.
-5. **Usage history** — recovery point retention count.
-6. Force-quit and relaunch: every setting must persist.
+### 2. Two new themes: Catnap and Lord of the Rings
 
-### 3. Suspended-box reminders and expiry
+1. "Catnap" — a napping ginger cat theme. Check artwork, card surfaces and contrast in both appearances.
+2. "Lord of the Rings" — black lacquer with a single gold. Check the gold strokes are neither blown out in dark nor muddy in light.
+3. Both must change glyphs, radii and shadows, not only colours.
 
-1. Set the expiry policy to **keep as overdue**: an expired suspended task must stay in the box showing "overdue by N days", still renew / assign / deletable.
-2. Switch back to **auto-delete**: expired tasks disappear with no record.
-3. Cycle reminder intensity through Minimal / Standard / Full; actual reminder timing must match the description on the settings screen.
-4. New suspended tasks must default to the configured countdown, still adjustable before saving.
-5. With due reminders off, no suspended-box notifications should arrive.
+### 3. Blueprint retired
 
-### 4. Week Topology (full-screen)
+1. If you had "Blueprint" selected, you should land on "Amber" after updating, and Blueprint should no longer be listed.
+2. Pick another theme, relaunch, and confirm the choice persists.
 
-1. Task cards for adjacent days must no longer overlap; compact day cards (e.g. "14 · 2") must not wrap or hit the badge.
-2. **Watch the connectors specifically**: no line should cross a day card, group node or task card.
-3. Tapping a day should focus that day's task subtree — no "nothing happens".
-4. Tapping a task card must show task details, **not** "task forgotten".
-5. Known limit: with four or more tasks in a day the subtree does not fit the compact canvas and must be scrolled.
+### 4. VIP and purchases (sandbox)
 
-### 5. Other changes
+Personalised themes, iCloud sync and Flexible mode are VIP features. Please walk the real purchase flow with a sandbox account.
 
-1. Extensions module tiles should rotate through real content; turning off auto-rotation stops it.
-2. With the start ritual disabled, confirming the warning starts the day directly with no stamp.
-3. Note the app icon has changed.
-4. iCloud sync regression (unchanged from the previous build): create / edit / delete tasks, projects, MindStamps and suspended tasks on device A — device B must receive the same changes; attachments must open on the other device.
-5. **Install over the previous build (1.0 build 4) without uninstalling**: existing weeks, days, tasks, projects, attachments and all settings must be preserved.
+1. Open the VIP page: monthly / quarterly / yearly / lifetime must all show prices; yearly carries the 14-day free trial note.
+2. Buy one plan (sandbox does not charge you) and confirm themes unlock immediately and sync becomes available.
+3. Tap "Restore Purchases"; then sign in on a second device with the same Apple Account — the entitlement should follow.
+4. If any plan shows no price or no trial, screenshot which one.
+
+### 5. iCloud sync (focus of this release)
+
+1. Create / edit / delete tasks, projects and MindStamps on two devices; both sides must converge with no duplicates or rollbacks.
+2. Go offline, make changes, come back online: changes must upload without overwriting each other.
+3. Switch the iCloud account in Settings: a second confirmation appears, local data survives, and the old account's data is not written into the new one.
+4. Attachments must open on the other device (blobs are verified by content hash).
+
+### 6. Data and over-install (as always)
+
+1. Install over 1.2 (4): weeks, days, tasks, projects, attachments, habits, settings and theme choice — nothing should go missing.
+2. On both iCloud devices, install over the previous build, then change data on each side and confirm two-way sync.
 
 ### When reporting
 
-Include device model and OS version, build number 1.0 (5), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log.
+Include device model and OS version, build number 1.2 (6), reproduction steps, and screenshots or a screen recording. For crashes, attach the TestFlight crash log. The previous launch-crash fix lives on this same path — report any crash immediately.
 
 ---
 

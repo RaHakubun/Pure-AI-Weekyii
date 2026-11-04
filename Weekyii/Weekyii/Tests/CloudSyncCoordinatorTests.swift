@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import XCTest
 @testable import Weekyii
@@ -78,7 +79,7 @@ final class CloudSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .locked(.notPurchased), requested: true, requiresAccountResolution: false), .locked)
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .pausedAfterFailure, requested: true, requiresAccountResolution: false), .paused)
         XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .quotaExceeded, requested: true, requiresAccountResolution: true), .accountDecision)
-        XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: true, requiresAccountResolution: false), nil)
+        XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: true, requiresAccountResolution: false), .initialDecision)
     }
 
     func test_diagnosticsManualSyncRequiresSafeRequestedSession() {
@@ -419,6 +420,231 @@ final class CloudSyncCoordinatorTests: XCTestCase {
         XCTAssertTrue(harness.settings.cloudSyncRequested)
         let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.accountRecordName))
         XCTAssertEqual(metadata.entityBaselines.count, 2)
+    }
+
+    // MARK: Records this build cannot read
+
+    /// N1-for-deletion: `merge` used to call `resetCustomZone()`, which deletes
+    /// every record in the zone — including records this build cannot decode,
+    /// which never made it into the merged snapshot and so were never uploaded
+    /// again. The decision is now withheld instead of acting on a partial view.
+    func test_mergeIsRefusedWhenTheZoneHoldsRecordsThisBuildCannotRead() async throws {
+        let local = CloudSyncEntity.task(makeTask(title: "local"))
+        let remote = try CloudRecordCodec.encode(.task(makeTask(title: "cloud readable")))
+        let base = InMemoryCloudSyncTransport(seedRecords: [remote])
+        let transport = QuarantiningZoneTransport(base: base, undecodableRecordNames: ["wy1_written_by_newer_build"])
+        let harness = try await makeHarness(local: [local], customTransport: transport, memoryTransport: base)
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteHasNewerData))
+
+        await harness.coordinator.resolveInitialEnable(.merge)
+
+        let resets = await transport.resetCount()
+        XCTAssertEqual(resets, 0, "the zone must not be reset while it holds records this build cannot read")
+        let remoteAfter = await base.remoteRecords()
+        XCTAssertEqual(remoteAfter, [remote], "the readable record must survive untouched")
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"], "local data must not be half-merged")
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteHasNewerData))
+        XCTAssertTrue(harness.settings.cloudSyncRequested, "refusing is not the same as turning sync off")
+    }
+
+    /// A zone holding only unreadable records used to look empty, so the user was
+    /// told "iCloud has no data" and offered "upload this device".
+    func test_zoneWithOnlyUnreadableRecordsIsNotReportedAsEmpty() async throws {
+        let base = InMemoryCloudSyncTransport()
+        let transport = QuarantiningZoneTransport(base: base, undecodableRecordNames: ["wy1_written_by_newer_build"])
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteHasNewerData))
+        XCTAssertNotEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteEmpty))
+    }
+
+    /// The account-switch flow reaches the same destructive `resetCustomZone()`,
+    /// so it needs the same precondition. Blocking is reported through the
+    /// resolution context, which is what the sheet renders.
+    func test_accountSwitchIsBlockedWhenTargetZoneHoldsUnreadableRecords() async throws {
+        let localTask = makeTask(title: "local")
+        let harness = try await makeHarness(
+            local: [.task(localTask)],
+            remote: [try CloudRecordCodec.encode(.task(localTask))],
+            requested: true
+        )
+        try await connectAccountA(harness, entities: [.task(localTask)])
+
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(.task(makeTask(title: "cloud B")))])
+        _ = try await base.ensureInfrastructure()
+        let wrapped = QuarantiningZoneTransport(base: base, undecodableRecordNames: ["wy1_written_by_newer_build"])
+        await harness.transportFactory.setTransport(wrapped, forAccountRecordName: "account-B")
+
+        let context = await beginAccountSwitch(harness, to: "account-B")
+
+        XCTAssertEqual(context?.progress, .failed(.cloudHasNewerData))
+        let resetsAfterPrepare = await wrapped.resetCount()
+        XCTAssertEqual(resetsAfterPrepare, 0)
+
+        await harness.coordinator.resolveAccountSwitch(.merge)
+
+        let resetsAfterChoice = await wrapped.resetCount()
+        XCTAssertEqual(resetsAfterChoice, 0, "a blocked context must not let a choice reach the zone reset")
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"])
+        let targetRecords = await base.remoteRecords()
+        XCTAssertEqual(try targetRecords.map { try taskTitle(from: $0) }, ["cloud B"])
+    }
+
+    /// The sheet can be open while another device writes a record this build
+    /// cannot read. The choice branches must re-check, not trust the prepared
+    /// context.
+    func test_accountSwitchMergeRechecksTheZoneAfterTheContextWasPrepared() async throws {
+        let localTask = makeTask(title: "local")
+        let harness = try await makeHarness(
+            local: [.task(localTask)],
+            remote: [try CloudRecordCodec.encode(.task(localTask))],
+            requested: true
+        )
+        try await connectAccountA(harness, entities: [.task(localTask)])
+
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(.task(makeTask(title: "cloud B")))])
+        _ = try await base.ensureInfrastructure()
+        let wrapped = QuarantiningZoneTransport(base: base)
+        await harness.transportFactory.setTransport(wrapped, forAccountRecordName: "account-B")
+
+        let context = await beginAccountSwitch(harness, to: "account-B")
+        XCTAssertEqual(context?.progress, .ready)
+        await wrapped.setUndecodableRecordNames(["wy1_written_by_newer_build"])
+
+        await harness.coordinator.resolveAccountSwitch(.merge)
+
+        let resets = await wrapped.resetCount()
+        XCTAssertEqual(resets, 0, "the choice branch must re-read the zone before resetting it")
+        XCTAssertEqual(harness.coordinator.accountResolutionContext?.progress, .failed(.cloudHasNewerData))
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"], "local data must not be half-merged")
+        let targetRecords = await base.remoteRecords()
+        XCTAssertEqual(try targetRecords.map { try taskTitle(from: $0) }, ["cloud B"])
+    }
+
+    /// `.useLocal` is the explicit "throw the cloud copy away" choice, but the
+    /// count shown in its confirmation only covers records this build can read.
+    /// A zone that went unreadable while the sheet was open must therefore be
+    /// refused rather than deleted behind a smaller number than it destroys.
+    func test_accountSwitchUseLocalRechecksTheZoneAfterTheContextWasPrepared() async throws {
+        let localTask = makeTask(title: "local")
+        let harness = try await makeHarness(
+            local: [.task(localTask)],
+            remote: [try CloudRecordCodec.encode(.task(localTask))],
+            requested: true
+        )
+        try await connectAccountA(harness, entities: [.task(localTask)])
+
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(.task(makeTask(title: "cloud B")))])
+        _ = try await base.ensureInfrastructure()
+        let wrapped = QuarantiningZoneTransport(base: base)
+        await harness.transportFactory.setTransport(wrapped, forAccountRecordName: "account-B")
+
+        let context = await beginAccountSwitch(harness, to: "account-B")
+        XCTAssertEqual(context?.progress, .ready)
+        await wrapped.setUndecodableRecordNames(["wy1_written_by_newer_build"])
+
+        await harness.coordinator.resolveAccountSwitch(.useLocal)
+
+        let resets = await wrapped.resetCount()
+        XCTAssertEqual(resets, 0, "the destructive choice must not reset a zone it cannot read")
+        XCTAssertEqual(harness.coordinator.accountResolutionContext?.progress, .failed(.cloudHasNewerData))
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"])
+        let targetRecords = await base.remoteRecords()
+        XCTAssertEqual(try targetRecords.map { try taskTitle(from: $0) }, ["cloud B"])
+    }
+
+    /// The old coverage stopped at "entitlementState was updated". A subscription
+    /// that expires mid-cycle must also abandon the work in flight without
+    /// writing local data, keep the user's request to sync, and resume cleanly
+    /// when the subscription comes back.
+    func test_expiryAbortsAnInFlightCycleAndRenewalResumes() async throws {
+        let local = CloudSyncEntity.task(makeTask(title: "local"))
+        let entitlement = FakeCloudSyncEntitlementProvider(.entitled)
+        let probe = RetryDelayProbe()
+        let harness = try await makeHarness(
+            local: [local],
+            remote: [try CloudRecordCodec.encode(local)],
+            requested: true,
+            retryDelay: { await probe.delay($0) },
+            entitlementProvider: entitlement
+        )
+        try await harness.establishBaseline([local])
+
+        // A local edit the transport rejects with a retryable failure parks the
+        // cycle inside `retryDelay`: mid-flight, with an upload still owed.
+        let edited = CloudSyncEntity.task(makeTask(id: try taskID(from: local), title: "local edited"))
+        harness.localStore.snapshot = makeSnapshot([edited])
+        await harness.memoryTransport.injectFailure(.networkFailure, for: local.key, operation: .upsert)
+
+        let cycle = Task { await harness.coordinator.handle(.manual) }
+        await probe.waitUntilParked()
+
+        await entitlement.setState(.expired)
+        await harness.coordinator.entitlementDidChange()
+        XCTAssertEqual(harness.coordinator.status, .locked(.expired))
+
+        let upsertsWhileParked = await harness.memoryTransport.upsertCallCount()
+        let localWhileLocked = harness.localStore.snapshot
+        await probe.open()
+        await cycle.value
+
+        let upsertsAfterAbort = await harness.memoryTransport.upsertCallCount()
+        XCTAssertEqual(upsertsAfterAbort, upsertsWhileParked, "an abandoned cycle must not retry the upload")
+        XCTAssertEqual(harness.localStore.snapshot, localWhileLocked, "an abandoned cycle must not write local data")
+        XCTAssertTrue(harness.settings.cloudSyncRequested, "expiry pauses sync; it does not discard the user's choice")
+
+        // Renewal resumes and finishes the work the abandoned cycle left behind.
+        await entitlement.setState(.entitled)
+        await harness.coordinator.entitlementDidChange()
+        await harness.coordinator.handle(.manual)
+
+        let remote = await harness.memoryTransport.remoteRecords()
+        XCTAssertEqual(try remote.map { try taskTitle(from: $0) }, ["local edited"])
+    }
+
+    /// The codec's own test only asserted "decoding a v2 payload throws". What
+    /// matters for users is that one such record does not take the whole zone
+    /// down: `inspect` must count it and move on.
+    func test_inspectSetsAsideRecordsFromANewerBuildInsteadOfFailingTheZone() async throws {
+        let zoneID = CKRecordZone.ID(
+            zoneName: CloudRecordCodec.customZoneName,
+            ownerName: CKCurrentUserDefaultName
+        )
+        let encoded = try CloudRecordCodec.encode(.task(makeTask(title: "readable")))
+
+        func cloudRecord(name: String, kind: String, payloadVersion: Int) -> CKRecord {
+            let record = CKRecord(
+                recordType: CloudRecordCodec.recordTypeName,
+                recordID: CKRecord.ID(recordName: name, zoneID: zoneID)
+            )
+            record["kind"] = kind as CKRecordValue
+            record["payloadVersion"] = NSNumber(value: payloadVersion)
+            record["payload"] = encoded.payload as CKRecordValue
+            record["payloadHash"] = encoded.payloadHash as CKRecordValue
+            return record
+        }
+
+        let manager = CloudKitInfrastructureManager(client: FakeInfrastructureClient(records: [
+            cloudRecord(name: encoded.recordName, kind: encoded.kind.rawValue, payloadVersion: 1),
+            cloudRecord(name: "wy1_written_by_newer_build", kind: encoded.kind.rawValue, payloadVersion: 2),
+            cloudRecord(name: "wy1_unknown_kind", kind: "mystery", payloadVersion: 1)
+        ]))
+
+        let inspection = try await manager.inspect()
+
+        XCTAssertEqual(inspection.records.map(\.recordName), [encoded.recordName], "readable records must survive")
+        XCTAssertEqual(
+            inspection.undecodableRecordNames,
+            ["wy1_unknown_kind", "wy1_written_by_newer_build"],
+            "both a newer payload version and an unknown kind are set aside, sorted by name"
+        )
     }
 
     func test_establishedAppLaunchSyncsAndSceneActiveIsThrottled() async throws {
@@ -1378,6 +1604,94 @@ final class CloudSyncCoordinatorTests: XCTestCase {
         XCTAssertNotNil(reopenedContext)
     }
 
+    // MARK: Deleted remote zone
+
+    /// CloudKit removed Weekyii's zone. That is not a user-actionable failure:
+    /// the transport already dropped this account's baselines, so the session must
+    /// drop the stale transport and land in the first-enable inspection instead of
+    /// parking in `pausedAfterFailure` until the user taps sync.
+    func test_deletedRemoteZoneReentersFirstEnableInspectionInsteadOfLatching() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.fetch])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteEmpty))
+        XCTAssertFalse(harness.coordinator.automaticRetrySuppressed)
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.accountRecordName))
+        XCTAssertFalse(metadata.automaticRetrySuppressed)
+        XCTAssertNil(metadata.lastFailure)
+        XCTAssertNil(metadata.lastFailureReason)
+        XCTAssertFalse(metadata.zoneInitialized)
+        XCTAssertNotNil(try harness.metadataStore.loadActiveAccountHash(), "the account did not change, only its zone")
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local"], "nothing may be re-created silently")
+        let remoteAfterLoss = await base.remoteRecords()
+        XCTAssertTrue(remoteAfterLoss.isEmpty)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 1)
+    }
+
+    /// The re-entry is bounded: a zone that keeps vanishing must not spin.
+    /// Zone loss during the send/upsert phase returns per-record failures instead of
+    /// throwing from `fetchChanges`. The session must still re-enter first-enable
+    /// inspection instead of latching until manual sync.
+    func test_deletedRemoteZoneDuringSendReentersFirstEnableInspectionInsteadOfLatching() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.send])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .initialEnableDecisionRequired(.remoteEmpty))
+        XCTAssertFalse(harness.coordinator.automaticRetrySuppressed)
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.accountRecordName))
+        XCTAssertFalse(metadata.automaticRetrySuppressed)
+        XCTAssertNil(metadata.lastFailure)
+        XCTAssertFalse(metadata.zoneInitialized)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 1)
+    }
+
+    func test_repeatedZoneLossStopsAfterOneReentryAndFallsBackToAnOrdinaryFailure() async throws {
+        let remoteSeed = CloudSyncEntity.task(makeTask(title: "cloud before zone loss"))
+        let base = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(remoteSeed)])
+        let transport = ZoneLossTransport(base: base)
+        let harness = try await makeHarness(
+            local: [.task(makeTask(title: "local"))],
+            customTransport: transport,
+            memoryTransport: base
+        )
+        await transport.attach(metadataStore: harness.metadataStore, accountRecordName: harness.accountRecordName)
+        try await harness.establishBaseline([remoteSeed])
+        await transport.schedule([.fetch, .inspect])
+
+        await harness.coordinator.setRequested(true)
+
+        XCTAssertEqual(harness.coordinator.status, .pausedAfterFailure)
+        XCTAssertTrue(harness.coordinator.automaticRetrySuppressed)
+        let lossCount = await transport.lossCount()
+        XCTAssertEqual(lossCount, 2, "one re-entry, then an ordinary failure")
+        let remaining = await transport.scheduledRemaining()
+        XCTAssertEqual(remaining, 0)
+    }
+
     private struct Harness {
         let coordinator: CloudSyncCoordinator
         let settings: UserSettings
@@ -1557,12 +1871,58 @@ private actor FakeCloudSyncAccountProvider: CloudSyncAccountProviding {
 }
 
 private actor FakeCloudSyncEntitlementProvider: CloudSyncEntitlementProviding {
-    private let state: CloudSyncEntitlementState
+    private var state: CloudSyncEntitlementState
     private var queries = 0
 
     init(_ state: CloudSyncEntitlementState) { self.state = state }
     func currentState() async -> CloudSyncEntitlementState { queries += 1; return state }
     func queryCount() -> Int { queries }
+    /// Simulates a subscription expiring or being renewed while a cycle runs.
+    func setState(_ newState: CloudSyncEntitlementState) { state = newState }
+}
+
+/// Minimal infrastructure client: one existing zone, one existing subscription,
+/// and a fixed set of records, so `inspect()` can be exercised without CloudKit.
+private actor FakeInfrastructureClient: CloudKitInfrastructureClient {
+    private let records: [CKRecord]
+
+    init(records: [CKRecord]) { self.records = records }
+
+    func zoneExists() async throws -> Bool { true }
+    func createZone() async throws {}
+    func subscriptionExists(id: String) async throws -> Bool { true }
+    func createZoneSubscription(id: String) async throws {}
+    func deleteWeekyiiZone() async throws {}
+    func recordsInWeekyiiZone() async throws -> [CKRecord] { records }
+}
+
+/// Holds a sync cycle inside `retryDelay` so a test can change the world while
+/// the cycle is in flight, then release it.
+private actor RetryDelayProbe {
+    private var release: CheckedContinuation<Void, Never>?
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+    private(set) var calls = 0
+
+    func delay(_: TimeInterval) async {
+        calls += 1
+        startWaiters.forEach { $0.resume() }
+        startWaiters.removeAll()
+        guard !released else { return }
+        await withCheckedContinuation { release = $0 }
+    }
+
+    /// Returns once a cycle is parked inside `delay`.
+    func waitUntilParked() async {
+        if release != nil || released { return }
+        await withCheckedContinuation { startWaiters.append($0) }
+    }
+
+    func open() {
+        released = true
+        release?.resume()
+        release = nil
+    }
 }
 
 private actor FakeCloudSyncTransportFactory: CloudSyncTransportFactory {
@@ -1622,6 +1982,133 @@ private actor CoordinatorAsyncGate {
     func release() { operationContinuation?.resume(); operationContinuation = nil }
 }
 
+/// Reports records the build cannot decode, the way `CloudKitInfrastructure`
+/// does after a newer build wrote to the zone, and counts zone deletions so a
+/// test can prove nothing destructive happened.
+private actor QuarantiningZoneTransport: CloudSyncTransport {
+    private let base: InMemoryCloudSyncTransport
+    private var undecodableRecordNames: [String]
+    private var resets = 0
+
+    init(base: InMemoryCloudSyncTransport, undecodableRecordNames: [String] = []) {
+        self.base = base
+        self.undecodableRecordNames = undecodableRecordNames
+    }
+
+    func setUndecodableRecordNames(_ names: [String]) { undecodableRecordNames = names }
+    func resetCount() -> Int { resets }
+
+    var databaseScope: CloudSyncDatabaseScope { get async { await base.databaseScope } }
+
+    func ensureInfrastructure() async throws -> CloudSyncRemoteInfrastructure {
+        try await base.ensureInfrastructure()
+    }
+
+    func inspectRemoteZone() async throws -> CloudSyncZoneInspection {
+        let inspection = try await base.inspectRemoteZone()
+        return CloudSyncZoneInspection(
+            exists: inspection.exists,
+            records: inspection.records,
+            undecodableRecordNames: undecodableRecordNames
+        )
+    }
+
+    func resetCustomZone() async throws {
+        resets += 1
+        try await base.resetCustomZone()
+    }
+
+    func fetchChanges(since token: Data?) async throws -> CloudSyncChangeBatch {
+        try await base.fetchChanges(since: token)
+    }
+
+    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] { await base.upsert(records) }
+    func delete(_ keys: [SyncEntityKey]) async -> [CloudSyncRecordResult] { await base.delete(keys) }
+    func restoreTransportState(_ state: Data?) async { await base.restoreTransportState(state) }
+    func persistedTransportState() async -> Data? { await base.persistedTransportState() }
+}
+
+private enum ZoneLossPoint: Sendable {
+    case infrastructure
+    case inspect
+    case fetch
+    case send
+}
+
+/// Simulates CloudKit deleting Weekyii's custom zone at a chosen point. Like the
+/// real transport it resets this account's device-local state before failing, so
+/// the coordinator sees exactly what `handleRemoteZoneLoss` leaves behind.
+private actor ZoneLossTransport: CloudSyncTransport {
+    private let base: InMemoryCloudSyncTransport
+    private var schedule: [ZoneLossPoint] = []
+    private var metadataStore: CloudSyncMetadataStore?
+    private var accountRecordName: String?
+    private var losses = 0
+
+    init(base: InMemoryCloudSyncTransport) { self.base = base }
+
+    func attach(metadataStore: CloudSyncMetadataStore, accountRecordName: String) {
+        self.metadataStore = metadataStore
+        self.accountRecordName = accountRecordName
+    }
+
+    func schedule(_ points: [ZoneLossPoint]) { schedule = points }
+    func lossCount() -> Int { losses }
+    func scheduledRemaining() -> Int { schedule.count }
+
+    private func loseZoneIfScheduled(_ point: ZoneLossPoint) async throws {
+        guard schedule.first == point else { return }
+        schedule.removeFirst()
+        losses += 1
+        if let metadataStore, let accountRecordName {
+            try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+        }
+        // A deleted zone takes its records with it.
+        try? await base.resetCustomZone()
+        throw CloudSyncTransportError.cloudFailure(.other(CloudKitFailureMapper.remoteZoneDeletedReason))
+    }
+
+    var databaseScope: CloudSyncDatabaseScope { get async { await base.databaseScope } }
+
+    func ensureInfrastructure() async throws -> CloudSyncRemoteInfrastructure {
+        try await loseZoneIfScheduled(.infrastructure)
+        return try await base.ensureInfrastructure()
+    }
+
+    func inspectRemoteZone() async throws -> CloudSyncZoneInspection {
+        try await loseZoneIfScheduled(.inspect)
+        return try await base.inspectRemoteZone()
+    }
+
+    func resetCustomZone() async throws { try await base.resetCustomZone() }
+
+    func fetchChanges(since token: Data?) async throws -> CloudSyncChangeBatch {
+        try await loseZoneIfScheduled(.fetch)
+        return try await base.fetchChanges(since: token)
+    }
+
+    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] {
+        if schedule.first == .send {
+            schedule.removeFirst()
+            losses += 1
+            if let metadataStore, let accountRecordName {
+                try? metadataStore.resetSynchronizationState(forAccountRecordName: accountRecordName)
+            }
+            return records.map { record in
+                CloudSyncRecordResult(
+                    entityKey: record.entityKey,
+                    outcome: .failed(.other(CloudKitFailureMapper.remoteZoneDeletedReason)),
+                    recordName: record.recordName
+                )
+            }
+        }
+        return await base.upsert(records)
+    }
+
+    func delete(_ keys: [SyncEntityKey]) async -> [CloudSyncRecordResult] { await base.delete(keys) }
+    func restoreTransportState(_ state: Data?) async { await base.restoreTransportState(state) }
+    func persistedTransportState() async -> Data? { await base.persistedTransportState() }
+}
 private actor GatedCoordinatorTransport: CloudSyncTransport, CloudSyncCancellableTransport {
     private let base: InMemoryCloudSyncTransport
     private let gate: CoordinatorAsyncGate

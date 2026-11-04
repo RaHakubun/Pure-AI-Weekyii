@@ -93,6 +93,30 @@ final class NotificationService: NotificationScheduling {
         }
     }
 
+    /// Namespace for the scheduled-start confirmation, matched by
+    /// `NotificationPresentationDelegate` because that is the only notification shown
+    /// while the app is in the foreground.
+    nonisolated static let autoStartIdentifierPrefix = "autostart-"
+
+    nonisolated static func isAutoStartIdentifier(_ identifier: String) -> Bool {
+        identifier.hasPrefix(autoStartIdentifierPrefix)
+    }
+
+    /// Best-effort confirmation that the scheduled start ran. Delivery depends on the
+    /// user's notification settings, so a dropped notification never fails the start.
+    func notifyAutomaticStart(dayId: String, focusTitle: String) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "notification.auto_start.title")
+        content.body = String(format: String(localized: "notification.auto_start.body"), focusTitle)
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "\(Self.autoStartIdentifierPrefix)\(dayId)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     func scheduleKillTimeNotification(for day: DayModel, reminderMinutes: Int, fixedReminder: DateComponents?) {
         cancelKillTimeNotification(for: day)
         let plan = killTimeReminderPlan(

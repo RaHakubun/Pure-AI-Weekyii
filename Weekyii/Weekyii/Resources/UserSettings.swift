@@ -204,14 +204,28 @@ final class UserSettings: ObservableObject {
     
     // Theme Settings
     @Published var selectedThemeRaw: String {
-        didSet { save() }
+        didSet {
+            let canonical = WeekTheme.canonicalStoredThemeRaw(selectedThemeRaw)
+            if canonical != selectedThemeRaw {
+                selectedThemeRaw = canonical
+            }
+            save()
+        }
     }
     @Published var appearanceModeRaw: String {
         didSet { save() }
     }
+    /// Local display mirror of the resolved VIP access, written only by
+    /// `PurchaseService` (and DEBUG overrides). It unlocks VIP themes and flexible
+    /// mode for display/start decisions and is mirrored to widgets via the App Group.
+    /// It is never an entitlement for iCloud sync and is not restored from archives.
     @Published var premiumThemeUnlocked: Bool {
         didSet { save() }
     }
+    /// In-memory only: true once `PurchaseService` has resolved StoreKit at least once
+    /// in this process. Until then the persisted mirror above may be stale, so it may
+    /// only drive theme display (to avoid a launch flicker), never feature decisions.
+    @Published var vipAccessResolved = false
     
     // Developer Settings
     @Published var developerSettingsEnabled: Bool {
@@ -327,7 +341,12 @@ final class UserSettings: ObservableObject {
         self.pastBrowseModeRaw = restoresBrowseModes
             ? defaults.string(forKey: Self.pastBrowseModeKey) ?? WeekBrowseMode.weekList.rawValue
             : WeekBrowseMode.weekList.rawValue
-        self.selectedThemeRaw = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        let storedTheme = defaults.string(forKey: "selectedTheme") ?? WeekTheme.amber.rawValue
+        let canonicalTheme = WeekTheme.canonicalStoredThemeRaw(storedTheme)
+        self.selectedThemeRaw = canonicalTheme
+        if canonicalTheme != storedTheme {
+            defaults.set(canonicalTheme, forKey: "selectedTheme")
+        }
         self.appearanceModeRaw = defaults.string(forKey: "appearanceMode") ?? AppearanceMode.system.rawValue
         self.premiumThemeUnlocked = defaults.object(forKey: "premiumThemeUnlocked") as? Bool ?? false
         self.developerSettingsEnabled = defaults.object(forKey: "developerSettingsEnabled") as? Bool ?? false
@@ -594,6 +613,17 @@ final class UserSettings: ObservableObject {
     var defaultExecutionMode: ExecutionMode {
         get { ExecutionMode(rawValue: defaultExecutionModeRaw) ?? .strict }
         set { defaultExecutionModeRaw = newValue.rawValue }
+    }
+
+    /// VIP access for feature decisions (flexible mode, selecting VIP themes).
+    /// Requires a StoreKit resolution in this launch, not just the persisted mirror.
+    var hasVIPAccess: Bool { premiumThemeUnlocked && vipAccessResolved }
+
+    /// The mode a newly started day actually uses. Flexible mode is VIP: without
+    /// access the day starts strict, while the stored preference is kept so it
+    /// returns as soon as VIP is active again. A day already running is never changed.
+    var effectiveDefaultExecutionMode: ExecutionMode {
+        defaultExecutionMode == .flexible && !hasVIPAccess ? .strict : defaultExecutionMode
     }
 
     var defaultProjectTileSize: ProjectTileSize {

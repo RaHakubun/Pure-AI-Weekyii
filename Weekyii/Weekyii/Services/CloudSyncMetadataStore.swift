@@ -60,6 +60,15 @@ nonisolated struct CloudSyncMetadata: Codable, Hashable, Sendable {
     /// A pre-inbox engine cursor may have consumed a delete that a full CK fetch
     /// cannot replay. Persist this flag until a current zone snapshot is journaled.
     var needsFullRemoteSnapshot: Bool?
+    /// Remote records this build could not decode (newer payload version, unknown
+    /// kind, malformed fields), keyed by CloudKit record name with a short reason.
+    /// They are left untouched on the server, never overwritten or deleted from
+    /// this device, and never block the rest of the zone from syncing.
+    var quarantinedRecords: [String: String]?
+    /// `CloudRecordCodec.decoderSignature` of the build that filled
+    /// `quarantinedRecords`. A build with a different signature refetches the zone
+    /// once so it can read what an older build had to set aside.
+    var quarantineCodecSignature: String?
 
     init(accountHash: String) {
         formatVersion = Self.currentFormatVersion
@@ -79,6 +88,8 @@ nonisolated struct CloudSyncMetadata: Codable, Hashable, Sendable {
         pendingRemoteChanges = []
         changeSequence = 0
         needsFullRemoteSnapshot = false
+        quarantinedRecords = [:]
+        quarantineCodecSignature = nil
     }
 
     mutating func remember(_ key: SyncEntityKey, recordName: String, serverMetadata: Data? = nil) {
@@ -112,6 +123,44 @@ nonisolated struct CloudSyncMetadata: Codable, Hashable, Sendable {
         remoteChangeToken = token
         pendingRemoteChanges?.removeAll { $0.sequence <= sequence }
     }
+
+    /// Drops inbox entries for keys whose baseline was just committed. Those
+    /// entries are already accounted for: replaying them later (after a partial
+    /// failure kept the cursor in place, or after a conflict resend) would make a
+    /// superseded server version look like a fresh remote edit and revert the
+    /// local winner.
+    mutating func discardPendingChanges(for keys: Set<SyncEntityKey>, through sequence: UInt64) {
+        guard !keys.isEmpty else { return }
+        pendingRemoteChanges?.removeAll { pending in
+            guard pending.sequence <= sequence else { return false }
+            switch pending.change {
+            case .upsert(let record): return keys.contains(record.entityKey)
+            case .delete(let key): return keys.contains(key)
+            }
+        }
+    }
+
+    // MARK: Quarantine
+
+    mutating func quarantine(recordName: String, reason: String) {
+        var current = quarantinedRecords ?? [:]
+        current[recordName] = reason
+        quarantinedRecords = current
+        quarantineCodecSignature = CloudRecordCodec.decoderSignature
+    }
+
+    mutating func releaseQuarantine(recordName: String) {
+        quarantinedRecords?.removeValue(forKey: recordName)
+    }
+
+    func isQuarantined(_ key: SyncEntityKey) -> Bool {
+        guard let quarantined = quarantinedRecords, !quarantined.isEmpty else { return false }
+        if quarantined[CKRecordNameCodec.recordName(for: key)] != nil { return true }
+        if let name = entityBaselines[key]?.recordName, quarantined[name] != nil { return true }
+        return false
+    }
+
+    var quarantinedRecordCount: Int { quarantinedRecords?.count ?? 0 }
 }
 
 nonisolated enum CloudSyncMetadataStoreError: Error, Equatable {
@@ -264,6 +313,33 @@ nonisolated struct CloudSyncMetadataStore: Sendable {
         }
     }
 
+    /// Forgets every account's device-local sync state (baselines, engine cursor,
+    /// inbox, latch) while keeping the active-account pointer and any account
+    /// resolution journal. The next enable of iCloud sync then inspects the zone
+    /// and asks the user which data wins, instead of treating the current local
+    /// store as an edit of the last synced state.
+    ///
+    /// Used before local data is replaced wholesale (archive import, recovery
+    /// point restore) and as the user's "reset this device's sync state" exit.
+    func resetSynchronizationStateForAllAccounts() throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: rootURL.path) else { return }
+        let entries = try fileManager.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+        for directory in entries where Self.isAccountHash(directory.lastPathComponent) {
+            let fileURL = directory.appendingPathComponent("metadata.json", isDirectory: false)
+            guard fileManager.fileExists(atPath: fileURL.path) else { continue }
+            let hash = directory.lastPathComponent
+            try withAccountLock(at: fileURL) {
+                let data = try Self.encoder().encode(CloudSyncMetadata(accountHash: hash))
+                try data.write(to: fileURL, options: [.atomic])
+            }
+        }
+    }
+
     /// Replaces only one account's local synchronization state. Used when fresh
     /// cloud data becomes authoritative so stale baselines, engine cursors,
     /// reverse indexes, and inbox entries cannot leak into the new session.
@@ -341,19 +417,38 @@ nonisolated struct CloudSyncDurableInbox: Sendable {
                 current.changeSequence = 0
                 current.needsFullRemoteSnapshot = true
             }
+            // A build that reads more than the one which quarantined records
+            // restarts the engine from scratch once. The full fetch re-delivers
+            // every record as an upsert into the inbox (the application cursor is
+            // kept), so records set aside earlier are finally reconciled.
+            if current.quarantinedRecordCount > 0,
+               current.quarantineCodecSignature != CloudRecordCodec.decoderSignature {
+                current.syncEngineState = nil
+                current.quarantinedRecords = [:]
+                current.quarantineCodecSignature = nil
+            }
         }
         return (metadata, metadata.needsFullRemoteSnapshot == true)
     }
 
-    func append(upserts: [CloudSyncRecord], deletedRecordNames: [String]) throws {
+    func append(
+        upserts: [CloudSyncRecord],
+        deletedRecordNames: [String],
+        quarantined: [String: String] = [:]
+    ) throws {
         try store.update(forAccountRecordName: accountRecordName) { metadata in
             for record in upserts {
+                metadata.releaseQuarantine(recordName: record.recordName)
                 metadata.remember(record.entityKey, recordName: record.recordName, serverMetadata: record.serverMetadata)
                 metadata.enqueue(.upsert(record))
             }
             for recordName in deletedRecordNames {
+                metadata.releaseQuarantine(recordName: recordName)
                 guard let key = metadata.entityKey(forRecordName: recordName) else { continue }
                 metadata.enqueue(.delete(key))
+            }
+            for (recordName, reason) in quarantined {
+                metadata.quarantine(recordName: recordName, reason: reason)
             }
         }
     }
@@ -361,15 +456,21 @@ nonisolated struct CloudSyncDurableInbox: Sendable {
     /// One-time repair when upgrading metadata written by the old process-local
     /// delivery scheme. Comparing a complete zone snapshot with old baselines
     /// recovers deletes that a fresh CKSyncEngine cursor cannot deliver.
-    func appendAuthoritativeSnapshot(_ records: [CloudSyncRecord]) throws {
+    func appendAuthoritativeSnapshot(_ records: [CloudSyncRecord], undecodableRecordNames: [String] = []) throws {
         try store.update(forAccountRecordName: accountRecordName) { metadata in
             guard metadata.needsFullRemoteSnapshot == true else { return }
+            for name in undecodableRecordNames {
+                metadata.quarantine(recordName: name, reason: "undecodable in zone snapshot")
+            }
             let remoteKeys = Set(records.map(\.entityKey))
             for record in records {
+                metadata.releaseQuarantine(recordName: record.recordName)
                 metadata.remember(record.entityKey, recordName: record.recordName, serverMetadata: record.serverMetadata)
                 metadata.enqueue(.upsert(record))
             }
-            for key in metadata.entityBaselines.keys.sorted() where !remoteKeys.contains(key) {
+            // A record that exists but could not be read is not a deletion.
+            for key in metadata.entityBaselines.keys.sorted()
+            where !remoteKeys.contains(key) && !metadata.isQuarantined(key) {
                 metadata.enqueue(.delete(key))
             }
             metadata.needsFullRemoteSnapshot = false

@@ -136,6 +136,15 @@ enum CloudRecordCodec {
     nonisolated static let customZoneName = "WeekyiiSyncZoneV1"
     nonisolated static let recordTypeName = "WYEntityV1"
 
+    /// What this build can read: every known kind with its payload version.
+    /// It changes whenever a kind is added or a payload version is bumped, which
+    /// is what tells a device to refetch records it had to quarantine before.
+    nonisolated static var decoderSignature: String {
+        SyncEntityKind.allCases
+            .map { "\($0.rawValue)=\(payloadVersion(for: $0))" }
+            .joined(separator: ",")
+    }
+
     nonisolated static func payloadVersion(for kind: SyncEntityKind) -> Int {
         switch kind {
         case .week: 1

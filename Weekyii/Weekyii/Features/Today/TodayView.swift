@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+private struct QuenyaStatusAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
 private enum TodaySection: Int {
     case today
     case week
@@ -125,6 +132,7 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
+    @Environment(\.themeSkin) private var todaySkin
 
     @State private var viewModel: TodayViewModel?
     @State private var selectedTaskForDetail: TaskItem?
@@ -160,6 +168,8 @@ struct TodayView: View {
                     ProgressView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(todaySceneBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -176,7 +186,6 @@ struct TodayView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .background(todaySceneBackground)
         .onAppear {
             if viewModel == nil {
                 let model = TodayViewModel(
@@ -314,15 +323,30 @@ struct TodayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                 // 顶部状态卡片
-                statusCard(for: day)
+                erasedStatusCard(for: day)
 
                 // 任务流区域
                 taskFlowSection(day: day, viewModel: viewModel)
 
                 // 截止时间（放在最后）
-                killTimeCard(day: day, viewModel: viewModel)
+                erasedKillTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
+            .backgroundPreferenceValue(QuenyaStatusAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if todaySkin.isQuenya, let anchor {
+                        let bounds = proxy[anchor]
+                        Image("QuenyaNarsil")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: bounds.width * 0.98)
+                            .scaleEffect(x: -1, y: 1)
+                            .position(x: bounds.midX, y: bounds.maxY - 8)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
         }
         .overlay(alignment: .bottom) {
@@ -332,52 +356,117 @@ struct TodayView: View {
         }
     }
 
-    @ViewBuilder
+    // 启动崩溃修复（1.2 (3)，iOS 27 真机）：
+    // 原先这里是 5 路 `@ViewBuilder switch`，返回类型是把 5 个状态视图全部拼进去的
+    // `_ConditionalContent` 复合类型。编译器在判断 `day.status` 之前就按每个分支视图
+    // 类型的真实大小，在栈上一次性预留全部缓冲区，再叠加类型元数据的递归解析，
+    // 把 1MB 的主线程栈撑爆。
+    // 现在每个状态单独放进一个不内联的函数，并用 `AnyView` 隔开：
+    // - 这里只持有固定大小的 `AnyView`，不再为 5 个分支预留栈空间；
+    // - 只有当前状态那一支的视图类型会在它自己的栈帧里实例化，其余分支不会被解析。
+    // 不要把这里改回 `@ViewBuilder switch`，也不要去掉 `@inline(never)`。
     private func taskFlowSection(day: DayModel, viewModel: TodayViewModel) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-            // 根据状态显示不同内容
-            switch day.status {
-            case .empty:
-                emptyStateContent(day: day, viewModel: viewModel)
-                
-            case .draft:
-                draftStateContent(day: day, viewModel: viewModel)
-                
-            case .execute:
-                executeStateContent(day: day, viewModel: viewModel)
-                
-            case .completed:
-                completedStateContent(day: day)
-                
-            case .expired:
-                expiredStateContent(day: day)
-            }
+            stateContent(day: day, viewModel: viewModel)
         }
     }
 
+    private func stateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        switch day.status {
+        case .empty:
+            return erasedEmptyStateContent(day: day, viewModel: viewModel)
+        case .draft:
+            return erasedDraftStateContent(day: day, viewModel: viewModel)
+        case .execute:
+            return erasedExecuteStateContent(day: day, viewModel: viewModel)
+        case .completed:
+            return erasedCompletedStateContent(day: day)
+        case .expired:
+            return erasedExpiredStateContent(day: day)
+        }
+    }
+
+    @inline(never)
+    private func erasedEmptyStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(emptyStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedDraftStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(draftStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedExecuteStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(executeStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedCompletedStateContent(day: DayModel) -> AnyView {
+        AnyView(completedStateContent(day: day))
+    }
+
+    @inline(never)
+    private func erasedExpiredStateContent(day: DayModel) -> AnyView {
+        AnyView(expiredStateContent(day: day))
+    }
+
+    /// The status card and kill-time card sit beside the task flow in the same
+    /// stack; erasing them keeps the page's top-level type small as well.
+    @inline(never)
+    private func erasedStatusCard(for day: DayModel) -> AnyView {
+        AnyView(statusCard(for: day))
+    }
+
+    @inline(never)
+    private func erasedKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(killTimeCard(day: day, viewModel: viewModel))
+    }
+
     // MARK: - Status Card
+
+    /// Small caption over the status seal. Rubricated skins (红皮书) ink its
+    /// first character like every other heading on the page.
+    private func statusCaption(_ title: String) -> Text {
+        if let section = todaySkin.section, section.rubric != nil {
+            var plain = section
+            plain.titlePrefix = nil
+            return WeekSectionHeader.rubricText(title, section: plain, ink: .textSecondary)
+                .font(.caption)
+        }
+        return Text(verbatim: title)
+            .font(.caption)
+            .foregroundColor(.textSecondary)
+    }
     
     @ViewBuilder
     private func statusCard(for day: DayModel) -> some View {
-        WeekCard(accentColor: day.status.color) {
+        WeekCard(accentColor: day.status.color, quenyaStatus: day.status == .execute && day.focusTask != nil) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.status"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
+                        statusCaption(String(localized: "today.status"))
                         StatusBadge(status: day.status)
                     }
                     
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.days_started"))
+                        Text(todaySkin.drawsMiddleEarthGlyphs
+                             ? String(localized: "today.days_journeyed")
+                             : String(localized: "today.days_started"))
                             .font(.caption)
                             .foregroundColor(.textSecondary)
-                        Text("\(appState.daysStartedCount)")
-                            .font(.titleMedium)
-                            .foregroundColor(.weekyiiPrimary)
+                        if todaySkin.drawsMiddleEarthGlyphs {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.system(size: 28, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundColor(.weekyiiPrimary)
+                        } else {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.titleMedium)
+                                .foregroundColor(.weekyiiPrimary)
+                        }
                     }
                 }
 
@@ -387,10 +476,35 @@ struct TodayView: View {
                     .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
-                Text(formatDate(day.dayId))
-                    .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
+                if todaySkin.drawsMiddleEarthGlyphs {
+                    HStack(spacing: 6) {
+                        LotrGlyphView(glyph: .quill)
+                            .frame(width: 14, height: 14)
+                            .foregroundColor(.textSecondary)
+                        Text(formatDate(day.dayId))
+                            .font(.subheadline)
+                            .foregroundColor(.textSecondary)
+                    }
+                } else {
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            Text(formatDate(day.dayId))
+                            Text("· sí").italic().foregroundColor(.weekyiiPrimary)
+                        }
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                    } else {
+                        Text(formatDate(day.dayId))
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
+                }
             }
+        }
+        // Anchor to the status card, so the horizontal sword sits directly below
+        // the original illustration. It remains behind both cards and text.
+        .anchorPreference(key: QuenyaStatusAnchorKey.self, value: .bounds) { anchor in
+            day.status == .execute && day.focusTask != nil ? anchor : nil
         }
     }
 
@@ -405,11 +519,11 @@ struct TodayView: View {
 
     private func killTimeTitleRow(deadline: Date?, isEditable: Bool) -> some View {
         HStack(spacing: WeekSpacing.xs) {
-            Image(systemName: "clock.fill")
-                .foregroundColor(.accentOrange)
-            Text(String(localized: "killtime.title"))
-                .font(.titleSmall)
-                .foregroundColor(.textPrimary)
+            ThemedSectionIcon(systemName: "clock.fill", tint: .accentOrange)
+            ThemedSectionTitle(title: String(localized: "killtime.title"))
+            if todaySkin.isQuenya {
+                Text("· lúmë").font(.caption).italic().foregroundColor(.weekyiiPrimary)
+            }
             Spacer(minLength: WeekSpacing.sm)
             if isEditable {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -549,7 +663,8 @@ struct TodayView: View {
             // (WeekCard pads by WeekSpacing.lg and clips). Normal flames stay
             // below the track; urgent flames can rise into the space above it.
             .backgroundPreferenceValue(KillTimeLayoutAnchorKey.self) { anchors in
-                if isEditable {
+                // 昆雅保留火焰，即使截止时间卡当前不可编辑。
+                if isEditable || todaySkin.isQuenya {
                     GeometryReader { proxy in
                         // Measured in the content's space; the flames extend by
                         // WeekSpacing.lg to the card edges, so add it back.
@@ -663,7 +778,21 @@ struct TodayView: View {
         if let focusTask = day.focusTask {
             WeekCard(useGradient: true) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                                .layoutPriority(1)
+                            Spacer(minLength: 4)
+                            Text("\u{E02E}\u{E046}\u{E022}\u{E046}\u{E010} \u{E024}\u{E02C}\u{E044}\u{E022}\u{E040} \u{E022}\u{E02C}\u{E04C}\u{E011}\u{E046}\u{E010}\u{E051} \u{E02E}\u{E04A}\u{E011}\u{E046}\u{E00C}\u{E044}\u{E02E}\u{E046}\u{E022}\u{E015}\u{E04A}")
+                                .font(.custom("AlcarinTengwar-Regular", size: 15))
+                                .foregroundColor(.weekyiiPrimaryLight)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .accessibilityHidden(true)
+                        }
+                    } else {
+                        WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                    }
                     
                     HStack(alignment: .firstTextBaseline) {
                         Text(focusTask.title)
@@ -695,7 +824,7 @@ struct TodayView: View {
                     HStack {
                         if let startedAt = focusTask.startedAt {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "clock")
+                                ThemedSymbol(systemName: "clock", size: 13)
                                     .font(.caption)
                                 Text(formatTime(startedAt))
                                     .font(.caption)
@@ -709,7 +838,9 @@ struct TodayView: View {
                             taskForPostpone = focusTask
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "calendar.badge.clock")
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "calendar.badge.clock", size: 13)
+                                }
                                 Text("后移")
                             }
                             .font(.caption.weight(.semibold))
@@ -750,7 +881,9 @@ struct TodayView: View {
                             }
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "checkmark.circle.fill")
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "checkmark.circle.fill", size: 13)
+                                }
                                 Text(String(localized: "action.done_focus"))
                             }
                             .font(.caption.weight(.semibold))
@@ -841,7 +974,7 @@ struct TodayView: View {
         // 庆祝卡片
         WeekCard(useGradient: true) {
             VStack(spacing: WeekSpacing.lg) {
-                Image(systemName: "party.popper.fill")
+                ThemedSymbol(systemName: "party.popper.fill", glyph: .whiteTree, size: 54)
                     .font(.system(size: 50))
                     .foregroundColor(.weekyiiOnFeature)
                 
@@ -918,7 +1051,7 @@ struct TodayView: View {
 
     @ViewBuilder
     /// The button floats directly over the themed scene. A solid backdrop band
-    /// here would not match theme backgrounds (e.g. the sunset reflection) and
+    /// here would not match animated theme backgrounds and
     /// read as a halo; the scroll content already reserves room underneath.
     private var floatingStartButtonOverlay: some View {
         WeekButton(
@@ -1264,11 +1397,8 @@ struct TodayView: View {
     private var todaySceneBackground: some View {
         ZStack {
             Color.backgroundPrimary
-            if userSettings.selectedTheme == .sunset {
-                SunsetWaterReflectionBackground(animationsActive: animationsActive)
-                    .transition(.opacity)
-            } else if userSettings.selectedTheme == .lotr {
-                LotrRainNightBackground(animationsActive: animationsActive)
+            if userSettings.selectedTheme == .cat {
+                CatSunbeamBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
         }
@@ -1575,6 +1705,36 @@ private struct SectionToggleView: View {
     let progress: CGFloat
     let selectedSection: TodaySection
     let onSelect: (TodaySection) -> Void
+    @Environment(\.themeSkin) private var skin
+
+    /// 魔戒 and 指环王 draw a flat book surface: no gloss, no inner shadow.
+    private var isLotr: Bool { skin.drawsMiddleEarthGlyphs }
+    private var trackShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+    }
+    private var indicatorShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: (height - 6) / 2, style: .continuous)
+    }
+
+    private var indicatorColors: [Color] {
+        if let gilded = skin.gildedFill {
+            return [gilded.top.color, gilded.bottom.color]
+        }
+        return isLotr
+            ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary]
+            : [Color.weekyiiPrimary, Color.weekyiiPrimary.opacity(0.85)]
+    }
+
+    /// Ink on the selected half: the leather's own ink when the skin gilds it.
+    private var selectedInk: Color {
+        skin.gildedFill?.ink.color ?? .weekyiiOnPrimary
+    }
+
+    /// Gilt hairline inside the selected leather, or the classic soft rim.
+    private var indicatorRim: Color {
+        if let gilded = skin.gildedFill { return gilded.hairline.color }
+        return isLotr ? Color.clear : Color.white.opacity(0.2)
+    }
     
     private let height: CGFloat = 44
     
@@ -1585,12 +1745,12 @@ private struct SectionToggleView: View {
                 onSelect(.today)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "sun.max.fill")
+                    ThemedSymbol(systemName: "sun.max.fill", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .today ? .weekyiiOnPrimary : .textSecondary)
+                .foregroundColor(selectedSection == .today ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1603,12 +1763,12 @@ private struct SectionToggleView: View {
                 onSelect(.week)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar")
+                    ThemedSymbol(systemName: "calendar", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .week ? .weekyiiOnPrimary : .textSecondary)
+                .foregroundColor(selectedSection == .week ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1622,25 +1782,22 @@ private struct SectionToggleView: View {
                 let indicatorX = progress * halfWidth
                 
                 // 滑动的高亮胶囊 - 带渐变
-                Capsule()
+                indicatorShape
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color.weekyiiPrimary,
-                                Color.weekyiiPrimary.opacity(0.85)
-                            ],
+                            colors: indicatorColors,
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
                     .frame(width: halfWidth - 4, height: height - 6)
                     .offset(x: indicatorX + 2, y: 3)
-                    // 顶部高光
+                    // 顶部高光（魔戒是平的金箔，不加高光）
                     .overlay(
-                        Capsule()
+                        indicatorShape
                             .fill(
                                 LinearGradient(
-                                    colors: [
+                                    colors: isLotr ? [Color.clear] : [
                                         Color.white.opacity(0.4),
                                         Color.white.opacity(0.1),
                                         Color.clear
@@ -1654,8 +1811,8 @@ private struct SectionToggleView: View {
                     )
                     // 边框
                     .overlay(
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                        indicatorShape
+                            .strokeBorder(indicatorRim, lineWidth: skin.gildedFill != nil ? 1 : (isLotr ? 0 : 0.5))
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
                     )
@@ -1666,17 +1823,19 @@ private struct SectionToggleView: View {
         )
         .background(
             // 底层背景胶囊 - 带内阴影效果
-            Capsule()
-                .fill(Color.backgroundSecondary.opacity(0.8))
+            trackShape
+                .fill(isLotr ? Color.backgroundTertiary : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
-                    Capsule()
+                    trackShape
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1),
-                                    Color.black.opacity(0.05)
-                                ],
+                                colors: isLotr
+                                    ? [Color.clear, Color.clear]
+                                    : [
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0.1),
+                                        Color.black.opacity(0.05)
+                                    ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             ),
@@ -1685,300 +1844,103 @@ private struct SectionToggleView: View {
                 )
                 // 内阴影模拟
                 .overlay(
-                    Capsule()
-                        .stroke(Color.black.opacity(0.08), lineWidth: 2)
+                    trackShape
+                        .stroke(Color.black.opacity(isLotr ? 0 : 0.08), lineWidth: 2)
                         .blur(radius: 2)
-                        .mask(Capsule().fill(Color.black))
+                        .mask(trackShape.fill(Color.black))
                         .offset(y: 1)
                 )
         )
-        .clipShape(Capsule())
+        .clipShape(trackShape)
         .frame(height: height)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress)
     }
 }
 
-/// Lightweight animated scene used only by the Sunset theme on Today page.
-private struct SunsetWaterReflectionBackground: View {
+private struct CatSunbeamBackground: View {
     let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @State private var sunDrift = false
 
     private var shouldAnimate: Bool { animationsActive && !reduceMotion }
 
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let sunY = sunCenterY(for: size)
-            let waterlineY = waterline(for: size)
-
-            ZStack {
-                LinearGradient(
-                    colors: skyGradientColors,
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                horizonGlow(y: waterlineY, size: size)
-                sunDisk(y: sunY, size: size)
-                reflectedSun(y: sunY, waterlineY: waterlineY, size: size)
-                reflectionRipples(size: size, waterlineY: waterlineY)
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
-            .onAppear {
-                updateSunAnimation()
-            }
-            .onChange(of: shouldAnimate) { _, _ in
-                updateSunAnimation()
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var skyGradientColors: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color(hex: "#251414"),
-                Color(hex: "#3A1D1A"),
-                Color(hex: "#221917"),
-                Color(hex: "#141317")
-            ]
-        }
-        return [
-            Color(hex: "#FFE5D1"),
-            Color(hex: "#F9C39E"),
-            Color(hex: "#DF896B"),
-            Color(hex: "#B86A5C")
-        ]
-    }
-
-    private func waterline(for size: CGSize) -> CGFloat {
-        size.height * (colorScheme == .dark ? 0.52 : 0.56)
-    }
-
-    private func sunCenterY(for size: CGSize) -> CGFloat {
-        let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
-        guard shouldAnimate else { return base }
-        return base + (sunDrift ? 5 : -5)
-    }
-
-    private func updateSunAnimation() {
-        if shouldAnimate {
-            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
-                sunDrift = true
-            }
-        } else {
-            withAnimation(nil) {
-                sunDrift = false
-            }
-        }
-    }
-
-    private func sunCenterX(for size: CGSize) -> CGFloat {
-        size.width * 0.382
-    }
-
-    private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: colorScheme == .dark ? "#E5B099" : "#F2B28F")
-                            .opacity(colorScheme == .dark ? 0.08 : 0.13),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(height: 86)
-            .position(x: size.width / 2, y: y)
-    }
-
-    private func sunDisk(y: CGFloat, size: CGSize) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: colorScheme == .dark ? "#FA6D5B" : "#F16250"),
-                            Color(hex: colorScheme == .dark ? "#D84A3E" : "#C83D36")
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 74, height: 74)
-
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.2 : 0.24),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-                .frame(width: 40, height: 40)
-                .offset(y: -9)
-        }
-        .overlay(
-            Circle()
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                .frame(width: 74, height: 74)
-        )
-        .position(x: sunCenterX(for: size), y: y)
-    }
-
-    private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
-        let height: CGFloat = colorScheme == .dark ? 212 : 230
-        let reflectionTop = max(y + 24, waterlineY - 10)
-        return RoundedRectangle(cornerRadius: 70, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#F06B58").opacity(colorScheme == .dark ? 0.2 : 0.3),
-                        Color(hex: "#D34A3F").opacity(colorScheme == .dark ? 0.14 : 0.24),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(width: 84, height: height)
-            .blur(radius: 4)
-            .scaleEffect(x: 1.04, y: 1.0, anchor: .top)
-            .position(x: sunCenterX(for: size) + 10, y: reflectionTop + height / 2)
-    }
-
-    private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvasSize in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let lineCount = 13
-                let leftX = canvasSize.width * 0.06
-                let rightX = canvasSize.width * 0.94
-                let laneHeight = max((canvasSize.height - waterlineY) / CGFloat(lineCount + 2), 8)
-                let waveAmplitude: CGFloat = reduceMotion ? 0.8 : 3.8
-
-                for idx in 0..<lineCount {
-                    let progress = CGFloat(idx) / CGFloat(lineCount)
-                    let baseY = waterlineY + CGFloat(idx + 1) * laneHeight
-                    let phase = Double(idx) * 0.76
-                    let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
-                    let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
-                    let lineWidth = max(0.7, 2.1 - progress * 1.2)
-                    let alpha = max(0.02, 0.11 - Double(progress) * 0.08)
-
-                    var path = Path()
-                    path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
-                    path.addQuadCurve(
-                        to: CGPoint(x: rightX - xWave, y: baseY - yWave * 0.35),
-                        control: CGPoint(
-                            x: canvasSize.width * 0.5 + CGFloat(sin(t * 0.4 + phase * 1.4)) * 26,
-                            y: baseY + CGFloat(cos(t * 0.3 + phase)) * (waveAmplitude * 0.9)
-                        )
-                    )
-
-                    context.stroke(
-                        path,
-                        with: .color(Color(hex: "#FFD6B9").opacity(alpha)),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
+        Group {
+            if shouldAnimate {
+                TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { timeline in
+                    scene(time: timeline.date.timeIntervalSinceReferenceDate)
                 }
+            } else {
+                scene(time: 0)
             }
-            .frame(width: size.width, height: size.height)
-            .blendMode(.plusLighter)
-        }
-    }
-}
-
-private struct LotrRainNightBackground: View {
-    let animationsActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let horizonY = size.height * 0.6
-
-            ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#070808"), Color(hex: "#0D0F12"), Color(hex: "#13161A"), Color(hex: "#1A1D22")]
-                        : [Color(hex: "#E6E7EA"), Color(hex: "#D6D8DD"), Color(hex: "#C1C4CB"), Color(hex: "#ADB1BA")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                // starless night: no stars, only layered mountain silhouettes
-                mountainLayer(size: size, y: horizonY - 34, opacity: colorScheme == .dark ? 0.7 : 0.34, offset: 0)
-                mountainLayer(size: size, y: horizonY - 12, opacity: colorScheme == .dark ? 0.86 : 0.46, offset: 24)
-
-                // distant call: a tiny warm beacon near golden-left valley
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color(hex: colorScheme == .dark ? "#D1A261" : "#AF7D47"))
-                    .frame(width: 3, height: 12)
-                    .blur(radius: 0.4)
-                    .position(x: size.width * 0.362, y: horizonY - 8)
-
-                coldRain(size: size, fromY: horizonY - 120)
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -20, y: size.height))
-            path.addLine(to: CGPoint(x: -20, y: y + 40))
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.28, y: y - 22),
-                control1: CGPoint(x: size.width * 0.05, y: y + 10),
-                control2: CGPoint(x: size.width * 0.18, y: y - 26)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.58, y: y + 6),
-                control1: CGPoint(x: size.width * 0.36, y: y - 16),
-                control2: CGPoint(x: size.width * 0.46, y: y + 14)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width + 20, y: y - 12),
-                control1: CGPoint(x: size.width * 0.71, y: y - 14),
-                control2: CGPoint(x: size.width * 0.89, y: y - 20)
-            )
-            path.addLine(to: CGPoint(x: size.width + 20, y: size.height))
-            path.closeSubpath()
+    @ViewBuilder
+    private func scene(time: TimeInterval) -> some View {
+        // A slow swell, so the light feels like it moves with passing clouds.
+        let swell = 0.85 + 0.15 * CGFloat(sin(time * 0.35))
+        if colorScheme == .dark {
+            nightRoom(swell: swell, time: time)
+        } else {
+            sunnyRoom(swell: swell)
         }
-        .fill(Color.black.opacity(opacity))
-        .offset(x: offset)
     }
 
-    private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvas in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let columns = 24
-                for idx in 0..<columns {
-                    let x = (CGFloat(idx) + 0.5) / CGFloat(columns) * canvas.width
-                    let phase = Double(idx) * 0.37
-                    let drift = CGFloat(sin(t * 0.65 + phase)) * (reduceMotion ? 0.5 : 2.3)
-                    let dropTop = fromY + CGFloat((idx % 4) * 6) + CGFloat((t * 38 + phase * 30).truncatingRemainder(dividingBy: 16))
-                    let dropHeight: CGFloat = 14 + CGFloat(idx % 3) * 2
-                    let rect = CGRect(x: x + drift, y: dropTop, width: 1.0, height: dropHeight)
-                    let path = Path(roundedRect: rect, cornerRadius: 1)
-                    context.fill(path, with: .color(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.1)))
+    private func sunnyRoom(swell: CGFloat) -> some View {
+        Canvas { context, size in
+            let beam = Color(hex: "#FFF6E6")
+            // Three bands of light, each a slanted strip entering from the top trailing edge.
+            let bands: [(start: CGFloat, width: CGFloat, alpha: Double)] = [
+                (0.50, 0.16, 0.85), (0.72, 0.09, 0.65), (0.86, 0.05, 0.5),
+            ]
+            let slant = size.height * 0.55
+            for band in bands {
+                let x0 = size.width * band.start
+                let w = size.width * band.width
+                var strip = Path()
+                strip.move(to: CGPoint(x: x0, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w - slant, y: size.height))
+                strip.addLine(to: CGPoint(x: x0 - slant, y: size.height))
+                strip.closeSubpath()
+                context.fill(
+                    strip,
+                    with: .linearGradient(
+                        Gradient(colors: [beam.opacity(band.alpha * Double(swell)), beam.opacity(0)]),
+                        startPoint: CGPoint(x: x0, y: 0),
+                        endPoint: CGPoint(x: x0 - slant * 0.7, y: size.height * 0.75)
+                    )
+                )
+            }
+        }
+    }
+
+    private func nightRoom(swell: CGFloat, time: TimeInterval) -> some View {
+        ZStack {
+            RadialGradient(
+                colors: [Color(hex: "#F29A5E").opacity(0.16 * Double(swell)), Color(hex: "#F29A5E").opacity(0)],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 360
+            )
+            Canvas { context, size in
+                var seed: UInt64 = 0xCA7_5EA7_57A2_2025
+                func next() -> CGFloat {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return CGFloat((seed >> 33) % 10_000) / 10_000
+                }
+                for index in 0..<22 {
+                    let x = next() * size.width
+                    // Stars stay in the upper part of the page, where the window is.
+                    let y = next() * size.height * 0.45
+                    let r = 0.6 + next() * 0.9
+                    let twinkle = 0.55 + 0.45 * sin(time * 0.8 + Double(index))
+                    let star = Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+                    context.fill(star, with: .color(Color(hex: "#F7E7C6").opacity(0.22 * twinkle)))
                 }
             }
         }
@@ -2168,7 +2130,8 @@ private struct TodayExpiredCompletedList: View {
                         onTapTask(task)
                     } label: {
                         HStack(spacing: WeekSpacing.sm) {
-                            Image(systemName: "checkmark.circle")
+                            CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 17)
+                                .font(.body)
                                 .foregroundColor(.accentGreen)
                             Text(task.title)
                                 .font(.bodyMedium)

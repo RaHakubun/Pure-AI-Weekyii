@@ -326,7 +326,9 @@ final class KillTimeFireTests: XCTestCase {
         // Render actual drawing code at a fixed phase. Attachments make color,
         // clipping, text contrast and the entire intensity range reviewable.
         for isDark in [false, true] {
-            for (batch, themes) in [Array(WeekTheme.allCases.prefix(7)), Array(WeekTheme.allCases.suffix(7))].enumerated() {
+            let themesInOrder = Array(WeekTheme.allCases)
+            let batches = [Array(themesInOrder.prefix(8)), Array(themesInOrder.suffix(themesInOrder.count - 8))]
+            for (batch, themes) in batches.enumerated() {
                 let atlas = VStack(spacing: 8) {
                     ForEach(themes) { theme in
                         HStack(spacing: 8) {
@@ -580,7 +582,7 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_openAccessEntitlementAndPreferenceControllerAreIndependentOfThemeUnlock() async {
+    func test_openAccessEntitlementAndSyncPreferenceAreIndependentOfThemeUnlock() async {
         let lockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
         lockedThemeSettings.premiumThemeUnlocked = false
         let unlockedThemeSettings = UserSettings(defaults: makeSuiteDefaults())
@@ -596,34 +598,20 @@ final class ModelTests: XCTestCase {
         let defaults = makeSuiteDefaults()
         let settings = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(settings)
-        let controller = CloudSyncPreferenceController(entitlementProvider: openAccessProvider)
 
-        let didEnable = await controller.setRequested(true, for: settings)
-        XCTAssertTrue(didEnable)
+        settings.setCloudSyncRequested(true)
         XCTAssertTrue(settings.cloudSyncRequested)
         XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, true)
 
-        let didDisable = await controller.setRequested(false, for: settings)
-        XCTAssertTrue(didDisable)
+        settings.setCloudSyncRequested(false)
         XCTAssertFalse(settings.cloudSyncRequested)
         XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
     }
 
-    @MainActor
-    func test_cloudSyncEntitlementProviderCanBeInjectedWithoutPaywallBehavior() async {
-        let defaults = makeSuiteDefaults()
-        let settings = UserSettings(defaults: defaults)
-        Self.retainedUserSettings.append(settings)
-        let controller = CloudSyncPreferenceController(
-            entitlementProvider: FixedCloudSyncEntitlementProvider(state: .notPurchased)
-        )
-
-        let saved = await controller.setRequested(true, for: settings)
-
-        XCTAssertFalse(saved)
-        XCTAssertFalse(settings.cloudSyncRequested)
-        XCTAssertEqual(defaults.object(forKey: "cloudSyncRequested") as? Bool, false)
-    }
+    // The paywall gate lives in `CloudSyncCoordinator.setRequested` and is
+    // covered by `CloudSyncCoordinatorTests.test_...(.notPurchased)`. The
+    // former `CloudSyncPreferenceController` was a second, ungated path into
+    // the same flag; it is gone, so there is nothing left to test here.
 
     @MainActor
     func test_persistentStoreRemainsWritableAcrossReopen() throws {
@@ -2650,15 +2638,117 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(WeekTheme.lotr.isPremiumTheme)
     }
 
-    func test_lotrThemeRequiresUnlockBeforeUse() {
-        XCTAssertEqual(
-            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: false),
-            .amber
+    func test_retiredLotrFallsBackRegardlessOfVIP() {
+        XCTAssertFalse(WeekTheme.lotr.isSelectable)
+        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("lotr"), "amber")
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "lotr", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "lotr", premiumThemeUnlocked: true), .amber)
+    }
+
+    @MainActor
+    func test_vipThemesBeginWithQuenyaAndExcludeRetiredThemes() {
+        XCTAssertEqual(WeekTheme.vipThemes, [.quenya, .brutal, .neon, .paper, .terminal, .cat])
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.quenya))
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.lotr))
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.lotr))
+        XCTAssertTrue(WeekTheme.quenya.requiresVIP)
+        XCTAssertTrue(WeekTheme.freeThemes.allSatisfy { !$0.requiresVIP })
+        // Legacy decorative flag is kept only for decoding old theme data.
+        XCTAssertEqual(WeekTheme.allCases.filter(\.isPremiumTheme), [.lotr])
+    }
+
+    @MainActor
+    func test_lockedVIPThemeFallsBackToAmberAndKeepsChoice() {
+        for theme in WeekTheme.vipThemes {
+            XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: theme.rawValue, premiumThemeUnlocked: false), .amber)
+            XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: theme.rawValue, premiumThemeUnlocked: true), theme)
+        }
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: WeekTheme.ocean.rawValue, premiumThemeUnlocked: false), .ocean)
+
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.premiumThemeUnlocked = true
+        settings.selectedThemeRaw = WeekTheme.neon.rawValue
+        settings.premiumThemeUnlocked = false
+        XCTAssertEqual(settings.selectedTheme, .amber)
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.neon.rawValue)
+        settings.premiumThemeUnlocked = true
+        XCTAssertEqual(settings.selectedTheme, .neon)
+    }
+
+    @MainActor
+    func test_flexibleModeStartsStrictWithoutVIPButKeepsPreference() {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.defaultExecutionMode = .flexible
+        settings.premiumThemeUnlocked = false
+        settings.vipAccessResolved = true
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+        XCTAssertEqual(settings.defaultExecutionMode, .flexible)
+        settings.premiumThemeUnlocked = true
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .flexible)
+        settings.defaultExecutionMode = .strict
+        settings.premiumThemeUnlocked = false
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+    }
+
+    @MainActor
+    func test_persistedVIPMirrorIsNotTrustedBeforeStoreKitResolves() {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.defaultExecutionMode = .flexible
+        settings.premiumThemeUnlocked = true
+        XCTAssertFalse(settings.vipAccessResolved)
+        XCTAssertFalse(settings.hasVIPAccess)
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .strict)
+        settings.vipAccessResolved = true
+        XCTAssertTrue(settings.hasVIPAccess)
+        XCTAssertEqual(settings.effectiveDefaultExecutionMode, .flexible)
+    }
+
+    @MainActor
+    func test_vipAccessMapsToCloudSyncEntitlement() {
+        XCTAssertEqual(VIPAccess(source: .subscription, product: .yearly).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess(source: .lifetime).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess(source: .betaTester).cloudSyncState, .entitled)
+        XCTAssertEqual(VIPAccess.inactive.cloudSyncState, .notPurchased)
+        XCTAssertEqual(VIPAccess(hasExpiredSubscription: true).cloudSyncState, .expired)
+        XCTAssertEqual(VIPAccess(verificationFailure: "bad").cloudSyncState, .verificationFailed("bad"))
+    }
+
+    @MainActor
+    func test_productCatalogIdentifiersAreStable() {
+        XCTAssertEqual(WeekyiiProduct.allIDs, [
+            "com.fluentdesign.Weekyii.vip.monthly",
+            "com.fluentdesign.Weekyii.vip.quarterly",
+            "com.fluentdesign.Weekyii.vip.yearly",
+            "com.fluentdesign.Weekyii.vip.lifetime",
+        ])
+        XCTAssertEqual(WeekyiiProduct.trialProduct, .yearly)
+        XCTAssertEqual(WeekyiiProduct.trialDays, 14)
+        XCTAssertFalse(WeekyiiProduct.lifetime.isSubscription)
+    }
+
+    @MainActor
+    func test_nonBetaBuildsNeverAutoGrantVIP() async {
+        // Unit tests build the Debug configuration, which must not carry WEEKYII_BETA.
+        XCTAssertFalse(VIPEntitlementResolver.isBetaConfiguration)
+        let granted = await VIPEntitlementResolver.isBetaTesterBuild()
+        XCTAssertFalse(granted)
+    }
+
+    @MainActor
+    func test_coordinatorRecordsEntitlementChangeWithoutTouchingPreference() async {
+        let settings = UserSettings(defaults: makeSuiteDefaults())
+        Self.retainedUserSettings.append(settings)
+        settings.setCloudSyncRequested(true)
+        let coordinator = CloudSyncCoordinator(
+            settings: settings,
+            entitlementProvider: FixedCloudSyncEntitlementProvider(state: .expired)
         )
-        XCTAssertEqual(
-            WeekTheme.resolvedTheme(rawValue: WeekTheme.lotr.rawValue, premiumThemeUnlocked: true),
-            .lotr
-        )
+        await coordinator.entitlementDidChange()
+        XCTAssertEqual(coordinator.entitlementState, .expired)
+        XCTAssertTrue(settings.cloudSyncRequested)
     }
 
     func test_projectTilePresentation_miniEditingStaysCompact() {
@@ -4010,9 +4100,10 @@ final class ModelTests: XCTestCase {
 
     func test_themeSkin_classicThemesKeepEveryOriginalDrawing() {
         // A classic skin has no tokens, so every shared component keeps its original code path.
+        // 魔戒 (.lotr) ships its own skin, see `test_themeSkin_lotrDrawsForgedComponents`.
         let originals: [WeekTheme] = [
             .amber, .ocean, .forest, .rose, .lavender,
-            .graphite, .sunset, .mint, .midnight, .lotr
+            .graphite, .sunset, .mint, .midnight
         ]
         for theme in originals {
             XCTAssertEqual(theme.skin, .classic, "\(theme.rawValue) must keep the classic skin")
@@ -4026,8 +4117,239 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(ThemeSkin.classic.radii, "classic themes keep the 8 / 12 / 16 / 24 radius scale")
     }
 
+    func test_themeSkin_lotrDrawsForgedComponents() {
+        let skin = WeekTheme.lotr.skin
+        XCTAssertNotEqual(skin, .classic)
+        XCTAssertEqual(skin.card?.cornerRadius, 18)
+        XCTAssertNil(skin.card?.shadow)
+        XCTAssertEqual(skin.row?.surface.edges, .bottomRule)
+        XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
+        XCTAssertEqual(skin.row?.typeChip, true)
+        XCTAssertEqual(skin.row?.chipSize, 30)
+        XCTAssertNotNil(skin.feature)
+        XCTAssertNil(skin.feature?.surface.material, "魔戒 focus panel is a flat stone surface")
+        XCTAssertEqual(skin.feature?.surface.fill, ThemeHexPair("#F5F2EB", "#211E1A"))
+        XCTAssertNil(skin.feature?.surface.tooling)
+        XCTAssertNil(skin.feature?.inscription)
+        XCTAssertEqual(skin.feature?.primaryAction.glows, false)
+        XCTAssertEqual(skin.badge?.kind, .waxSeal)
+        XCTAssertEqual(skin.section?.count, .itemCaption)
+        XCTAssertNil(skin.section?.rule)
+        XCTAssertFalse(skin.section?.showsIcon ?? true)
+        XCTAssertEqual(skin.backdrop, .none)
+        XCTAssertFalse(skin.softShadows)
+        XCTAssertEqual(skin.glyphs, .lotr)
+        XCTAssertNotNil(skin.gildedFill)
+        XCTAssertNotNil(skin.onPrimary)
+        XCTAssertTrue(skin.drawsMiddleEarthGlyphs)
+        XCTAssertEqual(LotrGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .sting)
+        XCTAssertEqual(LotrGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .mountDoom)
+        XCTAssertEqual(LotrGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .pipe)
+        XCTAssertNil(LotrGlyph(builtInType: .leisure, iconName: "star"))
+        XCTAssertEqual(LotrGlyph(systemName: "clock.arrow.circlepath"), .redBook)
+        XCTAssertEqual(LotrGlyph(systemName: "square.grid.2x2"), .phial)
+        XCTAssertEqual(LotrGlyph(status: .execute), .beacon)
+        for theme in WeekTheme.allCases where ![.lotr, .cat, .ring].contains(theme) {
+            XCTAssertNil(theme.skin.glyphs, "\(theme.rawValue) must keep SF Symbols")
+            XCTAssertNotEqual(theme.skin.row?.themesBuiltInTypes, true)
+        }
+    }
+
+    func test_lotrPaletteUsesStoneAndBasalt() {
+        let light = WeekTheme.lotr.palette(for: .light, systemIsDark: true)
+        let dark = WeekTheme.lotr.palette(for: .dark, systemIsDark: false)
+        XCTAssertEqual(light.backgroundPrimary, "#EEEDE8")
+        XCTAssertEqual(light.backgroundSecondary, "#FCFBF8")
+        XCTAssertEqual(light.textPrimary, "#292720")
+        XCTAssertEqual(light.primary, "#80642D")
+        XCTAssertEqual(dark.backgroundPrimary, "#11100F")
+        XCTAssertEqual(dark.backgroundSecondary, "#1C1A18")
+        XCTAssertEqual(dark.textPrimary, "#ECE6DB")
+        XCTAssertEqual(dark.primary, "#CBA552")
+    }
+
+    func test_themeSkin_catDrawsSunnyNapComponents() {
+        let skin = WeekTheme.cat.skin
+        XCTAssertNotEqual(skin, .classic)
+        // 猫猫: rounded cushions with a soft outline in both appearances.
+        XCTAssertEqual(skin.typography.titleDesign, .rounded)
+        XCTAssertEqual(skin.typography.bodyDesign, .rounded)
+        XCTAssertEqual(skin.card?.borderWidth, 1)
+        XCTAssertEqual(skin.card?.border.light, "#E9D8C9")
+        XCTAssertEqual(skin.card?.border.dark, "#8E6D56")
+        XCTAssertEqual(skin.row?.surface.border.dark, "#8E6D56")
+        XCTAssertEqual(skin.feature?.surface.border.dark, "#AA8267")
+        XCTAssertEqual(skin.feature?.action.ink.light, "#3A2015")
+        XCTAssertEqual(skin.feature?.action.fill?.light, "#ED9767")
+        XCTAssertEqual(skin.card?.tintsWithAccent, true)
+        XCTAssertEqual(skin.card?.hidesAccentBar, true)
+        // Task rows: type-colour wash with the icon in a chip.
+        XCTAssertEqual(skin.row?.typeChip, true)
+        XCTAssertEqual(skin.row?.themesBuiltInTypes, true)
+        // The focus panel is the cat: ginger fur, ears and tail, no inscription.
+        XCTAssertNotNil(skin.feature?.catEars)
+        XCTAssertNil(skin.feature?.inscription)
+        if case .gradient = skin.feature?.surface.material {} else {
+            XCTFail("猫猫 focus panel must be a ginger gradient")
+        }
+        XCTAssertEqual(skin.badge?.kind, .softPill)
+        XCTAssertEqual(skin.section?.count, .capsule)
+        XCTAssertEqual(skin.section?.ruleDotted, true)
+        XCTAssertNotNil(skin.section?.ruleEndMark)
+        XCTAssertEqual(skin.icon?.tintsFill, true)
+        XCTAssertNotNil(skin.gildedFill)
+        XCTAssertEqual(skin.backdrop, .none)
+        XCTAssertTrue(skin.softShadows)
+        XCTAssertEqual(skin.glyphs, .cat)
+        for theme in WeekTheme.allCases where theme != .cat {
+            XCTAssertNotEqual(theme.skin.glyphs, .cat, "\(theme.rawValue) must not draw cat glyphs")
+            XCTAssertNil(theme.skin.feature?.catEars, "\(theme.rawValue) must not grow cat ears")
+            XCTAssertNotEqual(theme.skin.badge?.kind, .softPill, "\(theme.rawValue) must keep its own badge")
+            if theme != .ring && theme != .lotr {
+                XCTAssertNotEqual(theme.skin.row?.typeChip, true, "\(theme.rawValue) must keep its type bar")
+            }
+        }
+    }
+
+    func test_retiredRingThemeMigratesToAmber() {
+        XCTAssertFalse(WeekTheme.ring.isSelectable)
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.ring))
+        XCTAssertEqual(WeekTheme.canonicalStoredThemeRaw("ring"), "amber")
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "ring", premiumThemeUnlocked: true), .amber)
+        XCTAssertEqual(WeekTheme.ring.skin, WeekTheme.lotr.skin)
+        XCTAssertEqual(
+            WeekTheme.ring.widgetThemeSnapshot(appearanceMode: .system).darkBackgroundHex,
+            WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system).darkBackgroundHex
+        )
+    }
+
+    @MainActor
+    func test_retiredRingStoredSelectionIsMigrated() {
+        let defaults = makeSuiteDefaults()
+        defaults.set("ring", forKey: "selectedTheme")
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
+        settings.selectedThemeRaw = "ring"
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
+        settings.selectedThemeRaw = "lotr"
+        XCTAssertEqual(settings.selectedThemeRaw, "amber")
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), "amber")
+    }
+
+    func test_catThemeRequiresUnlock() {
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "cat", premiumThemeUnlocked: false), .amber)
+        XCTAssertEqual(WeekTheme.resolvedTheme(rawValue: "cat", premiumThemeUnlocked: true), .cat)
+        XCTAssertTrue(WeekTheme.vipThemes.contains(.cat))
+    }
+
+    func test_catGlyphCoversEveryCallSite() {
+        XCTAssertEqual(CatGlyph(systemName: "target"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "sun.max"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "flame"), .face)
+        XCTAssertEqual(CatGlyph(systemName: "clock"), .alarm)
+        XCTAssertEqual(CatGlyph(systemName: "hourglass"), .alarm)
+        XCTAssertEqual(CatGlyph(systemName: "clock.arrow.circlepath"), .curl)
+        XCTAssertEqual(CatGlyph(systemName: "snowflake"), .curl)
+        XCTAssertEqual(CatGlyph(systemName: "square.grid.2x2"), .box)
+        XCTAssertEqual(CatGlyph(systemName: "gearshape"), .bell)
+        XCTAssertEqual(CatGlyph(systemName: "checkmark.circle"), .bone)
+        XCTAssertEqual(CatGlyph(systemName: "leaf"), .yarn)
+        // A plain calendar stays an SF Symbol; only the 未来 tab redraws it.
+        XCTAssertNil(CatGlyph(systemName: "calendar"))
+        XCTAssertEqual(CatGlyph(tabSystemName: "calendar"), .gaze)
+        XCTAssertEqual(CatGlyph(tabSystemName: "sun.max"), .face)
+        XCTAssertEqual(CatGlyph(tabSystemName: "clock.arrow.circlepath"), .curl)
+        XCTAssertEqual(CatGlyph(tabSystemName: "square.grid.2x2"), .box)
+        XCTAssertEqual(CatGlyph(tabSystemName: "gearshape"), .bell)
+        XCTAssertNil(CatGlyph(systemName: "star"))
+        XCTAssertEqual(CatGlyph(builtInType: .regular, iconName: TaskType.regular.iconName), .paw)
+        XCTAssertEqual(CatGlyph(builtInType: .ddl, iconName: TaskType.ddl.iconName), .alarm)
+        XCTAssertEqual(CatGlyph(builtInType: .leisure, iconName: TaskType.leisure.iconName), .yarn)
+        XCTAssertNil(CatGlyph(builtInType: .leisure, iconName: "star"))
+        XCTAssertEqual(CatGlyph(status: .empty), .curl)
+        XCTAssertEqual(CatGlyph(status: .draft), .doze)
+        XCTAssertEqual(CatGlyph(status: .execute), .face)
+        XCTAssertEqual(CatGlyph(status: .completed), .bone)
+        XCTAssertEqual(CatGlyph(status: .expired), .curl)
+    }
+
+    func test_catGlyphsAreDistinctSilhouettes() {
+        XCTAssertEqual(CatGlyph.allCases.count, 11)
+        XCTAssertEqual(Set(CatGlyph.allCases.map(\.rawValue)).count, 11)
+        for glyph in CatGlyph.allCases {
+            XCTAssertFalse(glyph.layers.isEmpty, "\(glyph.rawValue) must draw something")
+        }
+    }
+
+    func test_killTimeFirePalette_doesNotFollowTheTheme() {
+        // 火焰是「时间压力」的状态色，不是纸张配色的一部分：换主题时它必须
+        // 保持同一组温度梯度，只有深浅色模式可以变。
+        for isDark in [false, true] {
+            let reference = flamePaletteComponents(KillTimeFirePalette(theme: .lotr, isDark: isDark))
+            for theme in WeekTheme.allCases {
+                XCTAssertEqual(
+                    flamePaletteComponents(KillTimeFirePalette(theme: theme, isDark: isDark)),
+                    reference,
+                    "\(theme.rawValue) must not recolour the deadline flame"
+                )
+            }
+        }
+    }
+
+    private func flamePaletteComponents(_ palette: KillTimeFirePalette) -> [Float] {
+        let colors = [
+            palette.glow, palette.outer, palette.body, palette.core,
+            palette.outerBase, palette.bodyBase, palette.coreBase, palette.ember
+        ]
+        var values = colors.flatMap { color -> [Float] in
+            let resolved = color.resolve(in: EnvironmentValues())
+            return [resolved.red, resolved.green, resolved.blue, resolved.opacity]
+        }
+        values.append(Float(palette.opacity))
+        return values
+    }
+
+    func test_lotrThemedTypeColor_onlyReplacesUntouchedBuiltInColours() {
+        XCTAssertEqual(
+            WeekTheme.lotr.themedTypeColorHex(storedHex: "#8B5A83", baseKind: .leisure, isDark: true),
+            "#CBA552"
+        )
+        XCTAssertEqual(
+            WeekTheme.lotr.themedTypeColorHex(storedHex: "#8b5a83", baseKind: .leisure, isDark: false),
+            "#80642D"
+        )
+        // A colour the user picked is kept.
+        XCTAssertEqual(
+            WeekTheme.lotr.themedTypeColorHex(storedHex: "#123456", baseKind: .leisure, isDark: true),
+            "#123456"
+        )
+        // Other themes never rewrite stored colours.
+        XCTAssertEqual(
+            WeekTheme.amber.themedTypeColorHex(storedHex: "#8B5A83", baseKind: .leisure, isDark: true),
+            "#8B5A83"
+        )
+    }
+
+    func test_liveActivityThemeSnapshot_gildedActionsOnlyForLotr() throws {
+        XCTAssertEqual(WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system).gildedActions, true)
+        XCTAssertNil(WeekTheme.amber.liveActivityThemeSnapshot(appearanceMode: .system).gildedActions)
+
+        // Snapshots written before the field existed still decode.
+        let snapshot = WeekTheme.amber.liveActivityThemeSnapshot(appearanceMode: .system)
+        let data = try JSONEncoder().encode(snapshot)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "gildedActions")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(LiveActivityThemeSnapshot.self, from: legacy)
+        XCTAssertNil(decoded.gildedActions)
+    }
+
     func test_themeSkin_personalisedThemesRestyleSharedComponents() {
-        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal]
+        let personalised: [WeekTheme] = [.brutal, .neon, .paper, .terminal, .blueprint]
         for theme in personalised {
             let skin = theme.skin
             XCTAssertNotEqual(skin, .classic, "\(theme.rawValue) must ship its own skin")
@@ -4052,12 +4374,14 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(WeekTheme.neon.visualStyle, .neon)
         XCTAssertEqual(WeekTheme.paper.visualStyle, .paper)
         XCTAssertEqual(WeekTheme.terminal.visualStyle, .terminal)
+        XCTAssertEqual(WeekTheme.blueprint.visualStyle, .drafting)
 
         // Brutalist is defined by a hard (unblurred) offset shadow.
         XCTAssertEqual(WeekTheme.brutal.visualStyle.shadow?.radius, 0)
         // Flat themes must not silently fall back to the classic diffuse shadow.
         XCTAssertEqual(WeekTheme.paper.visualStyle.shadow, .flat)
         XCTAssertEqual(WeekTheme.terminal.visualStyle.shadow, .flat)
+        XCTAssertEqual(WeekTheme.blueprint.visualStyle.shadow, .flat)
 
         XCTAssertEqual(WeekTheme.brutal.visualStyle.symbolVariant, .fill)
         XCTAssertEqual(WeekTheme.neon.visualStyle.symbolVariant, .fill)
@@ -4068,10 +4392,33 @@ final class ModelTests: XCTestCase {
         // otherwise it is just a recolour wearing a new name.
         for theme in WeekTheme.allCases where theme.visualStyle != .classic {
             XCTAssertTrue(
-                [.brutal, .neon, .paper, .terminal].contains(theme),
+                [.brutal, .neon, .paper, .terminal, .blueprint].contains(theme),
                 "\(theme.rawValue) changed the visual form without being a personalised theme"
             )
         }
+    }
+
+    /// 蓝图 is no longer offered. A stored selection resolves and persists as amber.
+    @MainActor
+    func test_blueprintThemeIsRemovedFromThePicker() {
+        XCTAssertFalse(WeekTheme.blueprint.isSelectable)
+        XCTAssertFalse(WeekTheme.freeThemes.contains(.blueprint))
+        XCTAssertFalse(WeekTheme.vipThemes.contains(.blueprint))
+        XCTAssertEqual(
+            WeekTheme.resolvedTheme(rawValue: WeekTheme.blueprint.rawValue, premiumThemeUnlocked: true),
+            .amber
+        )
+
+        let defaults = makeSuiteDefaults()
+        defaults.set(WeekTheme.blueprint.rawValue, forKey: "selectedTheme")
+        let settings = UserSettings(defaults: defaults)
+        Self.retainedUserSettings.append(settings)
+        XCTAssertEqual(settings.selectedTheme, .amber)
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.amber.rawValue)
+        XCTAssertEqual(defaults.string(forKey: "selectedTheme"), WeekTheme.amber.rawValue)
+
+        settings.selectedThemeRaw = WeekTheme.blueprint.rawValue
+        XCTAssertEqual(settings.selectedThemeRaw, WeekTheme.amber.rawValue)
     }
 
     /// `barScale` is a multiplier precisely so `.classic` stays untouched:
@@ -4116,6 +4463,52 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(ThemeSymbolVariant.fill.symbolVariants, .fill)
         XCTAssertEqual(ThemeSymbolVariant.circle.symbolVariants, .circle)
         XCTAssertEqual(ThemeSymbolVariant.square.symbolVariants, .square)
+    }
+
+    func test_sunsetUsesNeutralPageBackgroundInBothAppearances() {
+        XCTAssertEqual(WeekTheme.sunset.palette(for: .light, systemIsDark: false).backgroundPrimary, "#F8F8F7")
+        XCTAssertEqual(WeekTheme.sunset.palette(for: .dark, systemIsDark: true).backgroundPrimary, "#171717")
+    }
+
+    func test_catDarkEdgesAndTextHaveReadableContrast() {
+        func luminance(_ hex: String) -> Double {
+            let value = Int(hex.dropFirst(), radix: 16)!
+            func linear(_ component: Int) -> Double {
+                let c = Double(component) / 255
+                return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear((value >> 16) & 255)
+                + 0.7152 * linear((value >> 8) & 255)
+                + 0.0722 * linear(value & 255)
+        }
+        func contrast(_ a: String, _ b: String) -> Double {
+            let x = luminance(a), y = luminance(b)
+            return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+        }
+        let skin = WeekTheme.cat.skin
+        let palette = WeekTheme.cat.palette(for: .dark, systemIsDark: true)
+        XCTAssertGreaterThanOrEqual(contrast(skin.card!.border.dark, palette.backgroundSecondary), 3)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.surface.border.dark, "#493226"), 3)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textPrimary, palette.backgroundSecondary), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textSecondary, "#493226"), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(palette.textTertiary, palette.backgroundSecondary), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.action.ink.light, skin.feature!.action.fill!.light), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(skin.feature!.action.ink.dark, skin.feature!.action.fill!.dark), 4.5)
+    }
+
+    func test_quenyaThemeHasIndependentWarmPaletteAndFocusSkin() {
+        XCTAssertEqual(WeekTheme(rawValue: "quenya"), .quenya)
+        XCTAssertTrue(WeekTheme.quenya.isSelectable)
+        XCTAssertTrue(WeekTheme.quenya.skin.isQuenya)
+        XCTAssertFalse(WeekTheme.amber.skin.isQuenya)
+        XCTAssertNotNil(WeekTheme.quenya.skin.card)
+        XCTAssertNotNil(WeekTheme.quenya.skin.feature)
+        let light = WeekTheme.quenya.palette(for: .light, systemIsDark: false)
+        let dark = WeekTheme.quenya.palette(for: .dark, systemIsDark: true)
+        XCTAssertEqual(light.backgroundPrimary, "#E9DFCB")
+        XCTAssertEqual(light.backgroundSecondary, "#F7F1E5")
+        XCTAssertEqual(dark.backgroundPrimary, "#1B1512")
+        XCTAssertEqual(dark.backgroundSecondary, "#29201A")
     }
 
     func test_themePalette_everyThemeHasCompleteHexValuesInBothAppearances() {
@@ -4562,8 +4955,8 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.widgetThemeSnapshot(appearanceMode: .system)
 
         XCTAssertEqual(snapshot.primaryHex, WeekTheme.lotr.primaryThemeHex)
-        XCTAssertEqual(snapshot.darkBackgroundHex, "#101411")
-        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#E6DECf")
+        XCTAssertEqual(snapshot.darkBackgroundHex, "#1C1A18")
+        XCTAssertEqual(snapshot.darkTextPrimaryHex, "#ECE6DB")
     }
 
     func test_liveActivityThemeSnapshot_resolvesLockPaletteForForcedDarkMode() {
@@ -4602,10 +4995,10 @@ final class ModelTests: XCTestCase {
         let snapshot = WeekTheme.lotr.liveActivityThemeSnapshot(appearanceMode: .system)
         let darkLockPalette = snapshot.resolvedLockPalette(prefersDarkLock: true)
 
-        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#E6DECf")
-        XCTAssertEqual(snapshot.islandKeylineHex, "#C6AA79")
-        XCTAssertEqual(darkLockPalette.backgroundHex, "#101411")
-        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#E6DECf")
+        XCTAssertEqual(snapshot.islandTextPrimaryHex, "#ECE6DB")
+        XCTAssertEqual(snapshot.islandKeylineHex, "#DFC078")
+        XCTAssertEqual(darkLockPalette.backgroundHex, "#1C1A18")
+        XCTAssertEqual(darkLockPalette.textPrimaryHex, "#ECE6DB")
     }
 
     func test_widgetSnapshotStore_roundTrip() throws {
@@ -7975,5 +8368,37 @@ final class PastDayFailureRuleTests: XCTestCase {
         let restored = UserSettings(defaults: defaults)
         Self.retainedUserSettings.append(restored)
         XCTAssertEqual(restored.pastMonthMarkerOptions, .default)
+    }
+}
+
+final class ProjectDetailWeekTests: XCTestCase {
+    @MainActor
+    func test_groupsUseAnchoredMondayThroughSundayAcrossYearsAndCountMixedStates() throws {
+        let monday = try XCTUnwrap(WeekyiiDayId.date(from: "2026-12-28"))
+        let sunday = monday.addingDays(6)
+        let nextMonday = monday.addingDays(7)
+        let completed = TaskItem(title: "Done", order: 0, zone: .complete)
+        let open = TaskItem(title: "Open", order: 1, zone: .draft)
+        let sameDay = ProjectTaskLedgerSection(date: sunday, tasks: [completed, open], isExpandedByDefault: false, expiredCount: 2)
+        let earlierDay = ProjectTaskLedgerSection(date: monday.addingDays(1), tasks: [], isExpandedByDefault: false, expiredCount: 1)
+        let nextWeek = ProjectTaskLedgerSection(date: nextMonday, tasks: [], isExpandedByDefault: true, expiredCount: 1)
+
+        let weeks = ProjectDetailWeek.groups(from: [nextWeek, sameDay, earlierDay])
+        XCTAssertEqual(weeks.count, 2)
+        XCTAssertEqual(weeks[0].start.dayId, "2026-12-28")
+        XCTAssertEqual(weeks[0].end.dayId, "2027-01-03")
+        XCTAssertEqual(weeks[0].days.map(\.isoWeekday), [1, 2, 3, 4, 5, 6, 7])
+        XCTAssertEqual(weeks[0].section(on: sunday)?.id, sunday.dayId)
+        XCTAssertNil(weeks[0].section(on: monday))
+        XCTAssertEqual(weeks[0].completedCount, 1)
+        XCTAssertEqual(weeks[0].expiredCount, 3)
+        XCTAssertEqual(weeks[0].openCount, 1)
+        XCTAssertEqual(weeks[0].sections.map(\.id), [earlierDay.id, sameDay.id])
+        XCTAssertEqual(weeks[1].start.dayId, "2027-01-04")
+        XCTAssertEqual(weeks[1].expiredCount, 1)
+    }
+
+    func test_emptySectionsProduceNoWeeks() {
+        XCTAssertTrue(ProjectDetailWeek.groups(from: []).isEmpty)
     }
 }

@@ -21,7 +21,7 @@ struct PendingWeekCard: View {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     // 周标题行：图标中性化，仅周标签用主色，右侧显示日期范围
                     HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "calendar")
+                        CatCoveredSymbol(systemName: "calendar", pointSize: 13)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.textTertiary)
                         Text(week.relativeWeekLabel())

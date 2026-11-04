@@ -145,7 +145,8 @@ private struct SuspendedTasksModulePreview: View {
                 accessibilityIdentifier: "extensionsSuspendedLiveTile",
                 aspectRatio: 1,
                 tint: { _ in Color.suspendedModuleTint },
-                emptyTint: .suspendedModuleTint
+                emptyTint: .suspendedModuleTint,
+                quenyaMotif: .rings
             ) { task in
                 SuspendedTaskLiveTile(task: task, totalCount: viewModel.suspendedTasks.count)
             } emptyContent: {
@@ -192,7 +193,8 @@ private struct HabitsModulePreview: View {
                 accessibilityIdentifier: "extensionsHabitsLiveTile",
                 minHeight: 132,
                 tint: { $0.habitColor },
-                emptyTint: .accentGreen
+                emptyTint: .accentGreen,
+                quenyaMotif: .inscription
             ) { habit in
                 HabitLiveTile(
                     habit: habit,
@@ -369,6 +371,9 @@ private struct ProjectsModulePreview: View {
     /// 视口剩余可拉伸高度；瓦片只吃富余空间，绝不低于自身内容高度。
     var fillHeight: CGFloat = 0
 
+    /// 卡片最终高度。空态要自己撑到这个高度，占位图标才落得进卡片中间。
+    private var tileHeight: CGFloat { max(172, fillHeight) }
+
     var body: some View {
         NavigationLink {
             ProjectsFullView(viewModel: viewModel)
@@ -378,17 +383,18 @@ private struct ProjectsModulePreview: View {
                 initialDelay: .seconds(5.6),
                 isActive: animationsActive,
                 accessibilityIdentifier: "extensionsProjectsLiveTile",
-                minHeight: max(172, fillHeight),
+                minHeight: tileHeight,
                 stretches: true,
                 tint: { Color.weekyiiEmphasis(hex: $0.colorHex) },
-                emptyTint: .weekyiiPrimary
+                emptyTint: .weekyiiPrimary,
+                quenyaMotif: .tree
             ) { snapshot in
                 ProjectFocusLiveTile(
                     snapshot: snapshot,
                     projectCount: viewModel.activeProjects().count
                 )
             } emptyContent: {
-                ProjectEmptyLiveTile()
+                ProjectEmptyLiveTile(height: tileHeight)
             }
         }
         .buttonStyle(.plain)
@@ -1316,7 +1322,8 @@ private struct MindStampsModulePreview: View {
                 accessibilityIdentifier: "extensionsMindStampsLiveTile",
                 aspectRatio: 1,
                 tint: { _ in Color.accentPink },
-                emptyTint: .accentPink
+                emptyTint: .accentPink,
+                quenyaMotif: .star
             ) { stamp in
                 MindStampLiveTile(stamp: stamp, totalCount: viewModel.stamps.count)
             } emptyContent: {
@@ -1434,7 +1441,8 @@ private struct MindStampLiveTile: View {
                         icon: "bandage.fill",
                         tint: image == nil ? .accentPink : .white,
                         textColor: image == nil ? .textTertiary : .white.opacity(0.85),
-                        trailing: ""
+                        trailing: "",
+                        overImage: image != nil
                     )
 
                     Spacer(minLength: 0)
@@ -1862,32 +1870,45 @@ private struct ProjectHubRhythmChart: View {
 }
 
 private struct ProjectEmptyLiveTile: View {
+    /// 与 `LiveModuleTile` 的拉伸高度一致。空态没有内容可量自然高度，
+    /// 所以直接吃满这个高度，占位图标才能真正落到卡片中间而不是贴顶。
+    let height: CGFloat
+
     var body: some View {
-        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        VStack(alignment: .leading, spacing: 0) {
             HubModuleLabel(
                 title: String(localized: "extensions.module.projects.title"),
                 icon: "folder.fill",
                 tint: .weekyiiPrimary,
                 trailing: ""
             )
-            HStack(alignment: .center, spacing: WeekSpacing.sm) {
-                Image(systemName: "folder.badge.plus")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(Color.weekyiiPrimary.opacity(0.45))
-                Text(String(localized: "extensions.hub.projects.empty"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.textSecondary)
-                Spacer(minLength: 0)
-                Label(
-                    String(localized: "extensions.hub.projects.tap_to_see_all"),
-                    systemImage: "chevron.right"
-                )
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(Color.textTertiary)
+
+            Spacer(minLength: WeekSpacing.md)
+
+            // 没有项目时，整张卡下半部分是空的；用一枚安静的占位图标占住中间，
+            // 比让一行文字孤零零贴在顶上更像「这页还等着你写」。
+            VStack(spacing: WeekSpacing.sm) {
+                ThemedSymbol(systemName: "folder", size: 56)
+                    .font(.system(size: 56, weight: .ultraLight))
+                    .foregroundStyle(Color.weekyiiPrimary.opacity(0.22))
+
+                VStack(spacing: 3) {
+                    Text(String(localized: "extensions.hub.projects.empty"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.textSecondary)
+                    Text(String(localized: "extensions.hub.projects.empty_hint", defaultValue: "点按创建一个项目"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
+
+            Spacer(minLength: WeekSpacing.md)
         }
         .padding(WeekSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .frame(height: height, alignment: .top)
     }
 }
 
@@ -1900,15 +1921,57 @@ private struct HubModuleLabel: View {
     var tint: Color = .textTertiary
     var textColor: Color = .textTertiary
     let trailing: String
+    /// Drawn over a photo: keep the caller's light colours.
+    var overImage: Bool = false
+    @Environment(\.themeSkin) private var skin
 
     var body: some View {
+        if skin.drawsMiddleEarthGlyphs, let section = skin.section, !overImage {
+            bookLabel(section)
+        } else {
+            standardLabel
+        }
+    }
+
+    /// 红皮书：去掉彩色圆底，换成墨线道具图标；标题首字朱红，与页内其他标题一致。
+    private func bookLabel(_ section: ThemeSectionSkin) -> some View {
+        HStack(spacing: 7) {
+            // 玄铁与古金 keeps module captions as quiet text, like the section headers.
+            if let icon, section.count != .itemCaption {
+                ThemedSymbol(systemName: icon, size: 16)
+                    .foregroundColor(section.iconInk?.color ?? tint)
+                    .frame(width: 20, height: 20)
+            }
+            WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
+                .font(.caption.weight(.semibold))
+                .tracking(max(section.titleTracking, 0.6))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if !trailing.isEmpty {
+                Text(trailing)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(section.countInk?.color ?? textColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var standardLabel: some View {
         HStack(spacing: 6) {
             if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(tint)
-                    .frame(width: 24, height: 24)
-                    .background(tint.opacity(0.12), in: Circle())
+                Group {
+                    if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
+                        CatGlyphView(glyph: glyph)
+                            .frame(width: 13, height: 13)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                }
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.12), in: Circle())
             }
             Text(title)
                 .font(.caption2.weight(.medium))

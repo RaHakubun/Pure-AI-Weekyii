@@ -41,6 +41,8 @@ nonisolated struct CloudSyncChangeBatch: Hashable, Sendable {
 nonisolated struct CloudSyncZoneInspection: Hashable, Sendable {
     let exists: Bool
     let records: [CloudSyncRecord]
+    /// Records present in the zone that this build could not decode.
+    var undecodableRecordNames: [String] = []
 }
 
 nonisolated enum CloudSyncRecordOperation: String, Hashable, Sendable {

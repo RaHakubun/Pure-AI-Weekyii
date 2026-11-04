@@ -193,6 +193,11 @@ enum WeekyiiDataArchiveService {
         let (envelope, payload) = try decode(data)
         try validate(payload)
         try modelContext.save()
+        // Before anything is replaced: turn iCloud sync off and forget this
+        // device's sync baselines. Otherwise the next cycle reads the imported
+        // store as "the user deleted everything not in the archive" and deletes
+        // those records from iCloud. Throws (nothing replaced) if it cannot.
+        try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
         _ = try BackupRecoveryService.createSnapshot(storeURL: storeURL, reason: "import")
 
         do {
@@ -206,6 +211,10 @@ enum WeekyiiDataArchiveService {
         apply(payload.settings, to: settings)
         apply(payload.appState, to: appState)
         appState.bumpDataRevision()
+        // The store was replaced wholesale, so the view tree has to be rebuilt
+        // rather than patched. This is the one path where losing navigation
+        // state is the correct outcome.
+        appState.bumpStructureRevision()
         return Inspection(
             exportedAt: envelope.exportedAt,
             weekCount: payload.weeks.count,
@@ -235,7 +244,7 @@ enum WeekyiiDataArchiveService {
             suspendedTasks: suspended.map { suspendedRecord($0) },
             taskTypes: taskTypes.map { .init(idRaw: $0.idRaw, name: $0.name, iconName: $0.iconName, colorHex: $0.colorHex, baseKindRaw: $0.baseKindRaw, sortOrder: $0.sortOrder, isBuiltIn: $0.isBuiltIn, isArchived: $0.isArchived) },
             habits: habits.map { habitRecord($0) },
-            settings: .init(defaultKillTimeHour: settings.defaultKillTimeHour, defaultKillTimeMinute: settings.defaultKillTimeMinute, defaultTaskTypeRaw: settings.defaultTaskType.rawValue, defaultTaskTypeIdRaw: settings.defaultTaskTypeIdRaw, defaultExecutionModeRaw: settings.defaultExecutionModeRaw, killTimeReminderMinutes: settings.killTimeReminderMinutes, fixedReminderEnabled: settings.fixedReminderEnabled, fixedReminderHour: settings.fixedReminderHour, fixedReminderMinute: settings.fixedReminderMinute, weekStartsOnMonday: settings.weekStartsOnMonday, defaultProjectDurationDays: settings.defaultProjectDurationDays, defaultProjectTileSizeRaw: settings.defaultProjectTileSizeRaw, pendingMonthShowRegular: settings.pendingMonthShowRegular, pendingMonthShowDDL: settings.pendingMonthShowDDL, pendingMonthShowLeisure: settings.pendingMonthShowLeisure, selectedThemeRaw: settings.selectedThemeRaw, appearanceModeRaw: settings.appearanceModeRaw, premiumThemeUnlocked: settings.premiumThemeUnlocked, autoStartEnabled: settings.autoStartConfiguration.isEnabled, autoStartHour: settings.autoStartConfiguration.hour, autoStartMinute: settings.autoStartConfiguration.minute),
+            settings: .init(defaultKillTimeHour: settings.defaultKillTimeHour, defaultKillTimeMinute: settings.defaultKillTimeMinute, defaultTaskTypeRaw: settings.defaultTaskType.rawValue, defaultTaskTypeIdRaw: settings.defaultTaskTypeIdRaw, defaultExecutionModeRaw: settings.defaultExecutionModeRaw, killTimeReminderMinutes: settings.killTimeReminderMinutes, fixedReminderEnabled: settings.fixedReminderEnabled, fixedReminderHour: settings.fixedReminderHour, fixedReminderMinute: settings.fixedReminderMinute, weekStartsOnMonday: settings.weekStartsOnMonday, defaultProjectDurationDays: settings.defaultProjectDurationDays, defaultProjectTileSizeRaw: settings.defaultProjectTileSizeRaw, pendingMonthShowRegular: settings.pendingMonthShowRegular, pendingMonthShowDDL: settings.pendingMonthShowDDL, pendingMonthShowLeisure: settings.pendingMonthShowLeisure, selectedThemeRaw: settings.selectedThemeRaw, appearanceModeRaw: settings.appearanceModeRaw, premiumThemeUnlocked: false, autoStartEnabled: settings.autoStartConfiguration.isEnabled, autoStartHour: settings.autoStartConfiguration.hour, autoStartMinute: settings.autoStartConfiguration.minute),
             appState: .init(daysStartedCount: appState.daysStartedCount, dataRevision: appState.dataRevision, stateTransitionRevision: appState.stateTransitionRevision, systemStartDate: appState.systemStartDate, lastProcessedDate: appState.lastProcessedDate, lastRolloverAt: appState.lastRolloverAt)
         )
     }
@@ -385,7 +394,8 @@ enum WeekyiiDataArchiveService {
         settings.fixedReminderEnabled = value.fixedReminderEnabled; settings.fixedReminderHour = value.fixedReminderHour; settings.fixedReminderMinute = value.fixedReminderMinute
         settings.weekStartsOnMonday = value.weekStartsOnMonday; settings.defaultProjectDurationDays = value.defaultProjectDurationDays; settings.defaultProjectTileSizeRaw = value.defaultProjectTileSizeRaw
         settings.pendingMonthShowRegular = value.pendingMonthShowRegular; settings.pendingMonthShowDDL = value.pendingMonthShowDDL; settings.pendingMonthShowLeisure = value.pendingMonthShowLeisure
-        settings.selectedThemeRaw = value.selectedThemeRaw; settings.appearanceModeRaw = value.appearanceModeRaw; settings.premiumThemeUnlocked = value.premiumThemeUnlocked
+        settings.selectedThemeRaw = value.selectedThemeRaw; settings.appearanceModeRaw = value.appearanceModeRaw
+        // `premiumThemeUnlocked` is deliberately not restored: VIP access comes only from StoreKit.
         settings.restoreAutoStartConfiguration(
             isEnabled: value.autoStartEnabled ?? false,
             hour: value.autoStartHour ?? 9,
@@ -400,4 +410,31 @@ enum WeekyiiDataArchiveService {
     private static func encoder() -> JSONEncoder { let value = JSONEncoder(); value.outputFormatting = [.sortedKeys]; value.dateEncodingStrategy = .millisecondsSince1970; return value }
     private static func decoder() -> JSONDecoder { let value = JSONDecoder(); value.dateDecodingStrategy = .millisecondsSince1970; return value }
     private static func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+}
+
+/// Local data is about to be replaced wholesale (archive import, recovery point
+/// restore). iCloud sync must not interpret that as a series of user edits.
+@MainActor
+enum CloudSyncLocalReplacementGuard {
+    /// Posted after sync was switched off for a replacement, so the running
+    /// coordinator can drop its session immediately (WeekyiiApp observes it).
+    static let didSuspendSyncNotification = Notification.Name("WeekyiiCloudSyncSuspendedForLocalReplacement")
+
+    /// Turns iCloud sync off (the running cycle is invalidated at its next check,
+    /// because the coordinator's session test includes `cloudSyncRequested`) and
+    /// resets every account's device-local sync state. Turning sync back on then
+    /// inspects iCloud and asks: use this device / use iCloud / merge / cancel.
+    ///
+    /// - Returns: whether sync had been on, so the caller can tell the user.
+    @discardableResult
+    static func prepareForLocalReplacement(
+        settings: UserSettings,
+        metadataStore: CloudSyncMetadataStore = CloudSyncMetadataStore()
+    ) throws -> Bool {
+        let wasRequested = settings.cloudSyncRequested
+        settings.setCloudSyncRequested(false)
+        try metadataStore.resetSynchronizationStateForAllAccounts()
+        NotificationCenter.default.post(name: didSuspendSyncNotification, object: nil)
+        return wasRequested
+    }
 }

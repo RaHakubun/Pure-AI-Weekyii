@@ -411,6 +411,200 @@ final class CloudSyncReconcilerTests: XCTestCase {
         XCTAssertEqual(committed.entityBaselines[original.key]?.lastSyncedHash, try CloudRecordCodec.encode(updated).payloadHash)
     }
 
+    // MARK: Round 5 regressions
+
+    func test_undecodableRemoteRecordIsQuarantinedInsteadOfFailingTheCycle() async throws {
+        let future = CloudSyncEntity.task(task(title: "written by a newer build"))
+        let encoded = try CloudRecordCodec.encode(future)
+        let unreadable = CloudSyncRecord(zoneName: encoded.zoneName, recordType: encoded.recordType, recordName: encoded.recordName, kind: encoded.kind, businessId: encoded.businessId, payloadVersion: 99, payload: Data("{}".utf8), payloadHash: "future-hash", blob: nil)
+        let readable = CloudSyncEntity.task(task(title: "readable"))
+        let harness = try await makeHarness(local: snapshot([]), seedRecords: [unreadable, try CloudRecordCodec.encode(readable)])
+
+        let report = try await harness.reconciler().reconcile()
+
+        XCTAssertEqual(report.quarantinedRecords, 1)
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["readable"])
+        let remote = await harness.remoteRecords()
+        XCTAssertEqual(remote.first { $0.entityKey == future.key }?.payloadVersion, 99, "the newer record must not be deleted or overwritten")
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.account))
+        XCTAssertTrue(metadata.isQuarantined(future.key))
+
+        let second = try await harness.reconciler().reconcile()
+        XCTAssertTrue(second.perRecordFailures.isEmpty)
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["readable"])
+    }
+
+    func test_serverRecordChangedWithoutNewerServerVersionResendsWithoutStaleMetadata() async throws {
+        let local = CloudSyncEntity.task(task(title: "local only"))
+        let harness = try await makeHarness(local: snapshot([local]))
+        let memoryTransport = try XCTUnwrap(harness.memoryTransport)
+        await memoryTransport.injectFailure(.serverRecordChanged, for: local.key, operation: .upsert)
+
+        let report = try await harness.reconciler().reconcile()
+
+        XCTAssertTrue(report.perRecordFailures.isEmpty)
+        let remote = await harness.remoteRecords()
+        XCTAssertEqual(try remote.map(CloudRecordCodec.decode), [local])
+    }
+
+    /// Kept as a regression test for the resend path itself, but it does **not**
+    /// cover N1: `InMemoryCloudSyncTransport` echoes every write back into its
+    /// change log, so the batch always ends with the resent local winner and the
+    /// stale server version is overwritten by dictionary assignment. Commenting
+    /// out the commit-time inbox pruning leaves this test green. N1 is covered by
+    /// the two `InboxBackedTransport` tests below.
+    func test_conflictResendWithEchoingTransportKeepsLocalWinner() async throws {
+        let base = CloudSyncEntity.task(task(title: "base"))
+        let local = CloudSyncEntity.task(task(id: try taskID(from: base), title: "local winner"))
+        let latestRemote = try CloudRecordCodec.encode(.task(task(id: try taskID(from: base), title: "superseded server version")))
+        let baseTransport = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(base)])
+        let transport = ConflictOnceTransport(base: baseTransport, conflictKey: base.key, latestRecord: latestRemote)
+        let harness = try await makeHarness(local: snapshot([local]), transport: transport)
+        try await harness.establishBaseline([base])
+
+        _ = try await harness.reconciler().reconcile()
+        _ = try await harness.reconciler().reconcile()
+        _ = try await harness.reconciler().reconcile()
+
+        XCTAssertEqual(harness.localStore.snapshot.tasks.first?.title, "local winner")
+        let remote = await baseTransport.remoteRecords()
+        XCTAssertEqual(try CloudRecordCodec.decode(try XCTUnwrap(remote.first)), local)
+    }
+
+    /// N1: a conflict resend writes the local winner, but the server version it
+    /// replaced is still queued in the durable inbox. Unless the commit prunes it,
+    /// the next cycle reads it as a fresh remote edit and reverts the local winner.
+    func test_conflictResendKeepsLocalWinnerWhenTransportDoesNotEchoWrites() async throws {
+        let base = CloudSyncEntity.task(task(title: "base"))
+        let local = CloudSyncEntity.task(task(id: try taskID(from: base), title: "local winner"))
+        let superseded = try CloudRecordCodec.encode(.task(task(id: try taskID(from: base), title: "superseded server version")))
+        let server = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(base)])
+        let conflicting = ConflictOnceTransport(base: server, conflictKey: base.key, latestRecord: superseded)
+        let harness = try await makeInboxHarness(local: snapshot([local]), server: conflicting, memoryTransport: server)
+        try await harness.establishBaseline([base])
+
+        _ = try await harness.reconciler().reconcile()
+        _ = try await harness.reconciler().reconcile()
+        _ = try await harness.reconciler().reconcile()
+
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title), ["local winner"])
+        let remote = await server.remoteRecords()
+        XCTAssertEqual(try CloudRecordCodec.decode(try XCTUnwrap(remote.first)), local)
+        let metadata = try XCTUnwrap(harness.metadataStore.load(forAccountRecordName: harness.account))
+        XCTAssertEqual(metadata.pendingRemoteChanges?.count, 0, "the superseded server version must not stay queued")
+    }
+
+    /// N1 under partial failure: the cycle delivers a newer server version for
+    /// `localSecond`, the local edit wins the conflict, and a sibling upload
+    /// fails so the cursor is not acknowledged. The superseded server version must
+    /// still be pruned for that key, otherwise the retry cycle reverts it.
+    func test_partialFailureDoesNotReplaySupersededServerVersionOverLocalWinner() async throws {
+        let failing = CloudSyncEntity.task(task(title: "k1 local"))
+        let baseSecond = CloudSyncEntity.task(task(title: "k2 base"))
+        let localSecond = CloudSyncEntity.task(task(id: try taskID(from: baseSecond), title: "k2 local winner"))
+        let superseded = try CloudRecordCodec.encode(.task(task(id: try taskID(from: baseSecond), title: "k2 superseded server edit")))
+        let server = InMemoryCloudSyncTransport(seedRecords: [try CloudRecordCodec.encode(baseSecond)])
+        let harness = try await makeInboxHarness(
+            local: snapshot([failing, localSecond]),
+            server: server,
+            memoryTransport: server
+        )
+        try await harness.establishBaseline([baseSecond])
+        _ = await server.upsert([superseded])
+        await server.injectFailure(.quotaExceeded, for: failing.key, operation: .upsert)
+
+        let first = try await harness.reconciler().reconcile()
+        XCTAssertEqual(first.perRecordFailures.map(\.entityKey), [failing.key])
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title).sorted(), ["k1 local", "k2 local winner"])
+
+        _ = try await harness.reconciler().reconcile()
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title).sorted(), ["k1 local", "k2 local winner"])
+
+        _ = try await harness.reconciler().reconcile()
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.title).sorted(), ["k1 local", "k2 local winner"])
+
+        let remoteRecords = await server.remoteRecords()
+        let remoteSecond = try XCTUnwrap(remoteRecords.first { $0.entityKey == localSecond.key })
+        XCTAssertEqual(try CloudRecordCodec.decode(remoteSecond), localSecond)
+    }
+
+    func test_duplicateHabitTasksForSameDayConvergeOnDeterministicID() async throws {
+        let week = WeekSnapshot(weekId: "2026-W39", startDate: date(0), endDate: date(6), status: .present, completedTasksCount: 0, expiredTasksCount: 0, totalStartedDays: 0)
+        let day = DaySnapshot(dayId: "2026-09-25", weekId: week.weekId, date: date(1), dayOfWeek: "Fri", status: .draft, killTimeHour: 20, killTimeMinute: 0, followsDefaultKillTime: true, initiatedAt: nil, closedAt: nil, executionModeRaw: ExecutionMode.strict.rawValue, isDraftZoneUnlocked: false, expiredCount: 0)
+        let habit = HabitSnapshot(id: UUID(), name: "habit", iconName: "repeat", colorHex: "#123456", categoryRaw: "health", scheduleKindRaw: "weekly", scheduleWeekdaysRaw: 31, scheduleMonthDaysRaw: 0, startDayId: "2026-09-01", isActive: true, createdAt: date(0), sortOrder: 0)
+        let deterministic = HabitDeterministicID.task(habitId: habit.id, dayId: day.dayId)
+        let localTask = habitTask(id: UUID(), habitId: habit.id, dayId: day.dayId)
+        let remoteTask = habitTask(id: deterministic, habitId: habit.id, dayId: day.dayId)
+        let shared: [CloudSyncEntity] = [.week(week), .day(day), .habit(habit)]
+        let harness = try await makeHarness(
+            local: snapshot(shared + [.task(localTask)]),
+            seedRecords: try (shared + [.task(remoteTask)]).map(CloudRecordCodec.encode)
+        )
+
+        _ = try await harness.reconciler().reconcile()
+
+        XCTAssertEqual(harness.localStore.snapshot.tasks.map(\.id), [deterministic])
+        let remoteTaskIDs = await harness.remoteRecords().filter { $0.kind == .task }.map(\.businessId)
+        XCTAssertEqual(remoteTaskIDs, [deterministic.uuidString])
+    }
+
+    func test_habitDeterministicIDIsStableAndDistinctPerKind() {
+        let habit = UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF")!
+        XCTAssertEqual(HabitDeterministicID.task(habitId: habit, dayId: "2026-09-25"), HabitDeterministicID.task(habitId: habit, dayId: "2026-09-25"))
+        XCTAssertNotEqual(HabitDeterministicID.task(habitId: habit, dayId: "2026-09-25"), HabitDeterministicID.task(habitId: habit, dayId: "2026-09-26"))
+        XCTAssertNotEqual(HabitDeterministicID.task(habitId: habit, dayId: "2026-09-25"), HabitDeterministicID.record(habitId: habit, dayId: "2026-09-25"))
+    }
+
+    func test_discardPendingChangesDropsOnlySettledKeysUpToSequence() throws {
+        let settled = CloudSyncEntity.task(task(title: "settled"))
+        let other = CloudSyncEntity.task(task(title: "other"))
+        var metadata = CloudSyncMetadata(accountHash: try CloudSyncMetadataStore.accountHash(for: "a"))
+        metadata.enqueue(.upsert(try CloudRecordCodec.encode(settled)))
+        metadata.enqueue(.upsert(try CloudRecordCodec.encode(other)))
+        metadata.enqueue(.delete(settled.key))
+
+        metadata.discardPendingChanges(for: [settled.key], through: 2)
+
+        XCTAssertEqual(metadata.pendingRemoteChanges?.map(\.sequence), [2, 3])
+    }
+
+    func test_quarantineMatchesByCanonicalRecordName() throws {
+        let entity = CloudSyncEntity.task(task(title: "q"))
+        var metadata = CloudSyncMetadata(accountHash: try CloudSyncMetadataStore.accountHash(for: "a"))
+        XCTAssertFalse(metadata.isQuarantined(entity.key))
+        metadata.quarantine(recordName: CKRecordNameCodec.recordName(for: entity.key), reason: "test")
+        XCTAssertTrue(metadata.isQuarantined(entity.key))
+        XCTAssertEqual(metadata.quarantinedRecordCount, 1)
+        XCTAssertEqual(metadata.quarantineCodecSignature, CloudRecordCodec.decoderSignature)
+        metadata.releaseQuarantine(recordName: CKRecordNameCodec.recordName(for: entity.key))
+        XCTAssertFalse(metadata.isQuarantined(entity.key))
+    }
+
+    func test_resetSynchronizationStateForAllAccountsClearsEveryAccount() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("WeekyiiSyncReset-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let store = CloudSyncMetadataStore(rootURL: root)
+        for account in ["first", "second"] {
+            var metadata = CloudSyncMetadata(accountHash: try CloudSyncMetadataStore.accountHash(for: account))
+            metadata.remoteChangeToken = Data([1, 2, 3])
+            metadata.entityBaselines[CloudSyncEntity.task(task(title: account)).key] = CloudSyncEntityBaseline(lastSyncedHash: "h")
+            try store.save(metadata, forAccountRecordName: account)
+        }
+
+        try store.resetSynchronizationStateForAllAccounts()
+
+        for account in ["first", "second"] {
+            let metadata = try XCTUnwrap(store.load(forAccountRecordName: account))
+            XCTAssertNil(metadata.remoteChangeToken)
+            XCTAssertTrue(metadata.entityBaselines.isEmpty)
+        }
+    }
+
+    func test_initialDecisionStatusSurfacesBanner() {
+        XCTAssertEqual(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: true, requiresAccountResolution: false), .initialDecision)
+        XCTAssertNil(CloudSyncDiagnosticsSnapshot.bannerKind(for: .initialEnableDecisionRequired(.remoteEmpty), requested: false, requiresAccountResolution: false))
+    }
+
     @MainActor
     private struct Harness {
         let localStore: MemoryCloudSyncLocalStore
@@ -430,15 +624,17 @@ final class CloudSyncReconcilerTests: XCTestCase {
 
         func establishBaseline(_ entities: [CloudSyncEntity]) async throws {
             let token = try await transport.fetchChanges(since: nil).nextToken
-            let hash = try CloudSyncMetadataStore.accountHash(for: account)
-            var metadata = CloudSyncMetadata(accountHash: hash)
-            metadata.remoteChangeToken = token
-            for entity in entities {
-                let record = try CloudRecordCodec.encode(entity)
-                metadata.entityBaselines[entity.key] = CloudSyncEntityBaseline(lastSyncedHash: record.payloadHash, recordName: record.recordName)
-                metadata.remember(entity.key, recordName: record.recordName)
+            // Incremental, not a whole-object save: a transport that stages
+            // fetched changes in the durable inbox has already bumped its own
+            // cursor and queue, and a fresh `CloudSyncMetadata` would erase both.
+            try metadataStore.update(forAccountRecordName: account) { metadata in
+                metadata.remoteChangeToken = token
+                for entity in entities {
+                    let record = try CloudRecordCodec.encode(entity)
+                    metadata.entityBaselines[entity.key] = CloudSyncEntityBaseline(lastSyncedHash: record.payloadHash, recordName: record.recordName)
+                    metadata.remember(entity.key, recordName: record.recordName)
+                }
             }
-            try metadataStore.save(metadata, forAccountRecordName: account)
         }
     }
 
@@ -473,6 +669,35 @@ final class CloudSyncReconcilerTests: XCTestCase {
         return Harness(localStore: MemoryCloudSyncLocalStore(snapshot: local), transport: transport, memoryTransport: memoryTransport, metadataStore: metadataStore, metadataRoot: root, account: account)
     }
 
+    /// Harness whose transport delivers changes the way `CKSyncEngineTransport`
+    /// does: no echo of this device's own writes, and the app cursor is an inbox
+    /// position rather than the server's own sequence.
+    private func makeInboxHarness(
+        local: WeekyiiBusinessSnapshot,
+        server: any CloudSyncTransport,
+        memoryTransport: InMemoryCloudSyncTransport
+    ) async throws -> Harness {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("WeekyiiSyncInbox-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let account = "inbox-account-\(UUID().uuidString)"
+        let metadataStore = CloudSyncMetadataStore(rootURL: root)
+        try metadataStore.save(
+            CloudSyncMetadata(accountHash: try CloudSyncMetadataStore.accountHash(for: account)),
+            forAccountRecordName: account
+        )
+        let inbox = CloudSyncDurableInbox(store: metadataStore, accountRecordName: account)
+        let transport = InboxBackedTransport(server: server, inbox: inbox)
+        _ = try await transport.ensureInfrastructure()
+        return Harness(
+            localStore: MemoryCloudSyncLocalStore(snapshot: local),
+            transport: transport,
+            memoryTransport: memoryTransport,
+            metadataStore: metadataStore,
+            metadataRoot: root,
+            account: account
+        )
+    }
+
     private func snapshot(_ entities: [CloudSyncEntity]) -> WeekyiiBusinessSnapshot {
         var weeks: [WeekSnapshot] = []; var days: [DaySnapshot] = []; var tasks: [TaskSnapshot] = []
         var suspended: [SuspendedTaskSnapshot] = []; var attachments: [AttachmentSnapshot] = []; var projects: [ProjectSnapshot] = []
@@ -496,6 +721,10 @@ final class CloudSyncReconcilerTests: XCTestCase {
 
     private func task(id: UUID = UUID(), title: String, attachmentIds: [UUID] = []) -> TaskSnapshot {
         TaskSnapshot(id: id, dayId: nil, projectId: nil, habitId: nil, title: title, taskDescription: "", taskType: .regular, taskTypeIdRaw: "regular", order: 0, zone: .draft, startedAt: nil, endedAt: nil, completedOrder: 0, steps: [], attachmentIds: attachmentIds)
+    }
+
+    private func habitTask(id: UUID, habitId: UUID, dayId: String) -> TaskSnapshot {
+        TaskSnapshot(id: id, dayId: dayId, projectId: nil, habitId: habitId, title: "habit", taskDescription: "", taskType: .regular, taskTypeIdRaw: "regular", order: 0, zone: .draft, startedAt: nil, endedAt: nil, completedOrder: 0, steps: [], attachmentIds: [])
     }
 
     private func taskID(from entity: CloudSyncEntity) throws -> UUID {
@@ -644,6 +873,90 @@ private actor GatedCloudSyncTransport: CloudSyncTransport {
 
     func persistedTransportState() async -> Data? {
         await base.persistedTransportState()
+    }
+}
+
+/// Models how `CKSyncEngineTransport` really delivers changes, which
+/// `InMemoryCloudSyncTransport` does not: CloudKit never hands a device back the
+/// records it just wrote, and what is fetched lands in the durable inbox that
+/// reconciliation reads through its own cursor. Keeping the server cursor private
+/// (like CKSyncEngine's serialized state) also keeps the two sequence spaces —
+/// server change log vs. inbox position — from being confused, which is what the
+/// N1 regression needs in order to fail when the commit stops pruning.
+private actor InboxBackedTransport: CloudSyncTransport {
+    private let server: any CloudSyncTransport
+    private let inbox: CloudSyncDurableInbox
+    /// The server's own cursor. Callers only ever see inbox positions.
+    private var serverToken: Data?
+    /// Writes this device made that the server accepted. CloudKit does not echo
+    /// them, so they are filtered out of every later fetched batch.
+    private var acceptedUpsertHashes: [String: String] = [:]
+    private var acceptedDeletionNames: Set<String> = []
+
+    init(server: any CloudSyncTransport, inbox: CloudSyncDurableInbox) {
+        self.server = server
+        self.inbox = inbox
+    }
+
+    var databaseScope: CloudSyncDatabaseScope { get async { await server.databaseScope } }
+
+    func ensureInfrastructure() async throws -> CloudSyncRemoteInfrastructure {
+        try await server.ensureInfrastructure()
+    }
+
+    func inspectRemoteZone() async throws -> CloudSyncZoneInspection {
+        try await server.inspectRemoteZone()
+    }
+
+    func resetCustomZone() async throws {
+        try await server.resetCustomZone()
+    }
+
+    func fetchChanges(since token: Data?) async throws -> CloudSyncChangeBatch {
+        let fetched = try await server.fetchChanges(since: serverToken)
+        serverToken = fetched.nextToken
+        var upserts: [CloudSyncRecord] = []
+        var deletedRecordNames: [String] = []
+        for change in fetched.changes {
+            switch change {
+            case .upsert(let record):
+                if acceptedUpsertHashes[record.recordName] == record.payloadHash { continue }
+                upserts.append(record)
+            case .delete(let key):
+                let recordName = CKRecordNameCodec.recordName(for: key)
+                if acceptedDeletionNames.contains(recordName) { continue }
+                deletedRecordNames.append(recordName)
+            }
+        }
+        try inbox.append(upserts: upserts, deletedRecordNames: deletedRecordNames)
+        return try inbox.batch(since: token)
+    }
+
+    func upsert(_ records: [CloudSyncRecord]) async -> [CloudSyncRecordResult] {
+        let results = await server.upsert(records)
+        let outgoing = Dictionary(records.map { ($0.entityKey, $0) }, uniquingKeysWith: { _, last in last })
+        for result in results {
+            guard case .upserted = result.outcome, let record = outgoing[result.entityKey] else { continue }
+            acceptedUpsertHashes[record.recordName] = record.payloadHash
+        }
+        return results
+    }
+
+    func delete(_ keys: [SyncEntityKey]) async -> [CloudSyncRecordResult] {
+        let results = await server.delete(keys)
+        for result in results {
+            guard case .deleted = result.outcome else { continue }
+            acceptedDeletionNames.insert(CKRecordNameCodec.recordName(for: result.entityKey))
+        }
+        return results
+    }
+
+    func restoreTransportState(_ state: Data?) async {
+        await server.restoreTransportState(state)
+    }
+
+    func persistedTransportState() async -> Data? {
+        await server.persistedTransportState()
     }
 }
 

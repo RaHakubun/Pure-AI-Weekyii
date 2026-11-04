@@ -9,9 +9,7 @@ struct ProjectDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var deletingTask: TaskItem?
     @State private var editingTask: TaskItem?
-    @State private var animateProgress = false
-    @State private var expandedSectionIDs: Set<String> = []
-    @State private var seenSectionIDs: Set<String> = []
+    @State private var selectedDayID: String?
     @State private var expandedTaskIDs: Set<UUID> = []
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
@@ -101,15 +99,6 @@ struct ProjectDetailView: View {
         } message: {
             Text(String(localized: "project.task.delete.message"))
         }
-        .onAppear {
-            syncExpandedSections(with: snapshot.sections)
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
-                animateProgress = true
-            }
-        }
-        .onChange(of: snapshot.sections.map(\.id)) { _, _ in
-            syncExpandedSections(with: snapshot.sections)
-        }
         .onChange(of: viewModel.errorMessage) { _, newValue in
             if let newValue { errorMessage = newValue }
         }
@@ -174,42 +163,43 @@ struct ProjectDetailView: View {
 
     private var identitySection: some View {
         WeekCard(useGradient: true, accentColor: projectColor, shadow: .medium) {
-            HStack(alignment: .top, spacing: WeekSpacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(Color.weekyiiOnFeature.opacity(0.2))
-                        .frame(width: 54, height: 54)
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                HStack(alignment: .top, spacing: WeekSpacing.md) {
                     Image(systemName: snapshot.icon)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.weekyiiOnFeature)
-                }
+                        .frame(width: 48, height: 48)
+                        .background(Color.weekyiiOnFeature.opacity(0.2))
+                        .clipShape(.rect(cornerRadius: WeekRadius.medium))
 
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    Text(snapshot.name)
-                        .font(.titleLarge)
-                        .foregroundStyle(Color.weekyiiOnFeature)
-                        .lineLimit(2)
-
-                    HStack(spacing: WeekSpacing.sm) {
-                        Text(snapshot.status.displayName)
-                            .font(.captionBold)
-                            .foregroundStyle(projectColor)
-                            .padding(.horizontal, WeekSpacing.sm)
-                            .padding(.vertical, WeekSpacing.xs)
-                            .background(Capsule().fill(Color.white))
-
-                        Text(dateRangeText)
-                            .font(.caption)
-                            .foregroundStyle(Color.weekyiiOnFeature.opacity(0.88))
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text(snapshot.name)
+                            .font(.titleMedium)
+                            .foregroundStyle(Color.weekyiiOnFeature)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !snapshot.projectDescription.isEmpty {
+                            Text(snapshot.projectDescription)
+                                .font(.caption)
+                                .foregroundStyle(Color.weekyiiOnFeatureSecondary)
+                                .lineLimit(3)
+                        }
                     }
-
-                    if !snapshot.projectDescription.isEmpty {
-                        Text(snapshot.projectDescription)
-                            .font(.bodyMedium)
-                            .foregroundStyle(Color.weekyiiOnFeature.opacity(0.86))
-                            .lineLimit(3)
-                    }
+                    Spacer(minLength: 0)
+                    Text(snapshot.status.displayName)
+                        .font(.captionBold)
+                        .foregroundStyle(projectColor)
+                        .padding(.horizontal, WeekSpacing.sm)
+                        .padding(.vertical, WeekSpacing.xs)
+                        .background(Capsule().fill(Color.white))
                 }
+                Rectangle().fill(Color.weekyiiOnFeature.opacity(0.25)).frame(height: 1)
+                HStack {
+                    Text(dateRangeText)
+                    Spacer(minLength: WeekSpacing.sm)
+                    Text(String(localized: "project.detail.period", defaultValue: "项目周期"))
+                }
+                .font(.caption)
+                .foregroundStyle(Color.weekyiiOnFeatureSecondary)
             }
         }
     }
@@ -283,38 +273,58 @@ struct ProjectDetailView: View {
         }
     }
 
+    private var openTaskCount: Int {
+        max(snapshot.remainingCount - snapshot.expiredCount, 0)
+    }
+
     private var summarySection: some View {
-        WeekCard(accentColor: projectColor) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                Text("项目概览")
-                    .font(.titleSmall)
-                    .foregroundStyle(Color.textPrimary)
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            Text(String(localized: "project.detail.progress", defaultValue: "项目进展"))
+                .font(.titleMedium)
+                .foregroundStyle(Color.textPrimary)
 
-                HStack(spacing: WeekSpacing.lg) {
-                    progressRing
-
-                    VStack(spacing: WeekSpacing.sm) {
-                        HStack(spacing: WeekSpacing.sm) {
-                            metricChip(title: String(localized: "project.stat.total"), value: "\(snapshot.totalCount)", tint: .textPrimary)
-                            metricChip(title: String(localized: "project.stat.completed"), value: "\(snapshot.completedCount)", tint: .accentGreen)
-                        }
-                        HStack(spacing: WeekSpacing.sm) {
-                            metricChip(title: String(localized: "project.stat.remaining"), value: "\(snapshot.remainingCount)", tint: projectColor)
-                            metricChip(title: String(localized: "project.stat.expired"), value: "\(snapshot.expiredCount)", tint: .taskDDL)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                Divider()
-
-                HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .foregroundStyle(projectColor)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("下一步")
+            WeekCard(accentColor: projectColor) {
+                VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                    HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.xs) {
+                        Text("\(snapshot.completedCount) / \(snapshot.totalCount)")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.textPrimary)
+                        Text(String(localized: "project.detail.items_completed", defaultValue: "项已完成"))
                             .font(.caption)
                             .foregroundStyle(Color.textSecondary)
+                    }
+                    progressBar
+                    HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                        summaryMetric(String(localized: "project.stat.completed"), value: snapshot.completedCount, color: .accentGreen)
+                        summaryMetric(String(localized: "project.stat.expired"), value: snapshot.expiredCount, color: .taskDDL)
+                        summaryMetric(String(localized: "project.detail.open", defaultValue: "未逾期待办"), value: openTaskCount, color: .textPrimary)
+                    }
+                    if snapshot.expiredCount > 0 {
+                        Label {
+                            Text(expiredCountText(snapshot.expiredCount))
+                                .font(.captionBold)
+                            + Text(String(localized: "project.detail.overdue_in_remaining", defaultValue: " · 计入剩余任务"))
+                                .font(.caption)
+                        } icon: {
+                            Image(systemName: "exclamationmark.circle.fill")
+                        }
+                        .foregroundStyle(Color.taskDDL)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(WeekSpacing.sm)
+                        .background(Color.taskDDL.opacity(0.10))
+                        .clipShape(.rect(cornerRadius: WeekRadius.medium))
+                    }
+                }
+            }
+
+            WeekCard {
+                HStack(alignment: .center, spacing: WeekSpacing.sm) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundStyle(projectColor)
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text(String(localized: "project.detail.next", defaultValue: "下一步"))
+                            .font(.captionBold)
+                            .foregroundStyle(Color.textPrimary)
                         if let title = snapshot.nextTaskTitle {
                             Text(title)
                                 .font(.bodyMedium)
@@ -326,62 +336,73 @@ struct ProjectDetailView: View {
                                     .foregroundStyle(Color.textSecondary)
                             }
                         } else {
-                            Text("项目暂无待办")
-                                .font(.bodyMedium)
+                            Text(String(localized: "project.detail.no_next", defaultValue: "暂无待办任务"))
+                                .font(.caption)
                                 .foregroundStyle(Color.textSecondary)
                         }
+                    }
+                    Spacer(minLength: WeekSpacing.sm)
+                    if snapshot.nextTaskTitle == nil && isProjectWritable {
+                        Button {
+                            showingAddTaskSheet = true
+                        } label: {
+                            Label(String(localized: "project.detail.add_task", defaultValue: "添加任务"), systemImage: "plus")
+                                .font(.captionBold)
+                                .foregroundStyle(projectColor)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
         }
     }
 
-    private var progressRing: some View {
-        ZStack {
-            Circle()
-                .stroke(projectColor.opacity(0.2), lineWidth: 8)
-                .frame(width: 82, height: 82)
-
-            Circle()
-                .trim(from: 0, to: animateProgress ? CGFloat(min(snapshot.progress, 1.0)) : 0)
-                .stroke(projectColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 82, height: 82)
-
-            VStack(spacing: 0) {
-                Text("\(Int(snapshot.progress * 100))")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(projectColor)
-                    .contentTransition(.numericText())
-                Text("%")
-                    .font(.caption2)
-                    .foregroundStyle(Color.textSecondary)
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            let total = max(snapshot.totalCount, 0)
+            let completed = min(max(snapshot.completedCount, 0), total)
+            let overdue = min(max(snapshot.expiredCount, 0), total - completed)
+            HStack(spacing: 0) {
+                if total > 0 {
+                    Color.accentGreen.frame(width: geometry.size.width * CGFloat(completed) / CGFloat(total))
+                    Color.taskDDL.frame(width: geometry.size.width * CGFloat(overdue) / CGFloat(total))
+                }
+                Color.backgroundTertiary
             }
+            .clipShape(Capsule())
         }
+        .frame(height: 9)
+        .accessibilityHidden(true)
     }
 
-    private func metricChip(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func summaryMetric(_ title: String, value: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+            Text("\(value)")
+                .font(.titleSmall)
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
             Text(title)
                 .font(.caption)
                 .foregroundStyle(Color.textSecondary)
-            Text(value)
-                .font(.titleSmall)
-                .foregroundStyle(tint)
-                .contentTransition(.numericText())
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, WeekSpacing.xs)
-        .padding(.horizontal, WeekSpacing.sm)
-        .background(tint.opacity(0.08))
-        .clipShape(.rect(cornerRadius: WeekRadius.small))
+        .accessibilityElement(children: .combine)
     }
 
     private var ledgerSection: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            Text(String(localized: "project.tasks.title"))
-                .font(.titleMedium)
-                .foregroundStyle(Color.textPrimary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "project.detail.weekly_tasks", defaultValue: "每周任务"))
+                    .font(.titleMedium)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer(minLength: WeekSpacing.sm)
+                if !snapshot.sections.isEmpty {
+                    Text(String(localized: "project.detail.select_day", defaultValue: "点击日期查看任务"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
 
             if snapshot.sections.isEmpty {
                 WeekCard {
@@ -406,49 +427,171 @@ struct ProjectDetailView: View {
                     .weekPaddingVertical(WeekSpacing.lg)
                 }
             } else {
-                ForEach(snapshot.sections) { section in
-                    WeekCard {
-                        VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                            Button {
-                                // Overdue-only days have nothing to expand.
-                                guard !section.tasks.isEmpty else { return }
-                                toggleSection(section.id)
-                            } label: {
-                                HStack {
-                                    Text(section.date, format: .dateTime.month().day().weekday(.wide))
-                                        .font(.titleSmall)
-                                        .foregroundStyle(Color.textPrimary)
-                                    Spacer()
-                                    // Overdue tasks are count-only: no rows, no details.
-                                    if section.expiredCount > 0 {
-                                        Text(expiredCountText(section.expiredCount))
-                                            .font(.caption)
-                                            .foregroundStyle(Color.textTertiary)
-                                    }
-                                    if !section.tasks.isEmpty {
-                                        Text("\(section.tasks.count)")
-                                            .font(.captionBold)
-                                            .foregroundStyle(Color.textSecondary)
-                                        Image(systemName: expandedSectionIDs.contains(section.id) ? "chevron.up" : "chevron.down")
-                                            .font(.captionBold)
-                                            .foregroundStyle(Color.textSecondary)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            if expandedSectionIDs.contains(section.id) && !section.tasks.isEmpty {
-                                VStack(spacing: WeekSpacing.sm) {
-                                    ForEach(section.tasks) { task in
-                                        taskRow(task)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                HStack(spacing: WeekSpacing.md) {
+                    legendItem("checkmark", title: String(localized: "project.stat.completed"), color: .accentGreen)
+                    legendItem("exclamationmark", title: String(localized: "project.stat.expired"), color: .taskDDL)
+                    legendItem("circle.fill", title: String(localized: "project.detail.open", defaultValue: "未逾期待办"), color: projectColor)
+                }
+                ForEach(ProjectDetailWeek.groups(from: snapshot.sections)) { week in
+                    weekCard(week)
                 }
             }
         }
+    }
+
+    private func legendItem(_ symbol: String, title: String, color: Color) -> some View {
+        HStack(spacing: WeekSpacing.xs) {
+            Image(systemName: symbol).font(.system(size: 10, weight: .bold))
+                .foregroundStyle(color)
+            Text(title).font(.caption).foregroundStyle(Color.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+    }
+
+    private func weekCard(_ week: ProjectDetailWeek) -> some View {
+        WeekCard {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(weekDate(week.start, week: week)) – \(weekDate(week.end, week: week))")
+                        .font(.titleSmall)
+                        .foregroundStyle(Color.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: WeekSpacing.xs)
+                    Text(String(localized: "project.detail.monday_sunday", defaultValue: "周一至周日"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                HStack(spacing: WeekSpacing.md) {
+                    Text(countText(String(localized: "project.detail.week_completed", defaultValue: "完成 %lld"), count: week.completedCount))
+                        .foregroundStyle(Color.textSecondary)
+                    if week.expiredCount > 0 {
+                        Text(countText(String(localized: "project.detail.week_expired", defaultValue: "逾期 %lld"), count: week.expiredCount))
+                            .foregroundStyle(Color.taskDDL)
+                    }
+                    if week.openCount > 0 {
+                        Text(countText(String(localized: "project.detail.week_open", defaultValue: "待办 %lld"), count: week.openCount))
+                            .foregroundStyle(projectColor)
+                    }
+                }
+                .font(.caption)
+
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(week.days, id: \.dayId) { date in
+                        dayButton(date, section: week.section(on: date))
+                    }
+                }
+
+                if let selectedDayID, let date = week.days.first(where: { $0.dayId == selectedDayID }) {
+                    Divider()
+                    selectedDayDetail(date, section: week.section(on: date))
+                }
+            }
+        }
+    }
+
+    private func dayButton(_ date: Date, section: ProjectTaskLedgerSection?) -> some View {
+        let selected = selectedDayID == date.dayId
+        let completed = section?.tasks.filter { $0.zone == .complete }.count ?? 0
+        let open = section?.tasks.filter { $0.zone != .complete }.count ?? 0
+        let overdue = section?.expiredCount ?? 0
+        let accessibilitySummary = [
+            countText(String(localized: "project.detail.week_completed", defaultValue: "完成 %lld"), count: completed),
+            countText(String(localized: "project.detail.week_expired", defaultValue: "逾期 %lld"), count: overdue),
+            countText(String(localized: "project.detail.week_open", defaultValue: "待办 %lld"), count: open)
+        ].joined(separator: ", ")
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedDayID = selected ? nil : date.dayId
+            }
+        } label: {
+            VStack(spacing: WeekSpacing.xs) {
+                Text(WeekyiiWeekday.localizedSymbol(for: date.isoWeekday))
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+                VStack(spacing: WeekSpacing.xs) {
+                    Text("\(WeekyiiTimeZone.calendar.component(.day, from: date))")
+                        .font(.captionBold)
+                        .foregroundStyle(selected ? projectColor : Color.textPrimary)
+                    HStack(spacing: 2) {
+                        if completed > 0 { dayMarker("checkmark", color: .accentGreen) }
+                        if overdue > 0 { dayMarker("exclamationmark", color: .taskDDL) }
+                        if open > 0 { dayMarker("circle.fill", color: projectColor) }
+                        if completed + overdue + open == 0 {
+                            Text("·").font(.caption).foregroundStyle(selected ? projectColor : Color.textTertiary)
+                        }
+                    }
+                    .frame(height: 11)
+                }
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .background(selected ? projectColor.opacity(0.14) : Color.clear)
+                .clipShape(.rect(cornerRadius: WeekRadius.medium))
+                .overlay(RoundedRectangle(cornerRadius: WeekRadius.medium).stroke(selected ? projectColor : Color.clear, lineWidth: 1))
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("\(shortDate(date)), \(WeekyiiWeekday.localizedSymbol(for: date.isoWeekday)), \(accessibilitySummary)"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func dayMarker(_ symbol: String, color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(color)
+    }
+
+    private func selectedDayDetail(_ date: Date, section: ProjectTaskLedgerSection?) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            HStack {
+                Text("\(shortDate(date)) · \(WeekyiiWeekday.localizedSymbol(for: date.isoWeekday))")
+                    .font(.captionBold)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                let count = (section?.tasks.count ?? 0) + (section?.expiredCount ?? 0)
+                Text(countText(String(localized: "project.detail.day_count", defaultValue: "%lld 项任务"), count: count))
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            if let section {
+                if section.expiredCount > 0 {
+                    Label(expiredCountText(section.expiredCount), systemImage: "exclamationmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.taskDDL)
+                }
+                ForEach(section.tasks) { task in
+                    taskRow(task)
+                }
+            } else {
+                Text(String(localized: "project.detail.no_tasks_day", defaultValue: "当天没有任务"))
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+        }
+    }
+
+    private func countText(_ template: String, count: Int) -> String {
+        String(format: template, locale: Locale.current, Int64(count))
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        formattedDate(date, includingYear: false)
+    }
+
+    private func weekDate(_ date: Date, week: ProjectDetailWeek) -> String {
+        let calendar = WeekyiiTimeZone.calendar
+        let crossesYear = calendar.component(.year, from: week.start) != calendar.component(.year, from: week.end)
+        let spansYears = Set(snapshot.sections.map { calendar.component(.year, from: $0.date) }).count > 1
+        return formattedDate(date, includingYear: crossesYear || spansYears)
+    }
+
+    private func formattedDate(_ date: Date, includingYear: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = WeekyiiTimeZone.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(includingYear ? "yMMMd" : "MMMd")
+        return formatter.string(from: date)
     }
 
     private func taskRow(_ task: TaskItem) -> some View {
@@ -536,29 +679,12 @@ struct ProjectDetailView: View {
     }
 
     private var dateRangeText: String {
-        "\(snapshot.startDate.formatted(date: .abbreviated, time: .omitted)) - \(snapshot.endDate.formatted(date: .abbreviated, time: .omitted))"
-    }
-
-    private func syncExpandedSections(with sections: [ProjectTaskLedgerSection]) {
-        let valid = Set(sections.map(\.id))
-        expandedSectionIDs = expandedSectionIDs.intersection(valid)
-        for section in sections where section.isExpandedByDefault && !seenSectionIDs.contains(section.id) {
-            expandedSectionIDs.insert(section.id)
-        }
-        seenSectionIDs = valid
+        "\(shortDate(snapshot.startDate)) – \(shortDate(snapshot.endDate))"
     }
 
     private func canEditTaskFromProject(_ task: TaskItem) -> Bool {
         guard isProjectWritable, let day = task.day else { return false }
         return (day.status == .empty || day.status == .draft) && task.zone == .draft
-    }
-
-    private func toggleSection(_ id: String) {
-        if expandedSectionIDs.contains(id) {
-            expandedSectionIDs.remove(id)
-        } else {
-            expandedSectionIDs.insert(id)
-        }
     }
 
     private func toggleTaskExpansion(_ id: UUID) {
@@ -575,5 +701,29 @@ struct ProjectDetailView: View {
             locale: Locale.current,
             Int64(count)
         )
+    }
+}
+
+/// View-only weekly grouping. Uses the same anchored ISO week as the rest of Weekyii.
+struct ProjectDetailWeek: Identifiable {
+    let start: Date
+    let sections: [ProjectTaskLedgerSection]
+
+    var id: String { start.dayId }
+    var end: Date { start.addingDays(6) }
+    var days: [Date] { (0..<7).map { start.addingDays($0) } }
+    var completedCount: Int { sections.reduce(0) { $0 + $1.tasks.filter { $0.zone == .complete }.count } }
+    var expiredCount: Int { sections.reduce(0) { $0 + $1.expiredCount } }
+    var openCount: Int { sections.reduce(0) { $0 + $1.tasks.filter { $0.zone != .complete }.count } }
+
+    func section(on date: Date) -> ProjectTaskLedgerSection? {
+        sections.first { $0.id == date.dayId }
+    }
+
+    static func groups(from sections: [ProjectTaskLedgerSection]) -> [ProjectDetailWeek] {
+        let grouped = Dictionary(grouping: sections) { $0.date.startOfWeek }
+        return grouped.map { start, days in
+            ProjectDetailWeek(start: start, sections: days.sorted { $0.date < $1.date })
+        }.sorted { $0.start < $1.start }
     }
 }

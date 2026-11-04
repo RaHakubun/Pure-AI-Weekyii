@@ -21,3 +21,11 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Local agent / tool scratch directories
+.workbuddy-ai/
+.qoder-credits/
+*.qoder.site
+
+# Third-party reference checkouts (cloned for reading, never committed)
+docs/reference/
