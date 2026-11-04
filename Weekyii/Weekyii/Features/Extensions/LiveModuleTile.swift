@@ -3,6 +3,11 @@ import SwiftUI
 /// 让首页模块在用户停留时轮换真实内容；不写入任何业务状态。
 /// WP8.1 磁贴式：卡片外壳（背景/圆角/描边/阴影）由本容器持有且全程静止，
 /// 内容面只在固定框内纵向滚动切换——离场面向上滚出、新面自下方滚入，卡槽永不空白。
+/// Decorative motifs are confined to the Quenya theme and carry no interaction.
+enum QuenyaHubMotif {
+    case star, rings, inscription, tree
+}
+
 struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: View where Item.ID: Hashable {
     let items: [Item]
     let initialDelay: Duration
@@ -15,6 +20,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     var stretches: Bool = false
     let tint: (Item) -> Color
     let emptyTint: Color
+    var quenyaMotif: QuenyaHubMotif? = nil
     @ViewBuilder let content: (Item) -> Content
     @ViewBuilder let emptyContent: () -> EmptyContent
 
@@ -70,7 +76,15 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     /// 其他主题保持原来的圆角卡片与内容色描边。
     @ViewBuilder
     private var tileSurface: some View {
-        if skin.glyphs == .cat, let card = skin.card {
+        if skin.isQuenya, let card = skin.card {
+            shapedFaces
+                .background {
+                    if let quenyaMotif {
+                        QuenyaHubDecoration(motif: quenyaMotif)
+                    }
+                }
+                .themedSurface(card)
+        } else if skin.glyphs == .cat, let card = skin.card {
             // 猫猫：软垫卡片用模块自己的颜色淡淡染一层，不加色条。
             shapedFaces.themedSurface(
                 card,
@@ -218,5 +232,76 @@ private struct HubTileNaturalHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+/// Background-only engravings: their GeometryReader takes the existing tile
+/// bounds, never reserves space, and is excluded from touch and accessibility.
+private struct QuenyaHubDecoration: View {
+    let motif: QuenyaHubMotif
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { proxy in
+            switch motif {
+            case .star:
+                QuenyaEightPointStar()
+                    .stroke(Color.weekyiiPrimary.opacity(0.25), lineWidth: 0.8)
+                    .frame(width: 50, height: 50)
+                    .position(x: proxy.size.width - 33, y: 59)
+            case .rings:
+                ZStack {
+                    Circle().stroke(lineWidth: 0.8)
+                    Circle().inset(by: 7).stroke(lineWidth: 0.8)
+                }
+                .foregroundStyle(Color.weekyiiPrimary.opacity(0.18))
+                .frame(width: 47, height: 47)
+                .position(x: proxy.size.width - 36, y: 67)
+            case .inscription:
+                if proxy.size.width >= 240 {
+                    Text("\u{E02E}\u{E046}\u{E022}\u{E046}\u{E010} \u{E024}\u{E02C}\u{E044}\u{E022}\u{E040} \u{E022}\u{E02C}\u{E04C}\u{E011}\u{E046}\u{E010}\u{E051} \u{E02E}\u{E04A}\u{E011}\u{E046}\u{E00C}\u{E044}\u{E02E}\u{E046}\u{E022}\u{E015}\u{E04A}")
+                        .font(.custom("AlcarinTengwar-Regular", size: 13))
+                        .foregroundStyle(Color.weekyiiPrimary.opacity(0.38))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(width: 132, alignment: .trailing)
+                        .position(x: proxy.size.width - 80, y: 52)
+                }
+            case .tree:
+                Image("QuenyaWhiteTree")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.weekyiiPrimary)
+                    .opacity(0.26)
+                    .frame(width: min(proxy.size.width * 0.34, 112), height: 132)
+                    .position(x: proxy.size.width - 69, y: min(proxy.size.height * 0.56, 150))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Eight-point star, drawn as linework to match the approved preview.
+private struct QuenyaEightPointStar: Shape {
+    func path(in rect: CGRect) -> Path {
+        let points: [(CGFloat, CGFloat)] = [
+            (0.50, 0.04), (0.56, 0.40), (0.82, 0.18), (0.60, 0.44),
+            (0.96, 0.50), (0.60, 0.56), (0.82, 0.82), (0.56, 0.60),
+            (0.50, 0.96), (0.44, 0.60), (0.18, 0.82), (0.40, 0.56),
+            (0.04, 0.50), (0.40, 0.44), (0.18, 0.18), (0.44, 0.40)
+        ]
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let p = CGPoint(x: rect.minX + point.0 * rect.width,
+                            y: rect.minY + point.1 * rect.height)
+            if index == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        path.closeSubpath()
+        path.addEllipse(in: CGRect(x: rect.midX - rect.width * 0.1,
+                                   y: rect.midY - rect.height * 0.1,
+                                   width: rect.width * 0.2, height: rect.height * 0.2))
+        return path
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-private struct QuenyaFocusAnchorKey: PreferenceKey {
+private struct QuenyaStatusAnchorKey: PreferenceKey {
     static var defaultValue: Anchor<CGRect>? { nil }
     static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
         if let next = nextValue() { value = next }
@@ -332,18 +332,16 @@ struct TodayView: View {
                 erasedKillTimeCard(day: day, viewModel: viewModel)
             }
             .weekPadding(WeekSpacing.base)
-            .backgroundPreferenceValue(QuenyaFocusAnchorKey.self) { anchor in
+            .backgroundPreferenceValue(QuenyaStatusAnchorKey.self) { anchor in
                 GeometryReader { proxy in
                     if todaySkin.isQuenya, let anchor {
                         let bounds = proxy[anchor]
                         Image("QuenyaNarsil")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: bounds.width * 1.3)
+                            .frame(width: bounds.width * 0.98)
                             .scaleEffect(x: -1, y: 1)
-                            .rotationEffect(.degrees(-31))
-                            .position(x: bounds.minX + bounds.width * 0.43,
-                                      y: bounds.minY + bounds.height * 0.4)
+                            .position(x: bounds.midX, y: bounds.maxY - 8)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                     }
@@ -502,6 +500,11 @@ struct TodayView: View {
                     }
                 }
             }
+        }
+        // Anchor to the status card, so the horizontal sword sits directly below
+        // the original illustration. It remains behind both cards and text.
+        .anchorPreference(key: QuenyaStatusAnchorKey.self, value: .bounds) { anchor in
+            day.status == .execute && day.focusTask != nil ? anchor : nil
         }
     }
 
@@ -893,7 +896,6 @@ struct TodayView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .anchorPreference(key: QuenyaFocusAnchorKey.self, value: .bounds) { $0 }
         }
         
         if day.executionMode == .flexible {

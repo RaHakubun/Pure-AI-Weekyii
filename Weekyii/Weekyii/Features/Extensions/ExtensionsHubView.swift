@@ -145,7 +145,8 @@ private struct SuspendedTasksModulePreview: View {
                 accessibilityIdentifier: "extensionsSuspendedLiveTile",
                 aspectRatio: 1,
                 tint: { _ in Color.suspendedModuleTint },
-                emptyTint: .suspendedModuleTint
+                emptyTint: .suspendedModuleTint,
+                quenyaMotif: .rings
             ) { task in
                 SuspendedTaskLiveTile(task: task, totalCount: viewModel.suspendedTasks.count)
             } emptyContent: {
@@ -192,7 +193,8 @@ private struct HabitsModulePreview: View {
                 accessibilityIdentifier: "extensionsHabitsLiveTile",
                 minHeight: 132,
                 tint: { $0.habitColor },
-                emptyTint: .accentGreen
+                emptyTint: .accentGreen,
+                quenyaMotif: .inscription
             ) { habit in
                 HabitLiveTile(
                     habit: habit,
@@ -384,7 +386,8 @@ private struct ProjectsModulePreview: View {
                 minHeight: tileHeight,
                 stretches: true,
                 tint: { Color.weekyiiEmphasis(hex: $0.colorHex) },
-                emptyTint: .weekyiiPrimary
+                emptyTint: .weekyiiPrimary,
+                quenyaMotif: .tree
             ) { snapshot in
                 ProjectFocusLiveTile(
                     snapshot: snapshot,
@@ -1319,7 +1322,8 @@ private struct MindStampsModulePreview: View {
                 accessibilityIdentifier: "extensionsMindStampsLiveTile",
                 aspectRatio: 1,
                 tint: { _ in Color.accentPink },
-                emptyTint: .accentPink
+                emptyTint: .accentPink,
+                quenyaMotif: .star
             ) { stamp in
                 MindStampLiveTile(stamp: stamp, totalCount: viewModel.stamps.count)
             } emptyContent: {
