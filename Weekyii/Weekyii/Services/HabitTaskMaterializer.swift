@@ -1,0 +1,272 @@
+import Foundation
+import CryptoKit
+import SwiftData
+
+struct HabitSyncOutcome: Equatable {
+    var createdCount: Int = 0
+    var skippedExistingCount: Int = 0
+    var blockedCount: Int = 0
+    var failedCount: Int = 0
+    var missedRecordCount: Int = 0
+    var saveFailed: Bool = false
+    /// 需要写库（含记录更新）；不等于需要刷新 UI。
+    fileprivate var needsSave: Bool = false
+
+    /// 本次 sync 是否产生了新任务或补记（供测试与调用方判断；视图刷新由 stateTransitionRevision 承担）。
+    var didChange: Bool { createdCount > 0 || missedRecordCount > 0 }
+}
+
+enum HabitAssignOutcome: Equatable {
+    case created
+    case alreadyExists
+    case dayLocked
+    case pastKillTime
+    case notScheduledToday
+    case failed(String)
+}
+
+/// 习惯记录暂存：在调用方事务内修改，不 save；保证与任务完成同一次落盘。
+@MainActor
+enum HabitRecordService {
+    static func stageCompletion(for task: TaskItem, at date: Date) {
+        guard let habit = task.habit,
+              let dayId = task.day?.dayId,
+              !dayId.isEmpty else { return }
+
+        if let existing = habit.records.first(where: { $0.dayId == dayId }) {
+            existing.status = .completed
+            existing.completedAt = date
+        } else {
+            let record = HabitDayRecord(dayId: dayId, createdAt: date)
+            record.status = .completed
+            record.completedAt = date
+            record.habit = habit
+            habit.records.append(record)
+        }
+    }
+
+    @discardableResult
+    static func settleExpiredDay(_ expiredDay: DayModel, in modelContext: ModelContext, at settledAt: Date) -> Int {
+        guard expiredDay.status == .expired, !expiredDay.dayId.isEmpty else { return 0 }
+        let descriptor = FetchDescriptor<HabitModel>()
+        guard let habits = try? modelContext.fetch(descriptor) else { return 0 }
+        return settleExpiredDays([expiredDay], among: habits, at: settledAt)
+    }
+
+    @discardableResult
+    static func settleExpiredDays(_ expiredDays: [DayModel], among habits: [HabitModel], at settledAt: Date) -> Int {
+        var daysById: [String: DayModel] = [:]
+        for day in expiredDays where day.status == .expired && !day.dayId.isEmpty {
+            daysById[day.dayId] = day
+        }
+
+        var settledCount = 0
+        for habit in habits {
+            let recordsByDayId = Dictionary(grouping: habit.records, by: \.dayId)
+            for (dayId, expiredDay) in daysById {
+                let records = recordsByDayId[dayId] ?? []
+                if !records.isEmpty {
+                    for record in records where record.statusRaw == HabitDayRecordStatus.pending.rawValue {
+                        record.status = .missed
+                        settledCount += 1
+                    }
+                    continue
+                }
+
+                guard isScheduledForGeneration(habit, on: expiredDay.date, dayId: dayId) else { continue }
+                let record = HabitDayRecord(dayId: dayId, createdAt: settledAt)
+                record.status = .missed
+                record.habit = habit
+                habit.records.append(record)
+                settledCount += 1
+            }
+        }
+        return settledCount
+    }
+
+    static func hasScheduledHabit(on day: DayModel, among habits: [HabitModel]) -> Bool {
+        habits.contains { isScheduledForGeneration($0, on: day.date, dayId: day.dayId) }
+    }
+
+    static func hasScheduledHabit(on day: DayModel, in modelContext: ModelContext) -> Bool {
+        let descriptor = FetchDescriptor<HabitModel>()
+        guard let habits = try? modelContext.fetch(descriptor) else { return false }
+        return hasScheduledHabit(on: day, among: habits)
+    }
+
+    fileprivate static func isScheduledForGeneration(_ habit: HabitModel, on date: Date, dayId: String) -> Bool {
+        habit.isActive
+            && habit.hasSchedule
+            && habit.startDayId <= dayId
+            && habit.isScheduled(on: date)
+    }
+}
+
+/// 仅今日物化 + 过期记录补记。语义见计划 §2.1 / §2.2 / §2.3。
+@MainActor
+struct HabitTaskMaterializer {
+    private let modelContext: ModelContext
+
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+
+    /// 统一入口：补记过期 pending → 物化今日。单次 save。
+    @discardableResult
+    func sync(today: Date = Date(), now: Date = Date()) -> HabitSyncOutcome {
+        var outcome = HabitSyncOutcome()
+        let todayStart = today.startOfDay
+        let todayKey = todayStart.dayId
+
+        let descriptor = FetchDescriptor<HabitModel>(sortBy: [SortDescriptor(\.sortOrder)])
+        let habits = (try? modelContext.fetch(descriptor)) ?? []
+
+        outcome.missedRecordCount = sweepPendingRecords(habits: habits, todayKey: todayKey)
+        if outcome.missedRecordCount > 0 { outcome.needsSave = true }
+
+        for habit in habits where habit.isActive {
+            materializeToday(habit: habit, todayStart: todayStart, todayKey: todayKey, now: now, outcome: &outcome)
+        }
+
+        if outcome.needsSave {
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.rollback()
+                outcome.saveFailed = true
+                outcome.createdCount = 0
+                outcome.missedRecordCount = 0
+            }
+        }
+        return outcome
+    }
+
+    /// 手动加入今日。语义见 §2.9。
+    @discardableResult
+    func assignToday(habit: HabitModel, today: Date = Date(), now: Date = Date()) -> HabitAssignOutcome {
+        guard habit.isActive else { return .failed(HabitError.saveFailed.localizedDescription) }
+        let todayStart = today.startOfDay
+        let todayKey = todayStart.dayId
+        guard HabitRecordService.isScheduledForGeneration(habit, on: todayStart, dayId: todayKey) else {
+            return .notScheduledToday
+        }
+
+        do {
+            let day = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: todayStart, weekStatus: .present).day
+
+            if day.tasks.contains(where: { $0.habit?.id == habit.id }) {
+                return .alreadyExists
+            }
+            guard day.status == .empty || day.status == .draft else { return .dayLocked }
+            guard now < killDate(for: day) else { return .pastKillTime }
+
+            try createHabitTask(habit: habit, in: day, todayKey: todayKey, now: now)
+            try modelContext.save()
+            return .created
+        } catch {
+            modelContext.rollback()
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - 内部
+
+    private func sweepPendingRecords(habits: [HabitModel], todayKey: String) -> Int {
+        var missed = 0
+        for habit in habits {
+            // Historical fallback only; today's expired records are settled by StateMachine.
+            for record in habit.records
+            where record.statusRaw == HabitDayRecordStatus.pending.rawValue && record.dayId < todayKey {
+                record.statusRaw = HabitDayRecordStatus.missed.rawValue
+                missed += 1
+            }
+        }
+        return missed
+    }
+
+    private func materializeToday(
+        habit: HabitModel,
+        todayStart: Date,
+        todayKey: String,
+        now: Date,
+        outcome: inout HabitSyncOutcome
+    ) {
+        guard !habit.hasProcessed(dayId: todayKey) else { return }
+        guard HabitRecordService.isScheduledForGeneration(habit, on: todayStart, dayId: todayKey) else { return }
+
+        do {
+            let day = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: todayStart, weekStatus: .present).day
+
+            if day.tasks.contains(where: { $0.habit?.id == habit.id }) {
+                outcome.skippedExistingCount += 1
+                return
+            }
+            guard day.status == .empty || day.status == .draft, now < killDate(for: day) else {
+                outcome.blockedCount += 1
+                return
+            }
+
+            try createHabitTask(habit: habit, in: day, todayKey: todayKey, now: now)
+            outcome.needsSave = true
+            outcome.createdCount += 1
+        } catch {
+            outcome.failedCount += 1
+        }
+    }
+
+    private func createHabitTask(habit: HabitModel, in day: DayModel, todayKey: String, now: Date) throws {
+        let payload = TaskDraftPayload(
+            title: habit.name,
+            description: "",
+            type: .regular,
+            taskTypeIdRaw: nil,
+            steps: [],
+            attachments: []
+        )
+        let task = try TaskMutationService(modelContext: modelContext)
+            .createTask(in: day, payload: payload, zone: .draft, project: nil)
+        // Deterministic identities: two devices materialising the same habit on
+        // the same day produce the same task and record keys, so iCloud sync
+        // converges them into one instead of showing the habit twice.
+        task.id = HabitDeterministicID.task(habitId: habit.id, dayId: todayKey)
+        task.habit = habit
+
+        let record = HabitDayRecord(dayId: todayKey, createdAt: now)
+        record.id = HabitDeterministicID.record(habitId: habit.id, dayId: todayKey)
+        record.habit = habit
+        habit.records.append(record)
+    }
+
+    private func killDate(for day: DayModel) -> Date {
+        let calendar = Calendar(identifier: .iso8601)
+        var components = calendar.dateComponents([.year, .month, .day], from: day.date)
+        components.hour = day.killTimeHour
+        components.minute = day.killTimeMinute
+        components.second = 0
+        return calendar.date(from: components) ?? .distantFuture
+    }
+}
+
+/// Name-based identities for habit output (RFC 4122 version 5 layout over
+/// SHA-256 instead of SHA-1; only stability and uniqueness matter here).
+nonisolated enum HabitDeterministicID {
+    static func task(habitId: UUID, dayId: String) -> UUID {
+        make("weekyii.habit.task|\(habitId.uuidString)|\(dayId)")
+    }
+
+    static func record(habitId: UUID, dayId: String) -> UUID {
+        make("weekyii.habit.record|\(habitId.uuidString)|\(dayId)")
+    }
+
+    private static func make(_ name: String) -> UUID {
+        var bytes = Array(SHA256.hash(data: Data(name.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}

@@ -1,11 +1,6 @@
 import SwiftUI
 import SwiftData
 
-private enum PendingDisplayMode {
-    case weekList
-    case month
-}
-
 private struct PendingMonthAddTarget: Identifiable {
     let id: String
     let day: DayModel
@@ -31,11 +26,17 @@ struct PendingView: View {
     @State private var monthEditTarget: PendingMonthEditTarget?
     @State private var selectedTaskForDetail: TaskItem?
     @State private var errorMessage: String?
-    @State private var displayMode: PendingDisplayMode = .weekList
     @State private var selectedWeekID: String?
     @State private var monthSummaries: [String: PendingViewModel.MonthDaySummary] = [:]
     @State private var planningExtensionsViewModel: ExtensionsViewModel?
     private let calendar = Calendar(identifier: .iso8601)
+
+    /// Week list or month calendar. Stored in `UserSettings` (device-local), so
+    /// the last chosen view is restored after the app restarts.
+    private var displayMode: WeekBrowseMode {
+        get { settings.pendingBrowseMode }
+        nonmutating set { settings.pendingBrowseMode = newValue }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,6 +44,8 @@ struct PendingView: View {
             .accessibilityIdentifier("pendingWorkspaceContent")
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .small, animated: false)
@@ -328,13 +331,22 @@ struct PendingView: View {
                 displayMode = displayMode == .weekList ? .month : .weekList
             }
         } label: {
-            Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
+            HStack(spacing: WeekSpacing.xs) {
+                Image(systemName: displayMode == .weekList ? "calendar" : "list.bullet.rectangle")
+                Text(
+                    displayMode == .weekList
+                        ? String(localized: "pending.month.toggle_month")
+                        : String(localized: "pending.month.toggle_week")
+                )
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .accessibilityLabel(
             displayMode == .weekList
-                ? String(localized: "pending.switch.month", defaultValue: "切换到月视图")
-                : String(localized: "pending.switch.week", defaultValue: "切换到周列表")
+                ? String(localized: "pending.switch.month")
+                : String(localized: "pending.switch.week")
         )
+        .accessibilityIdentifier("pendingSwitchToMonthButton")
     }
 
     private var addWeekButton: some View {
@@ -349,14 +361,18 @@ struct PendingView: View {
         }
         .disabled(displayMode == .month && isSelectedDatePast)
         .opacity(displayMode == .month && isSelectedDatePast ? 0.45 : 1.0)
-        .accessibilityLabel(String(localized: "pending.add_week"))
+        .accessibilityLabel(
+            displayMode == .weekList
+                ? String(localized: "pending.add_week")
+                : String(localized: "pending.month.add_selected_date")
+        )
         .accessibilityIdentifier("pendingToolbarAddButton")
     }
 
     private func presentMonthTaskAddEditor() {
         guard let viewModel else { return }
         guard !isSelectedDatePast else {
-            errorMessage = "过去日期不可添加任务"
+            errorMessage = String(localized: "pending.month.past_date_unavailable")
             return
         }
 
@@ -435,109 +451,30 @@ struct PendingView: View {
     }
 
     private var selectedDayDetailCard: some View {
-        let dayId = calendar.startOfDay(for: selectedDate).dayId
-        let summary = monthSummaries[dayId]
-        let taskCount = summary?.taskCount ?? 0
-        let ddlCount = summary?.ddlCount ?? 0
-        let title = selectedDate.formatted(Date.FormatStyle().month().day().weekday(.abbreviated))
         let day = viewModel?.dayRecord(on: selectedDate)
         let tasks = day.flatMap { viewModel?.tasksForDisplay(in: $0) } ?? []
 
-        return WeekCard(accentColor: day?.status.color ?? .weekyiiPrimary) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "pending.month.selected", defaultValue: "已选日期"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-                        Text(title)
-                            .font(.titleMedium)
-                            .foregroundColor(.textPrimary)
-                    }
-
-                    Spacer()
-
-                    if let day {
-                        StatusBadge(status: day.status)
-                    }
+        return PendingSelectedDaySection(
+            selectedDate: selectedDate,
+            day: day,
+            tasks: tasks,
+            isSelectedDatePast: isSelectedDatePast,
+            onTaskTap: { task in
+                guard let day, let viewModel else {
+                    selectedTaskForDetail = task
+                    return
                 }
-
-                HStack(spacing: WeekSpacing.md) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "pending.month.task_count", defaultValue: "任务"))
-                            .font(.caption2)
-                            .foregroundColor(.textSecondary)
-                        Text("\(taskCount)")
-                            .font(.headline)
-                            .foregroundColor(.accentGreen)
-                    }
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(String(localized: "pending.month.ddl_count", defaultValue: "DDL"))
-                            .font(.caption2)
-                            .foregroundColor(.textSecondary)
-                        Text("\(ddlCount)")
-                            .font(.headline)
-                            .foregroundColor(.taskDDL)
-                    }
-                }
-
-                if isSelectedDatePast {
-                    Text("过去日期仅可查看，不可新增。")
-                        .font(.caption)
-                        .foregroundColor(.textSecondary)
-                }
-
-                if day == nil {
-                    Text("该日期暂无任务记录。")
-                        .font(.bodyMedium)
-                        .foregroundColor(.textTertiary)
-                } else if tasks.isEmpty {
-                    Text("该日期暂无任务。")
-                        .font(.bodyMedium)
-                        .foregroundColor(.textTertiary)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
-                            Button {
-                                guard let day, let viewModel else {
-                                    selectedTaskForDetail = task
-                                    return
-                                }
-                                if viewModel.canEdit(day), task.zone == .draft {
-                                    monthEditTarget = PendingMonthEditTarget(
-                                        id: task.id.uuidString,
-                                        day: day,
-                                        task: task
-                                    )
-                                } else {
-                                    selectedTaskForDetail = task
-                                }
-                            } label: {
-                                OrderedTaskRow(
-                                    task: task,
-                                    index: index,
-                                    accessibilityIdentifier: "pendingMonthTask_\(index)"
-                                )
-                            }
-                            .buttonStyle(.plain)
-
-                            if index < tasks.count - 1 {
-                                Divider()
-                                    .padding(.leading, 56)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, WeekSpacing.md)
-                    .background(Color.backgroundPrimary.opacity(0.55))
-                    .clipShape(.rect(cornerRadius: WeekRadius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WeekRadius.medium)
-                            .stroke(Color.backgroundTertiary, lineWidth: 1)
+                if viewModel.canEdit(day), task.zone == .draft {
+                    monthEditTarget = PendingMonthEditTarget(
+                        id: task.id.uuidString,
+                        day: day,
+                        task: task
                     )
+                } else {
+                    selectedTaskForDetail = task
                 }
             }
-        }
+        )
     }
     
     // MARK: - Empty State
@@ -545,7 +482,7 @@ struct PendingView: View {
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "calendar.badge.plus")
+                CatCoveredSymbol(systemName: "calendar.badge.plus", pointSize: 60)
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
                 
@@ -590,6 +527,12 @@ struct PendingView: View {
                             .font(.system(size: 40))
                             .foregroundColor(.accentOrange.opacity(0.3))
                     }
+                    
+                    Spacer()
+                    
+                    CatCoveredSymbol(systemName: "calendar.badge.clock", pointSize: 40)
+                        .font(.system(size: 40))
+                        .foregroundColor(.accentOrange.opacity(0.3))
                 }
             }
             
@@ -631,6 +574,300 @@ struct PendingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(WeekSpacing.xl)
+    }
+}
+
+private struct PendingSelectedDaySection: View {
+    let selectedDate: Date
+    let day: DayModel?
+    let tasks: [TaskItem]
+    let isSelectedDatePast: Bool
+    let onTaskTap: (TaskItem) -> Void
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            header
+            if !tasks.isEmpty {
+                selectedDaySummary
+            }
+            taskContent
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pendingSelectedDaySection")
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: WeekSpacing.md) {
+            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                Text(
+                    String(
+                        format: String(localized: "pending.month.schedule"),
+                        locale: Locale.current,
+                        selectedDate.formatted(Date.FormatStyle().weekday(.abbreviated))
+                    )
+                )
+                    .font(.titleMedium.weight(.bold))
+                    .foregroundStyle(Color.textPrimary)
+
+                HStack(spacing: WeekSpacing.xs) {
+                    Text(selectedDate, format: Date.FormatStyle().month().day())
+
+                    if let day, day.status != .empty {
+                        Text("·")
+                        Text(day.status.displayName)
+                            .foregroundStyle(day.status.color)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(Color.textTertiary)
+            }
+
+            Spacer(minLength: WeekSpacing.sm)
+
+            if !tasks.isEmpty {
+                Text(
+                    String(
+                        format: String(localized: "pending.month.task_count"),
+                        locale: Locale.current,
+                        Int64(tasks.count)
+                    )
+                )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                    .monospacedDigit()
+                    .padding(.horizontal, WeekSpacing.sm)
+                    .padding(.vertical, WeekSpacing.xs)
+                    .background(Color.weekyiiPrimary.opacity(0.10), in: Capsule())
+                    .accessibilityIdentifier("pendingSelectedDayTaskCount")
+            }
+
+        }
+    }
+
+    private var selectedDaySummary: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: WeekSpacing.sm) {
+                ForEach(typeSummaries) { summary in
+                    summaryChip(
+                        title: summary.name,
+                        value: "\(summary.count)",
+                        icon: summary.iconName,
+                        color: summary.color
+                    )
+                }
+
+                let stepCount = tasks.reduce(0) { $0 + $1.steps.count }
+                if stepCount > 0 {
+                    summaryChip(
+                        title: String(localized: "pending.month.steps"),
+                        value: "\(stepCount)",
+                        icon: "checklist",
+                        color: .weekyiiPrimary
+                    )
+                }
+
+                let projectCount = Set(tasks.compactMap { $0.project?.id }).count
+                if projectCount > 0 {
+                    summaryChip(
+                        title: String(localized: "pending.month.projects"),
+                        value: "\(projectCount)",
+                        icon: "folder.fill",
+                        color: .accentOrange
+                    )
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pendingSelectedDayTypeSummary")
+    }
+
+    private var typeSummaries: [PendingDayTypeSummary] {
+        var result: [PendingDayTypeSummary] = []
+        var indicesByID: [String: Int] = [:]
+
+        for task in tasks {
+            let id = task.taskTypeIdRaw.isEmpty ? task.taskType.rawValue : task.taskTypeIdRaw
+            if let index = indicesByID[id] {
+                result[index].count += 1
+                continue
+            }
+
+            let presentation = taskTypeCatalog.resolve(idRaw: id, fallback: task.taskType)
+            indicesByID[id] = result.count
+            result.append(
+                PendingDayTypeSummary(
+                    id: id,
+                    name: presentation.name,
+                    iconName: presentation.iconName,
+                    color: presentation.color,
+                    count: 1
+                )
+            )
+        }
+
+        return result
+    }
+
+    private func summaryChip(title: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: WeekSpacing.xs) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.semibold))
+
+            Text(value)
+                .font(.caption.weight(.bold))
+                .monospacedDigit()
+
+            Text(title)
+                .font(.caption)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, WeekSpacing.md)
+        .padding(.vertical, WeekSpacing.sm)
+        .background(color.opacity(0.10), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(color.opacity(0.16), lineWidth: 0.75)
+        }
+    }
+
+    @ViewBuilder
+    private var taskContent: some View {
+        if isSelectedDatePast {
+            Text(String(localized: "pending.month.past_read_only"))
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+        }
+
+        if day == nil {
+            emptyState(String(localized: "pending.month.empty_day"))
+        } else if tasks.isEmpty {
+            emptyState(String(localized: "pending.month.empty_day"))
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                    Button {
+                        onTaskTap(task)
+                    } label: {
+                        PendingDayTaskRow(
+                            task: task,
+                            index: index,
+                            accessibilityIdentifier: "pendingMonthTask_\(index)"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < tasks.count - 1 {
+                        Divider()
+                            .overlay(Color.backgroundTertiary.opacity(0.75))
+                            .padding(.leading, 48)
+                    }
+                }
+            }
+        }
+    }
+
+    private func emptyState(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: WeekSpacing.sm) {
+            CatCoveredSymbol(systemName: "calendar", pointSize: 17)
+                .font(.body.weight(.medium))
+                .foregroundStyle(Color.textTertiary)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                Text(message)
+                    .font(.bodyMedium.weight(.medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                if !isSelectedDatePast {
+                    Text(String(localized: "pending.month.empty_hint"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, WeekSpacing.base)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.backgroundTertiary.opacity(0.55))
+                .frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("pendingMonthEmptyState")
+    }
+}
+
+private struct PendingDayTypeSummary: Identifiable {
+    let id: String
+    let name: String
+    let iconName: String
+    let color: Color
+    var count: Int
+}
+
+private struct PendingDayTaskRow: View {
+    let task: TaskItem
+    let index: Int
+    let accessibilityIdentifier: String
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
+
+    private var taskType: TaskTypePresentation {
+        taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: WeekSpacing.md) {
+            Text(index + 1, format: .number.precision(.integerLength(2)))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(taskType.color)
+                .monospacedDigit()
+                .frame(width: 30, alignment: .leading)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                Text(task.title)
+                    .font(.bodyLarge.weight(.semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: WeekSpacing.sm) {
+                    Label(taskType.name, systemImage: taskType.iconName)
+                        .foregroundStyle(taskType.color)
+
+                    if !task.steps.isEmpty {
+                        Label(
+                            String(
+                                format: String(localized: "pending.month.steps_count"),
+                                locale: Locale.current,
+                                Int64(task.steps.count)
+                            ),
+                            systemImage: "checklist"
+                        )
+                            .foregroundStyle(Color.textSecondary)
+                    }
+
+                    if let project = task.project {
+                        Label(project.name, systemImage: "folder")
+                            .foregroundStyle(Color.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                .font(.caption2.weight(.medium))
+            }
+
+            Spacer(minLength: WeekSpacing.xs)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.textTertiary.opacity(0.75))
+                .padding(.top, 5)
+        }
+        .padding(.vertical, WeekSpacing.md)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -691,13 +928,18 @@ private struct PendingMonthCalendarView: View {
     }
 
     var body: some View {
-        VStack(spacing: WeekSpacing.md) {
+        // 与「过去」月历保持同一垂直节奏：星期标题、日期格标记行、底部图例。
+        // 未来页仍以任务类型表达当天计划，不复用过去页的完成／过期语义。
+        VStack(spacing: WeekSpacing.sm) {
             weekdayHeader
-            LazyVGrid(columns: columns, spacing: WeekSpacing.xs) {
+            LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(calendarDays) { day in
                     dayCell(day)
                 }
             }
+
+            typeLegend
+                .padding(.top, WeekSpacing.xs)
         }
     }
 
@@ -724,26 +966,42 @@ private struct PendingMonthCalendarView: View {
         let regularCount = summary?.regularCount ?? 0
         let ddlCount = summary?.ddlCount ?? 0
         let leisureCount = summary?.leisureCount ?? 0
+        let showsRegularMarker = showRegular && regularCount > 0
+        let showsDDLMarker = showDDL && ddlCount > 0
+        let showsLeisureMarker = showLeisure && leisureCount > 0
+        let hasVisibleMarker = showsRegularMarker || showsDDLMarker || showsLeisureMarker
 
         Button {
             guard day.isCurrentMonth, !isPastDate else { return }
-            selectedDate = day.date
+            withAnimation(.snappy(duration: 0.22)) {
+                selectedDate = day.date
+            }
         } label: {
+            // 保留未来任务类型的色彩编码，但把标记独立到日期数字下方，
+            // 让日期网格的高度和「过去」页一致。
             VStack(spacing: 3) {
                 ZStack {
+                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                        .fill(
+                            dayCellBackground(
+                                isSelected: isSelected,
+                                isAvailable: day.isCurrentMonth && !isPastDate,
+                                hasVisibleMarker: hasVisibleMarker,
+                                showsDDLMarker: showsDDLMarker,
+                                showsLeisureMarker: showsLeisureMarker
+                            )
+                        )
+
                     if isSelected && day.isCurrentMonth && !isPastDate {
-                        Circle()
-                            .fill(Color.weekyiiPrimary)
-                            .frame(width: 34, height: 34)
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(Color.white.opacity(0.24), lineWidth: 1)
                     } else if isToday && day.isCurrentMonth && !isPastDate {
-                        Circle()
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
                             .stroke(Color.weekyiiPrimary, lineWidth: 1.5)
-                            .frame(width: 34, height: 34)
                     }
 
                     Text("\(dayNumber)")
-                        .font(.body)
-                        .fontWeight(isToday ? .semibold : .regular)
+                        .font(.bodyMedium.weight(isSelected || isToday ? .bold : .medium))
                         .foregroundStyle(
                             dayNumberColor(
                                 day: day,
@@ -753,29 +1011,37 @@ private struct PendingMonthCalendarView: View {
                             )
                         )
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 38, height: 40)
 
                 HStack(spacing: 3) {
-                    if day.isCurrentMonth && !isPastDate && showRegular && regularCount > 0 {
+                    if day.isCurrentMonth && !isPastDate && showsRegularMarker {
                         Circle()
                             .fill(Color.accentGreen)
-                            .frame(width: 6, height: 6)
+                            .frame(width: 5, height: 5)
                     }
-                    if day.isCurrentMonth && !isPastDate && showDDL && ddlCount > 0 {
+                    if day.isCurrentMonth && !isPastDate && showsDDLMarker {
                         Image(systemName: TaskType.ddl.monthMarkerIconName)
-                            .font(.system(size: 8))
+                            .font(.system(size: 7, weight: .bold))
                             .foregroundStyle(Color.taskDDL)
                     }
-                    if day.isCurrentMonth && !isPastDate && showLeisure && leisureCount > 0 {
+                    if day.isCurrentMonth && !isPastDate && showsLeisureMarker {
                         Image(systemName: TaskType.leisure.monthMarkerIconName)
-                            .font(.system(size: 8))
+                            .font(.system(size: 7, weight: .bold))
                             .foregroundStyle(Color.taskLeisure)
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 10)
+                .opacity(hasVisibleMarker ? 1 : 0)
             }
+            .frame(maxWidth: .infinity)
+            .weekSoftShadow(
+                color: isSelected ? Color.weekyiiPrimary.opacity(0.18) : Color.clear,
+                radius: 6,
+                y: 3
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("pendingMonthDay_\(dayId)")
         .disabled(!day.isCurrentMonth || isPastDate)
         .dropDestination(for: String.self) { payloads, _ in
             guard day.isCurrentMonth, !isPastDate else { return false }
@@ -788,6 +1054,103 @@ private struct PendingMonthCalendarView: View {
                 ? "可接收从悬置箱拖来的任务"
                 : ""
         )
+        .accessibilityLabel(
+            calendarDayAccessibilityLabel(
+                dayNumber: dayNumber,
+                regularCount: regularCount,
+                ddlCount: ddlCount,
+                leisureCount: leisureCount
+            )
+        )
+    }
+
+    private var typeLegend: some View {
+        HStack(spacing: WeekSpacing.lg) {
+            if showRegular {
+                legendItem(color: .accentGreen, icon: nil, text: String(localized: "pending.month.legend.regular"))
+            }
+            if showDDL {
+                legendItem(color: .taskDDL, icon: TaskType.ddl.monthMarkerIconName, text: "DDL")
+            }
+            if showLeisure {
+                legendItem(
+                    color: .taskLeisure,
+                    icon: TaskType.leisure.monthMarkerIconName,
+                    text: String(localized: "pending.month.legend.leisure")
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("pendingMonthTypeLegend")
+    }
+
+    private func legendItem(color: Color, icon: String?, text: String) -> some View {
+        HStack(spacing: 4) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
+            } else {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+            }
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+        }
+    }
+
+    private func dayCellBackground(
+        isSelected: Bool,
+        isAvailable: Bool,
+        hasVisibleMarker: Bool,
+        showsDDLMarker: Bool,
+        showsLeisureMarker: Bool
+    ) -> Color {
+        guard isAvailable else { return .clear }
+        if isSelected { return .weekyiiPrimary }
+        guard hasVisibleMarker else { return .clear }
+        if showsDDLMarker { return .taskDDLBg.opacity(0.78) }
+        if showsLeisureMarker { return .taskLeisureBg.opacity(0.78) }
+        return .taskRegularBg.opacity(0.78)
+    }
+
+    private func calendarDayAccessibilityLabel(
+        dayNumber: Int,
+        regularCount: Int,
+        ddlCount: Int,
+        leisureCount: Int
+    ) -> String {
+        var parts = ["\(dayNumber)"]
+        if regularCount > 0 {
+            parts.append(
+                String(
+                    format: String(localized: "pending.month.a11y.regular"),
+                    locale: Locale.current,
+                    Int64(regularCount)
+                )
+            )
+        }
+        if ddlCount > 0 {
+            parts.append(
+                String(
+                    format: String(localized: "pending.month.a11y.ddl"),
+                    locale: Locale.current,
+                    Int64(ddlCount)
+                )
+            )
+        }
+        if leisureCount > 0 {
+            parts.append(
+                String(
+                    format: String(localized: "pending.month.a11y.leisure"),
+                    locale: Locale.current,
+                    Int64(leisureCount)
+                )
+            )
+        }
+        return ListFormatter.localizedString(byJoining: parts)
     }
 
     private func dayNumberColor(day: PendingCalendarDay, isSelected: Bool, isToday: Bool, isPastDate: Bool) -> Color {
@@ -798,7 +1161,7 @@ private struct PendingMonthCalendarView: View {
             return .textTertiary.opacity(0.55)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary

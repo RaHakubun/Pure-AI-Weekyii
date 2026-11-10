@@ -8,19 +8,26 @@ struct CreateProjectSheet: View {
 
     @State private var name = ""
     @State private var description = ""
-    @State private var selectedColor = "#C46A1A"
+    @State private var selectedColor = CreateProjectSheet.defaultColorHex
     @State private var selectedIcon = "folder.fill"
     @State private var startDate = Date()
     @State private var endDate = Date().addingDays(7)
     @State private var errorMessage: String?
     @State private var hasAppliedProjectDefaults = false
 
-    private let colorOptions = [
-        "#C46A1A", "#3FA67A", "#D05C3E", "#8C6AD9",
-        "#2F7E79", "#F08A3C", "#D97A6C", "#6B5A4F"
+    /// Shared with the project settings page so both surfaces offer the same palette.
+    /// 只列轻量色系：旧项目存储的深色系原样保留（编辑时不选新色就不会被改），
+    /// 但不再作为选项出现，因此这里没有兼容旧 hex 的分支。
+    static let colorOptions = [
+        "#E39A3F", "#43B07F", "#EE8462", "#A98CF0",
+        "#46A9A2", "#4D9DE0", "#E8749F", "#9A8577",
+        "#F7D3A8", "#B6E0BE", "#F6C2C6", "#D3C4F2",
+        "#A9DAD2", "#A8CBF0", "#F6E3A1", "#E3DAD2"
     ]
 
-    private let iconOptions = [
+    static let defaultColorHex = "#E39A3F"
+
+    static let iconOptions = [
         "folder.fill", "doc.text.fill", "star.fill", "bolt.fill",
         "flag.fill", "book.fill", "hammer.fill", "puzzlepiece.fill",
         "lightbulb.fill", "chart.bar.fill", "graduationcap.fill", "airplane"
@@ -31,7 +38,7 @@ struct CreateProjectSheet: View {
         self.projectToEdit = projectToEdit
         _name = State(initialValue: projectToEdit?.name ?? "")
         _description = State(initialValue: projectToEdit?.projectDescription ?? "")
-        _selectedColor = State(initialValue: projectToEdit?.color ?? "#C46A1A")
+        _selectedColor = State(initialValue: projectToEdit?.color ?? Self.defaultColorHex)
         _selectedIcon = State(initialValue: projectToEdit?.icon ?? "folder.fill")
         _startDate = State(initialValue: projectToEdit?.startDate ?? Date())
         _endDate = State(initialValue: projectToEdit?.endDate ?? Date().addingDays(7))
@@ -81,7 +88,7 @@ struct CreateProjectSheet: View {
                                 .foregroundColor(.textSecondary)
 
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: WeekSpacing.sm) {
-                                ForEach(colorOptions, id: \.self) { hex in
+                                ForEach(Self.colorOptions, id: \.self) { hex in
                                     ZStack {
                                         Circle()
                                             .fill(Color(hex: hex))
@@ -95,7 +102,7 @@ struct CreateProjectSheet: View {
 
                                             Image(systemName: "checkmark")
                                                 .font(.system(size: 12, weight: .bold))
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.weekyiiTileInk)
                                         }
                                     }
                                     .onTapGesture {
@@ -116,18 +123,18 @@ struct CreateProjectSheet: View {
                                 .foregroundColor(.textSecondary)
 
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: WeekSpacing.sm) {
-                                ForEach(iconOptions, id: \.self) { icon in
+                                ForEach(Self.iconOptions, id: \.self) { icon in
                                     ZStack {
                                         RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous)
-                                            .fill(selectedIcon == icon ? Color(hex: selectedColor).opacity(0.15) : Color.backgroundTertiary)
+                                            .fill(selectedIcon == icon ? accentColor.opacity(0.15) : Color.backgroundTertiary)
                                             .frame(width: 44, height: 44)
                                         Image(systemName: icon)
                                             .font(.system(size: 18))
-                                            .foregroundColor(selectedIcon == icon ? Color(hex: selectedColor) : .textTertiary)
+                                            .foregroundColor(selectedIcon == icon ? accentColor : .textTertiary)
                                     }
                                     .overlay(
                                         RoundedRectangle(cornerRadius: WeekRadius.small, style: .continuous)
-                                            .stroke(selectedIcon == icon ? Color(hex: selectedColor) : .clear, lineWidth: 1.5)
+                                            .stroke(selectedIcon == icon ? accentColor : .clear, lineWidth: 1.5)
                                     )
                                     .onTapGesture {
                                         withAnimation(.easeInOut(duration: 0.15)) {
@@ -162,6 +169,14 @@ struct CreateProjectSheet: View {
                 guard projectToEdit == nil, !hasAppliedProjectDefaults else { return }
                 startDate = Date()
                 endDate = Date().addingDays(max(settings.defaultProjectDurationDays, 1))
+                // Only adopt a stored default that is actually part of the palette,
+                // otherwise nothing would render as selected.
+                if Self.colorOptions.contains(settings.defaultProjectColorHex) {
+                    selectedColor = settings.defaultProjectColorHex
+                }
+                if Self.iconOptions.contains(settings.defaultProjectIconName) {
+                    selectedIcon = settings.defaultProjectIconName
+                }
                 hasAppliedProjectDefaults = true
             }
             .toolbar {
@@ -220,11 +235,14 @@ struct CreateProjectSheet: View {
 
     // MARK: - Live Preview Card
 
+    /// 与项目列表卡片一致：色条/图标/描边都是浅底前景，走 emphasis 才读得清。
+    private var accentColor: Color { Color.weekyiiEmphasis(hex: selectedColor) }
+
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Gradient color bar
             LinearGradient(
-                colors: [Color(hex: selectedColor), Color(hex: selectedColor).opacity(0.6)],
+                colors: [accentColor, accentColor.opacity(0.6)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -234,11 +252,11 @@ struct CreateProjectSheet: View {
                 // Icon circle
                 ZStack {
                     Circle()
-                        .fill(Color(hex: selectedColor).opacity(0.15))
+                        .fill(accentColor.opacity(0.15))
                         .frame(width: 44, height: 44)
                     Image(systemName: selectedIcon)
                         .font(.system(size: 20))
-                        .foregroundColor(Color(hex: selectedColor))
+                        .foregroundColor(accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -274,9 +292,9 @@ struct CreateProjectSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                .stroke(Color(hex: selectedColor).opacity(0.2), lineWidth: 1)
+                .stroke(accentColor.opacity(0.2), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .weekSoftShadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         .animation(.easeInOut(duration: 0.2), value: selectedColor)
         .animation(.easeInOut(duration: 0.2), value: selectedIcon)
     }

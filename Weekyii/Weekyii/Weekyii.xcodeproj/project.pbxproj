@@ -8,10 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		D7A2000130D0000100BEEF01 /* WorkspaceShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2000230D0000100BEEF01 /* WorkspaceShell.swift */; };
+		A6E100012F9B4E5100CAFE01 /* Cinzel.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */; };
+		A6E100032F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */; };
+		A6E100052F9B4E5100CAFE01 /* OFL-Cinzel.txt in Resources */ = {isa = PBXBuildFile; fileRef = A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */; };
+		A6E100072F9B4E5100CAFE01 /* OFL-Alcarin.txt in Resources */ = {isa = PBXBuildFile; fileRef = A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */; };
+		E1F000012FA0000100AAA001 /* PurchaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000022FA0000100AAA001 /* PurchaseService.swift */; };
+		E1F000032FA0000100AAA001 /* VIPServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F000042FA0000100AAA001 /* VIPServiceView.swift */; };
+		DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */; };
+		C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */; };
+		C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */; };
 		224A5BE0F3A5C75C697B7009 /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */; };
-		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
-		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
-		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */; };
 		9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA482F378923000424BF /* PastAnalyticsService.swift */; };
 		9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9439FA492F378923000424BF /* PastStatsOverview.swift */; };
@@ -33,8 +39,6 @@
 		944E58612F2B593A00DB2DEE /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58092F2B593A00DB2DEE /* AppState.swift */; };
 		944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581D2F2B593A00DB2DEE /* DayCardView.swift */; };
 		944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */; };
-		C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00230A0000100BEEF01 /* WeekTopology.swift */; };
-		C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */; };
 		944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E580A2F2B593A00DB2DEE /* ContentView.swift */; };
 		944E58662F2B593A00DB2DEE /* DayStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58232F2B593A00DB2DEE /* DayStatus.swift */; };
 		944E58672F2B593A00DB2DEE /* FocusZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58182F2B593A00DB2DEE /* FocusZoneView.swift */; };
@@ -63,6 +67,9 @@
 		944E58842F2B593A00DB2DEE /* PendingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58142F2B593A00DB2DEE /* PendingViewModel.swift */; };
 		944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */; };
 		944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 944E582D2F2B593A00DB2DEE /* Assets.xcassets */; };
+		D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
+		D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */; };
+		D5A100132F7A100100AAA001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */; };
 		9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 945022892F433A83000D67FF /* MindStampItem.swift */; };
 		9450228E2F433AA7000D67FF /* MindStampListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228C2F433AA7000D67FF /* MindStampListView.swift */; };
 		9450228F2F433AA7000D67FF /* MindStampViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450228D2F433AA7000D67FF /* MindStampViewModel.swift */; };
@@ -75,6 +82,8 @@
 		94982DB02F2BBB3C00CE8621 /* WeekButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */; };
 		94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */; };
 		94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */; };
+		A7C10D3E2F9B4E51008A1F01 /* LotrGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */; };
+		C47A11012F9B4E51008A1C01 /* CatGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C47A11022F9B4E51008A1C01 /* CatGlyph.swift */; };
 		94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */; };
 		94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */; };
 		94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */; };
@@ -92,6 +101,7 @@
 		94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */; };
 		94C1D0F32F3F64FD00AA8E13 /* ProjectStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */; };
 		94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */; };
+		B81F7C102F7B000100000001 /* LiveModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81F7C112F7B000100000001 /* LiveModuleTile.swift */; };
 		94C1D0F62F3F650B00AA8E13 /* ProjectModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */; };
 		94C1D0F72F3F650B00AA8E13 /* Analytics+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */; };
 		94E266502F2E5D180083581A /* PendingWeekDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */; };
@@ -103,17 +113,55 @@
 		B10000042F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
 		B10000052F90000000AAA001 /* WeekyiiWidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000042F90000000AAA001 /* WeekyiiWidgetSupport.swift */; };
 		B10000062F90000000AAA001 /* WidgetSnapshotComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */; };
+		C0D3A00130A0000100BEEF01 /* WeekTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00230A0000100BEEF01 /* WeekTopology.swift */; };
+		C0D3A00330A0000100BEEF01 /* WeekTopologyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */; };
+		C0D3A00530A0000100BEEF01 /* OrderedTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */; };
+		C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */; };
+		C0D3A00730A0000100BEEF01 /* HabitModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00830A0000100BEEF01 /* HabitModel.swift */; };
+		C0D3A00930A0000100BEEF01 /* HabitDayRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00A30A0000100BEEF01 /* HabitDayRecord.swift */; };
+		C0D3A00B30A0000100BEEF01 /* HabitTaskMaterializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */; };
+		C0D3A00D30A0000100BEEF01 /* HabitStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */; };
+		C0D3A00F30A0000100BEEF01 /* HabitViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A01030A0000100BEEF01 /* HabitViewModel.swift */; };
+		C0D3A01130A0000100BEEF01 /* HabitsFullView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A01230A0000100BEEF01 /* HabitsFullView.swift */; };
+		C0D3A01330A0000100BEEF01 /* HabitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A01430A0000100BEEF01 /* HabitDetailView.swift */; };
+		C0D3A01530A0000100BEEF01 /* HabitEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A01630A0000100BEEF01 /* HabitEditorSheet.swift */; };
+		C2A0000130C0000100CAFE01 /* ThemeStatusArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */; };
 		C5956E05E3404E00F711C775 /* TaskAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E9AD3A07816D9433F6BA2 /* TaskAttachment.swift */; };
+		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
+		D4A100212F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */; };
+		D4A100312F7A100100AAA003 /* WeekyiiSnapshotRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */; };
+		D4A100412F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */; };
+		D4A100512F7A100100AAA005 /* LegacyStoreConsolidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */; };
+		D4A100612F7A100100AAA006 /* CloudRecordCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */; };
+		D4A100712F7A100100AAA007 /* CloudSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */; };
+		D4A100812F7A100100AAA008 /* CloudSyncMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */; };
+		D4A100912F7A100100AAA009 /* CloudSyncRetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */; };
+		DA2D00012F7A100100AAA001 /* CloudKitRecordAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */; };
+		DA2D00032F7A100100AAA001 /* CloudKitInfrastructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */; };
+		DA2D00052F7A100100AAA001 /* CKSyncEngineTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */; };
+		A90000092FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */; };
+		A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */; };
+		A90000072FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */; };
+		A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */; };
+		A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */; };
+		A900000C2FA0000100AAA001 /* NotificationPresentationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */; };
+		DA2D00072F7A100100AAA001 /* CloudSyncD2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */; };
+		ECA100012F7A100100AAA001 /* CloudSyncLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */; };
+		ECA100032F7A100100AAA001 /* CloudSyncReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */; };
+		ECA100052F7A100100AAA001 /* CloudSyncETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA100062F7A100100AAA001 /* CloudSyncETests.swift */; };
+		EFA100012F7A100100AAA001 /* CloudSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */; };
+		EFA100032F7A100100AAA001 /* CloudSyncCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */; };
 		DF3C2419516E4D6FB1ABAE0F /* DraftReorderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */; };
 		E739DA7AF8C7EFA98F7C2AFA /* TaskStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7A6CE6657A22194F5108AB /* TaskStep.swift */; };
 		F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58422F2B593A00DB2DEE /* ModelTests.swift */; };
 		F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58432F2B593A00DB2DEE /* StateMachineTests.swift */; };
 		F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */; };
-		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
 		F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A100102F6A000100AAA001 /* ProjectTileSize.swift */; };
 		F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */; };
-		D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A100102F7A100100AAA001 /* DataArchiveService.swift */; };
 		F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */; };
+		F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100102F70000100AAA001 /* NotificationServiceTests.swift */; };
+		F7A100212F70000100AAA001 /* LegacyStoreConsolidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */; };
+		F8A100012F80000100AAA001 /* DayStartService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A100022F80000100AAA001 /* DayStartService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -156,6 +204,16 @@
 
 /* Begin PBXFileReference section */
 		D7A2000230D0000100BEEF01 /* WorkspaceShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceShell.swift; sourceTree = "<group>"; };
+		A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/Cinzel.ttf"; sourceTree = "<group>"; };
+		A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/AlcarinTengwar-Regular.otf"; sourceTree = "<group>"; };
+		A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL-Cinzel.txt"; sourceTree = "<group>"; };
+		A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fonts/OFL-Alcarin.txt"; sourceTree = "<group>"; };
+		E1F000022FA0000100AAA001 /* PurchaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseService.swift; sourceTree = "<group>"; };
+		E1F000042FA0000100AAA001 /* VIPServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VIPServiceView.swift; sourceTree = "<group>"; };
+		E1F000052FA0000100AAA001 /* Weekyii.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Weekyii.storekit; sourceTree = "<group>"; };
+		DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncD1Tests.swift; sourceTree = "<group>"; };
+		C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEntitlementService.swift; sourceTree = "<group>"; };
+		C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncTypes.swift; sourceTree = "<group>"; };
 		180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		35E01EAD05FA406B99AC60C8 /* DraftReorderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftReorderUITests.swift; sourceTree = "<group>"; };
 		8C7A6CE6657A22194F5108AB /* TaskStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStep.swift; sourceTree = "<group>"; };
@@ -183,19 +241,15 @@
 		944E58182F2B593A00DB2DEE /* FocusZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusZoneView.swift; sourceTree = "<group>"; };
 		944E58192F2B593A00DB2DEE /* FrozenZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrozenZoneView.swift; sourceTree = "<group>"; };
 		944E581A2F2B593A00DB2DEE /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
-		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
 		944E581B2F2B593A00DB2DEE /* TodayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayViewModel.swift; sourceTree = "<group>"; };
 		944E581D2F2B593A00DB2DEE /* DayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCardView.swift; sourceTree = "<group>"; };
 		944E581E2F2B593A00DB2DEE /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
 		944E581F2F2B593A00DB2DEE /* WeekOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekOverviewView.swift; sourceTree = "<group>"; };
-		C0D3A00230A0000100BEEF01 /* WeekTopology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopology.swift; sourceTree = "<group>"; };
-		C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopologyView.swift; sourceTree = "<group>"; };
 		944E58202F2B593A00DB2DEE /* WeekViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekViewModel.swift; sourceTree = "<group>"; };
 		944E58232F2B593A00DB2DEE /* DayStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayStatus.swift; sourceTree = "<group>"; };
 		944E58242F2B593A00DB2DEE /* TaskType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskType.swift; sourceTree = "<group>"; };
 		944E58252F2B593A00DB2DEE /* TaskZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskZone.swift; sourceTree = "<group>"; };
 		944E58262F2B593A00DB2DEE /* WeekStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStatus.swift; sourceTree = "<group>"; };
-		C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTypeDefinition.swift; sourceTree = "<group>"; };
 		944E58282F2B593A00DB2DEE /* DayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayModel.swift; sourceTree = "<group>"; };
 		944E58292F2B593A00DB2DEE /* TaskItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
 		944E582A2F2B593A00DB2DEE /* WeekModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekModel.swift; sourceTree = "<group>"; };
@@ -218,7 +272,6 @@
 		944E58422F2B593A00DB2DEE /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelTests.swift; sourceTree = "<group>"; };
 		944E58432F2B593A00DB2DEE /* StateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateMachineTests.swift; sourceTree = "<group>"; };
 		944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalculatorTests.swift; sourceTree = "<group>"; };
-		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		944E584B2F2B593A00DB2DEE /* Weekyii.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = Weekyii.xcodeproj; sourceTree = "<group>"; };
 		945022892F433A83000D67FF /* MindStampItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampItem.swift; sourceTree = "<group>"; };
 		9450228B2F433AA7000D67FF /* MindStampEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindStampEditorSheet.swift; sourceTree = "<group>"; };
@@ -228,10 +281,13 @@
 		9466DE4F2F69868200EF5E24 /* KillTimeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillTimeSlider.swift; sourceTree = "<group>"; };
 		94982D702F2BB70700CE8621 /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
 		94982D722F2BB71F00CE8621 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		94982DAA2F2BBB3C00CE8621 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
 		94982DAB2F2BBB3C00CE8621 /* TaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCard.swift; sourceTree = "<group>"; };
 		94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekButton.swift; sourceTree = "<group>"; };
 		94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCard.swift; sourceTree = "<group>"; };
+		A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LotrGlyph.swift; sourceTree = "<group>"; };
+		C47A11022F9B4E51008A1C01 /* CatGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatGlyph.swift; sourceTree = "<group>"; };
 		94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekLogo.swift; sourceTree = "<group>"; };
 		94982DB52F2BBB4B00CE8621 /* Spacing+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Spacing+Weekyii.swift"; sourceTree = "<group>"; };
 		94982DB62F2BBB4B00CE8621 /* Typography+Weekyii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography+Weekyii.swift"; sourceTree = "<group>"; };
@@ -250,6 +306,7 @@
 		94C1D0F22F3F64FD00AA8E13 /* ProjectStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStatus.swift; sourceTree = "<group>"; };
 		94C1D0F42F3F650B00AA8E13 /* Analytics+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Analytics+Extensions.swift"; sourceTree = "<group>"; };
 		94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionsHubView.swift; sourceTree = "<group>"; };
+		B81F7C112F7B000100000001 /* LiveModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModuleTile.swift; sourceTree = "<group>"; };
 		94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectModel.swift; sourceTree = "<group>"; };
 		94E2664F2F2E5D180083581A /* PendingWeekDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingWeekDetailView.swift; sourceTree = "<group>"; };
 		A1B2C3D42F70000100ABCD02 /* PostponeTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostponeTaskSheet.swift; sourceTree = "<group>"; };
@@ -262,12 +319,50 @@
 		B20000062F90000000AAA001 /* WeekyiiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeekyiiWidget.entitlements; sourceTree = "<group>"; };
 		B20000072F90000000AAA001 /* Weekyii.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Weekyii.entitlements; sourceTree = "<group>"; };
 		B20000082F90000000AAA001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		C0D3A00230A0000100BEEF01 /* WeekTopology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopology.swift; sourceTree = "<group>"; };
+		C0D3A00430A0000100BEEF01 /* WeekTopologyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTopologyView.swift; sourceTree = "<group>"; };
 		C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderedTaskRow.swift; sourceTree = "<group>"; };
+		C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTypeDefinition.swift; sourceTree = "<group>"; };
+		C0D3A00830A0000100BEEF01 /* HabitModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitModel.swift; sourceTree = "<group>"; };
+		C0D3A00A30A0000100BEEF01 /* HabitDayRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitDayRecord.swift; sourceTree = "<group>"; };
+		C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitTaskMaterializer.swift; sourceTree = "<group>"; };
+		C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitStatistics.swift; sourceTree = "<group>"; };
+		C0D3A01030A0000100BEEF01 /* HabitViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitViewModel.swift; sourceTree = "<group>"; };
+		C0D3A01230A0000100BEEF01 /* HabitsFullView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsFullView.swift; sourceTree = "<group>"; };
+		C0D3A01430A0000100BEEF01 /* HabitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitDetailView.swift; sourceTree = "<group>"; };
+		C0D3A01630A0000100BEEF01 /* HabitEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitEditorSheet.swift; sourceTree = "<group>"; };
+		C2A0000230C0000100CAFE01 /* ThemeStatusArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStatusArtwork.swift; sourceTree = "<group>"; };
+		C97BDBB470C84CE942883CCD /* TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
+		D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiBusinessSnapshot.swift; sourceTree = "<group>"; };
+		D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiSnapshotRepository.swift; sourceTree = "<group>"; };
+		D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiSnapshotMergeService.swift; sourceTree = "<group>"; };
+		D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStoreConsolidator.swift; sourceTree = "<group>"; };
+		D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRecordCodec.swift; sourceTree = "<group>"; };
+		D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncTransport.swift; sourceTree = "<group>"; };
+		D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncMetadataStore.swift; sourceTree = "<group>"; };
+		D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncRetryPolicy.swift; sourceTree = "<group>"; };
+		DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordAdapter.swift; sourceTree = "<group>"; };
+		DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitInfrastructure.swift; sourceTree = "<group>"; };
+		DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKSyncEngineTransport.swift; sourceTree = "<group>"; };
+		DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncD2Tests.swift; sourceTree = "<group>"; };
+		ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncLocalStore.swift; sourceTree = "<group>"; };
+		ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncReconciler.swift; sourceTree = "<group>"; };
+		ECA100062F7A100100AAA001 /* CloudSyncETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncETests.swift; sourceTree = "<group>"; };
+		EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncCoordinator.swift; sourceTree = "<group>"; };
+		EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncCoordinatorTests.swift; sourceTree = "<group>"; };
 		F2A100102F6A000100AAA001 /* ProjectTileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTileSize.swift; sourceTree = "<group>"; };
 		F3B100102F6A100100AAA001 /* WeekyiiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiPersistence.swift; sourceTree = "<group>"; };
-		D4A100102F7A100100AAA001 /* DataArchiveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataArchiveService.swift; sourceTree = "<group>"; };
 		F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTilePresentation.swift; sourceTree = "<group>"; };
+		F7A100102F70000100AAA001 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
+		F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStoreConsolidatorTests.swift; sourceTree = "<group>"; };
+		F8A100022F80000100AAA001 /* DayStartService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayStartService.swift; sourceTree = "<group>"; };
+		A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouterTests.swift; sourceTree = "<group>"; };
+		A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitor.swift; sourceTree = "<group>"; };
+		A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncNetworkMonitorTests.swift; sourceTree = "<group>"; };
+		A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRemoteNotificationRouter.swift; sourceTree = "<group>"; };
+		A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekyiiAppDelegate.swift; sourceTree = "<group>"; };
+		A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresentationDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -333,6 +428,8 @@
 		944E580C2F2B593A00DB2DEE /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A90000022FA0000100AAA001 /* WeekyiiAppDelegate.swift */,
+				A900000D2FA0000100AAA001 /* NotificationPresentationDelegate.swift */,
 				944E58092F2B593A00DB2DEE /* AppState.swift */,
 				944E580A2F2B593A00DB2DEE /* ContentView.swift */,
 				944E580B2F2B593A00DB2DEE /* WeekyiiApp.swift */,
@@ -434,6 +531,8 @@
 				94C1D0F52F3F650B00AA8E13 /* ProjectModel.swift */,
 				944E58272F2B593A00DB2DEE /* Enums */,
 				C1A0000230B0000100CAFE01 /* TaskTypeDefinition.swift */,
+				C0D3A00830A0000100BEEF01 /* HabitModel.swift */,
+				C0D3A00A30A0000100BEEF01 /* HabitDayRecord.swift */,
 				944E58282F2B593A00DB2DEE /* DayModel.swift */,
 				944E58292F2B593A00DB2DEE /* TaskItem.swift */,
 				8C7A6CE6657A22194F5108AB /* TaskStep.swift */,
@@ -447,12 +546,19 @@
 		944E58302F2B593A00DB2DEE /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				A6E100022F9B4E5100CAFE01 /* Cinzel.ttf */,
+				A6E100042F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf */,
+				A6E100062F9B4E5100CAFE01 /* OFL-Cinzel.txt */,
+				A6E100082F9B4E5100CAFE01 /* OFL-Alcarin.txt */,
 				944E582D2F2B593A00DB2DEE /* Assets.xcassets */,
 				180013CBC2F9F9A5A14A73C0 /* LaunchScreen.storyboard */,
 				944E582F2F2B593A00DB2DEE /* Localizable.xcstrings */,
 				B20000072F90000000AAA001 /* Weekyii.entitlements */,
+				D5A100102F7A100100AAA001 /* PrivacyInfo.xcprivacy */,
 				94982D702F2BB70700CE8621 /* UserSettings.swift */,
 				94982D722F2BB71F00CE8621 /* SettingsView.swift */,
+				E1F000042FA0000100AAA001 /* VIPServiceView.swift */,
+				E1F000052FA0000100AAA001 /* Weekyii.storekit */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -460,12 +566,34 @@
 		944E58352F2B593A00DB2DEE /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C3A0000530D0000100CAFE01 /* CloudSyncEntitlementService.swift */,
+				E1F000022FA0000100AAA001 /* PurchaseService.swift */,
+				C3A0000630D0000100CAFE01 /* CloudSyncTypes.swift */,
 				D4A100102F7A100100AAA001 /* DataArchiveService.swift */,
+				F8A100022F80000100AAA001 /* DayStartService.swift */,
+				C0D3A00C30A0000100BEEF01 /* HabitTaskMaterializer.swift */,
+				C0D3A00E30A0000100BEEF01 /* HabitStatistics.swift */,
 				944E58312F2B593A00DB2DEE /* NotificationService.swift */,
 				944E58322F2B593A00DB2DEE /* StateMachine.swift */,
 				A1B2C3D42F70000100ABCD04 /* TaskPostponeService.swift */,
 				944E58332F2B593A00DB2DEE /* TimeProvider.swift */,
 				944E58342F2B593A00DB2DEE /* WeekCalculator.swift */,
+				D4A100202F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift */,
+				D4A100302F7A100100AAA003 /* WeekyiiSnapshotRepository.swift */,
+				D4A100402F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift */,
+				D4A100502F7A100100AAA005 /* LegacyStoreConsolidator.swift */,
+				D4A100602F7A100100AAA006 /* CloudRecordCodec.swift */,
+				D4A100702F7A100100AAA007 /* CloudSyncTransport.swift */,
+				D4A100802F7A100100AAA008 /* CloudSyncMetadataStore.swift */,
+				D4A100902F7A100100AAA009 /* CloudSyncRetryPolicy.swift */,
+				DA2D00022F7A100100AAA001 /* CloudKitRecordAdapter.swift */,
+				DA2D00042F7A100100AAA001 /* CloudKitInfrastructure.swift */,
+				DA2D00062F7A100100AAA001 /* CKSyncEngineTransport.swift */,
+				ECA100022F7A100100AAA001 /* CloudSyncLocalStore.swift */,
+				ECA100042F7A100100AAA001 /* CloudSyncReconciler.swift */,
+				EFA100022F7A100100AAA001 /* CloudSyncCoordinator.swift */,
+				A90000062FA0000100AAA001 /* CloudRemoteNotificationRouter.swift */,
+				A90000042FA0000100AAA001 /* CloudSyncNetworkMonitor.swift */,
 				B20000052F90000000AAA001 /* WidgetSnapshotComposer.swift */,
 			);
 			path = Services;
@@ -482,6 +610,8 @@
 				C0D3A00630A0000100BEEF01 /* OrderedTaskRow.swift */,
 				94982DAC2F2BBB3C00CE8621 /* WeekButton.swift */,
 				94982DAD2F2BBB3C00CE8621 /* WeekCard.swift */,
+				A7C10D3E2F9B4E51008A1F02 /* LotrGlyph.swift */,
+				C47A11022F9B4E51008A1C01 /* CatGlyph.swift */,
 				94982DAE2F2BBB3C00CE8621 /* WeekLogo.swift */,
 				944E58362F2B593A00DB2DEE /* EmptyStateView.swift */,
 				944E58372F2B593A00DB2DEE /* KillTimeEditor.swift */,
@@ -521,8 +651,15 @@
 		944E58452F2B593A00DB2DEE /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				A90000082FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift */,
+				A900000A2FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift */,
 				944E58422F2B593A00DB2DEE /* ModelTests.swift */,
+				DA1D00022F7A100100AAA001 /* CloudSyncD1Tests.swift */,
+				DA2D00082F7A100100AAA001 /* CloudSyncD2Tests.swift */,
+				ECA100062F7A100100AAA001 /* CloudSyncETests.swift */,
+				EFA100042F7A100100AAA001 /* CloudSyncCoordinatorTests.swift */,
 				F7A100102F70000100AAA001 /* NotificationServiceTests.swift */,
+				F7A100202F70000100AAA001 /* LegacyStoreConsolidatorTests.swift */,
 				944E58432F2B593A00DB2DEE /* StateMachineTests.swift */,
 				944E58442F2B593A00DB2DEE /* WeekCalculatorTests.swift */,
 			);
@@ -568,7 +705,12 @@
 				94C1D0E82F3F64DC00AA8E13 /* CreateProjectSheet.swift */,
 				94C1D0E92F3F64DC00AA8E13 /* ExtensionsView.swift */,
 				94C1D0F52F3F64DC00AA8E13 /* ExtensionsHubView.swift */,
+				B81F7C112F7B000100000001 /* LiveModuleTile.swift */,
 				94C1D0EA2F3F64DC00AA8E13 /* ExtensionsViewModel.swift */,
+				C0D3A01030A0000100BEEF01 /* HabitViewModel.swift */,
+				C0D3A01230A0000100BEEF01 /* HabitsFullView.swift */,
+				C0D3A01430A0000100BEEF01 /* HabitDetailView.swift */,
+				C0D3A01630A0000100BEEF01 /* HabitEditorSheet.swift */,
 				F4C200102F6A200100AAA001 /* ProjectTilePresentation.swift */,
 				94C1D0EB2F3F64DC00AA8E13 /* ProjectDetailView.swift */,
 			);
@@ -697,6 +839,17 @@
 				TargetAttributes = {
 					944E57CE2F2B397D00DB2DEE = {
 						CreatedOnToolsVersion = 26.2;
+						SystemCapabilities = {
+							com.apple.BackgroundModes = {
+								enabled = 1;
+							};
+							com.apple.Push = {
+								enabled = 1;
+							};
+							com.apple.iCloud = {
+								enabled = 1;
+							};
+						};
 					};
 					944E57DD2F2B397E00DB2DEE = {
 						CreatedOnToolsVersion = 26.2;
@@ -744,8 +897,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6E100012F9B4E5100CAFE01 /* Cinzel.ttf in Resources */,
+				A6E100032F9B4E5100CAFE01 /* AlcarinTengwar-Regular.otf in Resources */,
+				A6E100052F9B4E5100CAFE01 /* OFL-Cinzel.txt in Resources */,
+				A6E100072F9B4E5100CAFE01 /* OFL-Alcarin.txt in Resources */,
 				944E58862F2B593A00DB2DEE /* Localizable.xcstrings in Resources */,
 				944E58882F2B593A00DB2DEE /* Assets.xcassets in Resources */,
+				D5A100112F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,
 				6ADB5F63C560C8795AD46AE6 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -768,6 +926,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5A100122F7A100100AAA001 /* PrivacyInfo.xcprivacy in Resources */,
+				D5A100132F7A100100AAA001 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -779,6 +939,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				D7A2000130D0000100BEEF01 /* WorkspaceShell.swift in Sources */,
+				A90000012FA0000100AAA001 /* WeekyiiAppDelegate.swift in Sources */,
+				A900000C2FA0000100AAA001 /* NotificationPresentationDelegate.swift in Sources */,
+				A90000032FA0000100AAA001 /* CloudSyncNetworkMonitor.swift in Sources */,
+				A90000052FA0000100AAA001 /* CloudRemoteNotificationRouter.swift in Sources */,
+				C3A0000330D0000100CAFE01 /* CloudSyncEntitlementService.swift in Sources */,
+				E1F000012FA0000100AAA001 /* PurchaseService.swift in Sources */,
+				C3A0000430D0000100CAFE01 /* CloudSyncTypes.swift in Sources */,
 				944E58532F2B593A00DB2DEE /* View+Modifiers.swift in Sources */,
 				944E58552F2B593A00DB2DEE /* DayDetailView.swift in Sources */,
 				944E58562F2B593A00DB2DEE /* WeekViewModel.swift in Sources */,
@@ -797,6 +964,7 @@
 				944E585F2F2B593A00DB2DEE /* NotificationService.swift in Sources */,
 				944E58602F2B593A00DB2DEE /* WeekyiiError.swift in Sources */,
 				94982D732F2BB71F00CE8621 /* SettingsView.swift in Sources */,
+				E1F000032FA0000100AAA001 /* VIPServiceView.swift in Sources */,
 				944E58612F2B593A00DB2DEE /* AppState.swift in Sources */,
 				944E58622F2B593A00DB2DEE /* DayCardView.swift in Sources */,
 				944E58632F2B593A00DB2DEE /* WeekOverviewView.swift in Sources */,
@@ -808,6 +976,7 @@
 				94C1D0F02F3F64DC00AA8E13 /* ExtensionsViewModel.swift in Sources */,
 				94C1D0F12F3F64DC00AA8E13 /* ExtensionsView.swift in Sources */,
 				94C1D0F62F3F64DC00AA8E13 /* ExtensionsHubView.swift in Sources */,
+				B81F7C102F7B000100000001 /* LiveModuleTile.swift in Sources */,
 				94982DB92F2BBB4B00CE8621 /* Typography+Weekyii.swift in Sources */,
 				94982DBA2F2BBB4B00CE8621 /* Spacing+Weekyii.swift in Sources */,
 				944E58652F2B593A00DB2DEE /* ContentView.swift in Sources */,
@@ -819,6 +988,7 @@
 				944E58692F2B593A00DB2DEE /* PendingView.swift in Sources */,
 				9450228A2F433A83000D67FF /* MindStampItem.swift in Sources */,
 				944E586A2F2B593A00DB2DEE /* StateMachine.swift in Sources */,
+				F8A100012F80000100AAA001 /* DayStartService.swift in Sources */,
 				9466DE502F69868200EF5E24 /* KillTimeSlider.swift in Sources */,
 				A1B2C3D42F70000100ABCD03 /* TaskPostponeService.swift in Sources */,
 				944E586B2F2B593A00DB2DEE /* TodayViewModel.swift in Sources */,
@@ -844,6 +1014,20 @@
 				944E58752F2B593A00DB2DEE /* WeekyiiApp.swift in Sources */,
 				F3B100112F6A100100AAA001 /* WeekyiiPersistence.swift in Sources */,
 				D4A100112F7A100100AAA001 /* DataArchiveService.swift in Sources */,
+				D4A100212F7A100100AAA002 /* WeekyiiBusinessSnapshot.swift in Sources */,
+				D4A100312F7A100100AAA003 /* WeekyiiSnapshotRepository.swift in Sources */,
+				D4A100412F7A100100AAA004 /* WeekyiiSnapshotMergeService.swift in Sources */,
+				D4A100512F7A100100AAA005 /* LegacyStoreConsolidator.swift in Sources */,
+				D4A100612F7A100100AAA006 /* CloudRecordCodec.swift in Sources */,
+				D4A100712F7A100100AAA007 /* CloudSyncTransport.swift in Sources */,
+				D4A100812F7A100100AAA008 /* CloudSyncMetadataStore.swift in Sources */,
+				D4A100912F7A100100AAA009 /* CloudSyncRetryPolicy.swift in Sources */,
+				DA2D00012F7A100100AAA001 /* CloudKitRecordAdapter.swift in Sources */,
+				DA2D00032F7A100100AAA001 /* CloudKitInfrastructure.swift in Sources */,
+				DA2D00052F7A100100AAA001 /* CKSyncEngineTransport.swift in Sources */,
+				ECA100012F7A100100AAA001 /* CloudSyncLocalStore.swift in Sources */,
+				ECA100032F7A100100AAA001 /* CloudSyncReconciler.swift in Sources */,
+				EFA100012F7A100100AAA001 /* CloudSyncCoordinator.swift in Sources */,
 				94982DAF2F2BBB3C00CE8621 /* ProgressRing.swift in Sources */,
 				9439FA4A2F378923000424BF /* PastAnalyticsService.swift in Sources */,
 				9439FA4B2F378923000424BF /* PastStatsOverview.swift in Sources */,
@@ -856,6 +1040,8 @@
 				94982DB12F2BBB3C00CE8621 /* WeekLogo.swift in Sources */,
 				94C1D0F32F3F64FD00AA8E13 /* ProjectStatus.swift in Sources */,
 				94982DB22F2BBB3C00CE8621 /* WeekCard.swift in Sources */,
+				A7C10D3E2F9B4E51008A1F01 /* LotrGlyph.swift in Sources */,
+				C47A11012F9B4E51008A1C01 /* CatGlyph.swift in Sources */,
 				94982DB32F2BBB3C00CE8621 /* TaskCard.swift in Sources */,
 				F2A100112F6A000100AAA001 /* ProjectTileSize.swift in Sources */,
 				F4C200112F6A200100AAA001 /* ProjectTilePresentation.swift in Sources */,
@@ -863,6 +1049,14 @@
 				944E58782F2B593A00DB2DEE /* EmptyStateView.swift in Sources */,
 				944E587B2F2B593A00DB2DEE /* TaskType.swift in Sources */,
 				C1A0000130B0000100CAFE01 /* TaskTypeDefinition.swift in Sources */,
+				C0D3A00730A0000100BEEF01 /* HabitModel.swift in Sources */,
+				C0D3A00930A0000100BEEF01 /* HabitDayRecord.swift in Sources */,
+				C0D3A00B30A0000100BEEF01 /* HabitTaskMaterializer.swift in Sources */,
+				C0D3A00D30A0000100BEEF01 /* HabitStatistics.swift in Sources */,
+				C0D3A00F30A0000100BEEF01 /* HabitViewModel.swift in Sources */,
+				C0D3A01130A0000100BEEF01 /* HabitsFullView.swift in Sources */,
+				C0D3A01330A0000100BEEF01 /* HabitDetailView.swift in Sources */,
+				C0D3A01530A0000100BEEF01 /* HabitEditorSheet.swift in Sources */,
 				944E587C2F2B593A00DB2DEE /* DayModel.swift in Sources */,
 				944E587D2F2B593A00DB2DEE /* TimeProvider.swift in Sources */,
 				944E587E2F2B593A00DB2DEE /* PastView.swift in Sources */,
@@ -881,7 +1075,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F1A001112F5A9C4D00AAA001 /* ModelTests.swift in Sources */,
+				DA1D00012F7A100100AAA001 /* CloudSyncD1Tests.swift in Sources */,
+				DA2D00072F7A100100AAA001 /* CloudSyncD2Tests.swift in Sources */,
+				ECA100052F7A100100AAA001 /* CloudSyncETests.swift in Sources */,
+				EFA100032F7A100100AAA001 /* CloudSyncCoordinatorTests.swift in Sources */,
+				A90000092FA0000100AAA001 /* CloudRemoteNotificationRouterTests.swift in Sources */,
+				A90000072FA0000100AAA001 /* CloudSyncNetworkMonitorTests.swift in Sources */,
 				F7A100112F70000100AAA001 /* NotificationServiceTests.swift in Sources */,
+				F7A100212F70000100AAA001 /* LegacyStoreConsolidatorTests.swift in Sources */,
 				F1A001122F5A9C4D00AAA001 /* StateMachineTests.swift in Sources */,
 				F1A001132F5A9C4D00AAA001 /* WeekCalculatorTests.swift in Sources */,
 			);
@@ -978,7 +1179,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -1035,7 +1236,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -1051,20 +1252,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.fluentdesign.Weekyii";
-						CFBundleURLSchemes = (
-							weekyii,
-						);
-					},
-				);
+				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1076,9 +1271,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -1095,20 +1291,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.fluentdesign.Weekyii";
-						CFBundleURLSchemes = (
-							weekyii,
-						);
-					},
-				);
+				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1120,9 +1310,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii App Store CloudKit";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -1138,9 +1329,9 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1159,9 +1350,9 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1179,7 +1370,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
@@ -1198,7 +1389,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
@@ -1219,17 +1410,17 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1247,20 +1438,22 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = K89PH8PTJW;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii Widget App Store";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1271,6 +1464,173 @@
 			};
 			name = Release;
 		};
+		E1F000102FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WEEKYII_BETA $(inherited)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Beta;
+		};
+		E1F000112FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Resources/Weekyii.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.fluentdesign.Weekyii\";\n    CFBundleURLSchemes =     (\n        weekyii\n    );\n}";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii App Store CloudKit";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Beta;
+		};
+		E1F000122FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Weekyii.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Weekyii";
+			};
+			name = Beta;
+		};
+		E1F000132FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.WeekyiiUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Weekyii;
+			};
+			name = Beta;
+		};
+		E1F000142FA0000100AAA001 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WeekyiiWidget/WeekyiiWidget.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = W8UNGRPC5N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeekyiiWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentdesign.Weekyii.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "Weekyii Widget App Store";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Beta;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1279,6 +1639,7 @@
 			buildConfigurations = (
 				944E57F02F2B397E00DB2DEE /* Debug */,
 				944E57F12F2B397E00DB2DEE /* Release */,
+				E1F000102FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1288,6 +1649,7 @@
 			buildConfigurations = (
 				944E57F32F2B397E00DB2DEE /* Debug */,
 				944E57F42F2B397E00DB2DEE /* Release */,
+				E1F000112FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1297,6 +1659,7 @@
 			buildConfigurations = (
 				944E57F62F2B397E00DB2DEE /* Debug */,
 				944E57F72F2B397E00DB2DEE /* Release */,
+				E1F000122FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1306,6 +1669,7 @@
 			buildConfigurations = (
 				944E57F92F2B397E00DB2DEE /* Debug */,
 				944E57FA2F2B397E00DB2DEE /* Release */,
+				E1F000132FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1315,6 +1679,7 @@
 			buildConfigurations = (
 				B70000012F90000000AAA001 /* Debug */,
 				B70000022F90000000AAA001 /* Release */,
+				E1F000142FA0000100AAA001 /* Beta */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

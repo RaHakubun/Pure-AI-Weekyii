@@ -263,6 +263,8 @@ private struct WorkspaceSidebar: View {
     @Binding var selectedRoute: WorkspaceRoute
     let showsInspectorButton: Bool
     let onShowInspector: () -> Void
+    @State private var showingExtensions = false
+    @State private var showingFullSettings = false
 
     var body: some View {
         List(selection: routeSelection) {
@@ -290,7 +292,15 @@ private struct WorkspaceSidebar: View {
             routeSection("回望", routes: WorkspaceRoute.reflectionRoutes)
 
             Section("系统") {
+                Button { showingExtensions = true } label: {
+                    Label("扩展与习惯", systemImage: "square.grid.2x2")
+                }
+                .accessibilityIdentifier("workspaceFullExtensions")
                 routeRow(.settings)
+                Button { showingFullSettings = true } label: {
+                    Label("完整设置", systemImage: "gearshape")
+                }
+                .accessibilityIdentifier("workspaceFullSettings")
             }
         }
         .listStyle(.sidebar)
@@ -312,6 +322,14 @@ private struct WorkspaceSidebar: View {
             }
         }
         .accessibilityIdentifier("workspaceSidebar")
+        .sheet(isPresented: $showingExtensions) {
+            ExtensionsHubView(animationsActive: true)
+                .environment(\.workspaceSelectionStore, nil)
+        }
+        .sheet(isPresented: $showingFullSettings) {
+            SettingsView()
+                .environment(\.workspaceSelectionStore, nil)
+        }
     }
 
     private var routeSelection: Binding<WorkspaceRoute?> {
@@ -1840,6 +1858,8 @@ private struct WorkspaceTodayTaskActions: View {
     @State private var viewModel: TodayViewModel?
     @State private var showingPostpone = false
     @State private var showingCompleteConfirmation = false
+    @State private var showingPostponeConfirmation = false
+    @State private var postponeTargetDate: Date?
     @State private var postponePreview: TodayViewModel.PostponePreview?
     @State private var errorMessage: String?
 
@@ -1895,14 +1915,21 @@ private struct WorkspaceTodayTaskActions: View {
             viewModel = created
         }
         .sheet(isPresented: $showingPostpone) {
-            PostponeTaskSheet(taskTitle: task.title) { date in
+            PostponeTaskSheet(taskTitle: task.title, onSubmit: { date in
+                postponeTargetDate = date.startOfDay
+                showingPostpone = false
+                showingPostponeConfirmation = true
+            })
+        }
+        .alert("确认后移任务", isPresented: $showingPostponeConfirmation) {
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                postponeTargetDate = nil
+            }
+            Button("确认后移") {
+                guard let viewModel, let date = postponeTargetDate else { return }
                 do {
-                    guard let viewModel else { return }
-                    let preview = try viewModel.previewPostpone(
-                        taskID: task.id,
-                        taskTitle: task.title,
-                        targetDate: date
-                    )
+                    let preview = try viewModel.previewPostpone(taskID: task.id, taskTitle: task.title, targetDate: date)
+                    postponeTargetDate = nil
                     if preview.requiresWeekCreation {
                         postponePreview = preview
                     } else {
@@ -1911,8 +1938,13 @@ private struct WorkspaceTodayTaskActions: View {
                         NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
                     }
                 } catch {
+                    postponeTargetDate = nil
                     errorMessage = error.localizedDescription
                 }
+            }
+        } message: {
+            if let date = postponeTargetDate {
+                Text("将任务后移至 \(date.formatted(date: .abbreviated, time: .omitted))。是否继续？")
             }
         }
         .confirmationDialog(

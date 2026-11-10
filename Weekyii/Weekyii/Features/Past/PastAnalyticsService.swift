@@ -30,6 +30,12 @@ enum DayPeriod: String, CaseIterable {
 @MainActor
 final class PastAnalyticsService {
     private let calendar = Calendar(identifier: .iso8601)
+
+    // SwiftUI may release a value-type view and its main-actor service while
+    // the simulator is flushing a graph transaction. Keep destruction
+    // nonisolated so the service does not ask the back-deployed task runtime
+    // to hop executors during deallocation.
+    nonisolated deinit {}
     
     // MARK: - 辅助计算
     

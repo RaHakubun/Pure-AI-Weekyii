@@ -3,18 +3,20 @@ import SwiftData
 
 @Model
 final class TaskItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var title: String
-    var taskType: TaskType
+    var title: String = ""
+    var taskType: TaskType = TaskType.regular
     var taskTypeIdRaw: String = TaskType.regular.rawValue
-    var order: Int
-    var zone: TaskZone
+    var order: Int = 0
+    var zone: TaskZone = TaskZone.draft
 
     var taskDescription: String = ""
     
-    @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
-    @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+    @Relationship(deleteRule: .cascade, originalName: "steps", inverse: \TaskStep.task)
+    private var stepRecords: [TaskStep]? = []
+    @Relationship(deleteRule: .cascade, originalName: "attachments", inverse: \TaskAttachment.task)
+    private var attachmentRecords: [TaskAttachment]? = []
 
     var startedAt: Date?
     var endedAt: Date?
@@ -22,6 +24,7 @@ final class TaskItem {
 
     var day: DayModel?
     var project: ProjectModel?
+    var habit: HabitModel?
 
     init(title: String, taskDescription: String = "", taskType: TaskType = .regular, order: Int, zone: TaskZone = .draft) {
         self.title = title
@@ -30,6 +33,16 @@ final class TaskItem {
         self.taskTypeIdRaw = taskType.rawValue
         self.order = order
         self.zone = zone
+    }
+
+    var steps: [TaskStep] {
+        get { stepRecords ?? [] }
+        set { stepRecords = newValue }
+    }
+
+    var attachments: [TaskAttachment] {
+        get { attachmentRecords ?? [] }
+        set { attachmentRecords = newValue }
     }
 
     var taskNumber: String {

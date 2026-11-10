@@ -84,4 +84,5 @@ final class MindStampViewModel {
     func randomStamp() -> MindStampItem? {
         stamps.randomElement()
     }
+
 }

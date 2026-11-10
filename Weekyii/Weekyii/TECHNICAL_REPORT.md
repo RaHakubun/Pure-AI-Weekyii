@@ -52,7 +52,7 @@ modelContainer = try ModelContainer(for: schema, migrationPlan: WeekyiiMigration
 - Extensions
 - Settings
 
-`appState.dataRevision` is bound to `.id(...)` on `TabView` to force refresh after data reseed/reset.
+`appState.structureRevision` is bound to `.id(...)` on `TabView` to force a rebuild after a whole-store replacement (archive import, factory reset). `appState.dataRevision` is still bumped by ordinary edits and by iCloud sync, but no longer participates in view identity: rebuilding the `TabView` discards every tab's navigation stack, which is correct for a reseed and wrong for a sync.
 
 ## 3. Domain Model (SwiftData)
 ### 3.1 Core entities

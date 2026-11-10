@@ -64,3 +64,57 @@ struct WeekCalculator {
         return startDate.weekId == normalized ? startDate : nil
     }
 }
+
+@MainActor
+struct WeekDataStore {
+    struct DayResolution {
+        let day: DayModel
+        let createdWeek: Bool
+        let createdDay: Bool
+    }
+
+    private let modelContext: ModelContext
+    private let weekCalculator: WeekCalculator
+
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        self.weekCalculator = WeekCalculator()
+    }
+
+    func resolveWeek(containing date: Date, status: WeekStatus) throws -> (week: WeekModel, created: Bool) {
+        let weekId = date.weekId
+        let descriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
+        if let existing = try modelContext.fetch(descriptor).first {
+            return (existing, false)
+        }
+
+        let week = weekCalculator.makeWeek(for: date, status: status)
+        modelContext.insert(week)
+        return (week, true)
+    }
+
+    func resolveDay(on date: Date, weekStatus: WeekStatus) throws -> DayResolution {
+        let dayId = date.dayId
+        let dayDescriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
+        if let existing = try modelContext.fetch(dayDescriptor).first {
+            return DayResolution(day: existing, createdWeek: false, createdDay: false)
+        }
+
+        let weekResolution = try resolveWeek(containing: date, status: weekStatus)
+        if let existing = weekResolution.week.days.first(where: { $0.dayId == dayId }) {
+            return DayResolution(
+                day: existing,
+                createdWeek: weekResolution.created,
+                createdDay: false
+            )
+        }
+
+        let day = DayModel(dayId: dayId, date: date, status: .empty)
+        weekResolution.week.days.append(day)
+        return DayResolution(
+            day: day,
+            createdWeek: weekResolution.created,
+            createdDay: true
+        )
+    }
+}

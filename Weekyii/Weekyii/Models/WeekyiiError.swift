@@ -6,6 +6,10 @@ enum WeekyiiError: LocalizedError, Equatable {
     case cannotStartEmptyDay
     case cannotEditStartedDay
     case killTimePassed
+    case killTimePreviewOutdated
+    case killTimeImmediateExpireConfirmationRequired(expiredCount: Int)
+    case killTimeImmediateExpireImpactChanged(expiredCount: Int)
+    case killTimeDeadlineUnavailable
     case dateFormatInvalid
     case taskTitleEmpty
     case operationFailedRetry
@@ -20,6 +24,7 @@ enum WeekyiiError: LocalizedError, Equatable {
     case projectHasOpenTasks
     case projectDateOutOfRange
     case projectTaskStateLocked
+    case cannotPostponeHabitTask
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +38,14 @@ enum WeekyiiError: LocalizedError, Equatable {
             return String(localized: "error.cannot_edit_started", defaultValue: "Started days cannot be edited.")
         case .killTimePassed:
             return String(localized: "error.kill_time_passed", defaultValue: "Kill time has passed.")
+        case .killTimePreviewOutdated:
+            return "今日日期或已保存的截止时间已变化，请重新选择。"
+        case .killTimeImmediateExpireConfirmationRequired(let expiredCount):
+            return "截止时间已到，请重新确认是否立即过期今日任务（\(expiredCount) 项）。"
+        case .killTimeImmediateExpireImpactChanged(let expiredCount):
+            return "待过期项目数量已变化为 \(expiredCount) 项，请重新确认后再提交。"
+        case .killTimeDeadlineUnavailable:
+            return "此日期不存在该本地时刻，请选择其他截止时间。"
         case .dateFormatInvalid:
             return String(localized: "error.date_format_invalid", defaultValue: "Invalid date format.")
         case .taskTitleEmpty:
@@ -61,6 +74,8 @@ enum WeekyiiError: LocalizedError, Equatable {
             return "任务日期必须位于项目的开始与结束日期之间。"
         case .projectTaskStateLocked:
             return "该任务所属日期已启动或结束，不能从项目页面修改。"
+        case .cannotPostponeHabitTask:
+            return "习惯任务属于当天，不能后移。"
         }
     }
 }

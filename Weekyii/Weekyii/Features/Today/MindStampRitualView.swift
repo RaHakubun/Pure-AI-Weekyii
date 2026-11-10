@@ -61,7 +61,7 @@ struct MindStampRitualView: View {
                 } label: {
                     Text(String(localized: "mindstamp.ritual.dismiss"))
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.weekyiiOnPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, WeekSpacing.md)
                         .background(Color.weekyiiGradient)
@@ -73,7 +73,7 @@ struct MindStampRitualView: View {
             .padding(WeekSpacing.xl)
             .background(Color.backgroundSecondary)
             .clipShape(RoundedRectangle(cornerRadius: WeekRadius.xlarge, style: .continuous))
-            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
+            .weekSoftShadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .padding(.horizontal, WeekSpacing.xl)
             .scaleEffect(appeared ? 1 : 0.8)
             .opacity(appeared ? 1 : 0)

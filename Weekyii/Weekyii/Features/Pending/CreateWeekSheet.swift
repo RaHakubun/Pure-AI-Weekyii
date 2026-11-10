@@ -428,6 +428,7 @@ private struct CustomCalendarView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("pendingMonthDay_\(dayIdStr)")
         .disabled(!day.isCurrentMonth)
     }
 
@@ -436,7 +437,7 @@ private struct CustomCalendarView: View {
             return .textTertiary.opacity(0.3)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary

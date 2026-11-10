@@ -6,40 +6,57 @@ extension Font {
     // MARK: Display - 超大标题
     
     /// 超大标题 - 用于品牌标识
-    static let displayLarge = Font.system(size: 46, weight: .bold, design: .serif)
+    static var displayLarge: Font { WeekTypography.title(size: 46, weight: .bold) }
     
     // MARK: Titles - 标题系列
     
     /// 大标题 - 用于页面标题
-    static let titleLarge = Font.system(size: 32, weight: .bold, design: .serif)
+    static var titleLarge: Font { WeekTypography.title(size: 32, weight: .bold) }
     
     /// 中标题 - 用于 Section 标题
-    static let titleMedium = Font.system(size: 22, weight: .semibold, design: .serif)
+    static var titleMedium: Font { WeekTypography.title(size: 22, weight: .semibold) }
     
     /// 小标题 - 用于卡片标题
-    static let titleSmall = Font.system(size: 18, weight: .semibold, design: .serif)
+    static var titleSmall: Font { WeekTypography.title(size: 18, weight: .semibold) }
     
     // MARK: Body - 正文系列
     
     /// 大正文
-    static let bodyLarge = Font.system(size: 17, weight: .regular, design: .default)
+    static var bodyLarge: Font { WeekTypography.body(size: 17, weight: .regular) }
     
     /// 中正文
-    static let bodyMedium = Font.system(size: 15, weight: .regular, design: .default)
+    static var bodyMedium: Font { WeekTypography.body(size: 15, weight: .regular) }
     
     /// 小正文
-    static let bodySmall = Font.system(size: 13, weight: .regular, design: .default)
+    static var bodySmall: Font { WeekTypography.body(size: 13, weight: .regular) }
     
     // MARK: Caption - 辅助文字
     
     /// 说明文字
-    static let caption = Font.system(size: 13, weight: .regular, design: .default)
+    static var caption: Font { WeekTypography.body(size: 13, weight: .regular) }
     
     /// 粗体说明文字
-    static let captionBold = Font.system(size: 13, weight: .semibold, design: .default)
+    static var captionBold: Font { WeekTypography.body(size: 13, weight: .semibold) }
     
     /// 小说明文字
-    static let captionSmall = Font.system(size: 11, weight: .regular, design: .default)
+    static var captionSmall: Font { WeekTypography.body(size: 11, weight: .regular) }
+}
+
+// MARK: - Theme-aware font resolution
+
+/// Resolves the design-system fonts against the active theme's typography, so a
+/// personalised theme can swap serif titles for monospaced or black grotesque
+/// faces without any call site changing. Classic themes resolve to exactly the
+/// fonts these tokens always produced (serif titles, default body).
+enum WeekTypography {
+    static func title(size: CGFloat, weight: Font.Weight) -> Font {
+        let typography = ThemeSkin.active.typography
+        return .system(size: size, weight: typography.titleWeight ?? weight, design: typography.titleDesign)
+    }
+
+    static func body(size: CGFloat, weight: Font.Weight) -> Font {
+        .system(size: size, weight: weight, design: ThemeSkin.active.typography.bodyDesign)
+    }
 }
 
 // MARK: - Text Styles

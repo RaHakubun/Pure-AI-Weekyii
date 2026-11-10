@@ -14,8 +14,23 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
     case mint
     case midnight
     case lotr
+    // Personalised themes: these ship with their own visual language, not just a palette.
+    case brutal
+    case neon
+    case paper
+    case terminal
+    case cat
+    case quenya
+    /// Retired identifier, kept only to decode and migrate existing selections.
+    case ring
+    /// Retired from 外观与主题. The case stays so a stored `"blueprint"` still
+    /// decodes; `resolvedTheme` and the settings list both send it to amber.
+    case blueprint
 
     var id: String { rawValue }
+
+    /// Retired identifiers remain decodable, but are not offered in settings.
+    var isSelectable: Bool { self != .blueprint && self != .ring && self != .lotr }
 
     var displayName: String {
         switch self {
@@ -28,12 +43,41 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
         case .sunset: return "落日"
         case .mint: return "薄荷"
         case .midnight: return "极夜"
-        case .lotr: return "魔戒"
+        case .lotr: return String(localized: "theme.lotr.name", defaultValue: "魔戒")
+        case .brutal: return String(localized: "theme.brutal.name", defaultValue: "粗野")
+        case .neon: return String(localized: "theme.neon.name", defaultValue: "霓虹")
+        case .paper: return String(localized: "theme.paper.name", defaultValue: "纸感")
+        case .terminal: return String(localized: "theme.terminal.name", defaultValue: "终端")
+        case .cat: return String(localized: "theme.cat.name", defaultValue: "猫猫")
+        case .quenya: return String(localized: "theme.quenya.name", defaultValue: "昆雅")
+        case .ring: return String(localized: "theme.ring.name", defaultValue: "指环王")
+        case .blueprint: return String(localized: "theme.blueprint.name", defaultValue: "蓝图")
         }
     }
 
     var isPremiumTheme: Bool {
         self == .lotr
+    }
+
+    /// Visual form (not colour): corner radius, borders, shadows and icon style.
+    /// The ten original themes keep `.classic` so their appearance never changes;
+    /// personalised themes override it to ship a different visual language.
+    var visualStyle: ThemeVisualStyle {
+        switch self {
+        case .quenya: return .classic
+        case .brutal:
+            return .brutalist
+        case .neon:
+            return .neon
+        case .paper:
+            return .paper
+        case .terminal:
+            return .terminal
+        case .blueprint:
+            return .drafting
+        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight, .lotr, .cat, .ring:
+            return .classic
+        }
     }
 
     var primaryColor: Color {
@@ -104,6 +148,8 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             darkBackgroundHex: palettePair.dark.backgroundSecondary,
             darkTextPrimaryHex: palettePair.dark.textPrimary,
             darkTextSecondaryHex: palettePair.dark.textSecondary,
+            successHex: palettePair.light.accentGreen,
+            darkSuccessHex: palettePair.dark.accentGreen,
             appearanceModeRaw: appearanceMode.rawValue
         )
     }
@@ -114,7 +160,7 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             islandTextSecondaryHex: palettePair.dark.textSecondary,
             islandAccentHex: palettePair.dark.primary,
             islandWarningHex: palettePair.dark.taskDDL,
-            islandSuccessHex: palettePair.dark.taskRegular,
+            islandSuccessHex: self == .lotr || self == .ring ? palettePair.dark.primaryLight : palettePair.dark.taskRegular,
             islandChipPrimaryHex: palettePair.dark.primary,
             islandChipSecondaryHex: palettePair.dark.accentOrange,
             islandKeylineHex: palettePair.dark.primaryLight,
@@ -130,17 +176,55 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             darkLockTextSecondaryHex: palettePair.dark.textSecondary,
             darkLockAccentHex: palettePair.dark.primary,
             darkLockProgressTrackHex: palettePair.dark.primaryLight,
-            appearanceModeRaw: appearanceMode.rawValue
+            appearanceModeRaw: appearanceMode.rawValue,
+            gildedActions: self == .lotr || self == .ring ? true : nil
         )
+    }
+
+    /// Whether this theme recolours the three built-in task types with its own
+    /// palette (魔戒: mithril / ember / elven leaf).
+    var themesBuiltInTypeColors: Bool {
+        self == .lotr || self == .ring
+    }
+
+    /// Built-in task types keep a fixed stored colour. Themes that recolour the
+    /// built-in types swap that untouched default for their own palette colour;
+    /// colours the user picked are kept.
+    func themedTypeColorHex(storedHex: String?, baseKind: TaskType, isDark: Bool) -> String? {
+        guard themesBuiltInTypeColors,
+              let storedHex,
+              TaskTypeDefinition.isBuiltInDefaultColor(storedHex, for: baseKind) else {
+            return storedHex
+        }
+        let palette = isDark ? palettePair.dark : palettePair.light
+        switch baseKind {
+        case .regular: return palette.taskRegular
+        case .ddl: return palette.taskDDL
+        case .leisure: return palette.taskLeisure
+        }
     }
 
     private var palettePair: WeekThemePalettePair {
         WeekThemePalettePair.forTheme(self)
     }
 
+    /// `premiumThemeUnlocked` mirrors the resolved VIP access (written only by
+    /// `PurchaseService`). A locked VIP theme falls back to amber for display while
+    /// the user's stored choice is kept, so renewing restores it automatically.
+    /// Migrate retired selections before checking the current VIP entitlement.
+    static func canonicalStoredThemeRaw(_ raw: String) -> String {
+        switch raw {
+        case WeekTheme.blueprint.rawValue: return WeekTheme.amber.rawValue
+        case WeekTheme.ring.rawValue, WeekTheme.lotr.rawValue: return WeekTheme.amber.rawValue
+        default: return raw
+        }
+    }
+
     static func resolvedTheme(rawValue: String?, premiumThemeUnlocked: Bool) -> WeekTheme {
-        let requestedTheme = WeekTheme(rawValue: rawValue ?? "") ?? .amber
-        guard requestedTheme.isPremiumTheme, !premiumThemeUnlocked else {
+        let canonical = canonicalStoredThemeRaw(rawValue ?? "")
+        let requestedTheme = WeekTheme(rawValue: canonical) ?? .amber
+        guard requestedTheme.isSelectable else { return .amber }
+        guard requestedTheme.requiresVIP, !premiumThemeUnlocked else {
             return requestedTheme
         }
         return .amber
@@ -152,6 +236,988 @@ enum WeekTheme: String, CaseIterable, Codable, Identifiable {
             rawValue: defaults.string(forKey: WeekyiiWidgetBridge.selectedThemeKey),
             premiumThemeUnlocked: defaults.bool(forKey: WeekyiiWidgetBridge.premiumThemeUnlockedKey)
         )
+    }
+}
+
+// MARK: - Theme visual language (form, not colour)
+
+/// How a theme renders frames, bars and icons. Deliberately separated from
+/// `WeekThemePalette` so a theme can change its *shape* without touching its colours.
+struct ThemeVisualStyle: Equatable {
+    /// Corner radius for cards and frames.
+    var cornerRadius: CGFloat
+    /// Border width; `0` renders no stroke.
+    var borderWidth: CGFloat
+    /// Border colour in light mode. `nil` falls back to `backgroundTertiary`.
+    var borderColorHexLight: String?
+    /// Border colour in dark mode. Kept separate because an ink border vanishes on a dark surface.
+    var borderColorHexDark: String?
+    /// `nil` renders no shadow.
+    var shadow: ThemeShadowStyle?
+    /// SF Symbol variant applied app-wide through `.symbolVariant(_:)`.
+    var symbolVariant: ThemeSymbolVariant
+    /// Multiplier applied to the thickness a caller asked for on rings/bars.
+    /// `1.0` keeps the original Weekyii weight, which is why this is a scale
+    /// rather than an absolute width: call sites pass 4, 8, 12 … and every one
+    /// of them has to stay pixel-identical under `.classic`.
+    var barScale: CGFloat
+    /// Bar corner radius in points. `nil` keeps the pill shape (half the height).
+    var barCornerRadius: CGFloat?
+
+    /// The original Weekyii look: soft radius, hairline border, diffuse shadow, outline icons.
+    static let classic = ThemeVisualStyle(
+        cornerRadius: 12,
+        borderWidth: 1,
+        borderColorHexLight: nil,
+        borderColorHexDark: nil,
+        shadow: ThemeShadowStyle(colorHex: "#3A2A22", opacity: 0.08, radius: 10, x: 0, y: 3),
+        symbolVariant: .none,
+        barScale: 1.0,
+        barCornerRadius: nil
+    )
+
+    /// Neo-brutalism: near-square corners, heavy ink border, hard offset shadow, filled icons.
+    static let brutalist = ThemeVisualStyle(
+        cornerRadius: 4,
+        borderWidth: 2.5,
+        borderColorHexLight: "#111111",
+        borderColorHexDark: "#F2F2F2",
+        shadow: ThemeShadowStyle(colorHex: "#000000", opacity: 1.0, radius: 0, x: 4, y: 4),
+        symbolVariant: .fill,
+        barScale: 1.5,
+        barCornerRadius: 0
+    )
+
+    /// Cyberpunk neon: medium radius, glowing accent border, neon bloom, filled icons.
+    static let neon = ThemeVisualStyle(
+        cornerRadius: 14,
+        borderWidth: 1.5,
+        borderColorHexLight: "#0091A8",
+        borderColorHexDark: "#00F0FF",
+        shadow: ThemeShadowStyle(colorHex: "#00F0FF", opacity: 0.35, radius: 16, x: 0, y: 0),
+        symbolVariant: .fill,
+        barScale: 1.25,
+        barCornerRadius: nil
+    )
+
+    /// Printed page: near-square cards, hairline rules, no elevation, thin square bars.
+    static let paper = ThemeVisualStyle(
+        cornerRadius: 2,
+        borderWidth: 0.75,
+        borderColorHexLight: "#D6C9B4",
+        borderColorHexDark: "#4A453D",
+        shadow: .flat,
+        symbolVariant: .none,
+        barScale: 0.6,
+        barCornerRadius: 0.5
+    )
+
+    /// Phosphor terminal: absolute right angles, 1pt phosphor rule, filled glyphs.
+    static let terminal = ThemeVisualStyle(
+        cornerRadius: 0,
+        borderWidth: 1,
+        borderColorHexLight: "#2F7A3F",
+        borderColorHexDark: "#33FF66",
+        shadow: .flat,
+        symbolVariant: .fill,
+        barScale: 0.8,
+        barCornerRadius: 0
+    )
+
+    /// Drafting sheet: a small radius (drawn by hand, not by a stamp), one hairline
+    /// rule, no elevation, hairline outline glyphs and square-capped bars.
+    static let drafting = ThemeVisualStyle(
+        cornerRadius: 4,
+        borderWidth: 1,
+        borderColorHexLight: "#C3D2DA",
+        borderColorHexDark: "#23343E",
+        shadow: .flat,
+        symbolVariant: .none,
+        barScale: 0.75,
+        barCornerRadius: 0.5
+    )
+
+    func borderColor(isDark: Bool) -> Color? {
+        let hex = isDark ? borderColorHexDark : borderColorHexLight
+        return hex.map { Color(hex: $0) }
+    }
+}
+
+struct ThemeShadowStyle: Equatable {
+    var colorHex: String
+    var opacity: Double
+    /// `0` produces a hard, unblurred offset shadow (the brutalist signature).
+    var radius: CGFloat
+    var x: CGFloat
+    var y: CGFloat
+
+    var color: Color {
+        Color(hex: colorHex).opacity(opacity)
+    }
+
+    /// The original diffuse Weekyii shadow, used whenever a theme does not define one.
+    static let classic = ThemeShadowStyle(colorHex: "#3A2A22", opacity: 0.08, radius: 10, x: 0, y: 3)
+
+    /// No elevation. Expressed as a zeroed style rather than `nil`, because a
+    /// `nil` shadow falls back to `.classic` and would silently re-add one.
+    static let flat = ThemeShadowStyle(colorHex: "#000000", opacity: 0, radius: 0, x: 0, y: 0)
+}
+
+extension ThemeVisualStyle {
+    /// Shadow to render, falling back to the classic diffuse shadow.
+    var resolvedShadow: ThemeShadowStyle {
+        shadow ?? .classic
+    }
+
+    /// Thickness for a ring/bar that the call site sized at `base`.
+    /// Scaling (rather than an absolute width) is what keeps `.classic` unchanged
+    /// across every call site, which pass 4, 8 and 12 points.
+    func barThickness(_ base: CGFloat) -> CGFloat {
+        base * barScale
+    }
+
+    /// Corner radius for a bar: `nil` means the pill shape the original used.
+    func barCornerRadius(for thickness: CGFloat) -> CGFloat {
+        barCornerRadius ?? thickness / 2
+    }
+
+    // MARK: - Settings picker swatch
+
+    /// The 30pt theme swatch in 设置 is derived from the card form, so the picker
+    /// previews the shape language too. Both factors are chosen so `.classic`
+    /// reproduces the 7pt radius / 0.5pt rule the swatch has always had.
+    var swatchRadius: CGFloat { cornerRadius * (7.0 / 12.0) }
+    var swatchBorderWidth: CGFloat { borderWidth * 0.5 }
+
+    /// Border colour that adapts to light/dark, falling back to `backgroundTertiary`.
+    var resolvedBorderColor: Color {
+        if let light = borderColorHexLight, let dark = borderColorHexDark {
+            return Color.dynamic(lightHex: light, darkHex: dark)
+        }
+        return Color.backgroundTertiary
+    }
+}
+
+enum ThemeSymbolVariant: Equatable {
+    case none
+    case fill
+    case circle
+    case square
+
+    var symbolVariants: SymbolVariants {
+        switch self {
+        case .none: return .none
+        case .fill: return .fill
+        case .circle: return .circle
+        case .square: return .square
+        }
+    }
+}
+
+// MARK: - Theme skin (how shared components draw themselves)
+
+/// A light/dark hex pair. Resolves through the same appearance rules as the
+/// palette colours, so an explicit 浅色/深色 setting wins over the system trait.
+struct ThemeHexPair: Equatable {
+    var light: String
+    var dark: String
+
+    init(_ light: String, _ dark: String) {
+        self.light = light
+        self.dark = dark
+    }
+
+    init(_ both: String) {
+        self.init(both, both)
+    }
+
+    var color: Color {
+        WeekThemeRuntime.color(lightHex: light, darkHex: dark)
+    }
+}
+
+struct ThemeShadowSkin: Equatable {
+    /// ARGB hex is allowed, so a glow can be visible in dark mode only.
+    var color: ThemeHexPair
+    var radius: CGFloat
+    var x: CGFloat
+    var y: CGFloat
+}
+
+/// A framed surface: cards, task rows and the feature panel.
+struct ThemeSurfaceSkin: Equatable {
+    var cornerRadius: CGFloat
+    var borderWidth: CGFloat
+    var border: ThemeHexPair
+    /// `nil` keeps `backgroundSecondary`.
+    var fill: ThemeHexPair? = nil
+    var shadow: ThemeShadowSkin? = nil
+    /// Drawn instead of `border` when set (neon sign tube).
+    var borderGradient: [String]? = nil
+    /// A second sheet peeking out under the bottom edge (paper).
+    var stackLine: ThemeHexPair? = nil
+    /// Gilded inner hairline (魔戒). The four corner brackets this used to draw
+    /// alongside the hairline have been removed.
+    var ornament: ThemeHexPair? = nil
+    /// Warm glow rising from the top trailing corner inside the surface (魔戒 forge).
+    var innerGlow: ThemeHexPair? = nil
+    /// Which edges carry the border. `.horizontalRules` draws the surface as a
+    /// block of a book page: a rule above and below, nothing at the sides.
+    var edges: ThemeSurfaceEdges = .all
+    /// A physical material drawn under the content (魔戒 red-book leather).
+    var material: ThemeSurfaceMaterial? = nil
+    /// A double gilt rule tooled just inside the edge, as on a bound cover.
+    var tooling: ThemeHexPair? = nil
+    /// The card's accent colour hangs from the top edge as a silk bookmark
+    /// ribbon instead of the short 40 × 4 bar.
+    var ribbonAccent: Bool = false
+    /// The caller's accent washes the whole surface, so a page of cards shows
+    /// several materials instead of one flat sheet (魔戒 paper stock).
+    var tintsWithAccent: Bool = false
+    /// The bookmark ribbon hangs near the top trailing corner instead of the
+    /// leading one, so it never covers a header icon (指环王).
+    var ribbonTrailing: Bool = false
+    /// The caller's accent only tints the surface: no 40 × 4 bar on the top edge
+    /// (猫猫). Has no effect unless `tintsWithAccent` is also set.
+    var hidesAccentBar: Bool = false
+    /// Allows a background decoration to show subtly through the bottom of a status card.
+    var translucentBottom: Bool = false
+}
+
+/// Green leather with a gilt hairline for filled, selected controls (魔戒).
+struct ThemeGildedFill: Equatable {
+    var top: ThemeHexPair
+    var bottom: ThemeHexPair
+    /// Text and glyphs on the leather.
+    var ink: ThemeHexPair
+    /// Hairline just inside the edge.
+    var hairline: ThemeHexPair
+
+    var gradient: LinearGradient {
+        LinearGradient(colors: [top.color, bottom.color], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+enum ThemeSurfaceEdges: Equatable {
+    /// Border all round the rounded rect.
+    case all
+    /// Only a rule along the top and bottom edges.
+    case horizontalRules
+    /// Only a rule along the bottom edge (ledger rows).
+    case bottomRule
+}
+
+enum ThemeSurfaceMaterial: Equatable {
+    /// Tanned leather: a vertical two-tone fill with a fine pore grain.
+    case leather(top: ThemeHexPair, bottom: ThemeHexPair)
+    /// A smooth diagonal wash from the top leading to the bottom trailing
+    /// corner, no grain (猫猫 ginger fur).
+    case gradient(top: ThemeHexPair, bottom: ThemeHexPair)
+}
+
+/// Task rows: a surface plus the task-type bar on the leading edge.
+struct ThemeRowSkin: Equatable {
+    var surface: ThemeSurfaceSkin
+    var barWidth: CGFloat
+    var barCornerRadius: CGFloat
+    var barGlows: Bool = false
+    /// Bar runs edge to edge down the leading side with a divider in the border
+    /// colour, instead of floating inside the padding (brutalist).
+    var barFlush: Bool = false
+    /// Built-in types still on their shipped colour take the theme's task-type
+    /// colours and glyphs instead (魔戒).
+    var themesBuiltInTypes: Bool = false
+    /// The type colour washes the whole row and the type icon sits in a soft
+    /// rounded chip, instead of a bar on the leading edge (猫猫).
+    var typeChip: Bool = false
+    /// Chip geometry and inks for `typeChip`. The defaults are 猫猫's soft
+    /// chip; 指环王 uses a smaller ruled stamp with no row wash.
+    var chipSize: CGFloat = 32
+    var chipCornerRadius: CGFloat = 11
+    var chipFillOpacity: Double = 0.16
+    var chipBorderOpacity: Double = 0
+    var rowWashOpacity: Double = 0.07
+}
+
+enum ThemeLabelKind: Equatable {
+    /// Plain text in the label colour.
+    case plain
+    /// Inverted block behind the text (brutalist).
+    case block
+    /// Small letter-spaced caps (neon, paper).
+    case spaced
+    /// `> ` prompt in front of the text (terminal).
+    case prompt
+}
+
+struct ThemeLabelSkin: Equatable {
+    var kind: ThemeLabelKind
+    var ink: ThemeHexPair
+    var fill: ThemeHexPair? = nil
+}
+
+enum ThemeActionKind: Equatable {
+    case capsule
+    /// A rounded rectangle at the skin's medium radius (指环王).
+    case roundedRect
+    case rect
+    case underline
+    case stamp
+    case bracket
+}
+
+/// One button look on the feature panel (secondary or primary action).
+struct ThemeActionLook: Equatable {
+    var kind: ThemeActionKind
+    var ink: ThemeHexPair
+    var fill: ThemeHexPair? = nil
+    var border: ThemeHexPair? = nil
+    var borderWidth: CGFloat = 0
+    var hardShadow: ThemeHexPair? = nil
+    /// A filled capsule casts a soft halo in its own colour.
+    var glows: Bool = true
+}
+
+/// The emphasised surface that classic themes draw as a primary gradient with
+/// white text (focus task, day completed, project hero).
+struct ThemeFeatureSkin: Equatable {
+    var surface: ThemeSurfaceSkin
+    var ink: ThemeHexPair
+    var secondaryInk: ThemeHexPair
+    var label: ThemeLabelSkin
+    var action: ThemeActionLook
+    var primaryAction: ThemeActionLook
+    /// Double rule down the leading edge (paper notebook margin).
+    var marginRule: ThemeHexPair? = nil
+    /// Block cursor after the title (terminal).
+    var cursor: ThemeHexPair? = nil
+    /// A band of Elvish-looking letter strokes tooled along the top edge, like
+    /// the fire-letters on the Ring (魔戒). Pure ornament, never readable text.
+    var inscription: ThemeHexPair? = nil
+    /// Two ears peeking over the top edge and a tail curling out of the bottom
+    /// trailing corner, so the panel itself reads as a cat (猫猫).
+    var catEars: ThemeCatEars? = nil
+}
+
+/// Fur and inner-ear colours for `ThemeFeatureSkin.catEars`.
+struct ThemeCatEars: Equatable {
+    var fur: ThemeHexPair
+    var innerEar: ThemeHexPair
+    var tail: ThemeHexPair
+}
+
+enum ThemeBadgeKind: Equatable {
+    /// Square tag: tinted fill, ink border, heavy text.
+    case block
+    /// Capsule outline in the status colour.
+    case outline
+    /// Rotated rubber stamp in the status colour.
+    case stamp
+    /// `[执行中]` in the status colour.
+    case bracket
+    /// A wax seal in the status colour with the status glyph pressed in,
+    /// followed by the label (魔戒).
+    case waxSeal
+    /// A soft capsule tinted with the status colour, the status glyph in front
+    /// of the label (猫猫).
+    case softPill
+    /// Map-legend key: a short colour sample before the label (蓝图).
+    case legend
+}
+
+struct ThemeBadgeSkin: Equatable {
+    var kind: ThemeBadgeKind
+    /// Border for `.block`; other kinds use the status colour.
+    var border: ThemeHexPair? = nil
+}
+
+/// The small icon chip at the head of a settings row.
+///
+/// `nil` keeps the classic saturated square: the caller's tint behind a white
+/// glyph. A skin can strip the colour and draw a ruled stamp instead, so a
+/// column of rows stops reading as a rainbow against a monochrome page.
+struct ThemeIconSkin: Equatable {
+    var cornerRadius: CGFloat = 7
+    var borderWidth: CGFloat = 0.5
+    var border: ThemeHexPair? = nil
+    /// `nil` leaves the chip unfilled.
+    var fill: ThemeHexPair? = nil
+    /// Fill the chip with a soft wash of the caller's tint and draw the glyph in
+    /// the tint itself, instead of `fill` behind a white glyph (猫猫).
+    var tintsFill: Bool = false
+}
+
+enum ThemeCountKind: Equatable {
+    case plain
+    /// Count on an inverted block (brutalist).
+    case block
+    /// `[3]` (terminal).
+    case bracket
+    /// Italic serif numeral (paper).
+    case italic
+    /// Upright serif numeral (魔戒).
+    case serif
+    /// Heavy numeral on a soft capsule of the accent colour (猫猫).
+    case capsule
+    /// Quiet "3 项" caption in the secondary ink (魔戒 · 玄铁与古金).
+    case itemCaption
+}
+
+struct ThemeSectionSkin: Equatable {
+    /// Text drawn before the title, e.g. `## `.
+    var titlePrefix: String? = nil
+    var count: ThemeCountKind = .plain
+    /// Rule under the header row.
+    var rule: ThemeHexPair? = nil
+    /// The rule fades out towards the trailing edge.
+    var ruleFades: Bool = false
+    /// Keep the section icon in front of the title.
+    var showsIcon: Bool = false
+    /// Ink for the icon / count instead of the caller's tint, so a skin can keep
+    /// headers monochrome. `nil` keeps the tint.
+    var iconInk: ThemeHexPair? = nil
+    var countInk: ThemeHexPair? = nil
+    /// The title's first character is drawn in this colour (rubricated initial).
+    var rubric: ThemeHexPair? = nil
+    var titleTracking: CGFloat = 0
+    /// Height of a solid (non-fading) rule.
+    var ruleWidth: CGFloat = 1.5
+    /// A small ring drawn where the header rule ends (魔戒).
+    var ruleEndMark: ThemeHexPair? = nil
+    /// The rule is a row of round dots instead of a solid line (猫猫).
+    var ruleDotted: Bool = false
+}
+
+/// A theme-drawn icon set that replaces selected SF Symbols.
+enum ThemeGlyphSet: Equatable {
+    /// Hand-drawn forge, ring and elven glyphs (魔戒), see `LotrGlyph`.
+    case lotr
+    /// Die-cut cat silhouettes (猫猫), see `CatGlyph`.
+    case cat
+}
+
+enum ThemeBackdrop: Equatable {
+    case none
+    /// Faint horizontal paper fibres.
+    case paperGrain(ThemeHexPair)
+    /// CRT scanlines.
+    case scanlines(ThemeHexPair)
+    /// Drafting grid: a 10pt minor square with a 50pt major every fifth line.
+    case draftingGrid(ThemeHexPair)
+    /// Vellum: short scattered fibres, a darkened edge and an optional warm
+    /// light falling from the top (魔戒).
+    case vellum(fibre: ThemeHexPair, vignette: ThemeHexPair, topLight: ThemeHexPair)
+}
+
+/// The `WeekRadius` scale for a skin. Every page reads its corner radii through
+/// `WeekRadius`, so a square-cornered theme squares chips, cells and inset panels
+/// too, not only the shared cards.
+struct ThemeRadii: Equatable {
+    var small: CGFloat
+    var medium: CGFloat
+    var large: CGFloat
+    var xlarge: CGFloat
+}
+
+struct ThemeTypography: Equatable {
+    var titleDesign: Font.Design
+    /// `nil` keeps each role's own weight.
+    var titleWeight: Font.Weight?
+    var bodyDesign: Font.Design
+
+    /// Serif titles over system body text: the original Weekyii typography.
+    static let classic = ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .default)
+
+    /// Design published through `.fontDesign(_:)` at the app root, so system text
+    /// styles (`.caption2`, `.subheadline`, Form rows …) follow the theme too.
+    /// `nil` for the default design, which leaves the environment untouched.
+    var environmentDesign: Font.Design? {
+        bodyDesign == .default ? nil : bodyDesign
+    }
+}
+
+/// Everything a shared component needs to draw itself for a theme.
+///
+/// Components read these tokens and never switch on `WeekTheme`, so a theme's
+/// look lives entirely in `WeekTheme.skin`. A `nil` token means "draw the
+/// classic Weekyii way": the ten classic themes resolve to `.classic`, where
+/// every token is `nil` and each component keeps its original code path.
+struct ThemeSkin: Equatable {
+    var typography: ThemeTypography = .classic
+    /// `nil` keeps the original 8 / 12 / 16 / 24 scale.
+    var radii: ThemeRadii? = nil
+    var card: ThemeSurfaceSkin? = nil
+    var row: ThemeRowSkin? = nil
+    var feature: ThemeFeatureSkin? = nil
+    var badge: ThemeBadgeSkin? = nil
+    var section: ThemeSectionSkin? = nil
+    /// Text/icons on a `weekyiiPrimary` fill. `nil` keeps white.
+    var onPrimary: ThemeHexPair? = nil
+    /// Text/icons on an `accentGreen` fill. `nil` keeps white.
+    var onSuccess: ThemeHexPair? = nil
+    var backdrop: ThemeBackdrop = .none
+    /// Decorative blurred drop shadows (buttons, tiles, floating panels). Flat
+    /// and hard-shadow skins turn them off; see `weekSoftShadow`.
+    var softShadows: Bool = true
+    /// `nil` keeps SF Symbols everywhere.
+    var glyphs: ThemeGlyphSet? = nil
+    /// Settings-row icon chip. `nil` keeps the tinted square.
+    var icon: ThemeIconSkin? = nil
+    /// Filled selected controls (segmented indicator, primary button, selected
+    /// calendar day) drawn as green leather with a gilt hairline instead of a
+    /// flat primary fill. `nil` keeps the primary fill and `onPrimary` ink.
+    var gildedFill: ThemeGildedFill? = nil
+
+    /// Quenya-only decorative elements; no effect on other themes.
+    var isQuenya: Bool = false
+
+    static let classic = ThemeSkin()
+
+    /// Whether glyph call sites draw the Middle-earth set (`LotrGlyph`).
+    var drawsMiddleEarthGlyphs: Bool { glyphs == .lotr }
+
+    /// Skin of the theme currently stored in shared defaults. Views should prefer
+    /// `@Environment(\.themeSkin)`, which re-renders them when the theme changes.
+    static var active: ThemeSkin { WeekTheme.activeTheme.skin }
+}
+
+extension WeekTheme {
+    var skin: ThemeSkin {
+        switch self {
+        case .brutal: return .brutalist
+        case .neon: return .neon
+        case .paper: return .paper
+        case .terminal: return .terminal
+        case .blueprint: return .drafting
+        case .lotr: return .lotr
+        case .cat: return .cat
+        case .quenya: return .quenya
+        case .ring: return .lotr
+        case .amber, .ocean, .forest, .rose, .lavender, .graphite, .sunset, .mint, .midnight:
+            return .classic
+        }
+    }
+}
+
+extension ThemeSkin {
+    /// 魔戒 · 玄铁与古金: neutral stone in light mode and basalt at night.
+    /// The original animated ring and Mount Doom artwork stays independent.
+    static let lotr: ThemeSkin = {
+        let line = ThemeHexPair("#DED9CE", "#443A2A")
+        let ink = ThemeHexPair("#292720", "#ECE6DB")
+        let muted = ThemeHexPair("#6F6A60", "#B0A798")
+        let gold = ThemeHexPair("#80642D", "#CBA552")
+        let selection = ThemeHexPair("#866629", "#CBA552")
+        let onGold = ThemeHexPair("#FFFDF6", "#211A0D")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .semibold, bodyDesign: .default),
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 14),
+            card: ThemeSurfaceSkin(
+                cornerRadius: 18, borderWidth: 1, border: line,
+                fill: ThemeHexPair("#FCFBF8", "#1C1A18")
+            ),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 0, borderWidth: 0.5, border: line,
+                    fill: ThemeHexPair("#00000000"), edges: .bottomRule
+                ),
+                barWidth: 0, barCornerRadius: 0, themesBuiltInTypes: true,
+                typeChip: true, chipSize: 30, chipCornerRadius: 8,
+                chipFillOpacity: 0.10, chipBorderOpacity: 0, rowWashOpacity: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 18, borderWidth: 1, border: line,
+                    fill: ThemeHexPair("#F5F2EB", "#211E1A")
+                ),
+                ink: ink, secondaryInk: muted,
+                label: ThemeLabelSkin(kind: .spaced, ink: gold),
+                action: ThemeActionLook(
+                    kind: .capsule, ink: ink, fill: ThemeHexPair("#E5E1D8", "#29251D"),
+                    border: line, borderWidth: 1, glows: false
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .capsule, ink: onGold, fill: selection, glows: false
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .waxSeal),
+            // Plain bold title with a quiet "3 项" on the right: no icon, no rule.
+            section: ThemeSectionSkin(count: .itemCaption, countInk: muted),
+            onPrimary: onGold, onSuccess: onGold, backdrop: .none, softShadows: false,
+            glyphs: .lotr,
+            icon: ThemeIconSkin(cornerRadius: 9, borderWidth: 0, fill: ThemeHexPair("#F1EBE0", "#29241B")),
+            gildedFill: ThemeGildedFill(
+                top: selection, bottom: selection, ink: onGold,
+                hairline: ThemeHexPair("#00000000")
+            )
+        )
+    }()
+
+    static let brutalist: ThemeSkin = {
+        let ink = ThemeHexPair("#111111", "#F2F2F2")
+        let hardShadow = ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 4, y: 4)
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .black, bodyDesign: .default),
+            radii: ThemeRadii(small: 2, medium: 3, large: 4, xlarge: 4),
+            card: ThemeSurfaceSkin(cornerRadius: 4, borderWidth: 2.5, border: ink, shadow: hardShadow),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 2,
+                    borderWidth: 2,
+                    border: ink,
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#111111", "#2B50FF"), radius: 0, x: 3, y: 3)
+                ),
+                barWidth: 8,
+                barCornerRadius: 0,
+                barFlush: true
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 4,
+                    borderWidth: 2.5,
+                    border: ink,
+                    fill: ThemeHexPair("#FFD43B"),
+                    shadow: hardShadow
+                ),
+                ink: ThemeHexPair("#111111"),
+                secondaryInk: ThemeHexPair("#111111"),
+                label: ThemeLabelSkin(kind: .block, ink: ThemeHexPair("#FFD43B"), fill: ThemeHexPair("#111111")),
+                action: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#111111"),
+                    fill: ThemeHexPair("#FFFFFF"),
+                    border: ThemeHexPair("#111111"),
+                    borderWidth: 2,
+                    hardShadow: ThemeHexPair("#111111")
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#FFD43B"),
+                    fill: ThemeHexPair("#111111"),
+                    border: ThemeHexPair("#111111"),
+                    borderWidth: 2,
+                    hardShadow: ThemeHexPair("#111111")
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .block, border: ink),
+            section: ThemeSectionSkin(count: .block),
+            onPrimary: ThemeHexPair("#FFFFFF", "#111111"),
+            onSuccess: ThemeHexPair("#111111"),
+            softShadows: false
+        )
+    }()
+
+    static let neon: ThemeSkin = {
+        let line = ThemeHexPair("#9FD9E3", "#00A8B8")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .default, titleWeight: .bold, bodyDesign: .default),
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 18),
+            card: ThemeSurfaceSkin(
+                cornerRadius: 14,
+                borderWidth: 1.5,
+                border: line,
+                shadow: ThemeShadowSkin(color: ThemeHexPair("#0000F0FF", "#3300F0FF"), radius: 14, x: 0, y: 0)
+            ),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 10, borderWidth: 1, border: ThemeHexPair("#DDEEF2", "#1C2436")),
+                barWidth: 3,
+                barCornerRadius: 1.5,
+                barGlows: true
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 14,
+                    borderWidth: 1.5,
+                    border: ThemeHexPair("#00F0FF"),
+                    fill: ThemeHexPair("#0E1426"),
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#40FF4DA6", "#59FF4DA6"), radius: 16, x: 0, y: 0),
+                    borderGradient: ["#FF4DA6", "#00F0FF"]
+                ),
+                ink: ThemeHexPair("#E8FDFF"),
+                secondaryInk: ThemeHexPair("#A8C4CC"),
+                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#FF85C2")),
+                action: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#7DF5FF"),
+                    border: ThemeHexPair("#7DF5FF"),
+                    borderWidth: 1.5
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#04121A"),
+                    fill: ThemeHexPair("#00F0FF"),
+                    border: ThemeHexPair("#00F0FF"),
+                    borderWidth: 1.5
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .outline),
+            section: ThemeSectionSkin(),
+            onPrimary: ThemeHexPair("#04121A"),
+            onSuccess: ThemeHexPair("#04121A")
+        )
+    }()
+
+    static let paper: ThemeSkin = {
+        let rule = ThemeHexPair("#D6C9B4", "#4A453D")
+        let red = ThemeHexPair("#B23A2E", "#E0705F")
+        let ink = ThemeHexPair("#2C2A26", "#F0EADF")
+        let stack = ThemeHexPair("#E9DFCC", "#3A352C")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .serif, titleWeight: nil, bodyDesign: .serif),
+            radii: ThemeRadii(small: 1, medium: 2, large: 2, xlarge: 2),
+            card: ThemeSurfaceSkin(cornerRadius: 2, borderWidth: 0.75, border: rule, stackLine: stack),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 1, borderWidth: 0.75, border: ThemeHexPair("#E6DBC7", "#3A352C")),
+                barWidth: 2,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 2, borderWidth: 0.75, border: rule, stackLine: stack),
+                ink: ink,
+                secondaryInk: ThemeHexPair("#5F594F", "#B8AFA1"),
+                label: ThemeLabelSkin(kind: .spaced, ink: red),
+                action: ThemeActionLook(kind: .underline, ink: ink, border: rule, borderWidth: 1),
+                primaryAction: ThemeActionLook(kind: .stamp, ink: red, border: red, borderWidth: 1.5),
+                marginRule: red
+            ),
+            badge: ThemeBadgeSkin(kind: .stamp),
+            section: ThemeSectionSkin(count: .italic, rule: ink),
+            onPrimary: ThemeHexPair("#FFFFFF", "#1B1917"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#1B1917"),
+            backdrop: .paperGrain(ThemeHexPair("#0A785A32", "#08F0EADF")),
+            softShadows: false
+        )
+    }()
+
+    static let terminal: ThemeSkin = {
+        let line = ThemeHexPair("#2F7A3F", "#1E9442")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .monospaced, titleWeight: nil, bodyDesign: .monospaced),
+            radii: ThemeRadii(small: 0, medium: 0, large: 0, xlarge: 0),
+            card: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: line),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 0, borderWidth: 1, border: ThemeHexPair("#C9D6CB", "#12291A")),
+                barWidth: 2,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 0,
+                    borderWidth: 1,
+                    border: ThemeHexPair("#33FF66"),
+                    fill: ThemeHexPair("#05100A")
+                ),
+                ink: ThemeHexPair("#D6FFE1"),
+                secondaryInk: ThemeHexPair("#7FB892"),
+                label: ThemeLabelSkin(kind: .prompt, ink: ThemeHexPair("#33FF66")),
+                action: ThemeActionLook(kind: .bracket, ink: ThemeHexPair("#8CFFA8")),
+                primaryAction: ThemeActionLook(kind: .bracket, ink: ThemeHexPair("#05100A"), fill: ThemeHexPair("#33FF66")),
+                cursor: ThemeHexPair("#33FF66")
+            ),
+            badge: ThemeBadgeSkin(kind: .bracket),
+            section: ThemeSectionSkin(titlePrefix: "## ", count: .bracket),
+            onPrimary: ThemeHexPair("#FFFFFF", "#05100A"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#05100A"),
+            backdrop: .scanlines(ThemeHexPair("#00000000", "#0D33FF66")),
+            softShadows: false
+        )
+    }()
+
+    /// 蓝图: a drafting sheet. Cool paper, hairline rules, monospaced lettering and
+    /// a single construction-orange marker. The focus panel is a cyanotype print:
+    /// deep blue in both appearances, so it stays the one dark mass on the page.
+    static let drafting: ThemeSkin = {
+        let rule = ThemeHexPair("#C3D2DA", "#23343E")
+        let line = ThemeHexPair("#D5E1E7", "#1C2C35")
+        let sheet = ThemeHexPair("#F9FBFC", "#0F1A21")
+        let cyan = ThemeHexPair("#2F8CB4", "#6FB4D6")
+        let marker = ThemeHexPair("#B64B24", "#E08A5C")
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .monospaced, titleWeight: .medium, bodyDesign: .default),
+            radii: ThemeRadii(small: 2, medium: 3, large: 4, xlarge: 6),
+            card: ThemeSurfaceSkin(cornerRadius: 4, borderWidth: 1, border: rule, fill: sheet),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 3, borderWidth: 1, border: line, fill: sheet),
+                barWidth: 2.5,
+                barCornerRadius: 0
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 4,
+                    borderWidth: 1,
+                    border: cyan,
+                    fill: ThemeHexPair("#0E2836")
+                ),
+                ink: ThemeHexPair("#DCEEF7"),
+                secondaryInk: ThemeHexPair("#9CC2D2"),
+                label: ThemeLabelSkin(kind: .spaced, ink: ThemeHexPair("#8FD3E8")),
+                action: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#B7E3F2"),
+                    border: ThemeHexPair("#3D7E99"),
+                    borderWidth: 1
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .rect,
+                    ink: ThemeHexPair("#1C0E06"),
+                    fill: marker,
+                    border: marker,
+                    borderWidth: 1
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .legend),
+            section: ThemeSectionSkin(count: .bracket, rule: ThemeHexPair("#9FBDCB", "#28414E")),
+            onPrimary: ThemeHexPair("#F1FAFF", "#06202B"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#06202B"),
+            backdrop: .draftingGrid(ThemeHexPair("#141D5C82", "#146FB4D6")),
+            softShadows: false
+        )
+    }()
+
+    /// 昆雅: parchment by day, warm hearth-shadow at night.
+    static let quenya: ThemeSkin = {
+        let ink = ThemeHexPair("#F8EEDB", "#F8EEDB")
+        let gold = ThemeHexPair("#C49A58", "#DBB66D")
+        return ThemeSkin(
+            radii: ThemeRadii(small: 8, medium: 10, large: 14, xlarge: 18),
+            card: ThemeSurfaceSkin(cornerRadius: 16, borderWidth: 1,
+                border: ThemeHexPair("#CBBD9D", "#69523A"),
+                fill: ThemeHexPair("#F7F1E5", "#29201A")),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(cornerRadius: 16, borderWidth: 1,
+                    border: ThemeHexPair("#A78346", "#9D7944"),
+                    material: .gradient(top: ThemeHexPair("#493D2B", "#47352A"),
+                                        bottom: ThemeHexPair("#33271D", "#33271D"))),
+                ink: ink,
+                secondaryInk: ThemeHexPair("#D9C8AE", "#D9C8AE"),
+                label: ThemeLabelSkin(kind: .plain, ink: gold),
+                action: ThemeActionLook(kind: .roundedRect, ink: ink, glows: false),
+                primaryAction: ThemeActionLook(kind: .roundedRect,
+                    ink: ThemeHexPair("#251B13", "#251B13"), fill: gold, glows: false)
+            ),
+            badge: ThemeBadgeSkin(kind: .outline),
+            section: ThemeSectionSkin(count: .itemCaption, showsIcon: false),
+            onPrimary: ThemeHexPair("#FFFFFF", "#251B13"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#251B13"),
+            softShadows: false,
+            isQuenya: true
+        )
+    }()
+
+    /// 猫猫 v2 "午睡橘猫": a sunny room with a ginger cat asleep in it. The page is
+    /// warm cream (light) or a dusky room (dark). Cards are soft rounded cushions
+    /// with a subtle warm outline, task rows wear their type colour as a pale wash with the
+    /// type glyph in a chip, and the focus panel is the cat itself: ginger fur,
+    /// two ears peeking over the top edge and a tail curling out of the corner.
+    /// Glyphs are die-cut cat silhouettes, see `CatGlyph`.
+    static let cat: ThemeSkin = {
+        let ginger = ThemeHexPair("#D46A32", "#F29A5E")
+        let gingerLight = ThemeHexPair("#EE9558", "#F7B27E")
+        let featureInk = ThemeHexPair("#FFFFFF", "#F5EBDD")
+        let warmShadow = ThemeShadowSkin(color: ThemeHexPair("#1F7A4A2A", "#59000000"), radius: 14, x: 0, y: 6)
+        return ThemeSkin(
+            typography: ThemeTypography(titleDesign: .rounded, titleWeight: .bold, bodyDesign: .rounded),
+            radii: ThemeRadii(small: 10, medium: 14, large: 20, xlarge: 24),
+            card: ThemeSurfaceSkin(
+                cornerRadius: 22,
+                borderWidth: 1,
+                border: ThemeHexPair("#E9D8C9", "#8E6D56"),
+                fill: ThemeHexPair("#FFFDF9", "#30251F"),
+                shadow: warmShadow,
+                edges: .all,
+                // The accent tints the cushion; no bar on the top edge.
+                tintsWithAccent: true,
+                hidesAccentBar: true
+            ),
+            row: ThemeRowSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 16,
+                    borderWidth: 1,
+                    border: ThemeHexPair("#E8DDD1", "#8E6D56"),
+                    edges: .all
+                ),
+                barWidth: 0,
+                barCornerRadius: 0,
+                themesBuiltInTypes: true,
+                typeChip: true
+            ),
+            feature: ThemeFeatureSkin(
+                surface: ThemeSurfaceSkin(
+                    cornerRadius: 24,
+                    borderWidth: 1,
+                    border: ThemeHexPair("#D58258", "#AA8267"),
+                    shadow: ThemeShadowSkin(color: ThemeHexPair("#40D46A32", "#66000000"), radius: 16, x: 0, y: 8),
+                    innerGlow: ThemeHexPair("#E29463", "#493226"),
+                    edges: .all,
+                    material: .gradient(top: ThemeHexPair("#D87038", "#493226"), bottom: ThemeHexPair("#C35C2E", "#39281F"))
+                ),
+                ink: featureInk,
+                secondaryInk: ThemeHexPair("#E6FFFFFF", "#C7B5A4"),
+                label: ThemeLabelSkin(kind: .plain, ink: featureInk),
+                action: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#3A2015", "#F6E7D9"),
+                    fill: ThemeHexPair("#ED9767", "#654838"),
+                    border: ThemeHexPair("#ED9767", "#775340"),
+                    borderWidth: 1,
+                    glows: false
+                ),
+                primaryAction: ThemeActionLook(
+                    kind: .capsule,
+                    ink: ThemeHexPair("#C25E2A", "#2A1A10"),
+                    fill: ThemeHexPair("#FFFFFF", "#F29A5E"),
+                    border: nil,
+                    borderWidth: 0,
+                    glows: false
+                ),
+                catEars: ThemeCatEars(
+                    fur: ThemeHexPair("#F2A26A", "#A97655"),
+                    innerEar: ThemeHexPair("#F7B8A6", "#D7977D"),
+                    tail: ThemeHexPair("#D46A32", "#A97655")
+                )
+            ),
+            badge: ThemeBadgeSkin(kind: .softPill),
+            section: ThemeSectionSkin(
+                count: .capsule,
+                rule: ThemeHexPair("#E3D3C2", "#876755"),
+                showsIcon: true,
+                iconInk: ginger,
+                countInk: ThemeHexPair("#C25E2A", "#F29A5E"),
+                ruleWidth: 3,
+                // A filled paw where the dotted rule ends.
+                ruleEndMark: ThemeHexPair("#EE9558", "#F29A5E"),
+                ruleDotted: true
+            ),
+            // White on #D46A32 is ~3.5:1, fine for the bold labels it carries;
+            // dark mode's light ginger takes the dark ink.
+            onPrimary: ThemeHexPair("#FFFFFF", "#2A1A10"),
+            onSuccess: ThemeHexPair("#FFFFFF", "#1B1613"),
+            backdrop: .none,
+            softShadows: true,
+            glyphs: .cat,
+            // A soft wash of the row's tint with the glyph in the tint.
+            icon: ThemeIconSkin(cornerRadius: 10, borderWidth: 0, border: nil, fill: nil, tintsFill: true),
+            gildedFill: ThemeGildedFill(
+                top: gingerLight,
+                bottom: ginger,
+                ink: ThemeHexPair("#FFFFFF", "#2A1A10"),
+                hairline: ThemeHexPair("#40FFFFFF", "#80FFFFFF")
+            )
+        )
+    }()
+}
+
+private struct ThemeSkinKey: EnvironmentKey {
+    static let defaultValue = ThemeSkin.classic
+}
+
+extension EnvironmentValues {
+    /// The active theme's skin, published once at the app root. Reading it from
+    /// the environment (rather than `ThemeSkin.active`) makes a view re-render the
+    /// moment the theme changes, so nothing keeps the previous theme's look.
+    var themeSkin: ThemeSkin {
+        get { self[ThemeSkinKey.self] }
+        set { self[ThemeSkinKey.self] = newValue }
     }
 }
 
@@ -482,7 +1548,7 @@ private struct WeekThemePalettePair {
                     accentGreen: "#4B8D78",
                     accentGreenLight: "#7CBBA5",
                     accentPink: "#CF6A74",
-                    backgroundPrimary: "#FFF0E8",
+                    backgroundPrimary: "#F8F8F7",
                     backgroundSecondary: "#FFF9F5",
                     backgroundTertiary: "#F5E1D7",
                     textPrimary: "#351D19",
@@ -504,7 +1570,7 @@ private struct WeekThemePalettePair {
                     accentGreen: "#74BA9F",
                     accentGreenLight: "#94D0B6",
                     accentPink: "#E09AA4",
-                    backgroundPrimary: "#18110F",
+                    backgroundPrimary: "#171717",
                     backgroundSecondary: "#211714",
                     backgroundTertiary: "#2E1F1B",
                     textPrimary: "#F8E8E2",
@@ -615,48 +1681,330 @@ private struct WeekThemePalettePair {
         case .lotr:
             return WeekThemePalettePair(
                 light: WeekThemePalette(
-                    primary: "#7F683C",
-                    primaryLight: "#B79863",
-                    primaryDark: "#4E3E24",
-                    accentOrange: "#A76635",
-                    accentOrangeLight: "#C69060",
-                    accentGreen: "#6A7382",
-                    accentGreenLight: "#9EA7B6",
-                    accentPink: "#8F7160",
-                    backgroundPrimary: "#ECE8DE",
-                    backgroundSecondary: "#F5F2EB",
-                    backgroundTertiary: "#DDD8CD",
-                    textPrimary: "#211D18",
-                    textSecondary: "#4E4439",
-                    textTertiary: "#7C7063",
-                    taskRegular: "#5F6B7C",
-                    taskRegularBg: "#DCE2EA",
-                    taskDDL: "#9F5930",
-                    taskDDLBg: "#ECD8CB",
-                    taskLeisure: "#6D5A8A",
-                    taskLeisureBg: "#E4DEEF"
+                    primary: "#80642D", primaryLight: "#9A7C43", primaryDark: "#60491F",
+                    accentOrange: "#80642D", accentOrangeLight: "#9A7C43",
+                    accentGreen: "#80642D", accentGreenLight: "#9A7C43", accentPink: "#80642D",
+                    backgroundPrimary: "#EEEDE8", backgroundSecondary: "#FCFBF8", backgroundTertiary: "#E5E1D8",
+                    textPrimary: "#292720", textSecondary: "#6F6A60", textTertiary: "#81796D",
+                    taskRegular: "#80642D", taskRegularBg: "#F1EBE0",
+                    taskDDL: "#80642D", taskDDLBg: "#F1EBE0",
+                    taskLeisure: "#80642D", taskLeisureBg: "#F1EBE0"
                 ),
                 dark: WeekThemePalette(
-                    primary: "#AF9160",
-                    primaryLight: "#C6AA79",
-                    primaryDark: "#5C4829",
-                    accentOrange: "#BE8354",
-                    accentOrangeLight: "#D6A678",
-                    accentGreen: "#7A8597",
-                    accentGreenLight: "#99A5B8",
-                    accentPink: "#987669",
-                    backgroundPrimary: "#080A08",
-                    backgroundSecondary: "#101411",
-                    backgroundTertiary: "#171C18",
-                    textPrimary: "#E6DECf",
-                    textSecondary: "#B8AB94",
-                    textTertiary: "#837662",
-                    taskRegular: "#8392AA",
-                    taskRegularBg: "#18202C",
-                    taskDDL: "#D28F62",
-                    taskDDLBg: "#291C15",
-                    taskLeisure: "#A48FC8",
-                    taskLeisureBg: "#211D2E"
+                    primary: "#CBA552", primaryLight: "#DFC078", primaryDark: "#997A3A",
+                    accentOrange: "#CBA552", accentOrangeLight: "#DFC078",
+                    accentGreen: "#CBA552", accentGreenLight: "#DFC078", accentPink: "#CBA552",
+                    backgroundPrimary: "#11100F", backgroundSecondary: "#1C1A18", backgroundTertiary: "#29251D",
+                    textPrimary: "#ECE6DB", textSecondary: "#B0A798", textTertiary: "#A0988A",
+                    taskRegular: "#CBA552", taskRegularBg: "#29241B",
+                    taskDDL: "#CBA552", taskDDLBg: "#29241B",
+                    taskLeisure: "#CBA552", taskLeisureBg: "#29241B"
+                )
+            )
+        case .brutal:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#2B50FF",
+                    primaryLight: "#5C7BFF",
+                    primaryDark: "#1A34CC",
+                    accentOrange: "#FF5C39",
+                    accentOrangeLight: "#FF8A70",
+                    accentGreen: "#00A86B",
+                    accentGreenLight: "#3FC98D",
+                    accentPink: "#FF3D7F",
+                    backgroundPrimary: "#FFFDF5",
+                    backgroundSecondary: "#FFFFFF",
+                    backgroundTertiary: "#EFEBE0",
+                    textPrimary: "#111111",
+                    textSecondary: "#4A4A4A",
+                    textTertiary: "#8A8A8A",
+                    taskRegular: "#2B50FF",
+                    taskRegularBg: "#DCE3FF",
+                    taskDDL: "#E23E1D",
+                    taskDDLBg: "#FFE0D9",
+                    taskLeisure: "#7B4DCC",
+                    taskLeisureBg: "#EDE4FA"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#7B96FF",
+                    primaryLight: "#A3B5FF",
+                    primaryDark: "#2B50FF",
+                    accentOrange: "#FF7A5C",
+                    accentOrangeLight: "#FF9E88",
+                    accentGreen: "#3FC98D",
+                    accentGreenLight: "#6FDCA8",
+                    accentPink: "#FF6B9D",
+                    backgroundPrimary: "#111111",
+                    backgroundSecondary: "#1C1C1C",
+                    backgroundTertiary: "#2A2A2A",
+                    textPrimary: "#FFFDF5",
+                    textSecondary: "#C4C4C4",
+                    textTertiary: "#8A8A8A",
+                    taskRegular: "#7B96FF",
+                    taskRegularBg: "#1E2A5C",
+                    taskDDL: "#FF7A5C",
+                    taskDDLBg: "#4A2018",
+                    taskLeisure: "#C9A6FF",
+                    taskLeisureBg: "#2E2440"
+                )
+            )
+        case .neon:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#0091A8",
+                    primaryLight: "#00B8D4",
+                    primaryDark: "#00697A",
+                    accentOrange: "#E5007D",
+                    accentOrangeLight: "#FF3DA0",
+                    accentGreen: "#00B87A",
+                    accentGreenLight: "#38D9A0",
+                    accentPink: "#E5007D",
+                    backgroundPrimary: "#F0F8FA",
+                    backgroundSecondary: "#FFFFFF",
+                    backgroundTertiary: "#DDEEF2",
+                    textPrimary: "#0A1A20",
+                    textSecondary: "#3E5A63",
+                    textTertiary: "#6E8C95",
+                    taskRegular: "#0091A8",
+                    taskRegularBg: "#D6F2F7",
+                    taskDDL: "#C5006B",
+                    taskDDLBg: "#FFDCEF",
+                    taskLeisure: "#6B3FD4",
+                    taskLeisureBg: "#E9E0FA"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#00F0FF",
+                    primaryLight: "#7DF5FF",
+                    primaryDark: "#00A8B8",
+                    accentOrange: "#FF4DA6",
+                    accentOrangeLight: "#FF85C2",
+                    accentGreen: "#00E5A0",
+                    accentGreenLight: "#5CFFCB",
+                    accentPink: "#FF4DA6",
+                    backgroundPrimary: "#0A0E1A",
+                    backgroundSecondary: "#121826",
+                    backgroundTertiary: "#1C2436",
+                    textPrimary: "#E8FDFF",
+                    textSecondary: "#A8C4CC",
+                    textTertiary: "#6E8A94",
+                    taskRegular: "#00F0FF",
+                    taskRegularBg: "#0E2A33",
+                    taskDDL: "#FF4DA6",
+                    taskDDLBg: "#33102A",
+                    taskLeisure: "#B08CFF",
+                    taskLeisureBg: "#221A3D"
+                )
+            )
+        case .paper:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#B23A2E",
+                    primaryLight: "#D2695A",
+                    primaryDark: "#8A2A20",
+                    accentOrange: "#C08A3E",
+                    accentOrangeLight: "#D9AE72",
+                    accentGreen: "#4A6C58",
+                    accentGreenLight: "#7A9A85",
+                    accentPink: "#B4576B",
+                    backgroundPrimary: "#FBF6EC",
+                    backgroundSecondary: "#FFFDF8",
+                    backgroundTertiary: "#F1E9DA",
+                    textPrimary: "#2C2A26",
+                    textSecondary: "#5F594F",
+                    textTertiary: "#8C8377",
+                    taskRegular: "#3F6B62",
+                    taskRegularBg: "#E2EDE7",
+                    taskDDL: "#B23A2E",
+                    taskDDLBg: "#F7E2DE",
+                    taskLeisure: "#7A5FA8",
+                    taskLeisureBg: "#EAE3F2"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#E0705F",
+                    primaryLight: "#F0A091",
+                    primaryDark: "#B23A2E",
+                    accentOrange: "#D9AE72",
+                    accentOrangeLight: "#E8C79B",
+                    accentGreen: "#8FBF9F",
+                    accentGreenLight: "#B5D8BF",
+                    accentPink: "#DE8D9C",
+                    backgroundPrimary: "#1B1917",
+                    backgroundSecondary: "#232019",
+                    backgroundTertiary: "#2E2A22",
+                    textPrimary: "#F0EADF",
+                    textSecondary: "#B8AFA1",
+                    textTertiary: "#8A8175",
+                    taskRegular: "#8FBF9F",
+                    taskRegularBg: "#223029",
+                    taskDDL: "#E0705F",
+                    taskDDLBg: "#3A221E",
+                    taskLeisure: "#B79AE0",
+                    taskLeisureBg: "#2C2438"
+                )
+            )
+        case .terminal:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#1B7F3B",
+                    primaryLight: "#3FA35C",
+                    primaryDark: "#0F5A28",
+                    accentOrange: "#8F5600", // #B26A00 was 4.15:1 on the card; #8F5600 is 5.9:1
+                    accentOrangeLight: "#D18F2E",
+                    accentGreen: "#1B7F3B",
+                    accentGreenLight: "#3FA35C",
+                    accentPink: "#A31F5B",
+                    backgroundPrimary: "#F2F5F2",
+                    backgroundSecondary: "#FBFDFB",
+                    backgroundTertiary: "#E2E9E2",
+                    textPrimary: "#0F1A12",
+                    textSecondary: "#3E4F42",
+                    textTertiary: "#6E7F72",
+                    taskRegular: "#1B7F3B",
+                    taskRegularBg: "#DCEDE1",
+                    taskDDL: "#A32B1B",
+                    taskDDLBg: "#F5DFDB",
+                    taskLeisure: "#5A4FA8",
+                    taskLeisureBg: "#E4E2F5"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#33FF66",
+                    primaryLight: "#8CFFA8",
+                    primaryDark: "#1FA84A",
+                    accentOrange: "#FFB000",
+                    accentOrangeLight: "#FFC94D",
+                    accentGreen: "#33FF66",
+                    accentGreenLight: "#8CFFA8",
+                    accentPink: "#FF4D9E",
+                    backgroundPrimary: "#05100A",
+                    backgroundSecondary: "#0A1A10",
+                    backgroundTertiary: "#12291A",
+                    textPrimary: "#D6FFE1",
+                    textSecondary: "#7FB892",
+                    textTertiary: "#4E7A5C",
+                    taskRegular: "#33FF66",
+                    taskRegularBg: "#0C2415",
+                    taskDDL: "#FF5A5A",
+                    taskDDLBg: "#2A0F0F",
+                    taskLeisure: "#9D8CFF",
+                    taskLeisureBg: "#171334"
+                )
+            )
+        case .quenya:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#80602E", primaryLight: "#AD884A", primaryDark: "#684B24",
+                    accentOrange: "#AD7043", accentOrangeLight: "#D2A77A",
+                    accentGreen: "#73815B", accentGreenLight: "#A0AC89", accentPink: "#B98573",
+                    backgroundPrimary: "#E9DFCB", backgroundSecondary: "#F7F1E5", backgroundTertiary: "#E4D7BE",
+                    textPrimary: "#302A22", textSecondary: "#756B5B", textTertiary: "#988B77",
+                    taskRegular: "#758268", taskRegularBg: "#E9ECDD", taskDDL: "#A3745E", taskDDLBg: "#F0E2D8",
+                    taskLeisure: "#8D7E60", taskLeisureBg: "#EDE6D8"),
+                dark: WeekThemePalette(
+                    primary: "#DBB66D", primaryLight: "#E9CA8D", primaryDark: "#A78045",
+                    accentOrange: "#D49562", accentOrangeLight: "#E5B58C",
+                    accentGreen: "#A6B88C", accentGreenLight: "#C0CEA8", accentPink: "#D7A38E",
+                    backgroundPrimary: "#1B1512", backgroundSecondary: "#29201A", backgroundTertiary: "#342820",
+                    textPrimary: "#F0E5D4", textSecondary: "#C5B29A", textTertiary: "#998672",
+                    taskRegular: "#A6B797", taskRegularBg: "#283023", taskDDL: "#D5A28D", taskDDLBg: "#392720",
+                    taskLeisure: "#C0AC83", taskLeisureBg: "#302A21")
+            )
+        case .cat:
+            // 午睡橘猫。浅色是晒着太阳的奶油色房间，橘猫毛色作品牌色；深色是傍晚的
+            // 暖褐色房间，橘色提亮一档。蓝灰、番茄红、草绿只给任务类型。
+            // 正文对底色：浅色 12.4:1 / 5.0:1，深色 15.2:1 / 9.0:1。
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#D46A32",
+                    primaryLight: "#EE9558",
+                    primaryDark: "#C25E2A",
+                    accentOrange: "#E07B3C",
+                    accentOrangeLight: "#F2A26A",
+                    accentGreen: "#6B9658",
+                    accentGreenLight: "#93B784",
+                    accentPink: "#E8908A",
+                    backgroundPrimary: "#FBF4EA",
+                    backgroundSecondary: "#FFFDF9",
+                    backgroundTertiary: "#F1E6D8",
+                    textPrimary: "#3A2B22",
+                    textSecondary: "#7B6656",
+                    textTertiary: "#A99686",
+                    taskRegular: "#5E7891",
+                    taskRegularBg: "#E4EBF1",
+                    taskDDL: "#D9604F",
+                    taskDDLBg: "#FAE1DC",
+                    taskLeisure: "#6B9658",
+                    taskLeisureBg: "#E5EFDF"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#F29A5E",
+                    primaryLight: "#F7B27E",
+                    primaryDark: "#D46A32",
+                    accentOrange: "#F29A5E",
+                    accentOrangeLight: "#F7B27E",
+                    accentGreen: "#A5C68F",
+                    accentGreenLight: "#C1D9B0",
+                    accentPink: "#F2A7A0",
+                    backgroundPrimary: "#1B1613",
+                    backgroundSecondary: "#30251F",
+                    backgroundTertiary: "#403128",
+                    textPrimary: "#F5EBDD",
+                    textSecondary: "#C7B5A4",
+                    textTertiary: "#A99585",
+                    taskRegular: "#9DB4CC",
+                    taskRegularBg: "#1F2833",
+                    taskDDL: "#F08C78",
+                    taskDDLBg: "#3A231E",
+                    taskLeisure: "#A5C68F",
+                    taskLeisureBg: "#232E1E"
+                )
+            )
+        case .ring:
+            return forTheme(.lotr)
+        case .blueprint:
+            return WeekThemePalettePair(
+                light: WeekThemePalette(
+                    primary: "#1D5C82",
+                    primaryLight: "#4C8DB4",
+                    primaryDark: "#123C56",
+                    accentOrange: "#B64B24",
+                    accentOrangeLight: "#D98055",
+                    accentGreen: "#2E7D63",
+                    accentGreenLight: "#5AA88C",
+                    accentPink: "#A05672",
+                    backgroundPrimary: "#EDF2F5",
+                    backgroundSecondary: "#F9FBFC",
+                    backgroundTertiary: "#E1E9ED",
+                    textPrimary: "#14262F",
+                    textSecondary: "#48616E",
+                    textTertiary: "#7A8F9A",
+                    taskRegular: "#2E6D86",
+                    taskRegularBg: "#DCEBF2",
+                    taskDDL: "#A63A2E",
+                    taskDDLBg: "#F5DED8",
+                    taskLeisure: "#5B5FA8",
+                    taskLeisureBg: "#E5E5F5"
+                ),
+                dark: WeekThemePalette(
+                    primary: "#6FB4D6",
+                    primaryLight: "#9BCEE6",
+                    primaryDark: "#2A6C8C",
+                    accentOrange: "#E08A5C",
+                    accentOrangeLight: "#EDA981",
+                    accentGreen: "#6BBFA2",
+                    accentGreenLight: "#94D6BE",
+                    accentPink: "#D08BA3",
+                    backgroundPrimary: "#0A1116",
+                    backgroundSecondary: "#0F1A21",
+                    backgroundTertiary: "#16252E",
+                    textPrimary: "#DBE8EE",
+                    textSecondary: "#A6BAC4",
+                    textTertiary: "#6F8590",
+                    taskRegular: "#6FC0DA",
+                    taskRegularBg: "#12303C",
+                    taskDDL: "#E98F6E",
+                    taskDDLBg: "#38211A",
+                    taskLeisure: "#A6A8E8",
+                    taskLeisureBg: "#232441"
                 )
             )
         }
@@ -690,9 +2038,12 @@ private enum WeekThemeRuntime {
     }
 
     static func semanticColor(_ keyPath: KeyPath<WeekThemePalette, String>) -> Color {
-        let lightHex = palettePair.light[keyPath: keyPath]
-        let darkHex = palettePair.dark[keyPath: keyPath]
+        color(lightHex: palettePair.light[keyPath: keyPath], darkHex: palettePair.dark[keyPath: keyPath])
+    }
 
+    /// Resolves a light/dark pair the way palette colours do: an explicit
+    /// appearance setting wins, `.system` follows the trait collection.
+    static func color(lightHex: String, darkHex: String) -> Color {
         switch appearanceMode {
         case .light:
             return Color(hex: lightHex)
@@ -711,6 +2062,24 @@ extension Color {
 
     /// 深琥珀 - 主品牌色
     static var weekyiiPrimary: Color { WeekThemeRuntime.semanticColor(\.primary) }
+
+    /// 主色填充上的文字和图标。经典主题保持白色；个性主题按对比度换成深色墨（例如霓虹、终端的深色模式）。
+    static var weekyiiOnPrimary: Color { ThemeSkin.active.onPrimary?.color ?? .white }
+
+    /// `accentGreen` 填充上的文字和图标，规则同 `weekyiiOnPrimary`。
+    static var weekyiiOnSuccess: Color { ThemeSkin.active.onSuccess?.color ?? .white }
+
+    /// 旧金：红皮书封面上那道烫金线。只有给了 `tooling` 的皮肤才有这层金，
+    /// 其余主题退回主色，免得凭空冒出一块不属于它的黄。
+    static var weekyiiGilt: Color {
+        ThemeSkin.active.feature?.surface.tooling?.color ?? .weekyiiPrimary
+    }
+
+    /// 特色面板（经典主题的主色渐变卡）上的文字和图标。经典主题保持白色。
+    static var weekyiiOnFeature: Color { ThemeSkin.active.feature?.ink.color ?? .white }
+
+    /// 特色面板上的次要文字（时间、说明）。经典主题保持白色 90%。
+    static var weekyiiOnFeatureSecondary: Color { ThemeSkin.active.feature?.secondaryInk.color ?? .white.opacity(0.9) }
 
     /// 亮琥珀 - 主品牌色(浅色)
     static var weekyiiPrimaryLight: Color { WeekThemeRuntime.semanticColor(\.primaryLight) }
@@ -852,6 +2221,133 @@ extension Color {
         return Color(hex: lightHex)
         #endif
     }
+
+    // MARK: - 卡片纸染色
+
+    /// Card stock is dyed, not painted. Washing a dark accent (forest green,
+    /// rust red) straight over paper just greys it; lifting the accent towards
+    /// its own brightest form first keeps the hue when it lands on the sheet.
+    var weekPaperDye: Color {
+        #if canImport(UIKit)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        guard UIColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return self
+        }
+        return Color(
+            hue: hue,
+            saturation: min(1, saturation * 1.25),
+            brightness: min(1, brightness + 0.30),
+            opacity: alpha
+        )
+        #else
+        return self
+        #endif
+    }
+
+    // MARK: - Helper: 项目色亮度适配
+
+    /// 磁贴上唯一的文字/图形颜色：暖调近黑，与外观模式无关。
+    /// 底色会被抬到 `weekyiiTileLuminanceFloor` 之上，因此不需要逐块判断深浅配两种墨色。
+    static var weekyiiTileInk: Color { Color(hex: "#1F1712") }
+
+    /// 磁贴底色的相对亮度下限，低于它的项目色在渲染时向白色提亮（存储值不变）。
+    static var weekyiiTileLuminanceFloor: Double { 0.28 }
+
+    /// 浅色卡片上文字/描边的相对亮度上限，高于它的项目色向黑色压暗。
+    /// 取 0.22 是因为现成深色系本来就落在此值附近，新色系被拉到同一可读档位。
+    static var weekyiiEmphasisLuminanceCeiling: Double { 0.22 }
+
+    /// 磁贴底色：仅亮度不足时提亮，已达标的色值保持原样。
+    static func weekyiiTileSurface(hex: String) -> Color {
+        guard let source = WeekyiiSRGB(hex: hex) else { return Color(hex: hex) }
+        let target = weekyiiTileLuminanceFloor
+        guard source.luminance < target else { return source.color }
+        return weekyiiBlendToThreshold(source, toward: WeekyiiSRGB(r: 1, g: 1, b: 1)) {
+            $0.luminance >= target
+        }.color
+    }
+
+    /// 浅色背景上的项目色前景：仅过亮时压暗，深色系列表项逐字节不变。
+    static func weekyiiEmphasis(hex: String) -> Color {
+        guard let source = WeekyiiSRGB(hex: hex) else { return Color(hex: hex) }
+        let ceiling = weekyiiEmphasisLuminanceCeiling
+        guard source.luminance > ceiling else { return source.color }
+        return weekyiiBlendToThreshold(source, toward: WeekyiiSRGB(r: 0, g: 0, b: 0)) {
+            $0.luminance <= ceiling
+        }.color
+    }
+}
+
+/// sRGB 分量，用于按 WCAG 相对亮度做阈值判断；与 `init(hex:)` 同为 .sRGB 空间。
+private struct WeekyiiSRGB {
+    var r: Double
+    var g: Double
+    var b: Double
+
+    init(r: Double, g: Double, b: Double) {
+        self.r = r
+        self.g = g
+        self.b = b
+    }
+
+    init?(hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var raw: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&raw) else { return nil }
+        switch cleaned.count {
+        case 3:
+            (r, g, b) = (
+                Double((raw >> 8) & 0xF) * 17 / 255,
+                Double((raw >> 4) & 0xF) * 17 / 255,
+                Double(raw & 0xF) * 17 / 255
+            )
+        case 6:
+            (r, g, b) = (
+                Double((raw >> 16) & 0xFF) / 255,
+                Double((raw >> 8) & 0xFF) / 255,
+                Double(raw & 0xFF) / 255
+            )
+        default:
+            return nil
+        }
+    }
+
+    var luminance: Double {
+        0.2126 * Self.linearize(r) + 0.7152 * Self.linearize(g) + 0.0722 * Self.linearize(b)
+    }
+
+    var color: Color { Color(.sRGB, red: r, green: g, blue: b) }
+
+    func blending(to anchor: WeekyiiSRGB, by amount: Double) -> WeekyiiSRGB {
+        WeekyiiSRGB(
+            r: r + (anchor.r - r) * amount,
+            g: g + (anchor.g - g) * amount,
+            b: b + (anchor.b - b) * amount
+        )
+    }
+
+    private static func linearize(_ channel: Double) -> Double {
+        channel <= 0.03928 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+    }
+}
+
+/// 二分出满足阈值的最小插值量，保证同一 hex 每次得到同一个颜色。
+private func weekyiiBlendToThreshold(
+    _ source: WeekyiiSRGB,
+    toward anchor: WeekyiiSRGB,
+    satisfying isEnough: (WeekyiiSRGB) -> Bool
+) -> WeekyiiSRGB {
+    var low = 0.0
+    var high = 1.0
+    for _ in 0..<20 {
+        let middle = (low + high) / 2
+        if isEnough(source.blending(to: anchor, by: middle)) {
+            high = middle
+        } else {
+            low = middle
+        }
+    }
+    return source.blending(to: anchor, by: high)
 }
 
 #if canImport(UIKit)
