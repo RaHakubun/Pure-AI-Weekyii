@@ -22,6 +22,9 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(CloudSyncCoordinator.self) private var cloudSyncCoordinator
+    @Environment(PurchaseService.self) private var purchaseService
+    @State private var paywallFeature: VIPFeature?
     @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     @State private var seedAlertMessage: String?
     @State private var showingClearConfirm = false
@@ -40,6 +43,9 @@ struct SettingsView: View {
     @State private var pendingImportData: Data?
     @State private var pendingImportInspection: WeekyiiDataArchiveService.Inspection?
     @State private var showingImportConfirm = false
+    @State private var showingResetCloudSyncStateConfirm = false
+    @State private var showingInitialCloudSyncDecision = false
+    @State private var showingAutoStartEnableConfirm = false
     
     var body: some View {
         Group {
@@ -57,22 +63,26 @@ struct SettingsView: View {
         .frame(maxWidth: layoutMetrics.layoutClass == .compact ? .infinity : 760)
         .frame(maxWidth: .infinity)
         .onAppear {
+            // Re-evaluated on every appearance: the decision may have become
+            // pending while Settings was off screen.
+            showingInitialCloudSyncDecision = isInitialCloudSyncDecisionRequired
             guard !hasInitializedPendingDefaultKillTime else { return }
             pendingDefaultKillTimeHour = settings.defaultKillTimeHour
             pendingDefaultKillTimeMinute = settings.defaultKillTimeMinute
             hasInitializedPendingDefaultKillTime = true
         }
-        .onChange(of: settings.killTimeReminderMinutes) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
+        .onChange(of: cloudSyncCoordinator.status) { _, _ in
+            if isInitialCloudSyncDecisionRequired { showingInitialCloudSyncDecision = true }
         }
-        .onChange(of: settings.fixedReminderEnabled) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
+        .sheet(item: $paywallFeature) { feature in
+            NavigationStack {
+                VIPServiceView(highlightedFeature: feature, showsCloseButton: true)
+            }
+            .environment(purchaseService)
         }
-        .onChange(of: settings.fixedReminderHour) { _, _ in
+        .onChange(of: reminderSignature) { _, _ in
             rescheduleTodayKillTimeReminderIfNeeded()
-        }
-        .onChange(of: settings.fixedReminderMinute) { _, _ in
-            rescheduleTodayKillTimeReminderIfNeeded()
+            rescheduleSuspendedReminders()
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(get: {
             seedAlertMessage != nil
@@ -132,6 +142,18 @@ struct SettingsView: View {
         } message: {
             Text("今日任务流已过期，无法同步到今天。本次提交已取消。")
         }
+        .alert("开启启动托管？", isPresented: $showingAutoStartEnableConfirm) {
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+            Button("开启托管") {
+                updateAutoStartSettings(
+                    isEnabled: true,
+                    hour: settings.autoStartConfiguration.hour,
+                    minute: settings.autoStartConfiguration.minute
+                )
+            }
+        } message: {
+            Text("到达设定时间后，今日草稿可能自动进入专注；启动后无法撤回。首次在今天设定时间之后开启，将从明天生效。")
+        }
         .alert("回滚到最新备份", isPresented: $showingRestoreBackupConfirm) {
             Button("取消", role: .cancel) { }
             Button("确认回滚", role: .destructive) {
@@ -142,6 +164,9 @@ struct SettingsView: View {
                     return
                 }
                 do {
+                    // Replacing the store underneath sync would make the old
+                    // baselines delete/overwrite the restored data in iCloud.
+                    try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
                     try BackupRecoveryService.restoreSnapshot(named: latest.folderName, to: storeURL)
                     seedAlertMessage = "已回滚到 \(latest.folderName)。请立即重启应用。"
                 } catch {
@@ -149,7 +174,7 @@ struct SettingsView: View {
                 }
             }
         } message: {
-            Text("将直接替换当前数据库文件，可能丢失最新数据。")
+            Text("将直接替换当前数据库文件，可能丢失最新数据。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert("完整替换当前数据？", isPresented: $showingImportConfirm) {
             Button(String(localized: "action.cancel"), role: .cancel) {
@@ -160,7 +185,7 @@ struct SettingsView: View {
                 performPendingArchiveImport()
             }
         } message: {
-            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。")
+            Text("将导入 \(pendingImportInspection?.conciseSummary ?? "所选归档")。当前数据会被完整替换；开始前会自动建立一份本地恢复点。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .fileExporter(
             isPresented: $showingArchiveExporter,
@@ -178,6 +203,29 @@ struct SettingsView: View {
             allowsMultipleSelection: false
         ) { result in
             handleArchiveSelection(result)
+        }
+        .confirmationDialog(
+            initialCloudSyncDecisionTitle,
+            isPresented: $showingInitialCloudSyncDecision,
+            titleVisibility: .visible
+        ) {
+            switch cloudSyncCoordinator.status {
+            case .initialEnableDecisionRequired(.remoteEmpty):
+                Button(String(localized: "settings.icloud.decision.upload_local")) { resolveInitialCloudSync(.uploadLocal) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteNonempty):
+                Button(String(localized: "settings.icloud.decision.use_local")) { resolveInitialCloudSync(.useLocal) }
+                Button(String(localized: "settings.icloud.decision.use_cloud"), role: .destructive) { resolveInitialCloudSync(.useCloud) }
+                Button(String(localized: "settings.icloud.decision.merge")) { resolveInitialCloudSync(.merge) }
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            case .initialEnableDecisionRequired(.remoteHasNewerData):
+                // No source-of-truth button: see CloudSyncInitialEnableDecision.
+                Button(String(localized: "settings.icloud.decision.cancel"), role: .cancel) { resolveInitialCloudSync(.cancel) }
+            default:
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            }
+        } message: {
+            Text(initialCloudSyncDecisionMessage)
         }
         .sheet(isPresented: $showingCreateTaskType) {
             TaskTypeDefinitionEditorSheet(
@@ -210,7 +258,7 @@ struct SettingsView: View {
             if let workspaceSection {
                 workspaceSettingsPage(workspaceSection)
             } else {
-                settingsHome
+                erasedSettingsHome()
             }
         }
         .navigationTitle(String(localized: "settings.title"))
@@ -233,126 +281,347 @@ struct SettingsView: View {
         case .data:
             dataSettingsPage
         case .about:
-            aboutSettingsPage
+            AboutWeekyiiPage()
         case .diagnostics:
             developerSettingsPage
         }
     }
 
-    private var settingsHome: some View {
-        List {
-            Section("个性化") {
-                NavigationLink {
-                    appearanceSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "外观与主题",
-                        value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
-                        icon: "paintpalette.fill",
-                        tint: .purple
-                    )
-                }
-            }
-
-            Section("使用方式") {
-                NavigationLink {
-                    todayRhythmSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "今日节奏",
-                        value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
-                        icon: "timer",
-                        tint: .orange
-                    )
-                }
-
-                NavigationLink {
-                    taskTypeSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "任务管理",
-                        value: "\(activeTaskTypeDefinitions.count) 个类型",
-                        icon: "tag.fill",
-                        tint: .teal
-                    )
-                }
-
-                NavigationLink {
-                    futureSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "未来",
-                        value: settings.weekStartsOnMonday ? "周一开始" : nil,
-                        icon: "calendar.badge.clock",
-                        tint: .blue
-                    )
-                }
-
-                NavigationLink {
-                    ProjectSettingsView()
-                } label: {
-                    SettingsNavigationRow(
-                        title: "项目",
-                        value: "默认 \(settings.defaultProjectDurationDays) 天",
-                        icon: "folder.fill",
-                        tint: .brown
-                    )
-                }
-            }
-
-            Section("数据") {
-                NavigationLink {
-                    dataSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "数据与安全",
-                        icon: "lock.shield.fill",
-                        tint: .indigo
-                    )
-                }
-            }
-
-            Section("应用") {
-                NavigationLink {
-                    aboutSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "关于 Weekyii",
-                        icon: "info.circle.fill",
-                        tint: .mint
-                    )
-                }
-
-                NavigationLink {
-                    developerSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        title: "开发者与诊断",
-                        icon: "hammer.fill",
-                        tint: .gray
-                    )
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
+    @inline(never)
+    private func erasedSettingsHome() -> AnyView {
+        AnyView(settingsHome)
     }
 
+    private var settingsHome: some View {
+        List {
+            // Keep type erasure for the release-build stack fix, but apply row
+            // backgrounds to the links inside each erased group. Applying the
+            // modifier here styles the erased container rather than every row.
+            Group {
+                settingsHomeUpperSectionsErased()
+                settingsHomeLowerSectionsErased()
+            }
+        }
+        .themedGroupedList()
+        .listStyle(.insetGrouped)
+        .modifier(CatSettingsNavigationBarModifier())
+    }
+
+    @inline(never)
+    private func settingsHomeUpperSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedVIPServicePage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "vip.title", defaultValue: "VIP 服务"),
+                            value: vipStatusSummary,
+                            icon: "crown.fill",
+                            tint: .orange,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.vip")
+                    .themedListRows()
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAppearanceSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "外观与主题",
+                            value: "\(settings.selectedTheme.displayName) · \(appearanceDisplayName(for: settings.appearanceMode))",
+                            icon: "paintpalette.fill",
+                            tint: .purple,
+                            themedTint: .weekyiiPrimary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.appearance")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedLanguageSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.language.title", defaultValue: "语言"),
+                            value: settings.languageOverride.displayName,
+                            icon: "globe",
+                            tint: .cyan,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.language")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "个性化")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedTodayRhythmSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "今日节奏",
+                            value: String(format: "%02d:%02d", settings.defaultKillTimeHour, settings.defaultKillTimeMinute),
+                            icon: "timer",
+                            tint: .orange,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.todayRhythm")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedTaskTypeSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.task_type.title", defaultValue: "任务类型"),
+                            value: "\(activeTaskTypeDefinitions.count) 个类型",
+                            icon: "tag.fill",
+                            tint: .teal,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.taskTypes")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedPastSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.section.past", defaultValue: "过去"),
+                            value: settings.pastMonthMarkerOptions.summaryText,
+                            icon: "clock.arrow.circlepath",
+                            tint: .indigo,
+                            themedTint: .taskRegular
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.past")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedFutureSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "未来",
+                            value: settings.weekStartsOnMonday ? "周一开始" : nil,
+                            icon: "calendar.badge.clock",
+                            tint: .blue,
+                            themedTint: .taskLeisure
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.future")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "使用方式")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedSuspendedSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.suspended.header", defaultValue: "悬置箱"),
+                            value: String(
+                                format: String(localized: "settings.suspended.entry.value", defaultValue: "默认 %d 天"),
+                                settings.suspendedDefaultCountdownDays
+                            ),
+                            icon: "hourglass",
+                            tint: .suspendedModuleTint,
+                            themedTint: .weekyiiGilt
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.suspended")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedProjectSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "项目",
+                            value: "默认 \(settings.defaultProjectDurationDays) 天",
+                            icon: "folder.fill",
+                            tint: .brown,
+                            themedTint: .accentOrange
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.projects")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "扩展")
+                }
+            }
+        )
+    }
+
+    @inline(never)
+    private func settingsHomeLowerSectionsErased() -> AnyView {
+        AnyView(
+            Group {
+                Section {
+                    NavigationLink {
+                        erasedDataSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "数据与安全",
+                            icon: "lock.shield.fill",
+                            tint: .indigo,
+                            themedTint: .textSecondary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.data")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "数据")
+                }
+
+                Section {
+                    NavigationLink {
+                        erasedAboutWeekyiiPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: String(localized: "settings.about.title", defaultValue: "关于 Weekyii"),
+                            value: AboutWeekyiiPage.appVersion,
+                            icon: "info.circle.fill",
+                            tint: .mint,
+                            themedTint: .accentGreen
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.about")
+                    .themedListRows()
+
+                    NavigationLink {
+                        erasedDeveloperSettingsPage()
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "开发者与诊断",
+                            icon: "hammer.fill",
+                            tint: .gray,
+                            themedTint: .textTertiary
+                        )
+                    }
+                    .accessibilityIdentifier("settings.row.developer")
+                    .themedListRows()
+                } header: {
+                    SettingsSectionHeader(title: "应用")
+                }
+            }
+        )
+    }
+
+    @inline(never) private func erasedVIPServicePage() -> AnyView { AnyView(VIPServiceView()) }
+    @inline(never) private func erasedAppearanceSettingsPage() -> AnyView { AnyView(appearanceSettingsPage) }
+    @inline(never) private func erasedLanguageSettingsPage() -> AnyView { AnyView(languageSettingsPage) }
+    @inline(never) private func erasedTodayRhythmSettingsPage() -> AnyView { AnyView(todayRhythmSettingsPage) }
+    @inline(never) private func erasedTaskTypeSettingsPage() -> AnyView { AnyView(taskTypeSettingsPage) }
+    @inline(never) private func erasedPastSettingsPage() -> AnyView { AnyView(pastSettingsPage) }
+    @inline(never) private func erasedFutureSettingsPage() -> AnyView { AnyView(futureSettingsPage) }
+    @inline(never) private func erasedSuspendedSettingsPage() -> AnyView { AnyView(SuspendedSettingsView()) }
+    @inline(never) private func erasedProjectSettingsPage() -> AnyView { AnyView(ProjectSettingsView()) }
+    @inline(never) private func erasedDataSettingsPage() -> AnyView { AnyView(dataSettingsPage) }
+    @inline(never) private func erasedAboutWeekyiiPage() -> AnyView { AnyView(AboutWeekyiiPage()) }
+    @inline(never) private func erasedDeveloperSettingsPage() -> AnyView { AnyView(developerSettingsPage) }
+
     private var todayRhythmSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("执行方式") {
                 executionModeSettings
                 killTimeSettings
+                autoStartSettings
             }
             Section("提醒") {
                 reminderSettings
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("今日节奏")
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var autoStartSettings: some View {
+        Group {
+            Toggle(isOn: Binding(
+                get: { settings.autoStartConfiguration.isEnabled },
+                set: { isEnabled in
+                    if isEnabled {
+                        if settings.autoStartWasEverEnabled {
+                            updateAutoStartSettings(
+                                isEnabled: true,
+                                hour: settings.autoStartConfiguration.hour,
+                                minute: settings.autoStartConfiguration.minute
+                            )
+                        } else {
+                            showingAutoStartEnableConfirm = true
+                        }
+                    } else {
+                        updateAutoStartSettings(
+                            isEnabled: false,
+                            hour: settings.autoStartConfiguration.hour,
+                            minute: settings.autoStartConfiguration.minute
+                        )
+                    }
+                }
+            )) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "play.circle.fill", color: .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("启动托管")
+                        Text("自动开始今日草稿任务")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            DatePicker(selection: autoStartTimeBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "clock.fill", color: .orange)
+                    Text("每日启动时间")
+                }
+            }
+            .datePickerStyle(.compact)
+
+            Text(autoStartEffectiveDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 2)
+
+            Text("到达设定时间后，若今日已有草稿任务，将自动进入专注。App 未运行时会在下次打开后补启动。启动后无法撤回。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var languageSettingsPage: some View {
+        Form { Group {
+            Section {
+                Picker(String(localized: "settings.language.title", defaultValue: "语言"), selection: Binding(
+                    get: { settings.languageOverrideRaw },
+                    set: { raw in
+                        guard let override = LanguageOverride(rawValue: raw) else { return }
+                        settings.setLanguageOverride(override)
+                    }
+                )) {
+                    ForEach(LanguageOverride.allCases) { override in
+                        Text(override.displayName).tag(override.rawValue)
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.language.header", defaultValue: "界面语言"))
+            } footer: {
+                Text(String(localized: "settings.language.footer", defaultValue: "更改后需要完全退出并重新打开 Weekyii 才会生效。"))
+            }
+        }.themedListRows() }.themedGroupedList()
+        .navigationTitle(String(localized: "settings.language.title", defaultValue: "语言"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
     private var taskTypeSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("默认类型") {
                 taskTypeSettings
             }
@@ -366,40 +635,37 @@ struct SettingsView: View {
                     }
                 }
             }
-        }
-        .navigationTitle("任务管理")
+        }.themedListRows() }.themedGroupedList()
+        .navigationTitle(String(localized: "settings.task_type.title", defaultValue: "任务类型"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var pastSettingsPage: some View {
+        Form { Group { pastMarkerSection }.themedListRows() }.themedGroupedList()
+            .navigationTitle(String(localized: "settings.section.past", defaultValue: "过去"))
+            .navigationBarTitleDisplayMode(.inline)
+    }
+
     private var futureSettingsPage: some View {
-        Form { futureSection }
+        Form { Group { futureSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("未来")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var dataSettingsPage: some View {
-        Form { dataPrivacySection }
+        Form { Group { dataPrivacySection }.themedListRows() }.themedGroupedList()
             .navigationTitle("数据与安全")
             .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var aboutSettingsPage: some View {
-        Form {
-            pastSection
-            aboutSection
-        }
-        .navigationTitle("关于 Weekyii")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
     private var developerSettingsPage: some View {
-        Form { developerSection }
+        Form { Group { developerSection }.themedListRows() }.themedGroupedList()
             .navigationTitle("开发者与诊断")
             .navigationBarTitleDisplayMode(.inline)
     }
 
     private var appearanceSettingsPage: some View {
-        Form {
+        Form { Group {
             Section("显示模式") {
                 Picker(
                     "显示模式",
@@ -418,7 +684,7 @@ struct SettingsView: View {
             Section {
                 ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
                     .frame(height: 112)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .themeArtworkFrame(cornerRadius: 14, hairline: false)
             } header: {
                 Text("当前主题")
             } footer: {
@@ -426,70 +692,216 @@ struct SettingsView: View {
             }
 
             Section {
-                ForEach(WeekTheme.allCases) { theme in
-                    let isLocked = theme.isPremiumTheme && !settings.premiumThemeUnlocked
-                    Button {
-                        guard canSelect(theme) else { return }
-                        settings.selectedThemeRaw = theme.rawValue
-                    } label: {
-                        HStack(spacing: 12) {
-                            ThemePaletteMark(theme: theme)
-
-                            Text(theme.displayName)
-                                .foregroundStyle(isLocked ? .secondary : .primary)
-
-                            Spacer()
-
-                            if isLocked {
-                                Image(systemName: "lock.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if settings.selectedTheme == theme {
-                                Image(systemName: "checkmark")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLocked)
+                ForEach(WeekTheme.freeThemes) { theme in
+                    themeRow(theme)
                 }
             } header: {
                 Text("主题")
             } footer: {
                 Text("每套主题仍保留独立的色彩与印象画。")
             }
-        }
+
+            Section {
+                ForEach(WeekTheme.vipThemes) { theme in
+                    themeRow(theme)
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Text(String(localized: "settings.theme.vip.header", defaultValue: "VIP 主题"))
+                    VIPBadge()
+                }
+            } footer: {
+                Text(settings.hasVIPAccess
+                     ? String(localized: "settings.theme.vip.footer.unlocked", defaultValue: "VIP 主题拥有独立的视觉语言，小组件和灵动岛同步生效。")
+                     : String(localized: "settings.theme.vip.footer.locked", defaultValue: "开通 VIP 即可使用。到期后会切回琥珀主题，并保留你的选择，续费后自动恢复。"))
+            }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { settings.reduceMotionEnabled },
+                    set: { settings.reduceMotionEnabled = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "figure.walk.motion", color: .teal)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "settings.motion.reduce", defaultValue: "减少动效"))
+                            Text(String(localized: "settings.motion.reduce.subtitle", defaultValue: "停止主题背景、转场与磁贴翻转等动画"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Toggle(isOn: Binding(
+                    get: { settings.moduleTileRotationEnabled },
+                    set: { settings.moduleTileRotationEnabled = $0 }
+                )) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "rectangle.3.group.fill", color: .blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "settings.motion.tiles", defaultValue: "模块磁贴自动轮换"))
+                            Text(String(localized: "settings.motion.tiles.subtitle", defaultValue: "在扩展页停留时轮换展示不同的悬置任务与项目"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.motion.header", defaultValue: "动效"))
+            } footer: {
+                Text(String(localized: "settings.motion.footer", defaultValue: "“减少动效”开启后，磁贴轮换也会一并停止。改动立即生效。"))
+            }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("外观与主题")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Past
+    // MARK: - Past Month Markers
     @ViewBuilder
-    private var pastSection: some View {
+    private var pastMarkerSection: some View {
+        let options = settings.pastMonthMarkerOptions
+
         Section {
-            if let startDate = appState.systemStartDate {
-                HStack(spacing: 12) {
-                    SettingsIcon(icon: "calendar", color: .blue)
-                    Text(String(localized: "settings.about.start_date"))
-                    Spacer()
-                    Text(startDate, format: Date.FormatStyle().year().month().day())
+            PastMarkerSettingsPreview(options: options)
+        } header: {
+            Text(String(localized: "settings.past.markers.preview", defaultValue: "预览"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.preview.footer",
+                defaultValue: "这是示意数据，开关改动后，「过去」月历会同步变成这个样子。"
+            ))
+        }
+
+        Section {
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowUnfinishedFace },
+                    set: { settings.pastMonthShowUnfinishedFace = $0 }
+                ),
+                title: String(localized: "settings.past.markers.unfinished", defaultValue: "没完成的一天"),
+                subtitle: String(
+                    localized: "settings.past.markers.unfinished.subtitle",
+                    defaultValue: "开始执行后，到截止时间仍有任务没完成"
+                ),
+                tint: .taskDDL
+            ) {
+                PastFailureFaceMark(kind: .unfinished).frame(width: 17, height: 17)
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowNotStartedFace },
+                    set: { settings.pastMonthShowNotStartedFace = $0 }
+                ),
+                title: String(localized: "settings.past.markers.not_started", defaultValue: "未启动的一天"),
+                subtitle: String(
+                    localized: "settings.past.markers.not_started.subtitle",
+                    defaultValue: "有计划却没点开始就过期，只有习惯自动生成任务的日子也算"
+                ),
+                tint: .gray
+            ) {
+                PastFailureFaceMark(kind: .notStarted).frame(width: 17, height: 17)
+            }
+        } header: {
+            Text(String(localized: "settings.past.markers.failure_header", defaultValue: "失败提醒"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.failure_footer",
+                defaultValue: "本周和今天一过截止时间就会立即标出，不必等到整周结束。"
+            ))
+        }
+
+        Section {
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowCompletedCount },
+                    set: { settings.pastMonthShowCompletedCount = $0 }
+                ),
+                title: String(localized: "settings.past.markers.completed_count", defaultValue: "完成数量"),
+                subtitle: String(
+                    localized: "settings.past.markers.completed_count.subtitle",
+                    defaultValue: "在日期右上角显示当天完成了几项"
+                ),
+                tint: .accentGreen
+            ) {
+                PastCompletedCountBadge(count: 3)
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowRecordDot },
+                    set: { settings.pastMonthShowRecordDot = $0 }
+                ),
+                title: String(localized: "settings.past.markers.record", defaultValue: "有记录"),
+                subtitle: String(
+                    localized: "settings.past.markers.record.subtitle",
+                    defaultValue: "当天有计划、执行或完成记录时显示绿点"
+                ),
+                tint: .accentGreen
+            ) {
+                PastRecordDotMark()
+            }
+
+            pastMarkerToggle(
+                isOn: Binding(
+                    get: { settings.pastMonthShowExpiredFlame },
+                    set: { settings.pastMonthShowExpiredFlame = $0 }
+                ),
+                title: String(localized: "settings.past.markers.expired", defaultValue: "有过期"),
+                subtitle: String(
+                    localized: "settings.past.markers.expired.subtitle",
+                    defaultValue: "当天有任务过期时显示小火苗"
+                ),
+                tint: .taskDDL
+            ) {
+                PastExpiredFlameMark(size: 13)
+            }
+        } header: {
+            Text(String(localized: "settings.past.markers.stats_header", defaultValue: "完成统计"))
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.stats_footer",
+                defaultValue: "“有过期”和“没完成的一天”判定条件相同，可以只留一种，也可以同时显示。"
+            ))
+        }
+
+        Section {
+            Button(String(localized: "settings.past.markers.reset", defaultValue: "恢复默认")) {
+                settings.pastMonthMarkerOptions = .default
+            }
+            .disabled(options == .default)
+        } footer: {
+            Text(String(
+                localized: "settings.past.markers.local_footer",
+                defaultValue: "默认只显示“没完成的一天”。这些选项只保存在本机，不会通过 iCloud 同步。"
+            ))
+        }
+    }
+
+    private func pastMarkerToggle<Mark: View>(
+        isOn: Binding<Bool>,
+        title: String,
+        subtitle: String,
+        tint: Color,
+        @ViewBuilder mark: () -> Mark
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 12) {
+                // The icon is the real calendar glyph, so users recognise it on sight.
+                mark()
+                    .frame(width: 28, height: 28)
+                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(7), style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(subtitle)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "flag.fill", color: .orange)
-                Text(String(localized: "settings.about.days_started"))
-                Spacer()
-                Text("\(appState.daysStartedCount)")
-                    .foregroundStyle(.secondary)
-            }
-
-        } header: {
-            Text("使用历程")
         }
+        // The count badge icon contains text, which List would otherwise pick as
+        // the separator inset; pin every row's separator to the title (28 + 12).
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + 40 }
     }
 
     // MARK: - Future
@@ -556,18 +968,146 @@ struct SettingsView: View {
     @ViewBuilder
     private var dataPrivacySection: some View {
         Section {
-            Toggle(isOn: .constant(false)) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: cloudSyncStatusSymbol, color: cloudSyncStatusColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.icloud.header"))
+                    Text(cloudSyncStatusMessage)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if cloudSyncCoordinator.diagnosticsSnapshot.accountResolutionRequired {
+                    Button(String(localized: "settings.icloud.banner.account.open")) {
+                        cloudSyncCoordinator.requestAccountResolutionPresentation()
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("settings.icloud.accountResolution")
+                } else if isInitialCloudSyncDecisionRequired {
+                    Button(String(localized: "settings.icloud.decision.open")) {
+                        showingInitialCloudSyncDecision = true
+                    }
+                    .font(.caption)
+                    .accessibilityIdentifier("settings.icloud.initialDecision")
+                } else if cloudSyncCoordinator.diagnosticsSnapshot.manualSyncAllowed {
+                    Button {
+                        Task { await cloudSyncCoordinator.syncNow() }
+                    } label: {
+                        Label(String(localized: "settings.icloud.sync_now"), systemImage: "arrow.triangle.2.circlepath.icloud")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("settings.icloud.syncNow")
+                }
+                if cloudSyncCoordinator.status == .checkingAccount || cloudSyncCoordinator.status == .syncing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel(String(localized: "settings.icloud.status.checking"))
+                }
+            }
+
+            LabeledContent(String(localized: "settings.icloud.account")) {
+                Text(cloudSyncCoordinator.diagnosticsSnapshot.account.localizedDescription)
+                    .foregroundStyle(.secondary)
+            }
+
+            LabeledContent(String(localized: "settings.icloud.entitlement")) {
+                Text(entitlementStatusDescription)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let lastSuccessfulSync = cloudSyncCoordinator.diagnosticsSnapshot.lastSuccessfulSync {
+                LabeledContent(String(localized: "settings.icloud.last_success")) {
+                    Text(lastSuccessfulSync.formatted(date: .abbreviated, time: .shortened))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount > 0 {
+                LabeledContent(String(localized: "settings.icloud.conflicts", defaultValue: "上次同步的冲突")) {
+                    Text(String(
+                        format: String(localized: "settings.icloud.conflicts.value", defaultValue: "%lld 处（已保留本机版本）"),
+                        locale: Locale.current,
+                        Int64(cloudSyncCoordinator.diagnosticsSnapshot.lastConflictCount)
+                    ))
+                    .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("settings.icloud.conflicts")
+            }
+
+            if let lastFailure = cloudSyncCoordinator.diagnosticsSnapshot.lastFailure {
+                LabeledContent(String(localized: "settings.icloud.last_failure")) {
+                    Text(lastFailure.localizedDescription)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if cloudSyncCoordinator.diagnosticsSnapshot.automaticRetrySuppressed {
+                Label(String(localized: "settings.icloud.retry_paused"), systemImage: "pause.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(isOn: Binding(
+                get: { settings.cloudSyncRequested },
+                set: { requested in
+                    if requested, !purchaseService.hasVIP {
+                        paywallFeature = .cloudSync
+                        return
+                    }
+                    Task { await cloudSyncCoordinator.setRequested(requested) }
+                }
+            )) {
                 HStack(spacing: 12) {
-                    SettingsIcon(icon: "icloud.fill", color: .blue)
+                    SettingsIcon(icon: "arrow.triangle.2.circlepath.icloud", color: .blue)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.icloud.sync"))
-                        Text(String(localized: "settings.icloud.coming_soon"))
+                        Text(String(localized: "settings.icloud.toggle"))
+                        Text(String(localized: "settings.icloud.subtitle"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .disabled(true)
+
+            if case .locked = cloudSyncCoordinator.status, settings.cloudSyncRequested {
+                Button {
+                    paywallFeature = .cloudSync
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "crown.fill", color: .orange)
+                        Text(String(localized: "settings.icloud.renew", defaultValue: "续订会员以恢复 iCloud 同步"))
+                    }
+                }
+                .accessibilityIdentifier("settings.icloud.renew")
+            }
+
+            Button(role: .destructive) {
+                showingResetCloudSyncStateConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "arrow.counterclockwise.icloud", color: .red)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.icloud.reset_state", defaultValue: "重置本机同步状态"))
+                        Text(String(localized: "settings.icloud.reset_state.subtitle", defaultValue: "不删除任何数据；关闭同步并清除本机同步记录"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .accessibilityIdentifier("settings.icloud.resetState")
+            .confirmationDialog(
+                String(localized: "settings.icloud.reset_state.title", defaultValue: "重置本机同步状态？"),
+                isPresented: $showingResetCloudSyncStateConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "settings.icloud.reset_state.confirm", defaultValue: "关闭同步并重置"), role: .destructive) {
+                    resetCloudSyncState()
+                }
+                Button(String(localized: "action.cancel"), role: .cancel) { }
+            } message: {
+                Text(String(localized: "settings.icloud.reset_state.message", defaultValue: "本机和 iCloud 中的数据都不会被删除。重新开启同步时，会重新检查 iCloud 并让你选择以哪份数据为准。仅在同步长期异常时使用。"))
+            }
 
             Button {
                 exportArchive()
@@ -605,6 +1145,24 @@ struct SettingsView: View {
                     Text("本地恢复点")
                 }
             }
+
+            Stepper(value: Binding(
+                get: { settings.recoveryPointRetentionCount },
+                set: { settings.recoveryPointRetentionCount = min(max($0, 1), 50) }
+            ), in: 1...50) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "externaldrive.fill.badge.timemachine", color: .indigo)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.data.retention", defaultValue: "恢复点保留数量"))
+                        Text(String(localized: "settings.data.retention.subtitle", defaultValue: "超出后自动清理最旧的恢复点"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Text("\(settings.effectiveRecoveryPointRetentionCount)")
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text(String(localized: "settings.section.data"))
         } footer: {
@@ -612,8 +1170,105 @@ struct SettingsView: View {
         }
     }
 
+    private var cloudSyncStatusColor: Color {
+        switch cloudSyncCoordinator.status {
+        case .offline, .quotaExceeded, .accountUnavailable, .locked, .pausedAfterFailure:
+            return .orange
+        default:
+            return .blue
+        }
+    }
+
+    private var cloudSyncStatusSymbol: String {
+        switch cloudSyncCoordinator.status {
+        case .disabled: "icloud.slash"
+        case .checkingAccount, .syncing: "arrow.triangle.2.circlepath.icloud"
+        case .quotaExceeded, .offline, .accountUnavailable, .locked, .pausedAfterFailure: "exclamationmark.icloud"
+        case .initialEnableDecisionRequired, .accountDecisionRequired: "questionmark.icloud"
+        case .ready, .synced: "checkmark.icloud"
+        }
+    }
+
+    private var cloudSyncStatusMessage: String {
+        switch cloudSyncCoordinator.status {
+        case .disabled: String(localized: "settings.icloud.status.disabled")
+        case .locked: String(localized: "settings.icloud.status.locked")
+        case .checkingAccount: String(localized: "settings.icloud.status.checking")
+        case .ready: String(localized: "settings.icloud.status.ready")
+        case .syncing: String(localized: "settings.icloud.status.syncing")
+        case .synced: String(localized: "settings.icloud.status.synced")
+        case .offline: String(localized: "settings.icloud.status.offline")
+        case .quotaExceeded: String(localized: "settings.icloud.status.quota")
+        case .accountUnavailable: String(localized: "settings.icloud.status.account_unavailable")
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.status.first_upload")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.status.first_choice")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.status.newer_data", defaultValue: "需要更新版本")
+        case .accountDecisionRequired: String(localized: "settings.icloud.status.account_decision")
+        case .pausedAfterFailure: String(localized: "settings.icloud.status.paused")
+        }
+    }
+
+    private var entitlementStatusDescription: String {
+        switch cloudSyncCoordinator.diagnosticsSnapshot.entitlement {
+        case .checking: String(localized: "cloud.sync.entitlement.checking")
+        case .entitled: String(localized: "cloud.sync.entitlement.available")
+        case .notPurchased, .expired, .notConfigured, .verificationFailed:
+            String(localized: "cloud.sync.entitlement.unavailable")
+        }
+    }
+
+    private var isInitialCloudSyncDecisionRequired: Bool {
+        if case .initialEnableDecisionRequired = cloudSyncCoordinator.status { return true }
+        return false
+    }
+
+    private var initialCloudSyncDecisionTitle: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_title")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_title")
+        case .initialEnableDecisionRequired(.remoteHasNewerData): String(localized: "settings.icloud.decision.newer_data_title", defaultValue: "需要先更新 Weekyii")
+        default: String(localized: "settings.icloud.decision.title")
+        }
+    }
+
+    private var initialCloudSyncDecisionMessage: String {
+        switch cloudSyncCoordinator.status {
+        case .initialEnableDecisionRequired(.remoteEmpty): String(localized: "settings.icloud.decision.empty_message")
+        case .initialEnableDecisionRequired(.remoteNonempty): String(localized: "settings.icloud.decision.nonempty_message")
+        case .initialEnableDecisionRequired(.remoteHasNewerData):
+            String(
+                localized: "settings.icloud.decision.newer_data_message",
+                defaultValue: "iCloud 中有本版本无法读取的数据，可能由更新版本的 Weekyii 写入。为避免删除这些数据，暂时不能选择以哪份数据为准。请升级 Weekyii 后再开启同步。"
+            )
+        default: ""
+        }
+    }
+
+    private func resolveInitialCloudSync(_ choice: CloudSyncInitialEnableChoice) {
+        showingInitialCloudSyncDecision = false
+        Task { await cloudSyncCoordinator.resolveInitialEnable(choice) }
+    }
+
     private var archiveDefaultFilename: String {
         "Weekyii-\(Self.archiveFilenameFormatter.string(from: Date()))"
+    }
+
+    /// Every setting that changes when a reminder should fire, collapsed into one
+    /// comparable value so a single `onChange` can drive rescheduling.
+    private var reminderSignature: String {
+        [
+            "\(settings.killTimeReminderMinutes)",
+            "\(settings.fixedReminderEnabled)",
+            "\(settings.fixedReminderHour)",
+            "\(settings.fixedReminderMinute)",
+            "\(settings.morningReminderHour)",
+            "\(settings.morningReminderMinute)",
+            "\(settings.suspendedReminderEnabled)",
+            settings.suspendedReminderIntensityRaw,
+            "\(settings.suspendedReminderAdvanceDays)",
+            "\(settings.suspendedReminderEveningHour)",
+            "\(settings.suspendedReminderEveningMinute)"
+        ].joined(separator: "|")
     }
 
     private func exportArchive() {
@@ -642,6 +1297,16 @@ struct SettingsView: View {
             pendingImportData = nil
             pendingImportInspection = nil
             seedAlertMessage = "无法导入：\(error.localizedDescription)"
+        }
+    }
+
+    private func resetCloudSyncState() {
+        do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
+            Task { await cloudSyncCoordinator.setRequested(false) }
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.done", defaultValue: "已关闭 iCloud 同步并重置本机同步状态。需要时可重新开启。")
+        } catch {
+            seedAlertMessage = String(localized: "settings.icloud.reset_state.failed", defaultValue: "重置失败：") + error.localizedDescription
         }
     }
 
@@ -683,17 +1348,19 @@ struct SettingsView: View {
             }
 
             if settings.developerSettingsEnabled {
+                #if DEBUG
                 Toggle(isOn: Binding(
-                    get: { settings.premiumThemeUnlocked },
-                    set: { settings.premiumThemeUnlocked = $0 }
+                    get: { purchaseService.developerOverrideEnabled },
+                    set: { purchaseService.developerOverrideEnabled = $0 }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.developer.unlock_lotr", defaultValue: "解锁魔戒主题"))
-                        Text(String(localized: "settings.developer.unlock_lotr.subtitle", defaultValue: "本地调试用，不代表真实购买状态"))
+                        Text(String(localized: "settings.developer.simulate_vip", defaultValue: "模拟 VIP"))
+                        Text(String(localized: "settings.developer.simulate_vip.subtitle", defaultValue: "仅开发版本可见，不代表真实购买状态"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
+                #endif
 
                 Stepper(value: Binding(
                     get: { settings.seedPastWeeks },
@@ -824,56 +1491,127 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - About
-    @ViewBuilder
-    private var aboutSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                SettingsIcon(icon: "info.circle.fill", color: .teal)
-                Text(String(localized: "settings.about.version"))
-                Spacer()
-                Text("1.0.0")
-                    .foregroundStyle(.secondary)
-            }
-
-        } header: {
-            Text(String(localized: "settings.about.header"))
-        }
-    }
-    
-    // MARK: - Kill Time Settings
+    // MARK: - Execution Mode Settings
     @ViewBuilder
     private var executionModeSettings: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 SettingsIcon(icon: "slider.horizontal.3", color: .weekyiiPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("执行模式")
-                    Text("修改将在下一次开始任务流时生效")
+                    Text("选择后会立即同步尚未结束的今日，并成为以后默认方式")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Picker("执行模式", selection: Binding(
-                get: { settings.defaultExecutionModeRaw },
-                set: { settings.defaultExecutionModeRaw = $0 }
-            )) {
+            HStack(alignment: .top, spacing: 10) {
                 ForEach(ExecutionMode.allCases) { mode in
-                    Text(mode.displayName)
-                        .tag(mode.rawValue)
+                    Button {
+                        applyExecutionMode(mode)
+                    } label: {
+                        ExecutionModeOptionCard(
+                            mode: mode,
+                            isSelected: displayedExecutionMode == mode,
+                            requiresVIP: mode == .flexible && !settings.hasVIPAccess
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .accessibilityIdentifier("executionModeOption.\(mode.rawValue)")
+                    .accessibilityLabel("\(mode.displayName)执行模式")
+                    .accessibilityValue(displayedExecutionMode == mode ? "已选择" : "未选择")
+                    .accessibilityHint("点按后立即同步尚未结束的今日")
                 }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("executionModePicker")
 
-            Text(settings.defaultExecutionMode == .strict
-                 ? "严格模式：开始后按固定顺序逐项推进。"
-                 : "灵动模式：开始后可解冻草稿区，调整任务并与专注任务交换。")
+            Label(executionModeApplicationDescription, systemImage: "bolt.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.weekyiiPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(10)))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("两种模式都遵守")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("每日截止时间一到，未完成项不会继续留在今日，也不能查看其明细；系统只保留过期数量和已完成记录。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 2)
         }
         .padding(.vertical, 4)
+    }
+
+    private var executionModeApplicationDescription: String {
+        if settings.defaultExecutionMode == .flexible, !settings.hasVIPAccess {
+            return String(localized: "settings.execution.vip_expired", defaultValue: "VIP 未开通或已到期：今天已开始的任务流不受影响，之后启动的日子使用严格模式。续费后自动恢复灵动模式。")
+        }
+        guard let today = todayDayModel() else {
+            return "此选择会用于以后每一次启动任务流。"
+        }
+
+        switch today.status {
+        case .empty, .draft, .execute:
+            if today.executionMode == settings.defaultExecutionMode {
+                return "今日正在使用\(today.executionMode.displayName)，也会作为以后启动任务流的默认方式。"
+            }
+            return "今日正在使用\(today.executionMode.displayName)；以后默认是\(settings.defaultExecutionMode.displayName)。点按任一模式会立刻统一两者。"
+        case .completed:
+            return "今日已完成，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+        case .expired:
+            return "今日已过期，保留当日的执行方式；新选择会用于以后每一次启动任务流。"
+        }
+    }
+
+    private var displayedExecutionMode: ExecutionMode {
+        guard let today = todayDayModel() else { return settings.defaultExecutionMode }
+        switch today.status {
+        case .empty, .draft, .execute:
+            return today.executionMode
+        case .completed, .expired:
+            return settings.defaultExecutionMode
+        }
+    }
+
+    private func applyExecutionMode(_ mode: ExecutionMode) {
+        if mode == .flexible, !settings.hasVIPAccess {
+            paywallFeature = .flexibleMode
+            return
+        }
+        // Resolve the clock boundary before deciding whether "today" is still mutable.
+        // This prevents a mode tap just after the daily deadline from reviving an expired day.
+        _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
+
+        let previousDefaultModeRaw = settings.defaultExecutionModeRaw
+        settings.defaultExecutionModeRaw = mode.rawValue
+
+        guard let today = todayDayModel() else { return }
+        guard today.status == .empty || today.status == .draft || today.status == .execute else { return }
+        guard today.executionMode != mode else { return }
+
+        let previousMode = today.executionMode
+        let previousDraftZoneUnlocked = today.isDraftZoneUnlocked
+        today.executionMode = mode
+
+        // A mode choice must never silently reopen a committed queue. Switching either way
+        // returns the execution queue to its explicit, user-controlled locked state.
+        today.isDraftZoneUnlocked = false
+
+        do {
+            try modelContext.save()
+            appState.bumpStateTransitionRevision()
+        } catch {
+            today.executionMode = previousMode
+            today.isDraftZoneUnlocked = previousDraftZoneUnlocked
+            settings.defaultExecutionModeRaw = previousDefaultModeRaw
+            seedAlertMessage = "执行模式未能保存：\(error.localizedDescription)"
+        }
     }
 
     // MARK: - Kill Time Settings
@@ -963,7 +1701,7 @@ struct SettingsView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(definition.color, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(definition.color, in: RoundedRectangle(cornerRadius: WeekRadius.scaled(9), style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(definition.name)
@@ -1058,14 +1796,48 @@ struct SettingsView: View {
             .datePickerStyle(.compact)
         }
 
+        morningReminderSettingRow
+
         HStack(spacing: 12) {
             Color.clear
                 .frame(width: 28, height: 28)
-            Text("系统会自动追加晨间提醒与截止前最后提醒，固定时刻提醒用于你的个人节奏。")
+            Text(String(localized: "settings.reminder.auto.footer", defaultValue: "系统会在晨间时刻与截止前最后 5 分钟自动提醒，固定时刻提醒用于你的个人节奏。"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
         }
+    }
+
+    private var morningReminderSettingRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                SettingsIcon(icon: "sunrise.fill", color: .orange)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "settings.reminder.morning", defaultValue: "晨间提醒时刻"))
+                    Text(String(localized: "settings.reminder.morning.subtitle", defaultValue: "每天在这个时间提醒今日未完成项；悬置箱的早间提醒也跟随这个时刻。"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 12) {
+                Text("提醒时间")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                DatePicker(
+                    "晨间提醒时刻",
+                    selection: morningReminderDateBinding,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+            }
+            .padding(.leading, 40)
+        }
+        .padding(.vertical, 4)
     }
 
     private var seedOptions: SeedOptions {
@@ -1171,7 +1943,52 @@ struct SettingsView: View {
     }
 
     private func canSelect(_ theme: WeekTheme) -> Bool {
-        !theme.isPremiumTheme || settings.premiumThemeUnlocked
+        !theme.requiresVIP || settings.hasVIPAccess
+    }
+
+    private func themeRow(_ theme: WeekTheme) -> some View {
+        let isLocked = !canSelect(theme)
+        return Button {
+            guard canSelect(theme) else {
+                paywallFeature = .themes
+                return
+            }
+            settings.selectedThemeRaw = theme.rawValue
+        } label: {
+            HStack(spacing: 12) {
+                ThemePaletteMark(theme: theme)
+
+                Text(theme.displayName)
+                    .foregroundStyle(isLocked ? .secondary : .primary)
+
+                Spacer()
+
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if settings.selectedTheme == theme {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var vipStatusSummary: String {
+        switch purchaseService.access.source {
+        case .none:
+            return purchaseService.showsTrialOffer
+                ? String(format: String(localized: "vip.summary.trial", defaultValue: "免费试用 %d 天"), purchaseService.trialDays ?? WeekyiiProduct.trialDays)
+                : String(localized: "vip.summary.inactive", defaultValue: "未开通")
+        case .betaTester:
+            return String(localized: "vip.summary.beta", defaultValue: "测试版已开通")
+        default:
+            return String(localized: "vip.summary.active", defaultValue: "已开通")
+        }
     }
 
     private func appearanceDisplayName(for mode: AppearanceMode) -> String {
@@ -1182,6 +1999,89 @@ struct SettingsView: View {
             return String(localized: "settings.appearance.light", defaultValue: "浅色")
         case .dark:
             return String(localized: "settings.appearance.dark", defaultValue: "深色")
+        }
+    }
+
+    private var autoStartTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let timeProvider = TimeProvider()
+                return AutoStartSchedule.date(
+                    on: timeProvider.today,
+                    hour: settings.autoStartConfiguration.hour,
+                    minute: settings.autoStartConfiguration.minute
+                ) ?? timeProvider.now
+            },
+            set: { newDate in
+                let components = WeekyiiTimeZone.calendar.dateComponents([.hour, .minute], from: newDate)
+                updateAutoStartSettings(
+                    isEnabled: settings.autoStartConfiguration.isEnabled,
+                    hour: components.hour ?? settings.autoStartConfiguration.hour,
+                    minute: components.minute ?? settings.autoStartConfiguration.minute
+                )
+            }
+        )
+    }
+
+    private var autoStartEffectiveDescription: String {
+        let timeProvider = TimeProvider()
+        let configuration = settings.autoStartConfiguration
+        let plan = settings.autoStartDailyPlan.flatMap {
+            $0.dayId == timeProvider.today.dayId ? $0 : nil
+        }
+        let todayStatus = todayDayModel(for: timeProvider.today.dayId)?.status
+        if todayStatus == .execute || todayStatus == .completed || todayStatus == .expired {
+            return configuration.isEnabled
+                ? "今日已经启动或结束；新的托管设置从明日起生效。"
+                : "托管已关闭；今日状态不变，设定时间会保留。"
+        }
+        guard configuration.isEnabled else {
+            if let plan, plan.hour != configuration.hour || plan.minute != configuration.minute {
+                return "托管已关闭；今天原计划时间仍是 \(String(format: "%02d:%02d", plan.hour, plan.minute))，新时间从明日起生效。"
+            }
+            return "托管已关闭；设定时间会保留，开启后才会自动启动。"
+        }
+
+        guard let plan else {
+            return "今日计划 \(String(format: "%02d:%02d", configuration.hour, configuration.minute))。App 未运行时会在下次打开后补启动。"
+        }
+        if plan.wasSkipped {
+            return "今日已跳过启动托管；新计划从明日起生效。"
+        }
+        guard plan.isEnabled else {
+            return "今天不再自动启动；启动托管从明日起生效。"
+        }
+        if plan.hour != configuration.hour || plan.minute != configuration.minute {
+            return "今天仍按原计划 \(String(format: "%02d:%02d", plan.hour, plan.minute))；新时间从明日起生效。"
+        }
+        return "今日计划 \(String(format: "%02d:%02d", plan.hour, plan.minute))。App 未运行时会在下次打开后补启动。"
+    }
+
+    private func updateAutoStartSettings(isEnabled: Bool, hour: Int, minute: Int) {
+        let timeProvider = TimeProvider()
+        let now = timeProvider.now
+        let today = WeekyiiTimeZone.calendar.startOfDay(for: now)
+        let dayId = today.dayId
+        settings.updateAutoStartConfiguration(
+            isEnabled: isEnabled,
+            hour: hour,
+            minute: minute,
+            today: today,
+            dayId: dayId,
+            todayStatus: todayDayModel(for: dayId)?.status,
+            now: now
+        )
+
+        if isEnabled {
+            _ = makeHealthCoordinator().reconcile(trigger: .minuteTick, force: true)
+            WidgetSnapshotComposer.syncFromModelContext(
+                modelContext: modelContext,
+                now: now,
+                todayDate: today,
+                selectedThemeRaw: settings.selectedThemeRaw,
+                appearanceModeRaw: settings.appearanceModeRaw,
+                premiumThemeUnlocked: settings.premiumThemeUnlocked
+            )
         }
     }
 
@@ -1215,6 +2115,23 @@ struct SettingsView: View {
                 let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
                 settings.fixedReminderHour = min(max(components.hour ?? 0, 0), 23)
                 settings.fixedReminderMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+
+    private var morningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.morningReminderHour
+                components.minute = settings.morningReminderMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.morningReminderHour = min(max(components.hour ?? 0, 0), 23)
+                settings.morningReminderMinute = min(max(components.minute ?? 0, 0), 59)
             }
         )
     }
@@ -1283,9 +2200,22 @@ struct SettingsView: View {
     }
 
     private func todayDayModel() -> DayModel? {
-        let dayId = Date().dayId
+        todayDayModel(for: Date().dayId)
+    }
+
+    private func todayDayModel(for dayId: String) -> DayModel? {
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
         return try? modelContext.fetch(descriptor).first
+    }
+
+    /// Rebuilds the pending notifications of every active suspended task so a rhythm
+    /// change takes effect immediately instead of waiting for the next edit.
+    private func rescheduleSuspendedReminders() {
+        let tasks = ((try? modelContext.fetch(FetchDescriptor<SuspendedTaskItem>())) ?? [])
+            .filter { $0.status == .active }
+        for task in tasks {
+            NotificationService.shared.scheduleSuspendedTaskNotifications(for: task)
+        }
     }
 
     private func shouldWarnImmediateExpiryForToday(hour: Int, minute: Int) -> Bool {
@@ -1313,9 +2243,7 @@ struct SettingsView: View {
             let expiredCount = today.status == .draft ? 0 : ((today.focusTask == nil ? 0 : 1) + today.frozenTasks.count)
             today.status = .expired
             today.expiredCount = expiredCount
-            let toRemove = today.tasks.filter { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
-            today.tasks.removeAll { $0.zone == .draft || $0.zone == .focus || $0.zone == .frozen }
-            toRemove.forEach { modelContext.delete($0) }
+            today.isDraftZoneUnlocked = false
             NotificationService.shared.cancelKillTimeNotification(for: today)
         }
 
@@ -1341,6 +2269,7 @@ struct SettingsView: View {
             notificationService: .shared,
             appState: appState,
             userSettings: settings,
+            autoStartSettings: settings,
             liveActivityService: TodayLiveActivityService.shared
         )
     }
@@ -1387,7 +2316,7 @@ private struct SampleDataSeeder {
     
     func seed(options: SeedOptions) throws -> SeedResult {
         let descriptor = FetchDescriptor<WeekModel>()
-        let existingWeeks = (try? modelContext.fetch(descriptor)) ?? []
+        let existingWeeks = try modelContext.fetch(descriptor)
         if !options.allowExisting, !existingWeeks.isEmpty {
             return .skippedExisting
         }
@@ -1402,9 +2331,10 @@ private struct SampleDataSeeder {
                 continue
             }
             let status: WeekStatus = offset < 0 ? .past : (offset == 0 ? .present : .pending)
-            let week = weekCalculator.makeWeek(for: weekDate, status: status)
-            seedWeek(week, relativeTo: today, options: options)
-            modelContext.insert(week)
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: weekDate, status: status)
+            guard resolution.created else { continue }
+            seedWeek(resolution.week, relativeTo: today, options: options)
             inserted += 1
         }
         try modelContext.save()
@@ -1577,14 +2507,14 @@ private struct TaskTypeDefinitionEditorSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            Form { Group {
                 Section {
                     HStack(spacing: 16) {
                         Image(systemName: iconName)
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 54, height: 54)
-                            .background(Color(hex: colorHex), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .background(Color(hex: colorHex), in: RoundedRectangle(cornerRadius: WeekRadius.scaled(15), style: .continuous))
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(normalizedName.isEmpty ? "新任务类型" : normalizedName)
@@ -1666,7 +2596,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
                         }
                     }
                 }
-            }
+            }.themedListRows() }.themedGroupedList()
             .navigationTitle(definition == nil ? "新增任务类型" : "编辑任务类型")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1693,15 +2623,55 @@ private struct TaskTypeDefinitionEditorSheet: View {
     }
 }
 
+/// Hide scrolled settings content behind the Catnap navigation bar instead of
+/// letting rows and section labels bleed through its translucent material.
+private struct CatSettingsNavigationBarModifier: ViewModifier {
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if skin.glyphs == .cat {
+            content
+                .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+        } else {
+            content
+        }
+    }
+}
+
+/// Group titles in the settings list. A themed skin draws them with its own
+/// section typography — letterspaced ink with a rubricated initial (魔戒), so the
+/// page speaks the same language as the rest of the app. Classic themes keep the
+/// plain header.
+private struct SettingsSectionHeader: View {
+    let title: String
+
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        if let section = skin.section {
+            WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
+                .font(.footnote)
+                .tracking(section.titleTracking)
+                .textCase(nil)
+        } else {
+            Text(title)
+        }
+    }
+}
+
 private struct SettingsNavigationRow: View {
     let title: String
     var value: String? = nil
     let icon: String
     let tint: Color
+    /// Stamp ink on a themed skin; `nil` keeps `tint`.
+    var themedTint: Color? = nil
 
     var body: some View {
         HStack(spacing: 12) {
-            SettingsIcon(icon: icon, color: tint)
+            SettingsIcon(icon: icon, color: tint, themedColor: themedTint)
 
             Text(title)
 
@@ -1719,16 +2689,252 @@ private struct SettingsNavigationRow: View {
 private struct ThemePaletteMark: View {
     let theme: WeekTheme
 
+    /// The mark mirrors the theme's *form*, not just its colours, so a squared-off
+    /// Brutalist swatch is instantly distinguishable from a rounded classic one.
+    /// Card metrics are scaled down to the 30pt mark, and both factors are picked
+    /// so `.classic` reproduces exactly the 7pt radius / 0.5pt rule it has today.
+    private var style: ThemeVisualStyle { theme.visualStyle }
+
+    private var markRadius: CGFloat { style.swatchRadius }
+    private var markBorderWidth: CGFloat { style.swatchBorderWidth }
+
+    /// Light and dark differ on purpose: an ink rule disappears on a dark row.
+    private var markBorderColor: Color {
+        if let light = style.borderColorHexLight, let dark = style.borderColorHexDark {
+            return Color.dynamic(lightHex: light, darkHex: dark)
+        }
+        return Color.primary.opacity(0.08)
+    }
+
     var body: some View {
+        if theme == .paper {
+            // Paper cuts its bottom-right corner off (outline included) so the row
+            // background shows through behind the folded flap.
+            framedMark
+                .mask { DogEarCutShape(fold: 10) }
+        } else {
+            framedMark
+        }
+    }
+
+    private var framedMark: some View {
+        markArtwork
+        .frame(width: 30, height: 30)
+        .clipShape(RoundedRectangle(cornerRadius: markRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: markRadius, style: .continuous)
+                .stroke(markBorderColor, lineWidth: markBorderWidth)
+        }
+    }
+
+    @ViewBuilder
+    private var markArtwork: some View {
+        switch theme {
+        case .lotr, .ring:
+            lotrMark
+        case .brutal:
+            brutalMark
+        case .neon:
+            neonMark
+        case .paper:
+            paperMark
+        case .terminal:
+            terminalMark
+        case .cat:
+            catMark
+        case .blueprint:
+            blueprintMark
+        default:
+            classicMark
+        }
+    }
+
+    // All personality marks are drawn in the mark's own 30×30pt space (origin top-left).
+    // Fixed hex values are intentional: they are taken from each theme's signature
+    // surfaces so the mark reads the same in light and dark mode.
+
+    private func splitBase(_ leading: Color, _ trailing: Color) -> some View {
         HStack(spacing: 0) {
-            Rectangle().fill(theme.primaryColor)
-            Rectangle().fill(theme.accentColor)
+            Rectangle().fill(leading)
+            Rectangle().fill(trailing)
+        }
+    }
+
+    private var classicMark: some View {
+        splitBase(theme.primaryColor, theme.accentColor)
+    }
+
+    /// Ginger fur with a cream cat face die-cut on it.
+    private var catMark: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "#EE9558"), Color(hex: "#D46A32")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            CatGlyphView(glyph: .face)
+                .foregroundStyle(Color(hex: "#FFFDF9"))
+                .frame(width: 20, height: 20)
         }
         .frame(width: 30, height: 30)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+    }
+
+    /// Antique gold | shadow black, with a small gold ring in the lower-right.
+    private var lotrMark: some View {
+        ZStack {
+            splitBase(Color(hex: "#B79863"), Color(hex: "#101411"))
+
+            Path { path in
+                path.addEllipse(in: CGRect(x: 21.6 - 4.9, y: 21.6 - 4.9, width: 9.8, height: 9.8))
+            }
+            .stroke(Color(hex: "#E9C979"), lineWidth: 1.6)
+        }
+    }
+
+    /// Two hard-edged squares: an outlined white block over a solid offset shadow.
+    private var brutalMark: some View {
+        ZStack {
+            splitBase(theme.primaryColor, theme.accentColor)
+
+            Path { path in
+                path.addRect(CGRect(x: 17.75, y: 17.75, width: 9, height: 9))
+            }
+            .fill(Color(hex: "#111111"))
+
+            Path { path in
+                path.addRect(CGRect(x: 15.75, y: 15.75, width: 9, height: 9))
+            }
+            .fill(Color.white)
+
+            Path { path in
+                path.addRect(CGRect(x: 15.75, y: 15.75, width: 9, height: 9))
+            }
+            .stroke(Color(hex: "#111111"), lineWidth: 1.25)
+        }
+    }
+
+    /// A single glowing tube stroke across the lower-right corner.
+    private var neonMark: some View {
+        let tube = Path { path in
+            path.move(to: CGPoint(x: 17.5, y: 26.5))
+            path.addLine(to: CGPoint(x: 26.5, y: 17.5))
+        }
+
+        return ZStack {
+            splitBase(theme.primaryColor, theme.accentColor)
+
+            tube
+                .stroke(Color(hex: "#7DF5FF"), style: StrokeStyle(lineWidth: 3.2, lineCap: .round))
+                .opacity(0.9)
+                .blur(radius: 1.1)
+
+            tube
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 1.3, lineCap: .round))
+        }
+    }
+
+    /// A dog-eared page: the corner is folded back over the swatch.
+    private var paperMark: some View {
+        let flap = Path { path in
+            path.move(to: CGPoint(x: 20, y: 30))
+            path.addLine(to: CGPoint(x: 30, y: 20))
+            path.addLine(to: CGPoint(x: 20, y: 20))
+            path.closeSubpath()
+        }
+
+        return ZStack {
+            splitBase(theme.primaryColor, theme.accentColor)
+
+            flap
+                .fill(Color(hex: "#3A2A1A").opacity(0.18))
+                .offset(x: -0.6, y: -0.6)
+
+            flap
+                .fill(Color(hex: "#FBF6EC"))
+
+            Path { path in
+                path.move(to: CGPoint(x: 20, y: 30))
+                path.addLine(to: CGPoint(x: 30, y: 20))
+            }
+            .stroke(Color(hex: "#D6C9B4"), lineWidth: 0.6)
+        }
+    }
+
+    /// Phosphor green | CRT black, with scanlines and a glowing block cursor.
+    private var terminalMark: some View {
+        let cursor = CGRect(x: 20.5, y: 16.5, width: 5, height: 9.5)
+
+        return ZStack {
+            splitBase(Color(hex: "#1B7F3B"), Color(hex: "#05100A"))
+
+            Path { path in
+                for y in stride(from: CGFloat(1), to: 30, by: 2) {
+                    path.addRect(CGRect(x: 15, y: y, width: 15, height: 0.6))
+                }
+            }
+            .fill(Color(hex: "#33FF66").opacity(0.14))
+
+            Path { path in
+                path.addRect(cursor)
+            }
+            .fill(Color(hex: "#33FF66").opacity(0.7))
+            .blur(radius: 1.5)
+
+            Path { path in
+                path.addRect(cursor)
+            }
+            .fill(Color(hex: "#8CFFA8"))
+        }
+    }
+
+    /// A cyanotype tile: graph grid, with an orange corner bracket drawn like a
+    /// title-block crop mark.
+    private var blueprintMark: some View {
+        let grid = Path { path in
+            for x in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: x, y: 0, width: 0.6, height: 30))
+            }
+            for y in stride(from: CGFloat(6), to: 30, by: 6) {
+                path.addRect(CGRect(x: 0, y: y, width: 30, height: 0.6))
+            }
+        }
+
+        let bracket = Path { path in
+            path.move(to: CGPoint(x: 20, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 26))
+            path.addLine(to: CGPoint(x: 26, y: 20))
+        }
+
+        return ZStack {
+            Rectangle().fill(Color(hex: "#0E2836"))
+
+            grid
+                .fill(Color(hex: "#6FB4D6").opacity(0.28))
+
+            bracket
+                .stroke(
+                    Color(hex: "#E08A5C"),
+                    style: StrokeStyle(lineWidth: 1.8, lineCap: .square, lineJoin: .miter)
+                )
+        }
+    }
+}
+
+/// Rectangle with its bottom-right corner cut off along a 45° diagonal running
+/// from (maxX, maxY - fold) to (maxX - fold, maxY). The other edges sit `outset`
+/// points outside `rect` so the outer half of the mark's outline is not clipped.
+private struct DogEarCutShape: Shape {
+    let fold: CGFloat
+    var outset: CGFloat = 1
+
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.minX - outset, y: rect.minY - outset))
+            path.addLine(to: CGPoint(x: rect.maxX + outset, y: rect.minY - outset))
+            path.addLine(to: CGPoint(x: rect.maxX + outset, y: rect.maxY - fold - outset))
+            path.addLine(to: CGPoint(x: rect.maxX - fold - outset, y: rect.maxY + outset))
+            path.addLine(to: CGPoint(x: rect.minX - outset, y: rect.maxY + outset))
+            path.closeSubpath()
         }
     }
 }
@@ -1751,8 +2957,76 @@ private struct ProjectSettingsView: View {
         projects.filter { $0.status == .archived }
     }
 
+    /// 默认色的两种画法。提成计算属性是为了给 Form 的类型检查留出预算。
+    private var defaultColorSwatch: Color { Color(hex: settings.defaultProjectColorHex) }
+    private var defaultColorAccent: Color { Color.weekyiiEmphasis(hex: settings.defaultProjectColorHex) }
+
+    // 两个选项网格各自成属性：Form 的 body 表达式已接近类型检查预算上限。
+    private var defaultColorPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(String(localized: "settings.project.default_color", defaultValue: "默认颜色"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 10)], spacing: 10) {
+                ForEach(CreateProjectSheet.colorOptions, id: \.self) { hex in
+                    Button {
+                        settings.defaultProjectColorHex = hex
+                    } label: {
+                        Circle()
+                            .fill(Color(hex: hex))
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                if settings.defaultProjectColorHex == hex {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(Color.weekyiiTileInk)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(String(
+                        format: String(localized: "settings.project.default_color.a11y", defaultValue: "默认颜色 %@"),
+                        hex
+                    )))
+                }
+            }
+        }
+    }
+
+    private var defaultIconPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(String(localized: "settings.project.default_icon", defaultValue: "默认图标"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+                ForEach(CreateProjectSheet.iconOptions, id: \.self) { icon in
+                    let isSelected = settings.defaultProjectIconName == icon
+                    Button {
+                        settings.defaultProjectIconName = icon
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.body)
+                            .foregroundStyle(isSelected ? Color.weekyiiTileInk : defaultColorAccent)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                isSelected ? defaultColorSwatch : defaultColorAccent.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: WeekRadius.scaled(10), style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(String(
+                        format: String(localized: "settings.project.default_icon.a11y", defaultValue: "默认图标 %@"),
+                        icon
+                    )))
+                }
+            }
+        }
+    }
+
     var body: some View {
-        Form {
+        Form { Group {
             Section {
                 Stepper(value: Binding(
                     get: { settings.defaultProjectDurationDays },
@@ -1774,10 +3048,35 @@ private struct ProjectSettingsView: View {
                         Text(tileSizeName(size)).tag(size.rawValue)
                     }
                 }
+
+                defaultColorPicker
+
+                defaultIconPicker
             } header: {
                 Text("新建项目默认值")
             } footer: {
                 Text("仅影响以后新建的项目，不会修改现有项目。")
+            }
+
+            Section {
+                Stepper(value: Binding(
+                    get: { settings.boardColumnCount },
+                    set: { settings.boardColumnCount = min(max($0, 2), 6) }
+                ), in: 2...6) {
+                    HStack {
+                        Label(String(localized: "settings.project.board.columns", defaultValue: "每行列数"), systemImage: "square.grid.3x3")
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "settings.project.board.columns.value", defaultValue: "%d 列"),
+                            settings.effectiveBoardColumnCount
+                        ))
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text(String(localized: "settings.project.board.header", defaultValue: "项目看板"))
+            } footer: {
+                Text(String(localized: "settings.project.board.footer", defaultValue: "列数越少磁贴越大；宽幅磁贴会自动收窄以适应当前列数。"))
             }
 
             Section("项目概览") {
@@ -1818,7 +3117,7 @@ private struct ProjectSettingsView: View {
                     }
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("项目")
         .navigationBarTitleDisplayMode(.inline)
         .alert(String(localized: "alert.title"), isPresented: Binding(
@@ -1849,7 +3148,7 @@ private struct ProjectSettingsView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: project.icon)
-                .foregroundStyle(Color(hex: project.color))
+                .foregroundStyle(Color.weekyiiEmphasis(hex: project.color))
                 .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
@@ -1896,27 +3195,391 @@ private struct ProjectSettingsView: View {
     }
 }
 
+private struct SuspendedSettingsView: View {
+    @EnvironmentObject private var settings: UserSettings
+
+    var body: some View {
+        Form { Group {
+            Section {
+                reminderSettings
+            } header: {
+                Text(String(localized: "settings.suspended.reminder.section", defaultValue: "提醒"))
+            } footer: {
+                Text(String(
+                    localized: "settings.suspended.reminder.section.footer",
+                    defaultValue: "悬置任务会按这里的节奏在到期前提醒你。共用的晨间提醒时刻在「今日节奏 → 提醒」中设置。"
+                ))
+            }
+
+            Section {
+                countdownSettings
+                expiryPolicySettings
+            } header: {
+                Text(String(localized: "settings.suspended.behavior.section", defaultValue: "倒计时与到期"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "settings.suspended.default_countdown.footer", defaultValue: "新建悬置任务时的默认倒计时天数，保存前仍可单独调整。"))
+                    Text(settings.suspendedExpiryPolicy.summary)
+                }
+            }
+        }.themedListRows() }.themedGroupedList()
+        .navigationTitle(String(localized: "settings.suspended.header", defaultValue: "悬置箱"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private var reminderSettings: some View {
+        Toggle(isOn: Binding(
+            get: { settings.suspendedReminderEnabled },
+            set: { settings.suspendedReminderEnabled = $0 }
+        )) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass.circle.fill", color: .suspendedModuleTint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.suspended.reminder.enabled", defaultValue: "到期提醒"))
+                    Text(String(localized: "settings.suspended.reminder.enabled.subtitle", defaultValue: "关闭后不再发送任何悬置任务的到期提醒"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        if settings.suspendedReminderEnabled {
+            Picker(selection: Binding(
+                get: { settings.suspendedReminderIntensityRaw },
+                set: { settings.suspendedReminderIntensityRaw = $0 }
+            )) {
+                ForEach(SuspendedReminderIntensity.allCases) { intensity in
+                    Text(intensity.displayName).tag(intensity.rawValue)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "bell.badge.fill", color: .pink)
+                    Text(String(localized: "settings.suspended.reminder.intensity", defaultValue: "提醒强度"))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Color.clear
+                    .frame(width: 28, height: 28)
+                Text(settings.suspendedReminderIntensity.summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            if settings.suspendedReminderIntensity == .full {
+                Stepper(value: Binding(
+                    get: { settings.suspendedReminderAdvanceDays },
+                    set: { settings.suspendedReminderAdvanceDays = min(max($0, 1), 14) }
+                ), in: 1...14) {
+                    HStack(spacing: 12) {
+                        SettingsIcon(icon: "calendar.badge.exclamationmark", color: .purple)
+                        Text(String(
+                            format: String(localized: "settings.suspended.reminder.advance", defaultValue: "提前 %d 天开始提醒"),
+                            settings.suspendedReminderAdvanceDays
+                        ))
+                    }
+                }
+            }
+
+            DatePicker(selection: eveningReminderDateBinding, displayedComponents: .hourAndMinute) {
+                HStack(spacing: 12) {
+                    SettingsIcon(icon: "moon.stars.fill", color: .indigo)
+                    Text(String(localized: "settings.suspended.reminder.evening", defaultValue: "到期当晚提醒时刻"))
+                }
+            }
+            .datePickerStyle(.compact)
+        }
+    }
+
+    private var countdownSettings: some View {
+        Stepper(value: Binding(
+            get: { settings.suspendedDefaultCountdownDays },
+            set: { settings.suspendedDefaultCountdownDays = min(max($0, 1), 120) }
+        ), in: 1...120) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "hourglass", color: .suspendedModuleTint)
+                Text(String(localized: "settings.suspended.default_countdown", defaultValue: "悬置箱默认倒计时"))
+                Spacer(minLength: 8)
+                Text(String(format: String(localized: "settings.suspended.default_countdown.value", defaultValue: "%d 天"), settings.suspendedDefaultCountdownDays))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var expiryPolicySettings: some View {
+        Picker(selection: Binding(
+            get: { settings.suspendedExpiryPolicy },
+            set: { settings.suspendedExpiryPolicy = $0 }
+        )) {
+            ForEach(SuspendedExpiryPolicy.allCases) { policy in
+                Text(policy.displayName).tag(policy)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: "trash.slash.fill", color: .red)
+                Text(String(localized: "settings.suspended.expiry", defaultValue: "到期处理方式"))
+            }
+        }
+    }
+
+    private var eveningReminderDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                var components = Calendar(identifier: .iso8601).dateComponents([.year, .month, .day], from: Date())
+                components.hour = settings.suspendedReminderEveningHour
+                components.minute = settings.suspendedReminderEveningMinute
+                components.second = 0
+                return Calendar(identifier: .iso8601).date(from: components) ?? Date()
+            },
+            set: { newDate in
+                let components = Calendar(identifier: .iso8601).dateComponents([.hour, .minute], from: newDate)
+                settings.suspendedReminderEveningHour = min(max(components.hour ?? 0, 0), 23)
+                settings.suspendedReminderEveningMinute = min(max(components.minute ?? 0, 0), 59)
+            }
+        )
+    }
+}
+
+private struct ExecutionModeOptionCard: View {
+    let mode: ExecutionMode
+    let isSelected: Bool
+    var requiresVIP = false
+
+    private var accentColor: Color {
+        mode == .strict ? .accentOrange : .weekyiiPrimary
+    }
+
+    private var symbolName: String {
+        mode == .strict ? "lock.fill" : "arrow.triangle.2.circlepath"
+    }
+
+    private var summary: String {
+        mode == .strict ? "把今天当成一份已经签下的清单。" : "保留专注，也为真实变化留出入口。"
+    }
+
+    private var detailRows: [(String, String)] {
+        switch mode {
+        case .strict:
+            return [
+                ("开始后", "按既定顺序推进"),
+                ("今日队列", "保持冻结"),
+                ("允许变化", "仅后移到未来"),
+                ("过期任务", "不显示明细，仅留计数")
+            ]
+        case .flexible:
+            return [
+                ("开始后", "仍只专注一件事"),
+                ("今日队列", "默认保持冻结"),
+                ("主动解冻后", "可增改、排序、交换"),
+                ("过期任务", "不显示明细，仅留计数")
+            ]
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : symbolName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isSelected ? accentColor : .secondary)
+                    .frame(width: 18, height: 18)
+
+                Text(mode.displayName)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if requiresVIP {
+                    VIPBadge()
+                }
+            }
+
+            Text(summary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(detailRows, id: \.0) { row in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.0)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(row.1)
+                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 246, alignment: .topLeading)
+        .background(
+            isSelected ? accentColor.opacity(0.12) : Color.backgroundSecondary,
+            in: RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous)
+                .stroke(isSelected ? accentColor : Color.backgroundTertiary, lineWidth: isSelected ? 2 : 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: WeekRadius.scaled(14), style: .continuous))
+    }
+}
+
+/// Four sample days rendered with the real calendar cell, so every toggle
+/// shows its effect immediately without leaving Settings.
+private struct PastMarkerSettingsPreview: View {
+    let options: PastMonthMarkerOptions
+    @Environment(\.weekyiiReduceMotion) private var reduceMotion
+
+    private struct Sample: Identifiable {
+        let id: Int
+        let caption: String
+        let summary: PastMonthDaySummary?
+    }
+
+    private let samples: [Sample] = [
+        Sample(
+            id: 12,
+            caption: String(localized: "settings.past.markers.sample.done", defaultValue: "顺利完成"),
+            summary: PastMonthDaySummary(dayId: "sample-12", completedCount: 4, expiredCount: 0, hasRecord: true, failure: nil)
+        ),
+        Sample(
+            id: 13,
+            caption: String(localized: "settings.past.markers.sample.unfinished", defaultValue: "没完成"),
+            summary: PastMonthDaySummary(dayId: "sample-13", completedCount: 2, expiredCount: 1, hasRecord: true, failure: .unfinished)
+        ),
+        Sample(
+            id: 14,
+            caption: String(localized: "settings.past.markers.sample.not_started", defaultValue: "未启动"),
+            summary: PastMonthDaySummary(dayId: "sample-14", completedCount: 0, expiredCount: 0, hasRecord: true, failure: .notStarted)
+        ),
+        Sample(
+            id: 15,
+            caption: String(localized: "settings.past.markers.sample.empty", defaultValue: "空白"),
+            summary: nil
+        )
+    ]
+
+    var body: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            HStack(spacing: 0) {
+                ForEach(samples) { sample in
+                    VStack(spacing: 2) {
+                        PastCalendarDayLabel(
+                            dayNumber: sample.id,
+                            numberColor: .textPrimary,
+                            isEmphasized: false,
+                            highlight: .none,
+                            summary: sample.summary,
+                            options: options
+                        )
+                        Text(sample.caption)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            if options.isEmpty {
+                Text(String(
+                    localized: "settings.past.markers.preview.empty",
+                    defaultValue: "月历上不会显示任何标记"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                PastMarkerLegend(options: options)
+            }
+        }
+        .padding(.vertical, WeekSpacing.xs)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: options)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct SettingsIcon: View {
     let icon: String
     let color: Color
-    
+    /// Ink for the themed stamp. `nil` keeps `color`, so classic themes draw
+    /// exactly what they drew before.
+    var themedColor: Color? = nil
+
+    @Environment(\.themeSkin) private var skin
+
     var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(width: 28, height: 28)
-            .background(color)
-            .cornerRadius(7)
+        if let chip = skin.icon {
+            stamped(chip)
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(color)
+                .cornerRadius(WeekRadius.scaled(7))
+        }
+    }
+
+    /// The themed chip: a hairline-ruled stamp whose glyph carries the row's own
+    /// ink, so a column of rows stays a single family of muted colours instead of
+    /// a grid of saturated tiles. Filled symbols fall back to their outline so
+    /// every stamp has the same weight as the line work around it.
+    private func stamped(_ chip: ThemeIconSkin) -> some View {
+        let ink = skin.glyphs == .lotr ? Color.weekyiiPrimary : (themedColor ?? color)
+        return ZStack {
+            if chip.tintsFill {
+                // A soft wash of the row's own tint behind a glyph in that tint (猫猫).
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(ink.opacity(0.14))
+            } else if let fill = chip.fill {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .fill(fill.color)
+            }
+            if let border = chip.border {
+                RoundedRectangle(cornerRadius: chip.cornerRadius, style: .continuous)
+                    .strokeBorder(border.color, lineWidth: chip.borderWidth)
+            }
+            if skin.glyphs == .cat, let glyph = CatGlyph(systemName: icon) {
+                CatGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else if skin.glyphs == .lotr, let glyph = LotrGlyph(systemName: icon) {
+                LotrGlyphView(glyph: glyph)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(ink)
+            } else {
+                Image(systemName: chip.tintsFill ? icon : outlineName)
+                    .font(.system(size: 14, weight: chip.tintsFill ? .semibold : .medium))
+                    .foregroundStyle(ink)
+            }
+        }
+        .frame(width: 28, height: 28)
+    }
+
+    /// `tag.fill` → `tag`, but only when the outline really exists.
+    private var outlineName: String {
+        let stripped = icon.replacingOccurrences(of: ".fill", with: "")
+        guard stripped != icon, UIImage(systemName: stripped) != nil else { return icon }
+        return stripped
     }
 }
 
 private struct RecoveryPointsView: View {
+    @EnvironmentObject private var settings: UserSettings
     @State private var snapshots: [BackupRecoveryService.SnapshotSummary] = []
     @State private var pendingSnapshot: BackupRecoveryService.SnapshotSummary?
     @State private var message: String?
 
     var body: some View {
-        List {
+        List { Group {
             if snapshots.isEmpty {
                 ContentUnavailableView("暂无本地恢复点", systemImage: "clock.arrow.circlepath", description: Text("应用启动和数据导入前会自动建立恢复点。"))
             } else {
@@ -1946,7 +3609,7 @@ private struct RecoveryPointsView: View {
                     Text("恢复点是设备内的数据库快照。恢复后必须立即完全退出并重新打开 Weekyii。")
                 }
             }
-        }
+        }.themedListRows() }.themedGroupedList()
         .navigationTitle("本地恢复点")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }
@@ -1957,7 +3620,7 @@ private struct RecoveryPointsView: View {
             Button("取消", role: .cancel) { pendingSnapshot = nil }
             Button("完整恢复", role: .destructive) { restorePendingSnapshot() }
         } message: {
-            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。")
+            Text("当前数据库会被替换。完成后请立即完全退出并重新打开应用。") + Text(verbatim: "\n") + Text(String(localized: "settings.icloud.replacement_notice", defaultValue: "iCloud 同步会先关闭；重新开启时将让你选择以本机还是 iCloud 的数据为准。"))
         }
         .alert(String(localized: "alert.title"), isPresented: Binding(
             get: { message != nil },
@@ -1977,10 +3640,1027 @@ private struct RecoveryPointsView: View {
         guard let snapshot = pendingSnapshot else { return }
         pendingSnapshot = nil
         do {
+            try CloudSyncLocalReplacementGuard.prepareForLocalReplacement(settings: settings)
             try BackupRecoveryService.restoreSnapshot(named: snapshot.folderName, to: WeekyiiPersistence.persistentStoreURL())
             message = "恢复完成。请立即完全退出并重新打开 Weekyii。"
         } catch {
             message = "恢复失败：\(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - About Weekyii
+
+/// Snapshot of the lifetime numbers shown on the About page. Everything is
+/// derived from persisted records, never from the device-local
+/// `AppState.daysStartedCount` counter, so the page agrees with what sync and
+/// backup restore actually contain.
+private struct AboutWeekyiiStats {
+    struct WeekdayMark: Identifiable {
+        let id: Int
+        let label: String
+        let isStarted: Bool
+        let isToday: Bool
+        let isFuture: Bool
+    }
+
+    var startDate: Date?
+    var companionDays = 0
+    var startedDays = 0
+    var completedTasks = 0
+    var completionRate = 0.0
+    var focusHours = 0.0
+    var currentStreak = 0
+    var longestStreak = 0
+    var weekdayMarks: [WeekdayMark] = []
+    var weeksWithStarts = 0
+    /// Started days per week for the most recent weeks, oldest first.
+    var recentWeekCounts: [Int] = []
+    var completedProjects = 0
+    var mindStampCount = 0
+    var activeHabits = 0
+
+    static let recentWeekCount = 10
+
+    static func make(
+        days: [DayModel],
+        projects: [ProjectModel],
+        mindStampCount: Int,
+        habits: [HabitModel],
+        systemStartDate: Date?,
+        now: Date = Date()
+    ) -> AboutWeekyiiStats {
+        var stats = AboutWeekyiiStats()
+        let calendar = WeekyiiTimeZone.calendar
+        let today = now.startOfDay
+
+        // Task totals use the same algorithm as the Past tab.
+        let overview = PastAnalyticsService().getOverviewStats(days: days)
+        stats.completedTasks = overview.totalCompletedTasks
+        stats.completionRate = overview.completionRate
+        stats.focusHours = overview.totalFocusHours
+
+        // A day counts as started only when the user actually pressed start
+        // (`DayStartService` stamps `initiatedAt`). Draft or habit-only days
+        // that were closed at the deadline also end up `.expired`, but they
+        // were never started, so status alone is not enough.
+        let startedDayIds = Set(days.compactMap { day -> String? in
+            let started = day.initiatedAt != nil || day.status == .execute || day.status == .completed
+            return started ? day.dayId : nil
+        })
+        stats.startedDays = startedDayIds.count
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = WeekyiiTimeZone.timeZone
+        let startedDates = startedDayIds.compactMap { formatter.date(from: $0) }.sorted()
+
+        // Longest run of consecutive started days.
+        var longest = 0
+        var run = 0
+        var previous: Date?
+        for date in startedDates {
+            if let previous, calendar.dateComponents([.day], from: previous, to: date).day == 1 {
+                run += 1
+            } else {
+                run = 1
+            }
+            longest = max(longest, run)
+            previous = date
+        }
+        stats.longestStreak = longest
+
+        // Current run ends today, or yesterday when today has not been started yet.
+        var cursor = startedDayIds.contains(formatter.string(from: today)) ? today : today.addingDays(-1)
+        var current = 0
+        while startedDayIds.contains(formatter.string(from: cursor)) {
+            current += 1
+            cursor = cursor.addingDays(-1)
+        }
+        stats.currentStreak = current
+
+        // This week, Monday first, matching the app's week model.
+        let weekStart = today.startOfWeek
+        var symbolCalendar = calendar
+        symbolCalendar.locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+        let symbols = symbolCalendar.veryShortStandaloneWeekdaySymbols
+        stats.weekdayMarks = (0..<7).map { offset in
+            let date = weekStart.addingDays(offset)
+            // `veryShortStandaloneWeekdaySymbols` starts on Sunday; offset 0 is Monday.
+            let label = symbols.isEmpty ? "" : symbols[(offset + 1) % symbols.count]
+            return WeekdayMark(
+                id: offset,
+                label: label,
+                isStarted: startedDayIds.contains(formatter.string(from: date)),
+                isToday: date == today,
+                isFuture: date > today
+            )
+        }
+
+        var startsPerWeek: [String: Int] = [:]
+        for date in startedDates {
+            startsPerWeek[date.weekId, default: 0] += 1
+        }
+        stats.weeksWithStarts = startsPerWeek.count
+        stats.recentWeekCounts = (0..<recentWeekCount).reversed().map { weeksAgo in
+            startsPerWeek[weekStart.addingDays(-7 * weeksAgo).weekId] ?? 0
+        }
+
+        if let systemStartDate {
+            stats.startDate = systemStartDate
+            let elapsed = calendar.dateComponents([.day], from: systemStartDate.startOfDay, to: today).day ?? 0
+            stats.companionDays = max(1, elapsed + 1)
+        }
+
+        // `.archived` can only be reached from `.completed` (see ExtensionsViewModel.updateStatus).
+        stats.completedProjects = projects.filter { $0.status == .completed || $0.status == .archived }.count
+        stats.mindStampCount = mindStampCount
+        stats.activeHabits = habits.filter(\.isActive).count
+        return stats
+    }
+}
+
+private struct AboutWeekyiiPage: View {
+    @EnvironmentObject private var settings: UserSettings
+    @EnvironmentObject private var appState: AppState
+    @Query private var days: [DayModel]
+    @Query private var projects: [ProjectModel]
+    @Query private var mindStamps: [MindStampItem]
+    @Query private var habits: [HabitModel]
+
+    static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    static var buildNumber: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+    }
+
+    var body: some View {
+        let stats = AboutWeekyiiStats.make(
+            days: days,
+            projects: projects,
+            mindStampCount: mindStamps.count,
+            habits: habits,
+            systemStartDate: appState.systemStartDate
+        )
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: WeekSpacing.xl) {
+                heroCard(stats)
+
+                aboutSection(String(localized: "settings.about.streak.title", defaultValue: "连续启动")) {
+                    streakCard(stats)
+                    weeksCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.journey.title", defaultValue: "我们的旅程")) {
+                    journeyCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.stats.title", defaultValue: "我的成绩")) {
+                    statsGrid(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.seals.title", defaultValue: "收集的印章")) {
+                    sealsCard(stats)
+                }
+
+                aboutSection(String(localized: "settings.about.guide.title", defaultValue: "Weekyii 怎么用")) {
+                    WeekCard {
+                        AboutGuidePath()
+                    }
+                }
+
+                footer
+            }
+            .padding(.horizontal, WeekSpacing.base)
+            .padding(.top, WeekSpacing.base)
+            .padding(.bottom, WeekSpacing.xxxl)
+        }
+        .background(Color.backgroundPrimary.ignoresSafeArea())
+        .navigationTitle(String(localized: "settings.about.title", defaultValue: "关于 Weekyii"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: Sections
+
+    private func aboutSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            Text(title)
+                .font(.system(size: 20, weight: .semibold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .padding(.horizontal, WeekSpacing.xs)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private func heroCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            // Same narrative artwork as the Today status card, so the page follows
+            // the selected theme. Kept static like the theme preview in Settings.
+            ThemeStatusArtwork(theme: settings.selectedTheme, renderingMode: .staticImage)
+                .frame(maxWidth: .infinity)
+                .frame(height: 168)
+                .themeArtworkFrame(cornerRadius: WeekRadius.medium)
+
+            VStack(spacing: WeekSpacing.xs) {
+                Text(verbatim: "Weekyii")
+                    .font(.custom("SnellRoundhand-Bold", size: 40))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                Text(String(localized: "launch.subtitle"))
+                    .font(.bodySmall)
+                    .foregroundStyle(Color.textSecondary)
+
+                AboutOrnament()
+                    .padding(.vertical, WeekSpacing.xs)
+
+                if stats.companionDays > 0 {
+                    HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.xs) {
+                        Text(String(localized: "settings.about.companion_prefix", defaultValue: "我们已经一起走过"))
+                            .font(.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
+                        Text(verbatim: "\(stats.companionDays)")
+                            .font(.system(size: 26, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.weekyiiPrimary)
+                        Text(String(localized: "settings.about.unit.days", defaultValue: "天"))
+                            .font(.bodyMedium)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func streakCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(alignment: .top, spacing: WeekSpacing.base) {
+                AboutCandleVignette()
+                    .frame(width: 88, height: 104)
+
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    AboutNumber(
+                        value: "\(stats.currentStreak)",
+                        unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                        size: 38,
+                        color: .weekyiiPrimary,
+                        unitColor: .weekyiiPrimary
+                    )
+                    Text(String(localized: "settings.about.streak.current", defaultValue: "当前连续启动"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    Label {
+                        Text(String(localized: "settings.about.streak.best \(stats.longestStreak)"))
+                    } icon: {
+                        Image(systemName: "trophy")
+                    }
+                    .font(.captionBold)
+                    .foregroundStyle(Color.weekyiiPrimary)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.vertical, WeekSpacing.xs + 1)
+                    .background(Capsule().fill(Color.backgroundTertiary))
+                    .padding(.top, WeekSpacing.xs)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 0) {
+                ForEach(stats.weekdayMarks) { mark in
+                    VStack(spacing: WeekSpacing.sm) {
+                        Text(mark.label)
+                            .font(.captionSmall)
+                            .foregroundStyle(Color.textTertiary)
+                        AboutDayDot(mark: mark)
+                        Text(String(localized: "settings.about.today", defaultValue: "今天"))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.weekyiiPrimary)
+                            .opacity(mark.isToday ? 1 : 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func weeksCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(spacing: WeekSpacing.md) {
+                RoundedRectangle(cornerRadius: WeekRadius.scaled(12), style: .continuous)
+                    .fill(Color.taskRegularBg)
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: "calendar")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.taskRegular)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(
+                        value: "\(stats.weeksWithStarts)",
+                        unit: String(localized: "settings.about.unit.weeks", defaultValue: "周"),
+                        size: 24
+                    )
+                    Text(String(localized: "settings.about.weeks.caption", defaultValue: "留下过启动记录"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .accessibilityElement(children: .combine)
+
+                Spacer(minLength: WeekSpacing.sm)
+
+                VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
+                    HStack(alignment: .bottom, spacing: 5) {
+                        ForEach(Array(stats.recentWeekCounts.enumerated()), id: \.offset) { _, count in
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(Color.weekyiiPrimaryLight.opacity(count == 0 ? 0.22 : 0.35 + 0.65 * Double(min(count, 7)) / 7))
+                                .frame(width: 7, height: 4 + CGFloat(min(count, 7)) * 5)
+                        }
+                    }
+                    .frame(height: 39, alignment: .bottom)
+                    Text(String(localized: "settings.about.weeks.recent", defaultValue: "近 10 周"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func journeyCard(_ stats: AboutWeekyiiStats) -> some View {
+        let startLabel: String? = stats.startDate.map { date in
+            let text = date.formatted(.dateTime.year().month(.defaultDigits).day())
+            return String(localized: "settings.about.journey.start \(text)")
+        }
+
+        return WeekCard {
+            AboutJourneyScene(
+                startLabel: startLabel,
+                endLabel: String(localized: "settings.about.today", defaultValue: "今天")
+            )
+            .frame(height: 148)
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(
+                        value: "\(stats.companionDays)",
+                        unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                        size: 34
+                    )
+                    Text(String(localized: "settings.about.journey.together", defaultValue: "已陪伴"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .padding(WeekSpacing.base)
+                .accessibilityElement(children: .combine)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                    .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
+            )
+        }
+    }
+
+    private func statsGrid(_ stats: AboutWeekyiiStats) -> some View {
+        let columns = [GridItem(.flexible(), spacing: WeekSpacing.md), GridItem(.flexible(), spacing: WeekSpacing.md)]
+        let hours = stats.focusHours >= 10 || stats.focusHours == 0
+            ? "\(Int(stats.focusHours.rounded()))"
+            : stats.focusHours.formatted(.number.precision(.fractionLength(1)))
+
+        return VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            LazyVGrid(columns: columns, spacing: WeekSpacing.md) {
+                AboutStatTile(
+                    value: "\(stats.startedDays)",
+                    unit: String(localized: "settings.about.unit.days", defaultValue: "天"),
+                    label: String(localized: "settings.about.days_started"),
+                    tint: .accentOrange
+                ) {
+                    CatCoveredSymbol(systemName: "sun.max", pointSize: 18)
+                }
+                AboutStatTile(
+                    value: stats.completedTasks.formatted(),
+                    unit: String(localized: "settings.about.unit.tasks", defaultValue: "项"),
+                    label: String(localized: "settings.about.stats.completed", defaultValue: "完成任务"),
+                    tint: .accentGreen
+                ) {
+                    CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 18)
+                }
+                AboutStatTile(
+                    value: "\(Int((stats.completionRate * 100).rounded()))",
+                    unit: "%",
+                    label: String(localized: "stats.completion_rate"),
+                    tint: .weekyiiPrimary,
+                    progress: stats.completionRate
+                ) {
+                    EmptyView()
+                }
+                AboutStatTile(
+                    value: hours,
+                    unit: String(localized: "settings.about.unit.hours", defaultValue: "小时"),
+                    label: String(localized: "stats.focus_hours"),
+                    tint: .taskLeisure
+                ) {
+                    CatCoveredSymbol(systemName: "clock", pointSize: 18)
+                }
+            }
+
+            Text(String(localized: "settings.about.stats.note", defaultValue: "完成任务、完成率与专注时长按「过去」页同一算法统计"))
+                .font(.captionSmall)
+                .foregroundStyle(Color.textTertiary)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private func sealsCard(_ stats: AboutWeekyiiStats) -> some View {
+        WeekCard {
+            HStack(alignment: .top, spacing: WeekSpacing.sm) {
+                AboutSealItem(
+                    count: stats.completedProjects,
+                    label: String(localized: "settings.about.seals.projects", defaultValue: "完成项目"),
+                    symbol: "trophy",
+                    light: .weekyiiPrimaryLight,
+                    dark: .weekyiiPrimary
+                )
+                AboutSealItem(
+                    count: stats.mindStampCount,
+                    label: String(localized: "extensions.module.mindstamps.title"),
+                    symbol: "note.text",
+                    light: Color.accentPink.opacity(0.62),
+                    dark: .accentPink
+                )
+                AboutSealItem(
+                    count: stats.activeHabits,
+                    label: String(localized: "settings.about.seals.habits", defaultValue: "进行中的习惯"),
+                    symbol: "leaf",
+                    light: .accentGreenLight,
+                    dark: .accentGreen
+                )
+            }
+            .padding(.vertical, WeekSpacing.xs)
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: WeekSpacing.md) {
+            HStack(spacing: WeekSpacing.sm) {
+                AboutOrnament(lineWidth: 40, showsCenter: false)
+                Text(String(localized: "settings.about.motto", defaultValue: "一周一周，慢慢变好"))
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                AboutOrnament(lineWidth: 40, showsCenter: false, mirrored: true)
+            }
+            .padding(.bottom, WeekSpacing.md)
+
+            AboutAppIcon()
+                .frame(width: 52, height: 52)
+
+            Text(verbatim: "Weekyii")
+                .font(.custom("SnellRoundhand-Bold", size: 24))
+                .foregroundStyle(Color.weekyiiPrimary)
+
+            Text(String(localized: "settings.about.version_build \(Self.appVersion) \(Self.buildNumber)"))
+                .font(.caption)
+                .foregroundStyle(Color.weekyiiPrimary)
+                .padding(.horizontal, WeekSpacing.base)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color.weekyiiPrimaryLight, lineWidth: 1))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, WeekSpacing.sm)
+    }
+}
+
+// MARK: About building blocks
+
+private struct AboutNumber: View {
+    let value: String
+    let unit: String
+    var size: CGFloat = 24
+    var color: Color = .textPrimary
+    var unitColor: Color = .textSecondary
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.system(size: size, weight: .bold, design: .serif))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(unit)
+                .font(.system(size: max(11, size * 0.4)))
+                .foregroundStyle(unitColor)
+        }
+    }
+}
+
+/// Thin line – diamond – thin line, the small rule used between hero lines and around the motto.
+private struct AboutOrnament: View {
+    var lineWidth: CGFloat = 38
+    var showsCenter = true
+    var mirrored = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if showsCenter {
+                rule
+                diamond
+                rule
+            } else if mirrored {
+                diamond
+                rule
+            } else {
+                rule
+                diamond
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var rule: some View {
+        Rectangle()
+            .fill(Color.weekyiiPrimaryLight)
+            .frame(width: lineWidth, height: 0.8)
+    }
+
+    private var diamond: some View {
+        Rectangle()
+            .fill(Color.weekyiiPrimaryLight)
+            .frame(width: 5, height: 5)
+            .rotationEffect(.degrees(45))
+    }
+}
+
+private struct AboutDayDot: View {
+    let mark: AboutWeekyiiStats.WeekdayMark
+    @Environment(\.themeSkin) private var skin
+
+    var body: some View {
+        ZStack {
+            if mark.isStarted {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentOrangeLight, Color.weekyiiPrimary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 30, height: 30)
+                    .weekSoftShadow(color: Color.weekyiiPrimaryLight.opacity(0.55), radius: 5, x: 0, y: 1)
+                if skin.glyphs == .cat {
+                    CatGlyphView(glyph: .paw)
+                        .foregroundStyle(.white)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                }
+            } else {
+                Circle()
+                    .stroke(Color.textTertiary.opacity(mark.isFuture ? 0.55 : 0.3), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+            }
+            if mark.isToday {
+                Circle()
+                    .stroke(Color.weekyiiPrimary, lineWidth: 1.4)
+                    .frame(width: 38, height: 38)
+            }
+        }
+        .frame(width: 40, height: 40)
+    }
+}
+
+private struct AboutStatTile<Icon: View>: View {
+    let value: String
+    let unit: String
+    let label: String
+    let tint: Color
+    var progress: Double? = nil
+    @ViewBuilder let icon: () -> Icon
+
+    var body: some View {
+        WeekCard {
+            HStack(spacing: WeekSpacing.md) {
+                Group {
+                    if let progress {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.backgroundTertiary, lineWidth: 4.5)
+                            Circle()
+                                .trim(from: 0, to: max(0, min(1, progress)))
+                                .stroke(tint, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .frame(width: 32, height: 32)
+                        .frame(width: 40, height: 40)
+                    } else {
+                        RoundedRectangle(cornerRadius: WeekRadius.scaled(11), style: .continuous)
+                            .fill(tint.opacity(0.14))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                icon()
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(tint)
+                            )
+                    }
+                }
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    AboutNumber(value: value, unit: unit, size: 24, unitColor: .textTertiary)
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+private struct AboutSealItem: View {
+    let count: Int
+    let label: String
+    let symbol: String
+    let light: Color
+    let dark: Color
+
+    var body: some View {
+        VStack(spacing: WeekSpacing.sm) {
+            ZStack {
+                AboutSealShape()
+                    .fill(LinearGradient(colors: [light, dark], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .weekSoftShadow(color: dark.opacity(0.28), radius: 5, x: 0, y: 3)
+                Circle()
+                    .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                    .padding(11)
+                Ellipse()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(width: 26, height: 16)
+                    .blur(radius: 3)
+                    .offset(x: -10, y: -16)
+                Image(systemName: symbol)
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 72, height: 72)
+            .accessibilityHidden(true)
+
+            Text(verbatim: "\(count)")
+                .font(.system(size: 20, weight: .bold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Wax-seal outline: a circle with a soft scalloped rim.
+private struct AboutSealShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2 / 1.045
+        var path = Path()
+        let steps = 120
+        for index in 0...steps {
+            let angle = Double(index) / Double(steps) * 2 * .pi
+            let r = radius * CGFloat(1 + 0.045 * sin(angle * 14))
+            let point = CGPoint(x: center.x + CGFloat(cos(angle)) * r, y: center.y + CGFloat(sin(angle)) * r)
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct AboutFlameShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addCurve(
+            to: CGPoint(x: rect.midX, y: rect.maxY),
+            control1: CGPoint(x: rect.maxX + rect.width * 0.15, y: rect.midY),
+            control2: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.midX, y: rect.minY),
+            control1: CGPoint(x: rect.minX, y: rect.maxY),
+            control2: CGPoint(x: rect.minX - rect.width * 0.15, y: rect.midY)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Small framed candle in the same palette family as `AmberWindowScene`.
+private struct AboutCandleVignette: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let deskY = height * 0.80
+            let candleHeight: CGFloat = 40
+
+            ZStack {
+                LinearGradient(
+                    colors: [Color.weekyiiPrimaryLight.opacity(0.32), Color.weekyiiPrimaryLight.opacity(0.85)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Rectangle()
+                    .fill(Color.weekyiiPrimaryDark.opacity(0.38))
+                    .frame(height: height - deskY)
+                    .position(x: width / 2, y: deskY + (height - deskY) / 2)
+
+                Circle()
+                    .fill(Color(hex: "#FFBE62").opacity(0.45))
+                    .frame(width: 50, height: 50)
+                    .blur(radius: 10)
+                    .position(x: width / 2, y: deskY - candleHeight - 12)
+
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(hex: "#FFF6E2"), Color(hex: "#F1D9B0")], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 16, height: candleHeight)
+                    .position(x: width / 2, y: deskY - candleHeight / 2)
+
+                Capsule()
+                    .fill(Color(hex: "#5A3516"))
+                    .frame(width: 1.4, height: 5)
+                    .position(x: width / 2, y: deskY - candleHeight - 2)
+
+                AboutFlameShape()
+                    .fill(LinearGradient(colors: [Color(hex: "#FFC66B"), Color(hex: "#FFF3C4")], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 12, height: 24)
+                    .position(x: width / 2, y: deskY - candleHeight - 16)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                .stroke(Color.white.opacity(0.4), lineWidth: 0.8)
+        )
+        .accessibilityHidden(true)
+    }
+}
+
+/// Dusk hills with a dashed path from the first day (pennant) to today (lantern).
+private struct AboutJourneyScene: View {
+    let startLabel: String?
+    let endLabel: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let start = CGPoint(x: width * 0.12, y: height * 0.80)
+            let end = CGPoint(x: width * 0.84, y: height * 0.56)
+
+            ZStack {
+                LinearGradient(
+                    colors: [Color.backgroundSecondary, Color.weekyiiPrimaryLight.opacity(0.6)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Circle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: 56, height: 56)
+                    .blur(radius: 14)
+                    .position(x: width * 0.78, y: height * 0.28)
+                Circle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 18, height: 18)
+                    .position(x: width * 0.78, y: height * 0.28)
+
+                Ellipse()
+                    .fill(Color.weekyiiPrimaryLight.opacity(0.55))
+                    .frame(width: width * 0.9, height: height * 0.9)
+                    .position(x: width * 0.25, y: height * 0.98)
+                Ellipse()
+                    .fill(Color.weekyiiPrimary.opacity(0.42))
+                    .frame(width: width, height: height)
+                    .position(x: width * 0.82, y: height * 1.02)
+                Ellipse()
+                    .fill(Color.weekyiiPrimaryDark.opacity(0.5))
+                    .frame(width: width * 1.5, height: height * 0.8)
+                    .position(x: width * 0.45, y: height * 1.24)
+
+                Path { path in
+                    path.move(to: start)
+                    path.addCurve(
+                        to: end,
+                        control1: CGPoint(x: width * 0.36, y: height * 0.98),
+                        control2: CGPoint(x: width * 0.56, y: height * 0.48)
+                    )
+                }
+                .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [3, 5]))
+
+                // Pennant at the first day.
+                Rectangle()
+                    .fill(Color.textPrimary.opacity(0.7))
+                    .frame(width: 1.4, height: 26)
+                    .position(x: start.x, y: start.y - 13)
+                Path { path in
+                    path.move(to: CGPoint(x: start.x + 0.7, y: start.y - 26))
+                    path.addLine(to: CGPoint(x: start.x + 15, y: start.y - 21))
+                    path.addLine(to: CGPoint(x: start.x + 0.7, y: start.y - 16))
+                    path.closeSubpath()
+                }
+                .fill(Color.white.opacity(0.92))
+
+                // Lantern for today.
+                Circle()
+                    .fill(Color.accentOrangeLight.opacity(0.75))
+                    .frame(width: 34, height: 34)
+                    .blur(radius: 9)
+                    .position(x: end.x, y: end.y - 9)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.white.opacity(0.92))
+                    .frame(width: 9, height: 13)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .stroke(Color.weekyiiPrimaryDark, lineWidth: 1)
+                    )
+                    .position(x: end.x, y: end.y - 9)
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        if let startLabel {
+                            Text(startLabel)
+                        }
+                        Spacer()
+                        Text(endLabel)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 1)
+                    .padding(.horizontal, WeekSpacing.md)
+                    .padding(.bottom, WeekSpacing.sm)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The four stages as a gently winding path of nodes.
+private struct AboutGuidePath: View {
+    private struct Step {
+        let title: String
+        let detail: String
+        let symbol: String
+        let tint: Color
+    }
+
+    private let rowHeight: CGFloat = 112
+    private let nodeSize: CGFloat = 60
+    private let swing: CGFloat = 62
+
+    private var steps: [Step] {
+        [
+            Step(
+                title: String(localized: "tab.pending"),
+                detail: String(localized: "settings.about.guide.future", defaultValue: "提前把事排进一周"),
+                symbol: "calendar",
+                tint: .taskRegular
+            ),
+            Step(
+                title: String(localized: "tab.today"),
+                detail: String(localized: "settings.about.guide.present", defaultValue: "开始今天，一件件完成"),
+                symbol: "sunrise",
+                tint: .accentOrange
+            ),
+            Step(
+                title: String(localized: "settings.about.guide.deadline", defaultValue: "截止"),
+                detail: String(localized: "settings.about.guide.deadline_detail", defaultValue: "到点只留完成记录与过期数"),
+                symbol: "hourglass",
+                tint: .taskDDL
+            ),
+            Step(
+                title: String(localized: "tab.past"),
+                detail: String(localized: "settings.about.guide.past", defaultValue: "回看每一天的足迹"),
+                symbol: "book",
+                tint: .taskLeisure
+            )
+        ]
+    }
+
+    var body: some View {
+        let steps = self.steps
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let centers = steps.indices.map { index in
+                CGPoint(
+                    x: width / 2 + (index.isMultiple(of: 2) ? -swing : swing),
+                    y: rowHeight * CGFloat(index) + rowHeight / 2
+                )
+            }
+            let labelGap = nodeSize / 2 + 12
+
+            ZStack(alignment: .topLeading) {
+                Path { path in
+                    for index in 0..<(centers.count - 1) {
+                        let from = centers[index]
+                        let to = centers[index + 1]
+                        let midY = (from.y + to.y) / 2
+                        path.move(to: from)
+                        path.addCurve(
+                            to: to,
+                            control1: CGPoint(x: from.x, y: midY),
+                            control2: CGPoint(x: to.x, y: midY)
+                        )
+                    }
+                }
+                .stroke(Color.weekyiiPrimaryLight, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, dash: [4, 5]))
+
+                ForEach(steps.indices, id: \.self) { index in
+                    let step = steps[index]
+                    let center = centers[index]
+                    let isLeftNode = index.isMultiple(of: 2)
+                    let labelWidth = max(0, isLeftNode ? width - center.x - labelGap : center.x - labelGap)
+
+                    Circle()
+                        .fill(LinearGradient(colors: [step.tint.opacity(0.55), step.tint], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 1).padding(5))
+                        .overlay(
+                            Image(systemName: step.symbol)
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white)
+                        )
+                        .weekSoftShadow(color: step.tint.opacity(0.25), radius: 6, x: 0, y: 3)
+                        .frame(width: nodeSize, height: nodeSize)
+                        .position(center)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: isLeftNode ? .leading : .trailing, spacing: 4) {
+                        Text(verbatim: "\(index + 1) · \(step.title)")
+                            .font(.system(size: 18, weight: .semibold, design: .serif))
+                            .foregroundStyle(step.tint)
+                        Text(step.detail)
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(isLeftNode ? .leading : .trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(width: labelWidth, alignment: isLeftNode ? .leading : .trailing)
+                    .position(x: isLeftNode ? center.x + labelGap + labelWidth / 2 : labelWidth / 2, y: center.y)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+        .frame(height: rowHeight * CGFloat(steps.count))
+    }
+}
+
+/// The real app icon, read from the compiled bundle so the page never ships a
+/// second copy of the artwork. Falls back to a themed glyph if it cannot be read.
+private struct AboutAppIcon: View {
+    private static let image: UIImage? = {
+        guard let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
+              let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+              let files = primary["CFBundleIconFiles"] as? [String],
+              let name = files.last else { return nil }
+        return UIImage(named: name)
+    }()
+
+    var body: some View {
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                LinearGradient(colors: [Color.weekyiiPrimaryLight, Color.weekyiiPrimary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .overlay(
+                        Image(systemName: "scroll")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                    )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: Color.dynamic(lightHex: "#3A2A22", darkHex: "#000000").opacity(0.15), radius: 6, x: 0, y: 3)
+        .accessibilityHidden(true)
     }
 }

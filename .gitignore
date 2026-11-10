@@ -1,1 +1,6 @@
 .worktrees/
+
+# OS / Xcode per-user artefacts (never share these)
+.DS_Store
+xcuserdata/
+*.xcuserstate

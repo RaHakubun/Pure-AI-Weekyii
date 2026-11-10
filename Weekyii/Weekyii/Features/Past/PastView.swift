@@ -1,19 +1,116 @@
 import SwiftUI
 import SwiftData
 
-private enum PastDisplayMode {
-    case weekList
-    case month
-}
-
-private struct PastMonthDaySummary: Equatable {
+/// Per-day facts the Past month calendar can mark. Derived on read from
+/// existing `DayModel` fields; never written back.
+struct PastMonthDaySummary: Equatable {
     let dayId: String
     let completedCount: Int
     let expiredCount: Int
     let hasRecord: Bool
+    let failure: PastDayFailureKind?
+}
+
+/// Which markers the Past month calendar draws. Every flag is an independent,
+/// device-local preference in `UserSettings`; none of it lives in SwiftData
+/// or travels through iCloud sync.
+struct PastMonthMarkerOptions: Equatable {
+    /// Frowning face on days that ended with unfinished tasks.
+    var showsUnfinishedFace: Bool
+    /// Muted face on days that expired without ever being started.
+    var showsNotStartedFace: Bool
+    /// Completed-task count badge at the date's top-right corner.
+    var showsCompletedCount: Bool
+    /// Dot for any day that has a plan, execution or completion record.
+    var showsRecordDot: Bool
+    /// Flame for days with expired tasks (same condition as the unfinished face).
+    var showsExpiredFlame: Bool
+
+    static let `default` = PastMonthMarkerOptions(
+        showsUnfinishedFace: true,
+        showsNotStartedFace: false,
+        showsCompletedCount: false,
+        showsRecordDot: false,
+        showsExpiredFlame: false
+    )
+
+    var enabledCount: Int {
+        [showsUnfinishedFace, showsNotStartedFace, showsCompletedCount, showsRecordDot, showsExpiredFlame]
+            .filter { $0 }
+            .count
+    }
+
+    var isEmpty: Bool { enabledCount == 0 }
+
+    func showsFace(for kind: PastDayFailureKind) -> Bool {
+        switch kind {
+        case .unfinished: return showsUnfinishedFace
+        case .notStarted: return showsNotStartedFace
+        }
+    }
+
+    /// Short value for the Settings root row.
+    var summaryText: String {
+        if isEmpty {
+            return String(localized: "settings.past.markers.summary.none", defaultValue: "不显示")
+        }
+        if self == .default {
+            return String(localized: "settings.past.markers.summary.default", defaultValue: "失败提醒")
+        }
+        return String(
+            format: String(localized: "settings.past.markers.summary.count", defaultValue: "显示 %lld 项"),
+            enabledCount
+        )
+    }
+}
+
+enum PastDayFailureKind: Equatable {
+    /// Started (or reached kill time) with tasks still open: `expiredCount > 0`.
+    case unfinished
+    /// Expired without ever being started. Often produced by habit drafts the
+    /// app materialized on its own, so its marker is off by default.
+    case notStarted
+}
+
+/// Read-only interpretation of the state machine's persisted day outcome.
+/// It derives everything from existing fields (`status`, `expiredCount`,
+/// `initiatedAt`) and never writes back, so it stays correct when sync or
+/// invariant repair later settles a day as completed.
+enum PastDayFailureRule {
+    static func kind(for day: DayModel, todayId: String, includeNotStarted: Bool) -> PastDayFailureKind? {
+        kind(
+            dayId: day.dayId,
+            status: day.status,
+            expiredCount: day.expiredCount,
+            initiatedAt: day.initiatedAt,
+            todayId: todayId,
+            includeNotStarted: includeNotStarted
+        )
+    }
+
+    static func kind(
+        dayId: String,
+        status: DayStatus,
+        expiredCount: Int,
+        initiatedAt: Date?,
+        todayId: String,
+        includeNotStarted: Bool
+    ) -> PastDayFailureKind? {
+        guard !dayId.isEmpty, dayId <= todayId else { return nil }
+        // An open day has not reached its kill time yet; its outcome is undecided.
+        guard status != .draft && status != .execute else { return nil }
+        if expiredCount > 0 {
+            return .unfinished
+        }
+        if includeNotStarted, status == .expired, initiatedAt == nil {
+            return .notStarted
+        }
+        return nil
+    }
 }
 
 struct PastView: View {
+    @EnvironmentObject private var userSettings: UserSettings
     @Query(sort: \WeekModel.startDate, order: .reverse) private var allWeeks: [WeekModel]
     @Query(sort: \DayModel.date, order: .reverse) private var allDays: [DayModel]
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
@@ -21,16 +118,24 @@ struct PastView: View {
     @State private var selectedMonth = Date()
     @State private var selectedDate = Date()
     @State private var selectedWeekID: String?
-    @State private var displayMode: PastDisplayMode = .weekList
     @State private var showsMonthAnalytics = false
     private let analyticsService = PastAnalyticsService()
     private let calendar = Calendar(identifier: .iso8601)
+
+    /// Week list or month calendar. Stored in `UserSettings` (device-local), so
+    /// the last chosen view is restored after the app restarts.
+    private var displayMode: WeekBrowseMode {
+        get { userSettings.pastBrowseMode }
+        nonmutating set { userSettings.pastBrowseMode = newValue }
+    }
 
     var body: some View {
         NavigationStack {
             pastBody
             .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     WeekLogo(size: .small, animated: false)
@@ -122,16 +227,30 @@ struct PastView: View {
         }
     }
 
+    /// Days the calendar may mark or open: this month, up to and including
+    /// today, regardless of week status. The current week and today (once past
+    /// kill time) therefore show up immediately, while the review statistics
+    /// above keep using archived weeks only via `monthDays`. Matching on
+    /// `dayId` keeps the calendar aligned with the anchored Weekyii time zone.
+    private var calendarScopedDays: [DayModel] {
+        let range = monthRange
+        let lowerId = range.lowerBound.dayId
+        let upperId = min(range.upperBound.dayId, Date().dayId)
+        return allDays.filter { $0.dayId >= lowerId && $0.dayId <= upperId }
+    }
+
     private var monthSummaries: [String: PastMonthDaySummary] {
+        let todayId = Date().dayId
         var result: [String: PastMonthDaySummary] = [:]
-        for day in monthDays {
+        for day in calendarScopedDays {
             let completedCount = day.completedTasks.count
             let expiredCount = day.expiredCount
             result[day.dayId] = PastMonthDaySummary(
                 dayId: day.dayId,
                 completedCount: completedCount,
                 expiredCount: expiredCount,
-                hasRecord: completedCount > 0 || expiredCount > 0 || day.status != .empty
+                hasRecord: completedCount > 0 || expiredCount > 0 || day.status != .empty,
+                failure: PastDayFailureRule.kind(for: day, todayId: todayId, includeNotStarted: true)
             )
         }
         return result
@@ -139,7 +258,7 @@ struct PastView: View {
 
     private var selectedDay: DayModel? {
         let targetId = calendar.startOfDay(for: selectedDate).dayId
-        return monthDays.first(where: { $0.dayId == targetId })
+        return calendarScopedDays.first(where: { $0.dayId == targetId })
     }
 
     private var selectedDaySummary: PastMonthDaySummary? {
@@ -201,7 +320,11 @@ struct PastView: View {
                 displayMode = displayMode == .weekList ? .month : .weekList
             }
         } label: {
-            Image(systemName: displayMode == .weekList ? "calendar" : "rectangle.grid.1x2")
+            HStack(spacing: WeekSpacing.xs) {
+                Image(systemName: displayMode == .weekList ? "calendar" : "list.bullet.rectangle")
+                Text(displayMode == .weekList ? "月历" : "周列表")
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .accessibilityLabel(
             displayMode == .weekList
@@ -237,7 +360,8 @@ struct PastView: View {
             PastMonthCalendarView(
                 selectedDate: $selectedDate,
                 selectedMonth: $selectedMonth,
-                summaries: monthSummaries
+                summaries: monthSummaries,
+                markerOptions: userSettings.pastMonthMarkerOptions
             )
         }
     }
@@ -248,7 +372,7 @@ struct PastView: View {
         let expiredCount = selectedDaySummary?.expiredCount ?? 0
         let tasks = selectedDay?.completedTasks ?? []
 
-        return WeekCard(accentColor: selectedDay?.status.color ?? .weekyiiPrimary) {
+        return pastSurface {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
@@ -317,7 +441,7 @@ struct PastView: View {
 
     private var analyticsSection: some View {
         VStack(spacing: WeekSpacing.md) {
-            WeekCard {
+            pastSurface(tint: .accentOrange) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xxs) {
                         Text("趋势与洞察")
@@ -415,7 +539,7 @@ struct PastView: View {
     // MARK: - Empty State
 
     private var monthReviewCard: some View {
-        WeekCard(accentColor: .weekyiiPrimary) {
+        pastSurface(tint: .accentGreen) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -435,8 +559,8 @@ struct PastView: View {
                     HStack(spacing: WeekSpacing.lg) {
                         reviewMetric("完成", value: "\(stats.totalCompletedTasks)", color: .accentGreen)
                         reviewMetric("完成率", value: stats.completionRate.formatted(.percent.precision(.fractionLength(0))), color: .weekyiiPrimary)
-                        reviewMetric("专注", value: String(format: "%.1fh", stats.totalFocusHours), color: .orange)
-                        reviewMetric("活跃", value: "\(stats.totalStartedDays)天", color: .blue)
+                        reviewMetric("专注", value: String(format: "%.1fh", stats.totalFocusHours), color: .weekyiiPrimaryLight)
+                        reviewMetric("活跃", value: "\(stats.totalStartedDays)天", color: .weekyiiPrimary)
                     }
 
                     if let monthComparisonText {
@@ -467,10 +591,17 @@ struct PastView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// 保留过去页既有卡片与信息顺序，只统一其表面材质、圆角、边界和阴影。
+    private func pastSurface<Content: View>(tint: Color? = nil, @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(WeekSpacing.base)
+            .weekPageSurface(tint: tint)
+    }
+
     private var emptyStateView: some View {
         WeekCard {
             VStack(spacing: WeekSpacing.xl) {
-                Image(systemName: "clock.arrow.circlepath")
+                CatCoveredSymbol(systemName: "clock.arrow.circlepath", pointSize: 60)
                     .font(.system(size: 60))
                     .foregroundStyle(Color.weekyiiGradient)
                 
@@ -560,10 +691,11 @@ private struct PastWeekCard: View {
     }
 
     private var cardContent: some View {
-        WeekCard {
+        WeekCard(accentColor: week.expiredTasksCount > 0 ? .taskDDL : .accentGreen) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack {
-                        Image(systemName: "calendar.badge.checkmark")
+                        CatCoveredSymbol(systemName: "calendar.badge.checkmark", pointSize: 18)
+                            .font(.body)
                             .foregroundColor(.weekyiiPrimary)
                         Text(week.relativeWeekLabel(referenceDate: Date()))
                             .font(.titleSmall)
@@ -577,7 +709,7 @@ private struct PastWeekCard: View {
                     }
 
                     HStack(spacing: WeekSpacing.xs) {
-                        Image(systemName: "clock")
+                        CatCoveredSymbol(systemName: "clock", pointSize: 13)
                             .font(.caption)
                             .foregroundColor(.textSecondary)
                         Text(formatDateRange())
@@ -602,7 +734,7 @@ private struct PastWeekCard: View {
 
                         Spacer()
 
-                        Image(systemName: "checkmark.seal.fill")
+                        CatCoveredSymbol(systemName: "checkmark.seal.fill", pointSize: 32)
                             .font(.system(size: 32))
                             .foregroundColor(.accentGreen.opacity(0.3))
                     }
@@ -634,6 +766,7 @@ private struct PastMonthCalendarView: View {
     @Binding var selectedDate: Date
     @Binding var selectedMonth: Date
     let summaries: [String: PastMonthDaySummary]
+    let markerOptions: PastMonthMarkerOptions
 
     private let calendar = Calendar(identifier: .iso8601)
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
@@ -683,30 +816,22 @@ private struct PastMonthCalendarView: View {
     }
 
     var body: some View {
-        VStack(spacing: WeekSpacing.md) {
+        VStack(spacing: WeekSpacing.sm) {
             weekdayHeader
 
-            LazyVGrid(columns: columns, spacing: WeekSpacing.xs) {
+            LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(calendarDays) { day in
                     dayCell(day)
                 }
             }
 
-            HStack(spacing: WeekSpacing.lg) {
-                legendItem(
-                    color: .accentGreen,
-                    icon: nil,
-                    text: String(localized: "past.month.legend.completed", defaultValue: "有完成")
-                )
-                legendItem(
-                    color: .taskDDL,
-                    icon: "flame.fill",
-                    text: String(localized: "past.month.legend.expired", defaultValue: "有过期")
-                )
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, WeekSpacing.xs)
+            legend
         }
+    }
+
+    private var legend: some View {
+        PastMarkerLegend(options: markerOptions)
+            .padding(.top, WeekSpacing.xs)
     }
 
     private var weekdayHeader: some View {
@@ -723,75 +848,67 @@ private struct PastMonthCalendarView: View {
     @ViewBuilder
     private func dayCell(_ day: PastCalendarDay) -> some View {
         let dayId = day.date.dayId
-        let summary = summaries[dayId]
         let isSelected = calendar.isDate(day.date, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day.date)
         let today = calendar.startOfDay(for: Date())
         let isFutureDate = calendar.startOfDay(for: day.date) > today
-        let dayNumber = calendar.component(.day, from: day.date)
-        let completedCount = summary?.completedCount ?? 0
-        let expiredCount = summary?.expiredCount ?? 0
-        let hasRecord = summary?.hasRecord ?? false
+        let isInteractive = day.isCurrentMonth && !isFutureDate
+        let summary = isInteractive ? summaries[dayId] : nil
+        let highlight: PastCalendarDayLabel.Highlight = !isInteractive
+            ? .none
+            : (isSelected ? .selected : (isToday ? .today : .none))
 
         Button {
-            guard day.isCurrentMonth, !isFutureDate else { return }
-            selectedDate = day.date
-        } label: {
-            VStack(spacing: 3) {
-                ZStack(alignment: .topTrailing) {
-                    ZStack {
-                        if isSelected && day.isCurrentMonth && !isFutureDate {
-                            Circle()
-                                .fill(Color.weekyiiPrimary)
-                                .frame(width: 34, height: 34)
-                        } else if isToday && day.isCurrentMonth && !isFutureDate {
-                            Circle()
-                                .stroke(Color.weekyiiPrimary, lineWidth: 1.5)
-                                .frame(width: 34, height: 34)
-                        }
-
-                        Text("\(dayNumber)")
-                            .font(.body)
-                            .fontWeight(isToday ? .semibold : .regular)
-                            .foregroundStyle(
-                                dayNumberColor(
-                                    day: day,
-                                    isSelected: isSelected,
-                                    isToday: isToday,
-                                    isFutureDate: isFutureDate
-                                )
-                            )
-                    }
-                    .frame(width: 36, height: 36)
-
-                    if day.isCurrentMonth && completedCount > 0 && !isFutureDate {
-                        Text(completedCount > 99 ? "99+" : "\(completedCount)")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.accentGreen, in: Capsule())
-                            .offset(x: 5, y: -4)
-                    }
-                }
-
-                HStack(spacing: 3) {
-                    if day.isCurrentMonth && hasRecord && !isFutureDate {
-                        Circle()
-                            .fill(Color.accentGreen)
-                            .frame(width: 6, height: 6)
-                    }
-                    if day.isCurrentMonth && expiredCount > 0 && !isFutureDate {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 8))
-                            .foregroundStyle(Color.taskDDL)
-                    }
-                }
-                .frame(height: 10)
+            guard isInteractive else { return }
+            withAnimation(.snappy(duration: 0.22)) {
+                selectedDate = day.date
             }
+        } label: {
+            PastCalendarDayLabel(
+                dayNumber: calendar.component(.day, from: day.date),
+                numberColor: dayNumberColor(
+                    day: day,
+                    isSelected: isSelected,
+                    isToday: isToday,
+                    isFutureDate: isFutureDate
+                ),
+                isEmphasized: isToday,
+                highlight: highlight,
+                summary: summary,
+                options: markerOptions
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel(for: day.date, summary: summary))
+            .accessibilityAddTraits(isSelected && isInteractive ? .isSelected : [])
         }
         .buttonStyle(.plain)
-        .disabled(!day.isCurrentMonth || isFutureDate)
+        .disabled(!isInteractive)
+    }
+
+    /// VoiceOver reads only what is visible, so the spoken markers always
+    /// match the user's own display choices.
+    private func accessibilityLabel(for date: Date, summary: PastMonthDaySummary?) -> String {
+        var parts = [date.formatted(Date.FormatStyle().month().day())]
+        guard let summary else { return parts[0] }
+        if let failure = summary.failure, markerOptions.showsFace(for: failure) {
+            parts.append(failure.legendText)
+        }
+        if markerOptions.showsCompletedCount && summary.completedCount > 0 {
+            parts.append(String(
+                format: String(localized: "past.month.a11y.completed_count", defaultValue: "完成 %lld 项"),
+                summary.completedCount
+            ))
+        }
+        if markerOptions.showsRecordDot && summary.hasRecord {
+            parts.append(String(localized: "past.month.legend.record", defaultValue: "有记录"))
+        }
+        if markerOptions.showsExpiredFlame && summary.expiredCount > 0 {
+            parts.append(String(
+                format: String(localized: "past.month.a11y.expired_count", defaultValue: "过期 %lld 项"),
+                summary.expiredCount
+            ))
+        }
+        return parts.joined(separator: ", ")
     }
 
     private func dayNumberColor(day: PastCalendarDay, isSelected: Bool, isToday: Bool, isFutureDate: Bool) -> Color {
@@ -802,29 +919,239 @@ private struct PastMonthCalendarView: View {
             return .textTertiary.opacity(0.55)
         }
         if isSelected {
-            return .white
+            return .weekyiiOnPrimary
         }
         if isToday {
             return .weekyiiPrimary
         }
         return .textPrimary
     }
+}
 
-    private func legendItem(color: Color, icon: String?, text: String) -> some View {
-        HStack(spacing: 4) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 10))
-                    .foregroundStyle(color)
-            } else {
-                Circle()
-                    .fill(color)
-                    .frame(width: 7, height: 7)
+extension PastDayFailureKind {
+    var legendText: String {
+        switch self {
+        case .unfinished:
+            return String(localized: "past.month.legend.failed", defaultValue: "没完成的一天")
+        case .notStarted:
+            return String(localized: "past.month.legend.not_started", defaultValue: "未启动")
+        }
+    }
+}
+
+/// One calendar day: the number with its selection/today frame plus every
+/// marker the options allow. Shared by the Past calendar and the Settings
+/// preview so the preview is always exactly what the calendar will draw.
+struct PastCalendarDayLabel: View {
+    enum Highlight {
+        case none
+        case selected
+        case today
+    }
+
+    let dayNumber: Int
+    let numberColor: Color
+    let isEmphasized: Bool
+    let highlight: Highlight
+    let summary: PastMonthDaySummary?
+    let options: PastMonthMarkerOptions
+    @Environment(\.themeSkin) private var skin
+
+    /// 魔戒：选中日的数字压在绿皮面上，用皮面自己的墨色。
+    private var resolvedNumberColor: Color {
+        if highlight == .selected, let gilded = skin.gildedFill {
+            return gilded.ink.color
+        }
+        return numberColor
+    }
+
+    private var visibleFace: PastDayFailureKind? {
+        guard let failure = summary?.failure, options.showsFace(for: failure) else { return nil }
+        return failure
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    switch highlight {
+                    case .selected:
+                        if let gilded = skin.gildedFill {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(gilded.gradient)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                        .strokeBorder(gilded.hairline.color, lineWidth: 1)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                                .fill(Color.weekyiiPrimary)
+                        }
+                    case .today:
+                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+                            .stroke(skin.gildedFill != nil ? Color.weekyiiGilt : Color.weekyiiPrimary, lineWidth: 1.5)
+                    case .none:
+                        EmptyView()
+                    }
+
+                    Text("\(dayNumber)")
+                        .font(.body)
+                        .fontWeight(isEmphasized ? .semibold : .regular)
+                        .foregroundStyle(resolvedNumberColor)
+                }
+                .frame(width: 38, height: 40)
+
+                if options.showsCompletedCount, let count = summary?.completedCount, count > 0 {
+                    PastCompletedCountBadge(count: count)
+                        .offset(x: 5, y: -4)
+                }
             }
+
+            // Fixed height: toggling markers in Settings never shifts the grid.
+            HStack(spacing: 3) {
+                if options.showsRecordDot, summary?.hasRecord == true {
+                    PastRecordDotMark()
+                }
+                if options.showsExpiredFlame, (summary?.expiredCount ?? 0) > 0 {
+                    PastExpiredFlameMark()
+                }
+                if let visibleFace {
+                    PastFailureFaceMark(kind: visibleFace)
+                        .frame(width: 13, height: 13)
+                }
+            }
+            .frame(height: 13)
+        }
+        // Keep each marker visually attached to its own date rather than
+        // floating toward the next row.
+        .padding(.bottom, WeekSpacing.xs)
+    }
+}
+
+struct PastCompletedCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text(count > 99 ? "99+" : "\(count)")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundColor(.weekyiiOnSuccess)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(Color.accentGreen, in: Capsule())
+    }
+}
+
+struct PastRecordDotMark: View {
+    var body: some View {
+        Circle()
+            .fill(Color.accentGreen)
+            .frame(width: 6, height: 6)
+    }
+}
+
+struct PastExpiredFlameMark: View {
+    var size: CGFloat = 8
+
+    var body: some View {
+        Image(systemName: "flame.fill")
+            .font(.system(size: size))
+            .foregroundStyle(Color.taskDDL)
+    }
+}
+
+/// Lists only the markers the user turned on, in the same order they are
+/// configured in Settings. Hidden entirely when nothing is shown.
+struct PastMarkerLegend: View {
+    let options: PastMonthMarkerOptions
+
+    var body: some View {
+        if !options.isEmpty {
+            FlowLayout(spacing: WeekSpacing.lg, lineSpacing: WeekSpacing.xs) {
+                if options.showsUnfinishedFace {
+                    item(text: PastDayFailureKind.unfinished.legendText) {
+                        PastFailureFaceMark(kind: .unfinished).frame(width: 11, height: 11)
+                    }
+                }
+                if options.showsNotStartedFace {
+                    item(text: PastDayFailureKind.notStarted.legendText) {
+                        PastFailureFaceMark(kind: .notStarted).frame(width: 11, height: 11)
+                    }
+                }
+                if options.showsCompletedCount {
+                    item(text: String(localized: "past.month.legend.completed_count", defaultValue: "完成数量")) {
+                        PastCompletedCountBadge(count: 3)
+                    }
+                }
+                if options.showsRecordDot {
+                    item(text: String(localized: "past.month.legend.record", defaultValue: "有记录")) {
+                        PastRecordDotMark()
+                    }
+                }
+                if options.showsExpiredFlame {
+                    item(text: String(localized: "past.month.legend.expired", defaultValue: "有过期")) {
+                        PastExpiredFlameMark(size: 10)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func item<Mark: View>(text: String, @ViewBuilder mark: () -> Mark) -> some View {
+        HStack(spacing: 4) {
+            mark()
             Text(text)
                 .font(.caption)
                 .foregroundColor(.textSecondary)
+                .lineLimit(1)
         }
+    }
+}
+
+/// Small frowning face drawn with shapes so it follows the theme's DDL tint
+/// (SF Symbols has no sad face). Not-started days use a muted outline.
+struct PastFailureFaceMark: View {
+    let kind: PastDayFailureKind
+
+    private var tint: Color {
+        kind == .unfinished ? .taskDDL : .textTertiary
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            let line = max(size * 0.1, 1)
+            ZStack {
+                Circle()
+                    .fill(kind == .unfinished ? tint.opacity(0.18) : Color.clear)
+                Circle()
+                    .stroke(tint, lineWidth: line)
+                HStack(spacing: size * 0.22) {
+                    Circle().fill(tint).frame(width: size * 0.13, height: size * 0.13)
+                    Circle().fill(tint).frame(width: size * 0.13, height: size * 0.13)
+                }
+                .offset(y: -size * 0.1)
+                PastFrownShape()
+                    .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .frame(width: size * 0.42, height: size * 0.16)
+                    .offset(y: size * 0.2)
+            }
+            .frame(width: size, height: size)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct PastFrownShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.maxY),
+            control: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.6)
+        )
+        return path
     }
 }
 
@@ -999,21 +1326,21 @@ private struct PastWeekDetailView: View {
             VStack(spacing: WeekSpacing.xxs) {
                 Text(weekdaySymbol(for: day.date))
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .textPrimary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textPrimary)
 
                 Text(Self.monthDayFormatter.string(from: day.date))
                     .font(.caption)
-                    .foregroundColor(isSelected ? .white : .textSecondary)
+                    .foregroundColor(isSelected ? .weekyiiOnPrimary : .textSecondary)
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(hasCompleted ? (isSelected ? .white : .accentGreen) : .clear)
+                        .fill(hasCompleted ? (isSelected ? Color.weekyiiOnPrimary : .accentGreen) : .clear)
                         .frame(width: 6, height: 6)
 
                     if day.expiredCount > 0 {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 8))
-                            .foregroundStyle(isSelected ? .white : .taskDDL)
+                            .foregroundStyle(isSelected ? Color.weekyiiOnPrimary : .taskDDL)
                     }
                 }
                 .frame(height: 10)

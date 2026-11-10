@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+private struct QuenyaStatusAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
 private enum TodaySection: Int {
     case today
     case week
@@ -55,11 +62,36 @@ private struct PendingPostponeRequest {
     let targetDate: Date
 }
 
+private struct KillTimeEditDraft: Equatable {
+    let dayId: String
+    let baseHour: Int
+    let baseMinute: Int
+    var proposedHour: Int
+    var proposedMinute: Int
+
+    var hasChanges: Bool {
+        proposedHour != baseHour || proposedMinute != baseMinute
+    }
+
+    func isValid(for day: DayModel) -> Bool {
+        dayId == day.dayId
+            && baseHour == day.killTimeHour
+            && baseMinute == day.killTimeMinute
+            && (day.status == .draft || day.status == .execute)
+    }
+}
+
 struct TodayView: View {
-    private enum TodayKillTimeConfirmMode {
+    private enum TodayKillTimeConfirmMode: Equatable {
         case normal
         case immediateExpire(expiredCount: Int)
     }
+
+    private struct KillTimeConfirmationSnapshot: Equatable {
+        let draft: KillTimeEditDraft
+        let mode: TodayKillTimeConfirmMode
+    }
+
     private let floatingStartOverlayReserveHeight: CGFloat = 120
     let animationsActive: Bool
 
@@ -102,6 +134,7 @@ struct TodayView: View {
     @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var userSettings: UserSettings
+    @Environment(\.themeSkin) private var todaySkin
 
     @State private var viewModel: TodayViewModel?
     @State private var selectedTaskForDetail: TaskItem?
@@ -110,10 +143,8 @@ struct TodayView: View {
     @State private var startFlowCoordinator = TodayStartFlowCoordinator()
     @State private var startFlowStamp: MindStampItem?
     @State private var startFlowDetent: PresentationDetent = .fraction(0.5)
-    @State private var pendingTodayKillTimeHour: Int?
-    @State private var pendingTodayKillTimeMinute: Int?
-    @State private var showingTodayKillTimeConfirm = false
-    @State private var todayKillTimeConfirmMode: TodayKillTimeConfirmMode = .normal
+    @State private var killTimeEditDraft: KillTimeEditDraft?
+    @State private var killTimeConfirmation: KillTimeConfirmationSnapshot?
     @State private var selectedSection: TodaySection = .today
     @State private var taskForPostpone: TaskItem?
     @State private var pendingPostponeRequest: PendingPostponeRequest?
@@ -139,6 +170,8 @@ struct TodayView: View {
                     ProgressView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(todaySceneBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -155,7 +188,6 @@ struct TodayView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .background(todaySceneBackground)
         .onAppear {
             if viewModel == nil {
                 let model = TodayViewModel(
@@ -178,6 +210,22 @@ struct TodayView: View {
         .onChange(of: userSettings.defaultKillTimeMinute) { _, _ in
             viewModel?.refresh()
         }
+        .onChange(of: viewModel?.today?.dayId) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+        }
+        .onChange(of: viewModel?.today?.status) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+            if viewModel?.today?.status != .draft, startFlowCoordinator.isPresented {
+                startFlowStamp = nil
+                startFlowCoordinator.cancel()
+            }
+        }
+        .onChange(of: viewModel?.today?.killTimeHour) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+        }
+        .onChange(of: viewModel?.today?.killTimeMinute) { _, _ in
+            invalidateKillTimeEditingIfNeeded(for: viewModel?.today)
+        }
         .refreshOnStateTransitions(using: appState) {
             viewModel?.refresh()
         }
@@ -190,17 +238,23 @@ struct TodayView: View {
             }
         }
         .sheet(item: $selectedTaskForDetail) { task in
-            TaskEditorSheet(
-                title: String(localized: "task.detail.title"),
-                isReadOnly: true,
-                initialTitle: task.title,
-                initialDescription: task.taskDescription,
-                initialType: task.taskType,
-                initialTypeIdRaw: task.taskTypeIdRaw,
-                initialSteps: task.steps,
-                initialAttachments: task.attachments,
-                onSave: { _, _, _, _, _ in }
-            )
+            // Today aggregates tasks from several sources; a habit task opens
+            // its own read-only card drawn from the habit.
+            if task.habit != nil {
+                HabitTaskDetailSheet(task: task)
+            } else {
+                TaskEditorSheet(
+                    title: String(localized: "task.detail.title"),
+                    isReadOnly: true,
+                    initialTitle: task.title,
+                    initialDescription: task.taskDescription,
+                    initialType: task.taskType,
+                    initialTypeIdRaw: task.taskTypeIdRaw,
+                    initialSteps: task.steps,
+                    initialAttachments: task.attachments,
+                    onSave: { _, _, _, _, _ in }
+                )
+            }
         }
         .sheet(item: $draftTaskEditorMode) { mode in
             draftTaskEditorSheet(mode: mode)
@@ -281,23 +335,38 @@ struct TodayView: View {
                                 .accessibilityIdentifier("todayTaskColumn")
 
                             VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                                statusCard(for: day)
-                                killTimeCard(day: day, viewModel: viewModel)
+                                erasedStatusCard(for: day)
+                                erasedKillTimeCard(day: day, viewModel: viewModel)
                             }
                             .frame(width: layoutMetrics.auxiliaryColumnWidth)
                             .accessibilityIdentifier("todayAuxiliaryColumn")
                         }
                     } else {
                         VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-                            statusCard(for: day)
+                            erasedStatusCard(for: day)
                             taskFlowSection(day: day, viewModel: viewModel)
-                            killTimeCard(day: day, viewModel: viewModel)
+                            erasedKillTimeCard(day: day, viewModel: viewModel)
                         }
                     }
                 }
             }
             .padding(.horizontal, layoutMetrics.pageHorizontalPadding)
             .padding(.vertical, WeekSpacing.base)
+            .backgroundPreferenceValue(QuenyaStatusAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if todaySkin.isQuenya, let anchor {
+                        let bounds = proxy[anchor]
+                        Image("QuenyaNarsil")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: bounds.width * 0.98)
+                            .scaleEffect(x: -1, y: 1)
+                            .position(x: bounds.midX, y: bounds.maxY - 8)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
             .weekReadableContent()
             .accessibilityIdentifier("todayWorkspaceContent")
@@ -321,132 +390,361 @@ struct TodayView: View {
         }
     }
 
-    @ViewBuilder
+    // 启动崩溃修复（1.2 (3)，iOS 27 真机）：
+    // 原先这里是 5 路 `@ViewBuilder switch`，返回类型是把 5 个状态视图全部拼进去的
+    // `_ConditionalContent` 复合类型。编译器在判断 `day.status` 之前就按每个分支视图
+    // 类型的真实大小，在栈上一次性预留全部缓冲区，再叠加类型元数据的递归解析，
+    // 把 1MB 的主线程栈撑爆。
+    // 现在每个状态单独放进一个不内联的函数，并用 `AnyView` 隔开：
+    // - 这里只持有固定大小的 `AnyView`，不再为 5 个分支预留栈空间；
+    // - 只有当前状态那一支的视图类型会在它自己的栈帧里实例化，其余分支不会被解析。
+    // 不要把这里改回 `@ViewBuilder switch`，也不要去掉 `@inline(never)`。
     private func taskFlowSection(day: DayModel, viewModel: TodayViewModel) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.lg) {
-            // 根据状态显示不同内容
-            switch day.status {
-            case .empty:
-                emptyStateContent(day: day, viewModel: viewModel)
-                
-            case .draft:
-                draftStateContent(day: day, viewModel: viewModel)
-                
-            case .execute:
-                executeStateContent(day: day, viewModel: viewModel)
-                
-            case .completed:
-                completedStateContent(day: day)
-                
-            case .expired:
-                expiredStateContent(day: day)
-            }
+            stateContent(day: day, viewModel: viewModel)
         }
     }
 
+    private func stateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        switch day.status {
+        case .empty:
+            return erasedEmptyStateContent(day: day, viewModel: viewModel)
+        case .draft:
+            return erasedDraftStateContent(day: day, viewModel: viewModel)
+        case .execute:
+            return erasedExecuteStateContent(day: day, viewModel: viewModel)
+        case .completed:
+            return erasedCompletedStateContent(day: day)
+        case .expired:
+            return erasedExpiredStateContent(day: day)
+        }
+    }
+
+    @inline(never)
+    private func erasedEmptyStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(emptyStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedDraftStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(draftStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedExecuteStateContent(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(executeStateContent(day: day, viewModel: viewModel))
+    }
+
+    @inline(never)
+    private func erasedCompletedStateContent(day: DayModel) -> AnyView {
+        AnyView(completedStateContent(day: day))
+    }
+
+    @inline(never)
+    private func erasedExpiredStateContent(day: DayModel) -> AnyView {
+        AnyView(expiredStateContent(day: day))
+    }
+
+    /// The status card and kill-time card sit beside the task flow in the same
+    /// stack; erasing them keeps the page's top-level type small as well.
+    @inline(never)
+    private func erasedStatusCard(for day: DayModel) -> AnyView {
+        AnyView(statusCard(for: day))
+    }
+
+    @inline(never)
+    private func erasedKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> AnyView {
+        AnyView(killTimeCard(day: day, viewModel: viewModel))
+    }
+
     // MARK: - Status Card
+
+    /// Small caption over the status seal. Rubricated skins (红皮书) ink its
+    /// first character like every other heading on the page.
+    private func statusCaption(_ title: String) -> Text {
+        if let section = todaySkin.section, section.rubric != nil {
+            var plain = section
+            plain.titlePrefix = nil
+            return WeekSectionHeader.rubricText(title, section: plain, ink: .textSecondary)
+                .font(.caption)
+        }
+        return Text(verbatim: title)
+            .font(.caption)
+            .foregroundColor(.textSecondary)
+    }
     
     @ViewBuilder
     private func statusCard(for day: DayModel) -> some View {
-        WeekCard(accentColor: day.status.color) {
+        WeekCard(accentColor: day.status.color, quenyaStatus: day.status == .execute && day.focusTask != nil) {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.status"))
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
+                        statusCaption(String(localized: "today.status"))
                         StatusBadge(status: day.status)
                     }
                     
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "today.days_started"))
+                        Text(todaySkin.drawsMiddleEarthGlyphs
+                             ? String(localized: "today.days_journeyed")
+                             : String(localized: "today.days_started"))
                             .font(.caption)
                             .foregroundColor(.textSecondary)
-                        Text("\(appState.daysStartedCount)")
-                            .font(.titleMedium)
-                            .foregroundColor(.weekyiiPrimary)
+                        if todaySkin.drawsMiddleEarthGlyphs {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.system(size: 28, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundColor(.weekyiiPrimary)
+                        } else {
+                            Text("\(appState.daysStartedCount)")
+                                .font(.titleMedium)
+                                .foregroundColor(.weekyiiPrimary)
+                        }
                     }
                 }
 
                 ThemeStatusArtwork(theme: userSettings.selectedTheme)
                     .frame(maxWidth: .infinity)
                     .frame(height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                            .stroke(Color.white.opacity(0.20), lineWidth: 0.8)
-                    )
+                    .themeArtworkFrame(cornerRadius: WeekRadius.medium)
 
                 // 日期显示
-                Text(formatDate(day.dayId))
-                    .font(.bodyMedium)
-                    .foregroundColor(.textSecondary)
+                if todaySkin.drawsMiddleEarthGlyphs {
+                    HStack(spacing: 6) {
+                        LotrGlyphView(glyph: .quill)
+                            .frame(width: 14, height: 14)
+                            .foregroundColor(.textSecondary)
+                        Text(formatDate(day.dayId))
+                            .font(.subheadline)
+                            .foregroundColor(.textSecondary)
+                    }
+                } else {
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            Text(formatDate(day.dayId))
+                            Text("· sí").italic().foregroundColor(.weekyiiPrimary)
+                        }
+                        .font(.bodyMedium)
+                        .foregroundColor(.textSecondary)
+                    } else {
+                        Text(formatDate(day.dayId))
+                            .font(.bodyMedium)
+                            .foregroundColor(.textSecondary)
+                    }
+                }
             }
+        }
+        // Anchor to the status card, so the horizontal sword sits directly below
+        // the original illustration. It remains behind both cards and text.
+        .anchorPreference(key: QuenyaStatusAnchorKey.self, value: .bounds) { anchor in
+            day.status == .execute && day.focusTask != nil ? anchor : nil
         }
     }
 
     @ViewBuilder
     private func killTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
-        let displayedHour = pendingTodayKillTimeHour ?? day.killTimeHour
-        let displayedMinute = pendingTodayKillTimeMinute ?? day.killTimeMinute
-        let hasPendingChange = displayedHour != day.killTimeHour || displayedMinute != day.killTimeMinute
+        if day.status == .expired {
+            TodayEndedKillTimeFootnote(hour: day.killTimeHour, minute: day.killTimeMinute)
+        } else {
+            editableKillTimeCard(day: day, viewModel: viewModel)
+        }
+    }
+
+    private func killTimeTitleRow(deadline: Date?, isEditable: Bool) -> some View {
+        HStack(spacing: WeekSpacing.xs) {
+            ThemedSectionIcon(systemName: "clock.fill", tint: .accentOrange)
+            ThemedSectionTitle(title: String(localized: "killtime.title"))
+            if todaySkin.isQuenya {
+                Text("· lúmë").font(.caption).italic().foregroundColor(.weekyiiPrimary)
+            }
+            Spacer(minLength: WeekSpacing.sm)
+            if isEditable {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    if let text = killTimeRemainingText(deadline: deadline, now: context.date) {
+                        Text(text)
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+    }
+
+    private func killTimeRemainingText(deadline: Date?, now: Date) -> String? {
+        guard let deadline else { return nil }
+        let remaining = KillTimeDeadline.remainingMinutes(until: deadline, at: now)
+        guard remaining > 0 else { return nil }
+        let minutes = Int(remaining)
+        guard minutes > 0 else { return nil }
+        if minutes >= 60 {
+            return String(
+                format: String(localized: "killtime.remaining.hours", defaultValue: "还剩 %1$lld 小时 %2$lld 分"),
+                locale: Locale.current,
+                Int64(minutes / 60),
+                Int64(minutes % 60)
+            )
+        }
+        return String(
+            format: String(localized: "killtime.remaining.minutes", defaultValue: "还剩 %lld 分钟"),
+            locale: Locale.current,
+            Int64(minutes)
+        )
+    }
+
+    private func killTimePendingBar(hour: Int, minute: Int, day: DayModel, viewModel: TodayViewModel) -> some View {
+        HStack(spacing: WeekSpacing.md) {
+            Text(String(
+                format: String(localized: "killtime.pending.change_to", defaultValue: "改为 %@？"),
+                String(format: "%02d:%02d", hour, minute)
+            ))
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(.textPrimary)
+            .monospacedDigit()
+            Spacer(minLength: WeekSpacing.sm)
+            Button(String(localized: "action.cancel")) {
+                clearKillTimeEditing()
+            }
+            .font(.subheadline)
+            .foregroundColor(.textSecondary)
+            .buttonStyle(.plain)
+            Button {
+                guard let draft = validKillTimeEditDraft(for: day) else {
+                    clearKillTimeEditing()
+                    return
+                }
+                do {
+                    let impact = try viewModel.evaluateKillTimeChangeImpact(
+                        hour: draft.proposedHour,
+                        minute: draft.proposedMinute,
+                        expectedDayId: draft.dayId,
+                        expectedHour: draft.baseHour,
+                        expectedMinute: draft.baseMinute
+                    )
+                    let mode: TodayKillTimeConfirmMode
+                    switch impact {
+                    case .normal:
+                        mode = .normal
+                    case .immediateExpire(let expiredCount):
+                        mode = .immediateExpire(expiredCount: expiredCount)
+                    }
+                    killTimeConfirmation = KillTimeConfirmationSnapshot(draft: draft, mode: mode)
+                } catch let error as WeekyiiError {
+                    switch error {
+                    case .killTimePreviewOutdated, .cannotEditStartedDay:
+                        clearKillTimeEditing()
+                    default:
+                        break
+                    }
+                    errorMessage = error.localizedDescription
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            } label: {
+                Text(String(localized: "killtime.pending.confirm", defaultValue: "确认"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.weekyiiOnPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.weekyiiPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(.horizontal, WeekSpacing.md)
+        .frame(maxHeight: .infinity)
+        .background(Color.accentOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func editableKillTimeCard(day: DayModel, viewModel: TodayViewModel) -> some View {
+        let preview = validKillTimeEditDraft(for: day)
+        let displayedHour = preview?.proposedHour ?? day.killTimeHour
+        let displayedMinute = preview?.proposedMinute ?? day.killTimeMinute
+        let hasPendingChange = preview?.hasChanges ?? false
+        let deadline = KillTimeDeadline.date(for: day.date, hour: displayedHour, minute: displayedMinute)
+
+        let isEditable = day.status == .draft || day.status == .execute
 
         WeekCard(accentColor: .accentOrange) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .foregroundColor(.accentOrange)
-                    Text(String(localized: "killtime.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                // The header row turns into the confirm bar while a change is
+                // pending, so the card never changes height mid-drag.
+                ZStack {
+                    if isEditable && hasPendingChange {
+                        killTimePendingBar(hour: displayedHour, minute: displayedMinute, day: day, viewModel: viewModel)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    } else {
+                        killTimeTitleRow(deadline: deadline, isEditable: isEditable)
+                            .transition(.opacity)
+                    }
                 }
-                
+                .frame(height: 34)
+                .animation(.easeInOut(duration: 0.22), value: hasPendingChange)
+
                 KillTimeEditor(
+                    dayDate: day.date,
                     hour: displayedHour,
                     minute: displayedMinute,
-                    isEditable: day.status == .draft || day.status == .execute,
+                    isEditable: isEditable,
+                    rangeAnchorMinutes: day.killTimeHour * 60 + day.killTimeMinute,
                     onChange: { hour, minute in
-                        pendingTodayKillTimeHour = hour
-                        pendingTodayKillTimeMinute = minute
+                        updateKillTimePreview(hour: hour, minute: minute, for: day)
                     }
                 )
-
-                if day.status == .draft || day.status == .execute, hasPendingChange {
-                    HStack(spacing: WeekSpacing.sm) {
-                        WeekButton("取消", style: .outline) {
-                            pendingTodayKillTimeHour = nil
-                            pendingTodayKillTimeMinute = nil
+            }
+            // Flames sit behind the content, fill the card to its edges
+            // (WeekCard pads by WeekSpacing.lg and clips). Normal flames stay
+            // below the track; urgent flames can rise into the space above it.
+            .backgroundPreferenceValue(KillTimeLayoutAnchorKey.self) { anchors in
+                // 昆雅保留火焰，即使截止时间卡当前不可编辑。
+                if isEditable || todaySkin.isQuenya {
+                    GeometryReader { proxy in
+                        // Measured in the content's space; the flames extend by
+                        // WeekSpacing.lg to the card edges, so add it back.
+                        let bottom = proxy.size.height + WeekSpacing.lg
+                        let ceiling: KillTimeFlameCeiling? = anchors.slider.map { sliderAnchor in
+                            let trackY = proxy[sliderAnchor].minY + KillTimeSlider.trackCenterY
+                            let timeRect = anchors.time.map { proxy[$0] }
+                            let totalWidth = proxy.size.width + WeekSpacing.lg * 2
+                            return KillTimeFlameCeiling(
+                                left: bottom - trackY + 22,
+                                right: bottom - (timeRect?.minY ?? trackY - 60),
+                                transition: ((timeRect?.maxX ?? proxy.size.width * 0.4) + WeekSpacing.lg) / totalWidth,
+                                trackHeight: bottom - trackY
+                            )
                         }
-                        Spacer(minLength: 0)
-                        WeekButton("确认修改", style: .primary) {
-                            guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
-                            do {
-                                let impact = try viewModel.evaluateKillTimeChangeImpact(hour: hour, minute: minute)
-                                switch impact {
-                                case .normal:
-                                    todayKillTimeConfirmMode = .normal
-                                case .immediateExpire(let expiredCount):
-                                    todayKillTimeConfirmMode = .immediateExpire(expiredCount: expiredCount)
-                                }
-                                showingTodayKillTimeConfirm = true
-                            } catch {
-                                errorMessage = error.localizedDescription
-                            }
+                        if let deadline {
+                            KillTimeFlameBackground(
+                                deadline: deadline,
+                                animationsActive: animationsActive,
+                                ceiling: ceiling,
+                                selectableRange: anchors.selectableRange
+                            )
+                            .padding(-WeekSpacing.lg)
+                        } else {
+                            Color.clear
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
         .alert(
             todayKillTimeConfirmTitle,
-            isPresented: $showingTodayKillTimeConfirm
+            isPresented: Binding(
+                get: { killTimeConfirmation != nil },
+                set: { isPresented in
+                    if !isPresented { killTimeConfirmation = nil }
+                }
+            )
         ) {
-            Button(String(localized: "action.cancel"), role: .cancel) { }
+            let confirmation = killTimeConfirmation
+            Button(String(localized: "action.cancel"), role: .cancel) {
+                killTimeConfirmation = nil
+            }
             Button("确认") {
-                applyPendingTodayKillTime(viewModel: viewModel)
+                guard let confirmation else { return }
+                applyTodayKillTime(confirmation, viewModel: viewModel)
             }
         } message: {
             Text(todayKillTimeConfirmMessage)
@@ -514,35 +812,58 @@ struct TodayView: View {
         if let focusTask = day.focusTask {
             WeekCard(useGradient: true) {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "target")
-                            .foregroundColor(.white)
-                        Text(String(localized: "focus.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.white)
+                    if todaySkin.isQuenya {
+                        HStack(spacing: 4) {
+                            WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
+                                .layoutPriority(1)
+                            Spacer(minLength: 4)
+                            Text("\u{E02E}\u{E046}\u{E022}\u{E046}\u{E010} \u{E024}\u{E02C}\u{E044}\u{E022}\u{E040} \u{E022}\u{E02C}\u{E04C}\u{E011}\u{E046}\u{E010}\u{E051} \u{E02E}\u{E04A}\u{E011}\u{E046}\u{E00C}\u{E044}\u{E02E}\u{E046}\u{E022}\u{E015}\u{E04A}")
+                                .font(.custom("AlcarinTengwar-Regular", size: 15))
+                                .foregroundColor(.weekyiiPrimaryLight)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .accessibilityHidden(true)
+                        }
+                    } else {
+                        WeekFeatureLabel(systemImage: "target", title: String(localized: "focus.title"))
                     }
                     
-                    Text(focusTask.title)
-                        .font(.titleMedium)
-                        .foregroundColor(.white)
-                        .onTapGesture {
-                            selectTask(focusTask)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(focusTask.title)
+                            .font(.titleMedium)
+                            .foregroundColor(.weekyiiOnFeature)
+                            .onTapGesture {
+                                selectTask(focusTask)
+                            }
+
+                        WeekFeatureCursor()
+
+                        if focusTask.project != nil {
+                            Spacer(minLength: WeekSpacing.sm)
+                            TaskProjectOriginBadge(
+                                project: focusTask.project,
+                                isOnDarkBackground: true
+                            )
                         }
 
-                    TaskProjectOriginBadge(
-                        project: focusTask.project,
-                        isOnDarkBackground: true
-                    )
+                        if focusTask.habit != nil {
+                            Spacer(minLength: WeekSpacing.sm)
+                            TaskHabitOriginBadge(
+                                habit: focusTask.habit,
+                                isOnDarkBackground: true
+                            )
+                        }
+                    }
                     
                     HStack {
                         if let startedAt = focusTask.startedAt {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "clock")
+                                ThemedSymbol(systemName: "clock", size: 13)
                                     .font(.caption)
                                 Text(formatTime(startedAt))
                                     .font(.caption)
                             }
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.weekyiiOnFeatureSecondary)
                         }
                         
                         Spacer()
@@ -551,15 +872,16 @@ struct TodayView: View {
                             taskForPostpone = focusTask
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "calendar.badge.clock")
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "calendar.badge.clock", size: 13)
+                                }
                                 Text("后移")
                             }
                             .font(.caption.weight(.semibold))
                             .padding(.vertical, WeekSpacing.xs)
                             .padding(.horizontal, WeekSpacing.sm)
                         }
-                        .foregroundColor(.white)
-                        .background(.white.opacity(0.2), in: Capsule())
+                        .weekyiiFeatureAction()
                         .buttonStyle(.plain)
 
                         if day.executionMode == .flexible {
@@ -578,11 +900,10 @@ struct TodayView: View {
                                 .padding(.vertical, WeekSpacing.xs)
                                 .padding(.horizontal, WeekSpacing.sm)
                             }
-                            .foregroundColor(.white)
-                            .background(.white.opacity(0.2), in: Capsule())
-                            .buttonStyle(.plain)
-                            .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
-                            .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
+                            .weekyiiFeatureAction()
+                        .buttonStyle(.plain)
+                        .disabled(!day.isDraftZoneUnlocked || day.frozenTasks.isEmpty)
+                        .opacity(day.isDraftZoneUnlocked && !day.frozenTasks.isEmpty ? 1 : 0.45)
                             .accessibilityIdentifier("focusExchangeButton")
                         }
 
@@ -594,15 +915,16 @@ struct TodayView: View {
                             }
                         } label: {
                             HStack(spacing: WeekSpacing.xs) {
-                                Image(systemName: "checkmark.circle.fill")
+                                if !todaySkin.drawsMiddleEarthGlyphs {
+                                    ThemedSymbol(systemName: "checkmark.circle.fill", size: 13)
+                                }
                                 Text(String(localized: "action.done_focus"))
                             }
                             .font(.caption.weight(.semibold))
                             .padding(.vertical, WeekSpacing.xs)
                             .padding(.horizontal, WeekSpacing.sm)
                         }
-                        .foregroundColor(.white)
-                        .background(.white.opacity(0.2), in: Capsule())
+                        .weekyiiFeatureAction(isPrimary: true)
                         .buttonStyle(.plain)
                     }
                 }
@@ -637,23 +959,17 @@ struct TodayView: View {
         } else if !day.frozenTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "snowflake")
-                            .foregroundColor(.weekyiiPrimary)
-                        Text(String(localized: "frozen.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.frozenTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.weekyiiPrimary)
-                    }
+                    WeekSectionHeader(
+                        systemImage: "snowflake",
+                        title: String(localized: "frozen.title"),
+                        count: day.frozenTasks.count,
+                        tint: .weekyiiPrimary
+                    )
                     
                     FrozenZoneView(
                         tasks: day.frozenTasks,
                         showsProjectOrigin: true,
+                        showsHabitOrigin: true,
                         onTapTask: { task in
                             selectTask(task)
                         },
@@ -664,24 +980,17 @@ struct TodayView: View {
                 }
             }
         }
-        
+
         // 已完成任务
         if !day.completedTasks.isEmpty {
             WeekCard {
                 VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.accentGreen)
-                        Text(String(localized: "complete.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.completedTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.accentGreen)
-                    }
+                    WeekSectionHeader(
+                        systemImage: "checkmark.circle.fill",
+                        title: String(localized: "complete.title"),
+                        count: day.completedTasks.count,
+                        tint: .accentGreen
+                    )
                     
                     CompleteZoneView(tasks: day.completedTasks, onTapTask: { task in
                         selectTask(task)
@@ -699,17 +1008,17 @@ struct TodayView: View {
         // 庆祝卡片
         WeekCard(useGradient: true) {
             VStack(spacing: WeekSpacing.lg) {
-                Image(systemName: "party.popper.fill")
+                ThemedSymbol(systemName: "party.popper.fill", glyph: .whiteTree, size: 54)
                     .font(.system(size: 50))
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnFeature)
                 
                 Text(String(localized: "completed.congratulations"))
                     .font(.titleMedium)
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnFeature)
                 
                 Text(String(localized: "completed.message"))
                     .font(.bodyMedium)
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.weekyiiOnFeatureSecondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -719,19 +1028,12 @@ struct TodayView: View {
         // 完成任务列表
         WeekCard {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentGreen)
-                    Text(String(localized: "complete.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-                    
-                    Spacer()
-                    
-                    Text("\(day.completedTasks.count)")
-                        .font(.titleSmall)
-                        .foregroundColor(.accentGreen)
-                }
+                WeekSectionHeader(
+                    systemImage: "checkmark.circle.fill",
+                    title: String(localized: "complete.title"),
+                    count: day.completedTasks.count,
+                    tint: .accentGreen
+                )
                 
                 CompleteZoneView(tasks: day.completedTasks, onTapTask: selectTask)
             }
@@ -739,56 +1041,22 @@ struct TodayView: View {
     }
     
     // MARK: - Expired State
-    
+
     @ViewBuilder
     private func expiredStateContent(day: DayModel) -> some View {
-        // 过期提示卡片
-        WeekCard(accentColor: .taskDDL) {
-            VStack(spacing: WeekSpacing.md) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.taskDDL)
-                    Text(String(localized: "expired.title"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-                }
-                
-                HStack {
-                    Text(String(localized: "expired.count"))
-                        .font(.bodyMedium)
-                        .foregroundColor(.textSecondary)
-                    Spacer()
-                    Text("\(day.expiredCount)")
-                        .font(.titleMedium)
-                        .foregroundColor(.taskDDL)
-                }
-            }
-        }
-        
-        // 已完成任务
+        TodayExpiredOutcomeCard(day: day)
+
         if !day.completedTasks.isEmpty {
-            WeekCard {
-                VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.accentGreen)
-                        Text(String(localized: "complete.title"))
-                            .font(.titleSmall)
-                            .foregroundColor(.textPrimary)
-                        
-                        Spacer()
-                        
-                        Text("\(day.completedTasks.count)")
-                            .font(.titleSmall)
-                            .foregroundColor(.accentGreen)
-                    }
-                    
-                    CompleteZoneView(tasks: day.completedTasks, onTapTask: selectTask)
+            TodayExpiredCompletedList(
+                tasks: day.completedTasks,
+                expiredCount: day.expiredCount,
+                onTapTask: { task in
+                    selectTask(task)
                 }
-            }
+            )
         }
     }
-    
+
     // MARK: - Helper Methods
 
     @ViewBuilder
@@ -816,37 +1084,22 @@ struct TodayView: View {
     }
 
     @ViewBuilder
+    /// The button floats directly over the themed scene. A solid backdrop band
+    /// here would not match animated theme backgrounds and
+    /// read as a halo; the scroll content already reserves room underneath.
     private var floatingStartButtonOverlay: some View {
-        VStack(spacing: 0) {
-            LinearGradient(
-                colors: [
-                    Color.backgroundPrimary.opacity(0),
-                    Color.backgroundPrimary
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 32)
-            .allowsHitTesting(false)
-
-            VStack(spacing: 0) {
-                WeekButton(
-                    "准备开始",
-                    icon: "play.circle.fill",
-                    style: .primary
-                ) {
-                    startFlowDetent = .fraction(0.5)
-                    startFlowCoordinator.present()
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("todayFloatingStartButton")
-            }
-            .padding(.horizontal, WeekSpacing.base)
-            .padding(.top, WeekSpacing.sm)
-            .padding(.bottom, WeekSpacing.sm)
-            .background(Color.backgroundPrimary)
+        WeekButton(
+            "准备开始",
+            icon: "play.circle.fill",
+            style: .primary
+        ) {
+            startFlowDetent = .fraction(0.5)
+            startFlowCoordinator.present()
         }
-        .ignoresSafeArea(edges: .bottom)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("todayFloatingStartButton")
+        .padding(.horizontal, WeekSpacing.base)
+        .padding(.vertical, WeekSpacing.sm)
     }
 
     @ViewBuilder
@@ -887,6 +1140,9 @@ struct TodayView: View {
                     }
                 }
             )
+        case .edit(let task, _) where task.habit != nil:
+            // Habit tasks are owned by their habit and are never edited here.
+            HabitTaskDetailSheet(task: task)
         case .edit(let task, let context):
             TaskEditorSheet(
                 title: String(localized: "draft.edit_title"),
@@ -1007,35 +1263,65 @@ struct TodayView: View {
     }
 
     private var todayKillTimeConfirmTitle: String {
-        switch todayKillTimeConfirmMode {
+        switch killTimeConfirmation?.mode {
         case .normal:
             return "确认修改截止时间"
-        case .immediateExpire:
+        case .immediateExpire(_):
             return "新时间会导致今日任务立即过期"
+        case nil:
+            return "确认修改截止时间"
         }
     }
 
     private var todayKillTimeConfirmMessage: String {
-        switch todayKillTimeConfirmMode {
+        switch killTimeConfirmation?.mode {
         case .normal:
             return "确认后将更新今日截止时间。"
         case .immediateExpire(let expiredCount):
             return "确认后今日未完成内容将立即过期（\(expiredCount) 项）。"
+        case nil:
+            return "确认后将更新今日截止时间。"
         }
     }
 
-    private func applyPendingTodayKillTime(viewModel: TodayViewModel) {
-        guard let hour = pendingTodayKillTimeHour, let minute = pendingTodayKillTimeMinute else { return }
+    private func applyTodayKillTime(_ confirmation: KillTimeConfirmationSnapshot, viewModel: TodayViewModel) {
+        let draft = confirmation.draft
         do {
-            switch todayKillTimeConfirmMode {
+            switch confirmation.mode {
             case .normal:
-                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: false)
-            case .immediateExpire:
-                try viewModel.changeKillTime(hour: hour, minute: minute, allowImmediateExpire: true)
+                try viewModel.changeKillTime(
+                    hour: draft.proposedHour,
+                    minute: draft.proposedMinute,
+                    expectedDayId: draft.dayId,
+                    expectedHour: draft.baseHour,
+                    expectedMinute: draft.baseMinute,
+                    allowImmediateExpire: false,
+                    confirmedExpiredCount: nil
+                )
+            case .immediateExpire(let expiredCount):
+                try viewModel.changeKillTime(
+                    hour: draft.proposedHour,
+                    minute: draft.proposedMinute,
+                    expectedDayId: draft.dayId,
+                    expectedHour: draft.baseHour,
+                    expectedMinute: draft.baseMinute,
+                    allowImmediateExpire: true,
+                    confirmedExpiredCount: expiredCount
+                )
             }
-            pendingTodayKillTimeHour = nil
-            pendingTodayKillTimeMinute = nil
+            clearKillTimeEditing()
+        } catch let error as WeekyiiError {
+            switch error {
+            case .killTimeImmediateExpireConfirmationRequired(_), .killTimeImmediateExpireImpactChanged(_):
+                killTimeConfirmation = nil
+            case .killTimePreviewOutdated, .cannotEditStartedDay:
+                clearKillTimeEditing()
+            default:
+                killTimeConfirmation = nil
+            }
+            errorMessage = error.localizedDescription
         } catch {
+            killTimeConfirmation = nil
             errorMessage = error.localizedDescription
         }
     }
@@ -1046,6 +1332,45 @@ struct TodayView: View {
         } else {
             selectedTaskForDetail = task
         }
+    }
+
+    private func validKillTimeEditDraft(for day: DayModel) -> KillTimeEditDraft? {
+        guard let draft = killTimeEditDraft, draft.isValid(for: day) else { return nil }
+        return draft
+    }
+
+    private func updateKillTimePreview(hour: Int, minute: Int, for day: DayModel) {
+        guard (day.status == .draft || day.status == .execute),
+              (0...23).contains(hour), (0...59).contains(minute) else {
+            clearKillTimeEditing()
+            return
+        }
+
+        let current = validKillTimeEditDraft(for: day)
+        let draft = KillTimeEditDraft(
+            dayId: day.dayId,
+            baseHour: current?.baseHour ?? day.killTimeHour,
+            baseMinute: current?.baseMinute ?? day.killTimeMinute,
+            proposedHour: hour,
+            proposedMinute: minute
+        )
+        killTimeConfirmation = nil
+        killTimeEditDraft = draft.hasChanges ? draft : nil
+    }
+
+    private func invalidateKillTimeEditingIfNeeded(for day: DayModel?) {
+        guard let day, let draft = killTimeEditDraft, draft.isValid(for: day) else {
+            clearKillTimeEditing()
+            return
+        }
+        if let confirmation = killTimeConfirmation, !confirmation.draft.isValid(for: day) {
+            killTimeConfirmation = nil
+        }
+    }
+
+    private func clearKillTimeEditing() {
+        killTimeEditDraft = nil
+        killTimeConfirmation = nil
     }
 
     @ViewBuilder
@@ -1067,6 +1392,19 @@ struct TodayView: View {
                         startFlowCoordinator.cancel()
                     },
                     onContinue: {
+                        // When the start-day ritual is switched off, confirming the
+                        // warning starts the day immediately instead of showing a stamp.
+                        guard userSettings.startRitualEnabled else {
+                            do {
+                                try viewModel.startDay()
+                                startFlowStamp = nil
+                                startFlowDetent = .fraction(0.5)
+                                startFlowCoordinator.cancel()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                            return
+                        }
                         startFlowStamp = viewModel.pickStartRitualStamp()
                         startFlowCoordinator.chooseDirectEnter()
                         withAnimation(.easeInOut(duration: 0.24)) {
@@ -1101,11 +1439,8 @@ struct TodayView: View {
     private var todaySceneBackground: some View {
         ZStack {
             Color.backgroundPrimary
-            if userSettings.selectedTheme == .sunset {
-                SunsetWaterReflectionBackground(animationsActive: animationsActive)
-                    .transition(.opacity)
-            } else if userSettings.selectedTheme == .lotr {
-                LotrRainNightBackground(animationsActive: animationsActive)
+            if userSettings.selectedTheme == .cat {
+                CatSunbeamBackground(animationsActive: animationsActive)
                     .transition(.opacity)
             }
         }
@@ -1412,6 +1747,36 @@ private struct SectionToggleView: View {
     let progress: CGFloat
     let selectedSection: TodaySection
     let onSelect: (TodaySection) -> Void
+    @Environment(\.themeSkin) private var skin
+
+    /// 魔戒 and 指环王 draw a flat book surface: no gloss, no inner shadow.
+    private var isLotr: Bool { skin.drawsMiddleEarthGlyphs }
+    private var trackShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+    }
+    private var indicatorShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: (height - 6) / 2, style: .continuous)
+    }
+
+    private var indicatorColors: [Color] {
+        if let gilded = skin.gildedFill {
+            return [gilded.top.color, gilded.bottom.color]
+        }
+        return isLotr
+            ? [Color.weekyiiPrimaryLight, Color.weekyiiPrimary]
+            : [Color.weekyiiPrimary, Color.weekyiiPrimary.opacity(0.85)]
+    }
+
+    /// Ink on the selected half: the leather's own ink when the skin gilds it.
+    private var selectedInk: Color {
+        skin.gildedFill?.ink.color ?? .weekyiiOnPrimary
+    }
+
+    /// Gilt hairline inside the selected leather, or the classic soft rim.
+    private var indicatorRim: Color {
+        if let gilded = skin.gildedFill { return gilded.hairline.color }
+        return isLotr ? Color.clear : Color.white.opacity(0.2)
+    }
     
     private let height: CGFloat = 44
     
@@ -1422,12 +1787,12 @@ private struct SectionToggleView: View {
                 onSelect(.today)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "sun.max.fill")
+                    ThemedSymbol(systemName: "sun.max.fill", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.today"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .today ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .today ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1440,12 +1805,12 @@ private struct SectionToggleView: View {
                 onSelect(.week)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar")
+                    ThemedSymbol(systemName: "calendar", size: 16)
                         .font(.system(size: 14, weight: .medium))
                     Text(String(localized: "tab.week"))
                         .font(.bodyMedium.weight(.semibold))
                 }
-                .foregroundColor(selectedSection == .week ? .white : .textSecondary)
+                .foregroundColor(selectedSection == .week ? selectedInk : .textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -1459,25 +1824,22 @@ private struct SectionToggleView: View {
                 let indicatorX = progress * halfWidth
                 
                 // 滑动的高亮胶囊 - 带渐变
-                Capsule()
+                indicatorShape
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color.weekyiiPrimary,
-                                Color.weekyiiPrimary.opacity(0.85)
-                            ],
+                            colors: indicatorColors,
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
                     .frame(width: halfWidth - 4, height: height - 6)
                     .offset(x: indicatorX + 2, y: 3)
-                    // 顶部高光
+                    // 顶部高光（魔戒是平的金箔，不加高光）
                     .overlay(
-                        Capsule()
+                        indicatorShape
                             .fill(
                                 LinearGradient(
-                                    colors: [
+                                    colors: isLotr ? [Color.clear] : [
                                         Color.white.opacity(0.4),
                                         Color.white.opacity(0.1),
                                         Color.clear
@@ -1491,29 +1853,31 @@ private struct SectionToggleView: View {
                     )
                     // 边框
                     .overlay(
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                        indicatorShape
+                            .strokeBorder(indicatorRim, lineWidth: skin.gildedFill != nil ? 1 : (isLotr ? 0 : 0.5))
                             .frame(width: halfWidth - 4, height: height - 6)
                             .offset(x: indicatorX + 2, y: 3)
                     )
                     // 阴影
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
-                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
             }
         )
         .background(
             // 底层背景胶囊 - 带内阴影效果
-            Capsule()
-                .fill(Color.backgroundSecondary.opacity(0.8))
+            trackShape
+                .fill(isLotr ? Color.backgroundTertiary : Color.backgroundSecondary.opacity(0.8))
                 .overlay(
-                    Capsule()
+                    trackShape
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1),
-                                    Color.black.opacity(0.05)
-                                ],
+                                colors: isLotr
+                                    ? [Color.clear, Color.clear]
+                                    : [
+                                        Color.white.opacity(0.3),
+                                        Color.white.opacity(0.1),
+                                        Color.black.opacity(0.05)
+                                    ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             ),
@@ -1522,52 +1886,34 @@ private struct SectionToggleView: View {
                 )
                 // 内阴影模拟
                 .overlay(
-                    Capsule()
-                        .stroke(Color.black.opacity(0.08), lineWidth: 2)
+                    trackShape
+                        .stroke(Color.black.opacity(isLotr ? 0 : 0.08), lineWidth: 2)
                         .blur(radius: 2)
-                        .mask(Capsule().fill(Color.black))
+                        .mask(trackShape.fill(Color.black))
                         .offset(y: 1)
                 )
         )
-        .clipShape(Capsule())
+        .clipShape(trackShape)
         .frame(height: height)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress)
     }
 }
 
-/// Lightweight animated scene used only by the Sunset theme on Today page.
-private struct SunsetWaterReflectionBackground: View {
+private struct CatSunbeamBackground: View {
     let animationsActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @State private var sunDrift = false
 
     private var shouldAnimate: Bool { animationsActive && !reduceMotion }
 
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let sunY = sunCenterY(for: size)
-            let waterlineY = waterline(for: size)
-
-            ZStack {
-                LinearGradient(
-                    colors: skyGradientColors,
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                horizonGlow(y: waterlineY, size: size)
-                sunDisk(y: sunY, size: size)
-                reflectedSun(y: sunY, waterlineY: waterlineY, size: size)
-                reflectionRipples(size: size, waterlineY: waterlineY)
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
-            .onAppear {
-                updateSunAnimation()
-            }
-            .onChange(of: shouldAnimate) { _, _ in
-                updateSunAnimation()
+        Group {
+            if shouldAnimate {
+                TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { timeline in
+                    scene(time: timeline.date.timeIntervalSinceReferenceDate)
+                }
+            } else {
+                scene(time: 0)
             }
         }
         .ignoresSafeArea()
@@ -1575,249 +1921,833 @@ private struct SunsetWaterReflectionBackground: View {
         .accessibilityHidden(true)
     }
 
-    private var skyGradientColors: [Color] {
+    @ViewBuilder
+    private func scene(time: TimeInterval) -> some View {
+        // A slow swell, so the light feels like it moves with passing clouds.
+        let swell = 0.85 + 0.15 * CGFloat(sin(time * 0.35))
         if colorScheme == .dark {
-            return [
-                Color(hex: "#251414"),
-                Color(hex: "#3A1D1A"),
-                Color(hex: "#221917"),
-                Color(hex: "#141317")
-            ]
-        }
-        return [
-            Color(hex: "#FFE5D1"),
-            Color(hex: "#F9C39E"),
-            Color(hex: "#DF896B"),
-            Color(hex: "#B86A5C")
-        ]
-    }
-
-    private func waterline(for size: CGSize) -> CGFloat {
-        size.height * (colorScheme == .dark ? 0.52 : 0.56)
-    }
-
-    private func sunCenterY(for size: CGSize) -> CGFloat {
-        let base = size.height * (colorScheme == .dark ? 0.23 : 0.27)
-        guard shouldAnimate else { return base }
-        return base + (sunDrift ? 5 : -5)
-    }
-
-    private func updateSunAnimation() {
-        if shouldAnimate {
-            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) {
-                sunDrift = true
-            }
+            nightRoom(swell: swell, time: time)
         } else {
-            withAnimation(nil) {
-                sunDrift = false
+            sunnyRoom(swell: swell)
+        }
+    }
+
+    private func sunnyRoom(swell: CGFloat) -> some View {
+        Canvas { context, size in
+            let beam = Color(hex: "#FFF6E6")
+            // Three bands of light, each a slanted strip entering from the top trailing edge.
+            let bands: [(start: CGFloat, width: CGFloat, alpha: Double)] = [
+                (0.50, 0.16, 0.85), (0.72, 0.09, 0.65), (0.86, 0.05, 0.5),
+            ]
+            let slant = size.height * 0.55
+            for band in bands {
+                let x0 = size.width * band.start
+                let w = size.width * band.width
+                var strip = Path()
+                strip.move(to: CGPoint(x: x0, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w, y: 0))
+                strip.addLine(to: CGPoint(x: x0 + w - slant, y: size.height))
+                strip.addLine(to: CGPoint(x: x0 - slant, y: size.height))
+                strip.closeSubpath()
+                context.fill(
+                    strip,
+                    with: .linearGradient(
+                        Gradient(colors: [beam.opacity(band.alpha * Double(swell)), beam.opacity(0)]),
+                        startPoint: CGPoint(x: x0, y: 0),
+                        endPoint: CGPoint(x: x0 - slant * 0.7, y: size.height * 0.75)
+                    )
+                )
             }
         }
     }
 
-    private func sunCenterX(for size: CGSize) -> CGFloat {
-        size.width * 0.382
-    }
-
-    private func horizonGlow(y: CGFloat, size: CGSize) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: colorScheme == .dark ? "#E5B099" : "#F2B28F")
-                            .opacity(colorScheme == .dark ? 0.08 : 0.13),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(height: 86)
-            .position(x: size.width / 2, y: y)
-    }
-
-    private func sunDisk(y: CGFloat, size: CGSize) -> some View {
+    private func nightRoom(swell: CGFloat, time: TimeInterval) -> some View {
         ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: colorScheme == .dark ? "#FA6D5B" : "#F16250"),
-                            Color(hex: colorScheme == .dark ? "#D84A3E" : "#C83D36")
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 74, height: 74)
-
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.2 : 0.24),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-                .frame(width: 40, height: 40)
-                .offset(y: -9)
-        }
-        .overlay(
-            Circle()
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                .frame(width: 74, height: 74)
-        )
-        .position(x: sunCenterX(for: size), y: y)
-    }
-
-    private func reflectedSun(y: CGFloat, waterlineY: CGFloat, size: CGSize) -> some View {
-        let height: CGFloat = colorScheme == .dark ? 212 : 230
-        let reflectionTop = max(y + 24, waterlineY - 10)
-        return RoundedRectangle(cornerRadius: 70, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#F06B58").opacity(colorScheme == .dark ? 0.2 : 0.3),
-                        Color(hex: "#D34A3F").opacity(colorScheme == .dark ? 0.14 : 0.24),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+            RadialGradient(
+                colors: [Color(hex: "#F29A5E").opacity(0.16 * Double(swell)), Color(hex: "#F29A5E").opacity(0)],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 360
             )
-            .frame(width: 84, height: height)
-            .blur(radius: 4)
-            .scaleEffect(x: 1.04, y: 1.0, anchor: .top)
-            .position(x: sunCenterX(for: size) + 10, y: reflectionTop + height / 2)
-    }
-
-    private func reflectionRipples(size: CGSize, waterlineY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvasSize in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let lineCount = 13
-                let leftX = canvasSize.width * 0.06
-                let rightX = canvasSize.width * 0.94
-                let laneHeight = max((canvasSize.height - waterlineY) / CGFloat(lineCount + 2), 8)
-                let waveAmplitude: CGFloat = reduceMotion ? 0.8 : 3.8
-
-                for idx in 0..<lineCount {
-                    let progress = CGFloat(idx) / CGFloat(lineCount)
-                    let baseY = waterlineY + CGFloat(idx + 1) * laneHeight
-                    let phase = Double(idx) * 0.76
-                    let xWave = CGFloat(sin(t * 0.55 + phase)) * (8 - progress * 5)
-                    let yWave = CGFloat(cos(t * 0.65 + phase)) * waveAmplitude
-                    let lineWidth = max(0.7, 2.1 - progress * 1.2)
-                    let alpha = max(0.02, 0.11 - Double(progress) * 0.08)
-
-                    var path = Path()
-                    path.move(to: CGPoint(x: leftX + xWave, y: baseY + yWave))
-                    path.addQuadCurve(
-                        to: CGPoint(x: rightX - xWave, y: baseY - yWave * 0.35),
-                        control: CGPoint(
-                            x: canvasSize.width * 0.5 + CGFloat(sin(t * 0.4 + phase * 1.4)) * 26,
-                            y: baseY + CGFloat(cos(t * 0.3 + phase)) * (waveAmplitude * 0.9)
-                        )
-                    )
-
-                    context.stroke(
-                        path,
-                        with: .color(Color(hex: "#FFD6B9").opacity(alpha)),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
+            Canvas { context, size in
+                var seed: UInt64 = 0xCA7_5EA7_57A2_2025
+                func next() -> CGFloat {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return CGFloat((seed >> 33) % 10_000) / 10_000
+                }
+                for index in 0..<22 {
+                    let x = next() * size.width
+                    // Stars stay in the upper part of the page, where the window is.
+                    let y = next() * size.height * 0.45
+                    let r = 0.6 + next() * 0.9
+                    let twinkle = 0.55 + 0.45 * sin(time * 0.8 + Double(index))
+                    let star = Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+                    context.fill(star, with: .color(Color(hex: "#F7E7C6").opacity(0.22 * twinkle)))
                 }
             }
-            .frame(width: size.width, height: size.height)
-            .blendMode(.plusLighter)
         }
     }
 }
 
-private struct LotrRainNightBackground: View {
-    let animationsActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
+// MARK: - Expired Day Presentation
 
-    private var shouldAnimate: Bool { animationsActive && !reduceMotion }
+/// Outcome card shown once today has expired. It distinguishes a started day
+/// that ran out of time from a planned day that was never started, reading
+/// only persisted fields (`expiredCount`, `initiatedAt`, raw draft records).
+private struct TodayExpiredOutcomeCard: View {
+    let day: DayModel
+
+    /// Same rule as the Past calendar's grey face.
+    private var isNotStarted: Bool {
+        day.expiredCount == 0 && day.initiatedAt == nil
+    }
+
+    private var failureKind: PastDayFailureKind {
+        isNotStarted ? .notStarted : .unfinished
+    }
+
+    private var tint: Color {
+        isNotStarted ? .textTertiary : .taskDDL
+    }
+
+    private var killTimeText: String {
+        String(format: "%02d:%02d", day.killTimeHour, day.killTimeMinute)
+    }
+
+    /// Draft records survive expiry (hidden by `DayModel`'s terminal getters)
+    /// until garbage collection, so today's planned count is still readable.
+    private var plannedCount: Int {
+        day.tasks.filter { $0.zone == .draft }.count
+    }
+
+    private var completedCount: Int { day.completedTasks.count }
+    private var expiredCount: Int { day.expiredCount }
+
+    private var completionPercent: Int {
+        let total = completedCount + expiredCount
+        guard total > 0 else { return 0 }
+        return Int((Double(completedCount) / Double(total) * 100).rounded())
+    }
+
+    private var title: String {
+        isNotStarted
+            ? String(localized: "today.expired.not_started.title", defaultValue: "今天没有开始")
+            : String(localized: "today.expired.unfinished.title", defaultValue: "今天没能全部完成")
+    }
+
+    private var subtitle: String {
+        if isNotStarted {
+            if plannedCount > 0 {
+                return String(
+                    format: String(
+                        localized: "today.expired.not_started.subtitle",
+                        defaultValue: "写好的 %1$lld 项计划在 %2$@ 过期了"
+                    ),
+                    plannedCount,
+                    killTimeText
+                )
+            }
+            return String(
+                format: String(localized: "today.expired.not_started.subtitle_no_count", defaultValue: "计划在 %@ 过期了"),
+                killTimeText
+            )
+        }
+        return String(
+            format: String(localized: "today.expired.unfinished.subtitle", defaultValue: "%1$@ 截止时还剩 %2$lld 项"),
+            killTimeText,
+            expiredCount
+        )
+    }
 
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let horizonY = size.height * 0.6
+        WeekCard(accentColor: tint) {
+            HStack(spacing: WeekSpacing.md) {
+                PastFailureFaceMark(kind: failureKind)
+                    .frame(width: 26, height: 26)
+                    .frame(width: 46, height: 46)
+                    .background(Circle().fill(tint.opacity(0.12)))
 
-            ZStack {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color(hex: "#070808"), Color(hex: "#0D0F12"), Color(hex: "#13161A"), Color(hex: "#1A1D22")]
-                        : [Color(hex: "#E6E7EA"), Color(hex: "#D6D8DD"), Color(hex: "#C1C4CB"), Color(hex: "#ADB1BA")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                // starless night: no stars, only layered mountain silhouettes
-                mountainLayer(size: size, y: horizonY - 34, opacity: colorScheme == .dark ? 0.7 : 0.34, offset: 0)
-                mountainLayer(size: size, y: horizonY - 12, opacity: colorScheme == .dark ? 0.86 : 0.46, offset: 24)
-
-                // distant call: a tiny warm beacon near golden-left valley
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color(hex: colorScheme == .dark ? "#D1A261" : "#AF7D47"))
-                    .frame(width: 3, height: 12)
-                    .blur(radius: 0.4)
-                    .position(x: size.width * 0.362, y: horizonY - 8)
-
-                coldRain(size: size, fromY: horizonY - 120)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.titleSmall)
+                        .foregroundColor(.textPrimary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
+                }
+                Spacer(minLength: 0)
             }
-            .drawingGroup(opaque: false, colorMode: .linear)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
 
-    private func mountainLayer(size: CGSize, y: CGFloat, opacity: CGFloat, offset: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -20, y: size.height))
-            path.addLine(to: CGPoint(x: -20, y: y + 40))
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.28, y: y - 22),
-                control1: CGPoint(x: size.width * 0.05, y: y + 10),
-                control2: CGPoint(x: size.width * 0.18, y: y - 26)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width * 0.58, y: y + 6),
-                control1: CGPoint(x: size.width * 0.36, y: y - 16),
-                control2: CGPoint(x: size.width * 0.46, y: y + 14)
-            )
-            path.addCurve(
-                to: CGPoint(x: size.width + 20, y: y - 12),
-                control1: CGPoint(x: size.width * 0.71, y: y - 14),
-                control2: CGPoint(x: size.width * 0.89, y: y - 20)
-            )
-            path.addLine(to: CGPoint(x: size.width + 20, y: size.height))
-            path.closeSubpath()
-        }
-        .fill(Color.black.opacity(opacity))
-        .offset(x: offset)
-    }
-
-    private func coldRain(size: CGSize, fromY: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimate)) { timeline in
-            Canvas { context, canvas in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let columns = 24
-                for idx in 0..<columns {
-                    let x = (CGFloat(idx) + 0.5) / CGFloat(columns) * canvas.width
-                    let phase = Double(idx) * 0.37
-                    let drift = CGFloat(sin(t * 0.65 + phase)) * (reduceMotion ? 0.5 : 2.3)
-                    let dropTop = fromY + CGFloat((idx % 4) * 6) + CGFloat((t * 38 + phase * 30).truncatingRemainder(dividingBy: 16))
-                    let dropHeight: CGFloat = 14 + CGFloat(idx % 3) * 2
-                    let rect = CGRect(x: x + drift, y: dropTop, width: 1.0, height: dropHeight)
-                    let path = Path(roundedRect: rect, cornerRadius: 1)
-                    context.fill(path, with: .color(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.1)))
+            if isNotStarted {
+                Text(String(
+                    localized: "today.expired.not_started.comfort",
+                    defaultValue: "没关系。明天早一点点“开始”，让计划真正动起来。"
+                ))
+                .font(.bodyMedium)
+                .foregroundColor(.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: WeekSpacing.sm) {
+                    outcomeBar
+                    HStack {
+                        Text(String(
+                            format: String(localized: "today.expired.stat.completed", defaultValue: "完成 %lld"),
+                            completedCount
+                        ))
+                        .foregroundColor(.accentGreen)
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "today.expired.stat.expired", defaultValue: "过期 %lld"),
+                            expiredCount
+                        ))
+                        .foregroundColor(.taskDDL)
+                        Spacer()
+                        Text(String(
+                            format: String(localized: "today.expired.stat.rate", defaultValue: "完成率 %lld%%"),
+                            completionPercent
+                        ))
+                        .foregroundColor(.textSecondary)
+                    }
+                    .font(.captionBold)
+                    .monospacedDigit()
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Completed vs. expired share of the day, green then muted red.
+    private var outcomeBar: some View {
+        GeometryReader { proxy in
+            let total = max(completedCount + expiredCount, 1)
+            let gap: CGFloat = completedCount > 0 && expiredCount > 0 ? 2 : 0
+            let usable = max(proxy.size.width - gap, 0)
+            let completedWidth = usable * CGFloat(completedCount) / CGFloat(total)
+            HStack(spacing: gap) {
+                if completedCount > 0 {
+                    Capsule().fill(Color.accentGreen)
+                        .frame(width: completedWidth)
+                }
+                if expiredCount > 0 {
+                    Capsule().fill(Color.taskDDL.opacity(0.55))
+                }
+            }
+        }
+        .frame(height: 6)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Compact list of what did get done today: one hairline row per task with
+/// its finish time, plus a reminder that expired tasks keep no details.
+private struct TodayExpiredCompletedList: View {
+    let tasks: [TaskItem]
+    let expiredCount: Int
+    let onTapTask: (TaskItem) -> Void
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = WeekyiiTimeZone.timeZone
+        return formatter
+    }()
+
+    var body: some View {
+        WeekCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(String(localized: "today.expired.completed.title", defaultValue: "今日完成"))
+                        .font(.titleSmall)
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Text("\(tasks.count)")
+                        .font(.titleSmall)
+                        .foregroundColor(.accentGreen)
+                }
+                .padding(.bottom, WeekSpacing.sm)
+
+                ForEach(tasks) { task in
+                    Divider()
+                    Button {
+                        onTapTask(task)
+                    } label: {
+                        HStack(spacing: WeekSpacing.sm) {
+                            CatCoveredSymbol(systemName: "checkmark.circle", pointSize: 17)
+                                .font(.body)
+                                .foregroundColor(.accentGreen)
+                            Text(task.title)
+                                .font(.bodyMedium)
+                                .foregroundColor(.textPrimary)
+                                .lineLimit(1)
+                            Spacer(minLength: WeekSpacing.sm)
+                            if let endedAt = task.endedAt {
+                                Text(Self.timeFormatter.string(from: endedAt))
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                    .monospacedDigit()
+                            }
+                        }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if expiredCount > 0 {
+                    Text(String(
+                        format: String(
+                            localized: "today.expired.completed.forgotten",
+                            defaultValue: "过期的 %lld 项不保留详情"
+                        ),
+                        expiredCount
+                    ))
+                    .font(.caption)
+                    .foregroundColor(.textTertiary)
+                    .padding(.top, WeekSpacing.sm)
+                }
+            }
+        }
+    }
+}
+
+/// Replaces the kill-time editor once the day is over: nothing left to adjust,
+/// so it becomes a quiet, locked footnote instead of a live countdown.
+private struct TodayEndedKillTimeFootnote: View {
+    let hour: Int
+    let minute: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+                .font(.caption2)
+            Text(String(
+                format: String(localized: "today.expired.killtime_footnote", defaultValue: "截止于 %@ · 今天已结束"),
+                String(format: "%02d:%02d", hour, minute)
+            ))
+            .monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundColor(.textSecondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, WeekSpacing.sm)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Habit Task Detail
+
+/// Read-only detail for a task generated by a habit. Same sheet as the normal
+/// task detail, but redrawn from the habit: the category sets the hero visual,
+/// the schedule kind sets the rhythm module. Reads existing data only.
+private struct HabitTaskDetailSheet: View {
+    let task: TaskItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let habit = task.habit {
+                    HabitTaskDetailContent(task: task, habit: habit)
+                        .weekPadding(WeekSpacing.base)
+                }
+            }
+            .background(Color.backgroundPrimary)
+            .navigationTitle(String(localized: "task.detail.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "action.done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HabitTaskDetailContent: View {
+    let task: TaskItem
+    let habit: HabitModel
+
+    private var stats: HabitStatistics { HabitStatisticsCalculator.statistics(for: habit) }
+    private var tint: Color { Color.weekyiiEmphasis(hex: habit.colorHex) }
+    private var isDoneToday: Bool { task.zone == .complete }
+    private var weekDays: [HabitWeekStripDay] { HabitWeekStripDay.currentWeek(for: habit) }
+
+    /// Share of this week's scheduled days already completed (0...1).
+    private var weekRatio: Double {
+        let scheduled = weekDays.filter { $0.state != .rest }
+        guard !scheduled.isEmpty else { return isDoneToday ? 1 : 0 }
+        let done = scheduled.filter { $0.state == .completed }.count
+        return Double(done) / Double(scheduled.count)
+    }
+
+    private var isCentered: Bool { habit.category == .mindfulness }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            headerCard
+            rhythmCard
+            if habit.scheduleKind != .once {
+                statsCard
+            }
+        }
+    }
+
+    // MARK: Header
+
+    private var headerCard: some View {
+        WeekCard(accentColor: tint) {
+            if isCentered {
+                VStack(spacing: WeekSpacing.sm) {
+                    hero.frame(width: 120, height: 96)
+                    titleBlock(alignment: .center)
+                    Text(String(localized: "habit.detail.mindfulness.line", defaultValue: "慢一点。这一件事，今天只为它留出时间。"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                HStack(alignment: .center, spacing: WeekSpacing.md) {
+                    hero.frame(width: 84, height: 84)
+                    titleBlock(alignment: .leading)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private func titleBlock(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            Text(habit.name)
+                .font(.system(size: 22, weight: .semibold, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .multilineTextAlignment(alignment == .center ? .center : .leading)
+            Text(habit.category.displayName + " · " + habit.scheduleSummary)
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(2)
+            statusChip
+        }
+    }
+
+    private var statusChip: some View {
+        Text(isDoneToday
+             ? String(localized: "habit.detail.status.done", defaultValue: "今日已打卡")
+             : String(localized: "habit.detail.status.pending", defaultValue: "今日待打卡"))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isDoneToday ? Color.accentGreen : tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background((isDoneToday ? Color.accentGreen : tint).opacity(0.12), in: Capsule())
+    }
+
+    @ViewBuilder
+    private var hero: some View {
+        switch habit.category {
+        case .fitness:
+            HabitHeroRings(outer: weekRatio, inner: Double(stats.currentStreak) / Double(max(stats.longestStreak, 1)), tint: tint)
+        case .learning:
+            HabitHeroBooks(completed: stats.completedCount, isDoneToday: isDoneToday, tint: tint)
+        case .mindfulness:
+            HabitHeroBreath(tint: tint)
+        case .health:
+            HabitHeroDrop(fill: weekRatio, tint: tint)
+        case .creativity:
+            HabitHeroSparks(lit: stats.completedCount, tint: tint)
+        case .social:
+            HabitHeroCircles(isTogether: isDoneToday, tint: tint)
+        case .productivity:
+            HabitHeroTarget(rate: stats.completionRate ?? 0, tint: tint)
+        }
+    }
+
+    // MARK: Rhythm
+
+    @ViewBuilder
+    private var rhythmCard: some View {
+        switch habit.scheduleKind {
+        case .weekly:
+            WeekCard {
+                sectionLabel(
+                    String(localized: "habit.detail.rhythm.week", defaultValue: "本周节奏"),
+                    trailing: "\(weekDays.filter { $0.state == .completed }.count) / \(weekDays.filter { $0.state != .rest }.count)"
+                )
+                HabitDetailWeekStrip(days: weekDays, tint: tint)
+            }
+        case .monthly:
+            WeekCard {
+                sectionLabel(Date().formatted(.dateTime.month(.wide)), trailing: monthProgressText)
+                HabitDetailMonthGrid(habit: habit, tint: tint)
+            }
+        case .once:
+            WeekCard {
+                VStack(spacing: WeekSpacing.xs) {
+                    Text(String(localized: "habit.detail.once.label", defaultValue: "约定的那一天"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                    if let date = habit.startDate {
+                        Text(date.formatted(.dateTime.month(.defaultDigits)) + " · " + date.formatted(.dateTime.day()))
+                            .font(.system(size: 40, weight: .regular, design: .serif))
+                            .foregroundStyle(tint)
+                    }
+                    Text(isDoneToday
+                         ? String(localized: "habit.detail.once.done", defaultValue: "已经完成，这个习惯就此圆满")
+                         : String(localized: "habit.detail.once.today", defaultValue: "就是今天，完成后这个习惯自然结束"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var monthProgressText: String {
+        let days = HabitDetailMonthGrid.monthStates(for: habit)
+        let scheduled = days.filter { $0.state != .rest }
+        return "\(scheduled.filter { $0.state == .completed }.count) / \(scheduled.count)"
+    }
+
+    // MARK: Stats
+
+    private var statsCard: some View {
+        WeekCard {
+            HStack(spacing: 0) {
+                if habit.scheduleKind == .weekly {
+                    statItem("\(stats.currentStreak)", String(localized: "habit.detail.stat.current_streak", defaultValue: "当前连续"))
+                    statItem("\(stats.longestStreak)", String(localized: "habit.detail.stat.longest_streak", defaultValue: "最长连续"))
+                } else {
+                    statItem("\(stats.completedCount)", String(localized: "habit.detail.stat.completed", defaultValue: "累计完成"))
+                    statItem("\(stats.missedCount)", String(localized: "habit.detail.stat.missed", defaultValue: "中断"))
+                }
+                statItem(
+                    stats.completionRatePercent.map { "\($0)%" } ?? "—",
+                    String(localized: "habit.detail.stat.rate", defaultValue: "完成率")
+                )
+            }
+        }
+    }
+
+    private func statItem(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 22, weight: .regular, design: .serif))
+                .foregroundStyle(Color.textPrimary)
+                .monospacedDigit()
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sectionLabel(_ title: String, trailing: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.textTertiary)
+            Spacer()
+            Text(trailing)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.textTertiary)
+                .monospacedDigit()
+        }
+    }
+}
+
+// MARK: Rhythm modules
+
+private struct HabitDetailWeekStrip: View {
+    let days: [HabitWeekStripDay]
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(days) { day in
+                VStack(spacing: 6) {
+                    HabitDayMark(state: day.state, tint: tint)
+                        .frame(width: 26, height: 26)
+                    Text(WeekyiiWeekday.localizedSymbol(for: day.isoWeekday))
+                        .font(.system(size: 11, weight: day.isToday ? .semibold : .regular))
+                        .foregroundStyle(day.isToday ? Color.weekyiiPrimary : Color.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitDetailMonthGrid: View {
+    let habit: HabitModel
+    let tint: Color
+
+    struct Cell: Identifiable {
+        let id: String
+        let day: Int
+        let isToday: Bool
+        let state: HabitWeekStripDay.State
+    }
+
+    /// Same rules as the week strip, applied to every day of the current month.
+    @MainActor
+    static func monthStates(for habit: HabitModel, today: Date = Date()) -> [Cell] {
+        let calendar = WeekyiiTimeZone.calendar
+        let todayStart = today.startOfDay
+        guard let interval = calendar.dateInterval(of: .month, for: todayStart) else { return [] }
+        let start = habit.startDate?.startOfDay
+        var statusByDay: [String: HabitDayRecordStatus] = [:]
+        for record in habit.records {
+            statusByDay[record.dayId] = record.status
+        }
+        var cells: [Cell] = []
+        var cursor = interval.start.startOfDay
+        while cursor < interval.end {
+            let dayId = cursor.dayId
+            let isToday = dayId == todayStart.dayId
+            let state: HabitWeekStripDay.State
+            if let start, cursor >= start, habit.isScheduled(on: cursor) {
+                switch statusByDay[dayId] {
+                case .completed: state = .completed
+                case .missed: state = .missed
+                case .pending: state = cursor < todayStart ? .missed : .pendingToday
+                case nil: state = isToday ? .pendingToday : (cursor < todayStart ? .missed : .upcoming)
+                }
+            } else {
+                state = .rest
+            }
+            cells.append(Cell(id: dayId, day: calendar.component(.day, from: cursor), isToday: isToday, state: state))
+            cursor = cursor.addingDays(1)
+        }
+        return cells
+    }
+
+    var body: some View {
+        let cells = Self.monthStates(for: habit)
+        let leading = cells.first.flatMap { WeekyiiDayId.date(from: $0.id)?.isoWeekday }.map { $0 - 1 } ?? 0
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
+        VStack(spacing: 6) {
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(1...7, id: \.self) { weekday in
+                    Text(WeekyiiWeekday.localizedSymbol(for: weekday))
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                ForEach(0..<leading, id: \.self) { index in
+                    Color.clear.frame(height: 26).id("lead-\(index)")
+                }
+                ForEach(cells) { cell in
+                    ZStack {
+                        HabitDayMark(state: cell.state, tint: tint, shape: .rounded)
+                        Text("\(cell.day)")
+                            .font(.system(size: 10, weight: cell.isToday ? .bold : .regular))
+                            .foregroundStyle(cell.state == .completed ? .white : Color.textSecondary)
+                    }
+                    .frame(height: 26)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitDayMark: View {
+    enum MarkShape { case circle, rounded }
+
+    let state: HabitWeekStripDay.State
+    let tint: Color
+    var shape: MarkShape = .circle
+
+    var body: some View {
+        switch state {
+        case .completed:
+            base.fill(tint)
+        case .missed:
+            base.fill(Color.taskDDL.opacity(0.3))
+        case .pendingToday:
+            base.stroke(tint, style: StrokeStyle(lineWidth: 2, dash: [3, 2.5])).padding(1)
+        case .upcoming:
+            base.fill(tint.opacity(0.14))
+        case .rest:
+            if shape == .rounded {
+                base.fill(Color.backgroundTertiary.opacity(0.5))
+            } else {
+                Circle().fill(Color.backgroundTertiary).frame(width: 7, height: 7)
+            }
+        }
+    }
+
+    private var base: AnyShape {
+        shape == .circle ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+// MARK: Category heroes (decorative, derived from existing statistics)
+
+private struct HabitHeroRings: View {
+    let outer: Double
+    let inner: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            ring(progress: outer, lineWidth: 9, inset: 0, color: tint)
+            ring(progress: inner, lineWidth: 7, inset: 15, color: Color.accentOrange)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func ring(progress: Double, lineWidth: CGFloat, inset: CGFloat, color: Color) -> some View {
+        ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: min(max(progress, 0.001), 1))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .padding(inset + lineWidth / 2)
+    }
+}
+
+private struct HabitHeroBooks: View {
+    let completed: Int
+    let isDoneToday: Bool
+    let tint: Color
+
+    private let heights: [CGFloat] = [0.72, 0.86, 0.64, 0.8, 0.7, 0.9, 0.6]
+
+    var body: some View {
+        let solid = min(completed, 6)
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(0..<solid, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(tint.opacity(index.isMultiple(of: 2) ? 1 : 0.6))
+                    .frame(width: 9)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .scaleEffect(y: heights[index % heights.count], anchor: .bottom)
+            }
+            if !isDoneToday {
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(tint, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                    .frame(width: 9)
+                    .scaleEffect(y: 0.66, anchor: .bottom)
+            }
+            if solid == 0 && isDoneToday {
+                RoundedRectangle(cornerRadius: 2).fill(tint).frame(width: 9).scaleEffect(y: 0.7, anchor: .bottom)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroBreath: View {
+    let tint: Color
+    @Environment(\.weekyiiReduceMotion) private var reduceMotion
+    @State private var inhale = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<4, id: \.self) { index in
+                Circle()
+                    .fill(tint.opacity([0.08, 0.12, 0.2, 0.5][index]))
+                    .scaleEffect(CGFloat(4 - index) / 4 * (inhale ? 1 : 0.88))
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                inhale = true
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroDrop: View {
+    let fill: Double
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Image(systemName: "drop.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(tint.opacity(0.15))
+                Rectangle()
+                    .fill(tint)
+                    .frame(height: proxy.size.height * min(max(fill, 0.06), 1))
+                    .mask(alignment: .bottom) {
+                        Image(systemName: "drop.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                    }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroSparks: View {
+    let lit: Int
+    let tint: Color
+
+    var body: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(0..<9, id: \.self) { index in
+                Image(systemName: "sparkle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(index < min(lit, 9) ? tint : tint.opacity(0.15))
+                    .rotationEffect(.degrees(Double(index * 17 % 40) - 20))
+            }
+        }
+        .padding(4)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroCircles: View {
+    let isTogether: Bool
+    let tint: Color
+
+    var body: some View {
+        let offset: CGFloat = isTogether ? 9 : 18
+        ZStack {
+            Circle().fill(tint.opacity(0.35)).frame(width: 46, height: 46).offset(x: -offset)
+            Circle().fill(tint.opacity(0.75)).frame(width: 46, height: 46).offset(x: offset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HabitHeroTarget: View {
+    let rate: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .stroke(tint.opacity(0.2 + Double(index) * 0.15), lineWidth: 2)
+                    .padding(CGFloat(index) * 13 + 6)
+            }
+            Circle()
+                .trim(from: 0, to: min(max(rate, 0.001), 1))
+                .stroke(tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(3)
+            Circle().fill(tint).frame(width: 12, height: 12)
+        }
+        .accessibilityHidden(true)
     }
 }

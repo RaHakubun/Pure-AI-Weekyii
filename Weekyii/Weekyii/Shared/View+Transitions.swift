@@ -22,7 +22,7 @@ struct CardInteractionModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .shadow(
+            .weekSoftShadow(
                 color: isPressed ? WeekShadow.light.color : WeekShadow.medium.color,
                 radius: isPressed ? 4 : 8,
                 y: isPressed ? 2 : 4

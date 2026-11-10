@@ -6,13 +6,46 @@ enum SuspendedTaskStatus: String, Codable, CaseIterable {
     case assigned
 }
 
+/// What happens to a suspended task once its decision deadline has passed.
+///
+/// Stored as a raw string in `UserDefaults`, so adding cases does not touch the
+/// SwiftData schema.
+enum SuspendedExpiryPolicy: String, CaseIterable, Codable, Identifiable {
+    /// Delete the record silently. This is the historical behaviour and stays
+    /// the default so existing installs do not change.
+    case autoDelete
+    /// Keep the record in the suspended box as an overdue item, so the user
+    /// still gets to renew, assign or delete it themselves.
+    case keepOverdue
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .autoDelete:
+            String(localized: "settings.suspended.expiry.auto_delete", defaultValue: "到期自动删除")
+        case .keepOverdue:
+            String(localized: "settings.suspended.expiry.keep_overdue", defaultValue: "保留为逾期待处理")
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .autoDelete:
+            String(localized: "settings.suspended.expiry.auto_delete.summary", defaultValue: "到期后直接删除，不留记录。")
+        case .keepOverdue:
+            String(localized: "settings.suspended.expiry.keep_overdue.summary", defaultValue: "到期后保留在悬置箱并标记为已逾期，由你决定续期、分配或删除。")
+        }
+    }
+}
+
 @Model
 final class MindStampItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var text: String
+    var text: String = ""
     @Attribute(.externalStorage) var imageBlob: Data?
-    var createdAt: Date
+    var createdAt: Date = Date()
 
     init(text: String = "", imageBlob: Data? = nil) {
         self.text = text
@@ -28,19 +61,21 @@ final class MindStampItem {
 
 @Model
 final class SuspendedTaskItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
 
-    var title: String
-    var taskDescription: String
-    var taskType: TaskType
+    var title: String = ""
+    var taskDescription: String = ""
+    var taskType: TaskType = TaskType.regular
     var taskTypeIdRaw: String = TaskType.regular.rawValue
-    var createdAt: Date
-    var decisionDeadline: Date
-    var preferredCountdownDays: Int
-    var snoozeCount: Int
-    var statusRaw: String
-    @Relationship(deleteRule: .cascade) var steps: [TaskStep] = []
-    @Relationship(deleteRule: .cascade) var attachments: [TaskAttachment] = []
+    var createdAt: Date = Date()
+    var decisionDeadline: Date = Date()
+    var preferredCountdownDays: Int = 0
+    var snoozeCount: Int = 0
+    var statusRaw: String = SuspendedTaskStatus.active.rawValue
+    @Relationship(deleteRule: .cascade, originalName: "steps", inverse: \TaskStep.suspendedTask)
+    private var stepRecords: [TaskStep]? = []
+    @Relationship(deleteRule: .cascade, originalName: "attachments", inverse: \TaskAttachment.suspendedTask)
+    private var attachmentRecords: [TaskAttachment]? = []
 
     init(
         title: String,
@@ -61,6 +96,16 @@ final class SuspendedTaskItem {
         self.preferredCountdownDays = preferredCountdownDays
         self.snoozeCount = snoozeCount
         self.statusRaw = status.rawValue
+    }
+
+    var steps: [TaskStep] {
+        get { stepRecords ?? [] }
+        set { stepRecords = newValue }
+    }
+
+    var attachments: [TaskAttachment] {
+        get { attachmentRecords ?? [] }
+        set { attachmentRecords = newValue }
     }
 
     var status: SuspendedTaskStatus {

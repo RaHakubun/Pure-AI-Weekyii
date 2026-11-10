@@ -1,6 +1,124 @@
 import XCTest
 import UIKit
 
+// MARK: - Manual screenshot harness
+
+/// Ad-hoc screenshot helpers used to capture UI for review. They live in the UI
+/// test target because it is the one place where the host controls the app
+/// launch and can dismiss system alerts (notification permission) before
+/// snapping. They are skipped by CI via the `-skip-ui-screenshots` launch arg
+/// filter that we set in the production target, and they ignore their own
+/// outcome: success is "the file was written to /tmp/weekyii_shots/".
+final class ThemePickerScreenshotTests: XCTestCase {
+    /// Screenshots help verify grouped fills and the scrolled navigation bar.
+    func testCatSettingsGroupsAndNavigation() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let mineTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(mineTab.waitForExistence(timeout: 8))
+        mineTab.tap()
+
+        let appearance = app.descendants(matching: .any)
+            .matching(identifier: "settings.row.appearance").firstMatch
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        appearance.tap()
+
+        let cat = app.staticTexts["猫猫"].firstMatch
+        for _ in 0..<8 {
+            if cat.exists && cat.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(cat.isHittable, "猫猫主题应在主题列表中可选")
+        guard cat.isHittable else { return }
+        cat.tap()
+
+        let back = app.navigationBars.buttons.firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "猫猫")
+        ).firstMatch.waitForExistence(timeout: 5), "返回设置后应显示已选的猫猫主题")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(identifier: "settings.row.language").firstMatch.exists)
+
+        let top = XCTAttachment(screenshot: app.screenshot())
+        top.name = "cat-settings-top"
+        top.lifetime = .keepAlways
+        add(top)
+
+        app.swipeUp()
+        let data = app.descendants(matching: .any)
+            .matching(identifier: "settings.row.data").firstMatch
+        for _ in 0..<4 {
+            if data.exists && data.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(data.isHittable)
+        let scrolled = XCTAttachment(screenshot: app.screenshot())
+        scrolled.name = "cat-settings-scrolled"
+        scrolled.lifetime = .keepAlways
+        add(scrolled)
+        guard data.isHittable else { return }
+        data.tap()
+        XCTAssertTrue(app.navigationBars["数据与安全"].waitForExistence(timeout: 5))
+    }
+
+    func test_themePickerRenders() throws {
+        let app = XCUIApplication()
+        addUIInterruptionMonitor(withDescription: "Notifications") { alert in
+            if alert.buttons["允许"].exists { alert.buttons["允许"].tap(); return true }
+            if alert.buttons["Allow"].exists { alert.buttons["Allow"].tap(); return true }
+            return false
+        }
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let mineTab = app.tabBars.buttons["我的"]
+        XCTAssertTrue(mineTab.waitForExistence(timeout: 8))
+        mineTab.tap()
+
+        var appearanceLink = app.staticTexts["外观与主题"]
+        if !appearanceLink.exists { app.swipeUp() }
+        appearanceLink = app.staticTexts["外观与主题"]
+        guard appearanceLink.waitForExistence(timeout: 5) else {
+            XCTFail("Couldn't find 外观与主题")
+            return
+        }
+        appearanceLink.tap()
+
+        // Give the navigation transition a moment before snapping.
+        _ = app.staticTexts["主题"].waitForExistence(timeout: 5)
+        sleep(1)
+
+        let screenshotDirectory = URL(fileURLWithPath: "/tmp/weekyii_shots", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: screenshotDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let screenshot = app.screenshot()
+        try screenshot.pngRepresentation.write(
+            to: screenshotDirectory.appendingPathComponent("uitest_picker.png")
+        )
+
+        // Scroll the page so the personalised themes (粗野 / 霓虹 / 纸感 / 终端)
+        // appear in the screenshot. Form pages use a UI element whose swipe
+        // can be invoked at the application level.
+        for _ in 0..<4 {
+            app.swipeUp()
+            sleep(1)
+        }
+        sleep(1)
+        let scrolled = app.screenshot()
+        try scrolled.pngRepresentation.write(
+            to: screenshotDirectory.appendingPathComponent("uitest_picker_scrolled.png")
+        )
+    }
+}
+
 final class DraftReorderUITests: XCTestCase {
     private func selectModule(_ title: String, sidebarID: String, in app: XCUIApplication) {
         let tabButton = app.tabBars.buttons[title]
@@ -20,15 +138,98 @@ final class DraftReorderUITests: XCTestCase {
         case "mainSidebar_pending":
             workspaceID = "workspaceRoute_pending"
         case "mainSidebar_settings":
-            workspaceID = "workspaceRoute_settings"
+            workspaceID = "workspaceFullSettings"
         case "mainSidebar_extensions":
-            workspaceID = "workspaceRoute_projects"
+            workspaceID = "workspaceFullExtensions"
         default:
             workspaceID = sidebarID
         }
         let workspaceItem = app.descendants(matching: .any)[workspaceID]
         XCTAssertTrue(workspaceItem.waitForExistence(timeout: 5))
         workspaceItem.tap()
+    }
+
+    func testKillTimeFirePreviewTracksDraggingAndCancelRestoresSavedTime() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        let slider = app.descendants(matching: .any).matching(identifier: "killTimeSlider").firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        for _ in 0..<4 {
+            if slider.isHittable && slider.frame.maxY < app.frame.maxY - 150 { break }
+            app.swipeUp()
+        }
+        let saved = slider.value as? String
+        XCTAssertNotNil(saved)
+        let early = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5))
+        let late = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        late.press(forDuration: 0.1, thenDragTo: early)
+        let earlierValue = slider.value as? String
+        XCTAssertNotEqual(earlierValue, saved)
+        attachFireScreenshot(app, name: "fire-preview-earlier")
+        early.press(forDuration: 0.1, thenDragTo: late)
+        let laterValue = slider.value as? String
+        XCTAssertNotEqual(laterValue, earlierValue)
+        XCTAssertLessThan(earlierValue ?? "", laterValue ?? "")
+        attachFireScreenshot(app, name: "fire-preview-later")
+        let cancel = app.buttons["取消"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+        cancel.tap()
+        XCTAssertEqual(slider.value as? String, saved)
+        attachFireScreenshot(app, name: "fire-preview-cancelled")
+    }
+
+    func testKillTimeFirePreviewConfirmationCommitsCapturedSnapshot() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let slider = app.descendants(matching: .any).matching(identifier: "killTimeSlider").firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 8))
+        for _ in 0..<4 {
+            if slider.isHittable && slider.frame.maxY < app.frame.maxY - 150 { break }
+            app.swipeUp()
+        }
+
+        let saved = slider.value as? String
+        let early = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5))
+        let proposed = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        early.press(forDuration: 0.1, thenDragTo: proposed)
+        let proposedValue = slider.value as? String
+        XCTAssertNotEqual(proposedValue, saved)
+
+        app.buttons["确认"].firstMatch.tap()
+        let confirmation = app.alerts["确认修改截止时间"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["确认"].tap()
+
+        XCTAssertTrue(app.buttons["取消"].waitForNonExistence(timeout: 3))
+        XCTAssertEqual(slider.value as? String, proposedValue)
+    }
+
+    private func attachFireScreenshot(_ app: XCUIApplication, name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testPersistenceResolvingShowsOnlyLaunchPlaceholder() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-testPersistenceResolving"
+        ]
+        app.launch()
+
+        let placeholder = app.descendants(matching: .any)
+            .matching(identifier: "launch.persistence.placeholder")
+            .firstMatch
+        XCTAssertTrue(placeholder.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["正在打开本地数据…"].exists)
+        XCTAssertFalse(app.staticTexts["本地数据准备完成后即可继续使用 Weekyii"].exists)
     }
 
     func testExtensionsHubUsesSquareShortcutsAboveProjects() {
@@ -86,11 +287,20 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(moveDownButton.waitForExistence(timeout: 3))
         moveDownButton.tap()
 
-        let firstAfter = app.staticTexts["draftTaskTitle_0"].label
-        let secondAfter = app.staticTexts["draftTaskTitle_1"].label
+        let firstAfter = app.staticTexts["draftTaskTitle_0"]
+        let secondAfter = app.staticTexts["draftTaskTitle_1"]
+        let firstReordered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", secondBefore),
+            object: firstAfter
+        )
+        let secondReordered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", firstBefore),
+            object: secondAfter
+        )
+        wait(for: [firstReordered, secondReordered], timeout: 5)
 
-        XCTAssertEqual(firstAfter, secondBefore)
-        XCTAssertEqual(secondAfter, firstBefore)
+        XCTAssertEqual(firstAfter.label, secondBefore)
+        XCTAssertEqual(secondAfter.label, firstBefore)
     }
 
     func testDraftAddAndEditBothOpenTaskEditorSheet() {
@@ -114,8 +324,15 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(cancelButton.waitForExistence(timeout: 2))
         cancelButton.tap()
 
-        let firstDraftTask = app.staticTexts["draftTaskTitle_0"]
+        let editorDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: editorTitleField
+        )
+        wait(for: [editorDismissed], timeout: 5)
+
+        let firstDraftTask = app.buttons["draftTaskButton_0"]
         XCTAssertTrue(firstDraftTask.waitForExistence(timeout: 3))
+        XCTAssertTrue(firstDraftTask.isHittable)
         firstDraftTask.tap()
 
         XCTAssertTrue(editorTitleField.waitForExistence(timeout: 3))
@@ -143,7 +360,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertFalse(exchangeButton.isEnabled)
         XCTAssertFalse(addButton.isEnabled)
         XCTAssertFalse(editButton.isEnabled)
-        XCTAssertTrue(lockButton.isHittable)
+        XCTAssertTrue(waitForHittable(lockButton, in: app))
 
         lockButton.tap()
 
@@ -178,7 +395,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["draftTaskTitle_0"].label, "Flexible Focus Task")
     }
 
-    func testSettingsExecutionModePickerCanSelectFlexibleMode() {
+    func testSettingsExecutionModeCardsCanSelectFlexibleMode() {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting",
@@ -188,12 +405,14 @@ final class DraftReorderUITests: XCTestCase {
 
         selectModule("我的", sidebarID: "mainSidebar_settings", in: app)
 
-        let picker = app.segmentedControls["executionModePicker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 3))
-        let flexibleButton = picker.buttons["灵动模式"]
-        XCTAssertTrue(flexibleButton.exists)
+        let todayRhythm = app.cells.containing(.staticText, identifier: "今日节奏").firstMatch
+        XCTAssertTrue(todayRhythm.waitForExistence(timeout: 3))
+        todayRhythm.tap()
+
+        let flexibleButton = app.buttons["executionModeOption.flexible"]
+        XCTAssertTrue(flexibleButton.waitForExistence(timeout: 3))
         flexibleButton.tap()
-        XCTAssertTrue(flexibleButton.isSelected)
+        XCTAssertEqual(flexibleButton.value as? String, "已选择")
     }
 
     func testDraftShowsFloatingStartButton() {
@@ -253,7 +472,7 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(warningPrimaryButton.waitForExistence(timeout: 2))
         warningPrimaryButton.tap()
 
-        let ritualCard = app.otherElements["startFlowRitualCard"]
+        let ritualCard = app.descendants(matching: .any)["startFlowRitualCard"]
         XCTAssertTrue(ritualCard.waitForExistence(timeout: 3))
 
         let ritualSecondaryButton = app.buttons["startFlowSecondaryButton"]
@@ -278,6 +497,10 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertTrue(projectsSeeAll.waitForExistence(timeout: 5))
         projectsSeeAll.tap()
 
+        let projectsFullView = app.descendants(matching: .any)["projectsFullView"]
+        XCTAssertTrue(projectsFullView.waitForExistence(timeout: 5))
+        let projectsEmptyState = app.descendants(matching: .any)["projectsEmptyState"]
+        XCTAssertTrue(projectsEmptyState.waitForExistence(timeout: 5))
         let projectsEmptyCreate = app.buttons["projectsEmptyCreateButton"]
         XCTAssertTrue(projectsEmptyCreate.waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["projectsFooterCreateButton"].exists)
@@ -293,6 +516,19 @@ final class DraftReorderUITests: XCTestCase {
         let mindStampsToolbarCreate = app.buttons["mindstampsToolbarCreateButton"]
         XCTAssertTrue(mindStampsToolbarCreate.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["mindstampsFooterCreateButton"].exists)
+    }
+
+    private func waitForHittable(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8
+    ) -> Bool {
+        guard element.waitForExistence(timeout: 5) else { return false }
+        for _ in 0..<maxSwipes {
+            if element.isHittable { return true }
+            app.swipeUp()
+        }
+        return element.isHittable
     }
 
     func testMindStampsPageShowsToolbarCreateAndDeleteConfirmation() {
@@ -430,6 +666,46 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertFalse(app.buttons["pendingDraftTask_1"].waitForExistence(timeout: 2))
     }
 
+    func testPendingMonthViewShowsDynamicSelectedDayTypeSummaryWithoutFixedTypeCards() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedPendingWeek",
+            "1"
+        ]
+        app.launch()
+
+        let pendingTab = app.tabBars.buttons["未来"]
+        XCTAssertTrue(pendingTab.waitForExistence(timeout: 5))
+        pendingTab.tap()
+
+        let switchToMonth = app.buttons["pendingSwitchToMonthButton"]
+        XCTAssertTrue(switchToMonth.waitForExistence(timeout: 3))
+        switchToMonth.tap()
+
+        let calendar = Calendar(identifier: .iso8601)
+        let seededDate = calendar.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        if !calendar.isDate(seededDate, equalTo: Date(), toGranularity: .month) {
+            let nextMonth = app.buttons["monthPickerNextButton"]
+            XCTAssertTrue(nextMonth.waitForExistence(timeout: 3))
+            nextMonth.tap()
+        }
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let seededDayButton = app.buttons["pendingMonthDay_\(dateFormatter.string(from: seededDate))"]
+        XCTAssertTrue(seededDayButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(seededDayButton.isEnabled)
+        seededDayButton.tap()
+
+        XCTAssertTrue(app.staticTexts["pendingSelectedDayTaskCount"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["pendingSelectedDayTypeSummary"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_regular"].exists)
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_ddl"].exists)
+        XCTAssertFalse(app.otherElements["pendingMonthSummary_leisure"].exists)
+    }
+
     func testSuspendedTasksCanBeCreatedAndDeletedWithConfirmation() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -473,9 +749,12 @@ final class DraftReorderUITests: XCTestCase {
 
     func testWeekOverviewSupportsCardsStripsAndCollapsedModes() {
         let app = XCUIApplication()
+        // The topology card is replaced by an empty state when the week holds no
+        // tasks, so seed today's draft tasks to reach the tree itself.
         app.launchArguments = [
             "-uiTesting",
-            "1"
+            "1",
+            "-uiTestingSeedDraft"
         ]
         app.launch()
 
@@ -523,6 +802,169 @@ final class DraftReorderUITests: XCTestCase {
         cardsButton.tap()
 
         XCTAssertTrue(cardsGrid.waitForExistence(timeout: 3))
+    }
+
+    /// Tapping a task node must land on the task inspector.
+    ///
+    /// The inspector picks its variant from the selected node id. A task belongs
+    /// to a day but matches neither that day's id nor a group id, so it has to be
+    /// checked *before* the forgotten fallback — otherwise a live task renders as
+    /// "任务已遗忘". This guards that ordering.
+    func testWeekTopologyTaskNodeShowsTaskInspectorNotForgotten() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting",
+            "1",
+            "-uiTestingSeedDraft"
+        ]
+        app.launch()
+
+        let weekButton = app.buttons["todaySectionWeekButton"]
+        XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
+        weekButton.tap()
+
+        let topology = app.descendants(matching: .any)["weekTopologyView"]
+        XCTAssertTrue(topology.waitForExistence(timeout: 3))
+
+        // The seed puts both tasks on the current day. Do not hard-code Monday
+        // here: the test must remain valid when the calendar advances to a
+        // different weekday.
+        let seededDay = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH 'weekTopologyDay_' AND label CONTAINS '共 2 项'"
+            )
+        ).firstMatch
+        XCTAssertTrue(seededDay.waitForExistence(timeout: 3))
+
+        // Focusing a day is what brings the task layer into the compact canvas.
+        seededDay.tap()
+
+        // Task cards carry a label (title + type) but no identifier.
+        let taskCard = topology.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Draft Task A"))
+            .firstMatch
+        XCTAssertTrue(taskCard.waitForExistence(timeout: 3))
+        taskCard.tap()
+
+        // `.accessibilityIdentifier("weekTopologyInspector")` propagates to every
+        // child of the inspector, so the id is not unique and scoping a query to
+        // it is unreliable. Assert on labels that only one variant renders:
+        // "查看任务详情" exists only in the task inspector, "任务已遗忘" only in
+        // the forgotten one.
+        XCTAssertTrue(
+            app.buttons["查看任务详情"].waitForExistence(timeout: 3),
+            "轻点任务卡后没有出现任务详情入口，可能落到了别的 inspector"
+        )
+        XCTAssertFalse(
+            app.staticTexts["任务已遗忘"].exists,
+            "轻点任务卡错误地显示成了「任务已遗忘」"
+        )
+    }
+
+    // MARK: - 周视图日期卡等高
+
+    /// 周视图两列网格里，七张日期卡必须等高。
+    ///
+    /// `LazyVGrid` 只把一行撑到最高 cell 的高度，**不会**拉伸同行的其他 cell。
+    /// 空日期曾经完全不渲染进度环，intrinsic height 比有任务的日期少
+    /// `36pt（环）+ 12pt（间距）`，所以「某天第一次加任务」之后，同一行立刻变得
+    /// 参差不齐。修复方式是在 `DayCard` 里让所有状态共用同一条布局路径。
+    func testWeekOverviewDayCardsShareOneHeight() {
+        // 种子数据把两个草稿任务放在今天，于是本周恰好是「一天有任务、六天空」，
+        // 也就是最容易暴露高度不一致的组合。
+        let heights = measureWeekDayCardHeights(seedDraft: true)
+
+        XCTAssertEqual(
+            heights.count, 7,
+            "七张日期卡都应该被量到高度，实际只量到 \(heights.count) 张：\(heights)"
+        )
+
+        // 半像素归并，避免浮点噪声（实测同一高度会有 ~6e-5 的抖动）。
+        let distinctHeights = Set(heights.values.map { ($0 * 2).rounded() / 2 })
+        XCTAssertEqual(
+            distinctHeights.count, 1,
+            "同一周内日期卡高度不一致（空日期与有任务的日期不等高）：\(heights)"
+        )
+    }
+
+    /// 加任务前后，日期卡的高度必须不变。
+    ///
+    /// 这是缺陷的原始触发路径：用户在空日期上放第一个任务，卡片立刻长高 48pt。
+    /// `-uiTesting` 走的是 in-memory 容器，两次启动之间除种子数据外没有任何残留，
+    /// 所以可以把「加任务」隔离成唯一变量。
+    func testWeekOverviewDayCardHeightIsStableWhenADayGetsItsFirstTask() {
+        let emptyWeek = measureWeekDayCardHeights(seedDraft: false)
+        let seededWeek = measureWeekDayCardHeights(seedDraft: true)
+
+        XCTAssertEqual(emptyWeek.count, 7, "空库这一周也应量到 7 张卡：\(emptyWeek)")
+        XCTAssertEqual(seededWeek.count, 7, "有任务这一周也应量到 7 张卡：\(seededWeek)")
+
+        // 比高度「档位」而不是逐张精确值：种子只影响今天，其余六天两轮都为空，
+        // 所以只要出现一个新的高度档位，就说明状态变化改变了卡片高度。
+        let emptyTiers = Set(emptyWeek.values.map { ($0 * 2).rounded() / 2 })
+        let seededTiers = Set(seededWeek.values.map { ($0 * 2).rounded() / 2 })
+
+        XCTAssertEqual(
+            seededTiers, emptyTiers,
+            "给日期加上第一个任务后卡片高度变了：空库档位 \(emptyTiers)，有任务档位 \(seededTiers)"
+        )
+    }
+
+    /// 启动 App、进入周视图、量出七张日期卡的高度。
+    private func measureWeekDayCardHeights(seedDraft: Bool) -> [Int: CGFloat] {
+        let app = XCUIApplication()
+        app.launchArguments = seedDraft
+            ? ["-uiTesting", "1", "-uiTestingSeedDraft"]
+            : ["-uiTesting", "1"]
+        app.launch()
+
+        let weekButton = app.buttons["todaySectionWeekButton"]
+        XCTAssertTrue(weekButton.waitForExistence(timeout: 5))
+        weekButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["weekOverviewCardsGrid"].waitForExistence(timeout: 3)
+        )
+
+        // `weekDayCard_*` 的 identifier 会传播到子元素，所以用 firstMatch 取容器本身，
+        // 避免「multiple matching elements」。
+        func card(_ index: Int) -> XCUIElement {
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier == %@", "weekDayCard_\(index)"))
+                .firstMatch
+        }
+
+        // 每张卡只记第一次量到的值：高度不随滚动位置变化。
+        var heights: [Int: CGFloat] = [:]
+        func measureVisibleCards() {
+            for index in 0..<7 {
+                let element = card(index)
+                guard element.exists else { continue }
+                let height = element.frame.height
+                if height > 0, heights[index] == nil {
+                    heights[index] = height
+                }
+            }
+        }
+
+        measureVisibleCards()
+
+        // 网格位于拓扑卡下方，最后一行可能落在屏幕外；LazyVGrid 又是懒加载的，
+        // 所以要往下滚一遍把七张卡都量到。
+        //
+        // 拖拽必须锚定在卡片区域：非全屏的拓扑画布高 220pt 且自带拖拽手势，
+        // 用 `app.swipeUp()`（落点在屏幕中央）会被画布吃掉，页面根本不滚动。
+        var attempts = 0
+        while heights.count < 7, attempts < 6 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            measureVisibleCards()
+            attempts += 1
+        }
+
+        app.terminate()
+        return heights
     }
 }
 

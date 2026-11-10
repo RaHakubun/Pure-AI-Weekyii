@@ -5,22 +5,28 @@ import SwiftData
 @MainActor
 @Observable
 final class ExtensionsViewModel {
-    private let modelContext: ModelContext
-    private let notificationService: any NotificationScheduling
-    private let taskMutationService: TaskMutationService
-    private let weekCalculator = WeekCalculator()
-    private let calendar = Calendar(identifier: .iso8601)
+    @ObservationIgnored private let modelContext: ModelContext
+    @ObservationIgnored private let notificationService: any NotificationScheduling
+    @ObservationIgnored private let taskMutationService: TaskMutationService
+    @ObservationIgnored private let calendar = Calendar(identifier: .iso8601)
+    @ObservationIgnored private let trendWindowDays = 14
+    @ObservationIgnored private let tileTaskRowLimit = 3
 
     var projects: [ProjectModel] = []
     var suspendedTasks: [SuspendedTaskItem] = []
     var tileSnapshotsByProjectID: [UUID: ProjectTileSnapshot] = [:]
     var errorMessage: String?
 
-    init(modelContext: ModelContext, notificationService: (any NotificationScheduling)? = nil) {
+    init(
+        modelContext: ModelContext,
+        notificationService: (any NotificationScheduling)? = nil
+    ) {
         self.modelContext = modelContext
         self.notificationService = notificationService ?? NotificationService.shared
         self.taskMutationService = TaskMutationService(modelContext: modelContext)
     }
+
+    nonisolated deinit {}
 
     // MARK: - Refresh
 
@@ -340,33 +346,16 @@ final class ExtensionsViewModel {
 
     /// 找到或创建某日期对应的 DayModel（自动创建 Week）
     private func findOrCreateDay(for date: Date) -> DayModel? {
-        let dayId = calendar.startOfDay(for: date).dayId
-
-        // 先查找已有 Day
-        let dayDescriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
-        if let existingDay = try? modelContext.fetch(dayDescriptor).first {
-            return existingDay
-        }
-
-        // Day 不存在 → 查找或创建 Week
-        let weekId = date.weekId
-        let weekDescriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
-
-        if let existingWeek = try? modelContext.fetch(weekDescriptor).first {
-            // Week 存在但 Day 缺失（不应发生，但保险起见）
-            return existingWeek.days.first { $0.dayId == dayId }
-        }
-
-        // Week 也不存在 → 创建 Week（pending 状态）
-        let week = weekCalculator.makeWeek(for: date, status: .pending)
-        modelContext.insert(week)
         do {
-            try modelContext.save()
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: date, weekStatus: .pending)
+            if resolution.createdWeek || resolution.createdDay {
+                try modelContext.save()
+            }
+            return resolution.day
         } catch {
             return nil
         }
-
-        return week.days.first { $0.dayId == dayId }
     }
 
     // MARK: - Project Queries
@@ -385,6 +374,51 @@ final class ExtensionsViewModel {
 
     func dueSoonSuspendedTasks(limit: Int = 3) -> [SuspendedTaskItem] {
         Array(suspendedTasks.prefix(limit))
+    }
+
+    /// 扩展首页的悬置箱预览：先让用户看见最需要作出决定的事项。
+    func hubSuspendedTasks(referenceDate: Date = Date()) -> [SuspendedTaskItem] {
+        let today = calendar.startOfDay(for: referenceDate)
+        let soonLimit = today.addingDays(7)
+
+        return suspendedTasks.sorted { lhs, rhs in
+            let lhsDeadline = calendar.startOfDay(for: lhs.decisionDeadline)
+            let rhsDeadline = calendar.startOfDay(for: rhs.decisionDeadline)
+
+            func urgencyRank(for deadline: Date) -> Int {
+                if deadline < today { return 0 }
+                if calendar.isDate(deadline, inSameDayAs: today) { return 1 }
+                if deadline <= soonLimit { return 2 }
+                return 3
+            }
+
+            let lhsRank = urgencyRank(for: lhsDeadline)
+            let rhsRank = urgencyRank(for: rhsDeadline)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            if lhsDeadline != rhsDeadline { return lhsDeadline < rhsDeadline }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
+    /// 复用现有项目快照，按下一步任务的日期优先展示可推进的项目。
+    func hubProjectSnapshots() -> [ProjectTileSnapshot] {
+        activeProjects()
+            .compactMap { tileSnapshotsByProjectID[$0.id] }
+            .sorted { lhs, rhs in
+                switch (lhs.nextTaskDate, rhs.nextTaskDate) {
+                case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
+                    return lhsDate < rhsDate
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                default:
+                    if lhs.remainingCount != rhs.remainingCount {
+                        return lhs.remainingCount > rhs.remainingCount
+                    }
+                    return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                }
+            }
     }
 
     func suspendedTaskStats(referenceDate: Date = Date()) -> (total: Int, dueSoon: Int, dueToday: Int) {
@@ -597,19 +631,51 @@ final class ExtensionsViewModel {
         var next: [UUID: ProjectTileSnapshot] = [:]
         let today = calendar.startOfDay(for: Date())
         for project in projects {
-            let sortedPending = project.tasks
-                .filter { $0.zone != .complete }
-                .sorted { lhs, rhs in
-                    let lhsDate = lhs.day?.date ?? .distantFuture
-                    let rhsDate = rhs.day?.date ?? .distantFuture
-                    if lhsDate != rhsDate { return lhsDate < rhsDate }
-                    return lhs.order < rhs.order
-                }
+            // Overdue tasks are count-only (see ProjectTaskTimeline): they never
+            // become the next step and never appear by title in tile lists.
+            let actionableTasks = ProjectTaskTimeline.actionableTasks(in: project, today: today, calendar: calendar)
+            let preferredTask = actionableTasks.first
 
-            let preferredTask = sortedPending.first(where: { task in
-                guard let date = task.day?.date else { return false }
-                return calendar.startOfDay(for: date) >= today
-            }) ?? sortedPending.first
+            // 坐标轴与待办列表共用一个时间域：窗口右端跟着最晚的待办日延伸，
+            // 但最多到 today+13，避免远期任务把整段历史挤出窗口。
+            let latestPendingDay = project.tasks.compactMap { task -> Date? in
+                guard task.zone != .complete, let date = task.day?.date else { return nil }
+                return self.calendar.startOfDay(for: date)
+            }.max()
+            let horizonEnd = calendar.date(byAdding: .day, value: trendWindowDays - 1, to: today) ?? today
+            let windowEnd = min(latestPendingDay.map { max(today, $0) } ?? today, horizonEnd)
+            let windowStart = calendar.date(byAdding: .day, value: -(trendWindowDays - 1), to: windowEnd) ?? today
+
+            var completionsByDay: [Date: Int] = [:]
+            for task in project.tasks where task.zone == .complete {
+                guard let stamp = task.endedAt ?? task.day?.date else { continue }
+                let day = calendar.startOfDay(for: stamp)
+                guard day >= windowStart, day <= today else { continue }
+                completionsByDay[day, default: 0] += 1
+            }
+            var plannedByDay: [Date: Int] = [:]
+            for task in project.tasks where task.zone != .complete {
+                guard let date = task.day?.date else { continue }
+                let day = calendar.startOfDay(for: date)
+                guard day >= windowStart, day <= windowEnd else { continue }
+                plannedByDay[day, default: 0] += 1
+            }
+            let trend = (0..<trendWindowDays).compactMap { offset -> ProjectTileTrendPoint? in
+                guard let day = calendar.date(byAdding: .day, value: offset, to: windowStart) else { return nil }
+                return ProjectTileTrendPoint(
+                    day: day,
+                    completed: completionsByDay[day] ?? 0,
+                    planned: plannedByDay[day] ?? 0
+                )
+            }
+            let upcomingTasks = actionableTasks.prefix(tileTaskRowLimit).map { task in
+                ProjectTileTaskEntry(
+                    taskID: task.id,
+                    title: task.title,
+                    date: task.day?.date,
+                    isOverdue: false
+                )
+            }
 
             next[project.id] = ProjectTileSnapshot(
                 projectID: project.id,
@@ -622,11 +688,29 @@ final class ExtensionsViewModel {
                 remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
                 expiredCount: project.expiredTaskCount,
                 nextTaskTitle: preferredTask?.title,
-                nextTaskDate: preferredTask?.day?.date
+                nextTaskDate: preferredTask?.day?.date,
+                nextTaskID: preferredTask?.id,
+                trend: trend,
+                upcomingTasks: upcomingTasks
             )
         }
         tileSnapshotsByProjectID = next
     }
+}
+
+struct ProjectTileTrendPoint: Equatable {
+    let day: Date
+    let completed: Int
+    var planned: Int = 0
+}
+
+struct ProjectTileTaskEntry: Equatable {
+    /// Identity of the source task, so views can de-duplicate by task rather
+    /// than by title and date (two tasks may share both).
+    var taskID: UUID? = nil
+    let title: String
+    let date: Date?
+    let isOverdue: Bool
 }
 
 struct ProjectTileSnapshot: Equatable {
@@ -641,12 +725,18 @@ struct ProjectTileSnapshot: Equatable {
     let expiredCount: Int
     let nextTaskTitle: String?
     let nextTaskDate: Date?
+    var nextTaskID: UUID? = nil
+    var trend: [ProjectTileTrendPoint] = []
+    var upcomingTasks: [ProjectTileTaskEntry] = []
 }
 
 struct ProjectTaskLedgerSection: Identifiable {
     let date: Date
+    /// Tasks shown with details: completed and still-actionable ones.
     let tasks: [TaskItem]
     let isExpandedByDefault: Bool
+    /// Overdue tasks on this day. Count only, never listed (see ProjectTaskTimeline).
+    var expiredCount: Int = 0
 
     var id: String {
         date.dayId
@@ -685,16 +775,19 @@ enum ProjectDetailComposer {
 
         return grouped
             .map { date, tasks in
-                let sortedTasks = tasks.sorted { lhs, rhs in
-                    if lhs.order != rhs.order {
-                        return lhs.order < rhs.order
+                let visibleTasks = tasks
+                    .filter { !ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar) }
+                    .sorted { lhs, rhs in
+                        if lhs.order != rhs.order {
+                            return lhs.order < rhs.order
+                        }
+                        return lhs.id.uuidString < rhs.id.uuidString
                     }
-                    return lhs.id.uuidString < rhs.id.uuidString
-                }
                 return ProjectTaskLedgerSection(
                     date: date,
-                    tasks: sortedTasks,
-                    isExpandedByDefault: date >= today
+                    tasks: visibleTasks,
+                    isExpandedByDefault: date >= today,
+                    expiredCount: tasks.count - visibleTasks.count
                 )
             }
             .sorted { $0.date < $1.date }
@@ -706,24 +799,10 @@ enum ProjectDetailComposer {
         referenceDate: Date
     ) -> ProjectDetailSnapshot {
         let today = calendar.startOfDay(for: referenceDate)
-        let pending = project.tasks
-            .filter { $0.zone != .complete }
-            .sorted { lhs, rhs in
-                let lhsDate = calendar.startOfDay(for: lhs.day?.date ?? .distantFuture)
-                let rhsDate = calendar.startOfDay(for: rhs.day?.date ?? .distantFuture)
-                if lhsDate != rhsDate {
-                    return lhsDate < rhsDate
-                }
-                if lhs.order != rhs.order {
-                    return lhs.order < rhs.order
-                }
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-
-        let nextTask = pending.first { task in
-            guard let taskDay = task.day?.date else { return false }
-            return calendar.startOfDay(for: taskDay) >= today
-        } ?? pending.first
+        let nextTask = ProjectTaskTimeline.nextTask(in: project, today: today, calendar: calendar)
+        let expiredCount = project.tasks.filter {
+            ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar)
+        }.count
 
         return ProjectDetailSnapshot(
             projectID: project.id,
@@ -738,7 +817,7 @@ enum ProjectDetailComposer {
             totalCount: project.totalTaskCount,
             completedCount: project.completedTaskCount,
             remainingCount: max(project.totalTaskCount - project.completedTaskCount, 0),
-            expiredCount: project.expiredTaskCount,
+            expiredCount: expiredCount,
             nextTaskTitle: nextTask?.title,
             nextTaskDate: nextTask?.day?.date,
             sections: projectTaskLedgerSections(project: project, calendar: calendar, referenceDate: referenceDate)
@@ -751,7 +830,6 @@ struct SuspendedTaskLifecycleService {
     private let notificationService: any NotificationScheduling
     private let taskMutationService: TaskMutationService
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(modelContext: ModelContext, notificationService: any NotificationScheduling) {
         self.modelContext = modelContext
@@ -862,17 +940,28 @@ struct SuspendedTaskLifecycleService {
             zone: .draft
         )
         taskItem.taskTypeIdRaw = task.taskTypeIdRaw
-        replaceSteps(for: taskItem, with: task.steps)
-        replaceAttachments(for: taskItem, with: task.attachments)
+
+        // The resources **move** with the task instead of being re-created, so the
+        // attachment business identities survive the owner change. The suspended
+        // task's collections are emptied first: both relationships are `.cascade`,
+        // and a row still hanging off it would be deleted along with it.
+        let movedSteps = task.steps
+        let movedAttachments = task.attachments
+        task.steps = []
+        task.attachments = []
+        taskItem.steps = movedSteps
+        taskItem.attachments = movedAttachments
+        TaskResourceIdentity.renumberSteps(taskItem.steps)
+
         targetDay.tasks.append(taskItem)
         if targetDay.status == .empty {
             targetDay.status = .draft
         }
 
         task.status = .assigned
+        notificationService.cancelSuspendedTaskNotifications(for: task)
         modelContext.delete(task)
         try modelContext.save()
-        notificationService.cancelSuspendedTaskNotifications(for: task)
     }
 
     func deleteTask(_ task: SuspendedTaskItem) throws {
@@ -881,10 +970,18 @@ struct SuspendedTaskLifecycleService {
         try modelContext.save()
     }
 
-    func sweepExpiredTasks(now: Date) throws -> Int {
+    /// Sweeps suspended tasks whose decision deadline has passed.
+    ///
+    /// Returns the number of records actually deleted. Under `.keepOverdue` the
+    /// overdue records are deliberately left in place, so the count is `0` even
+    /// though expired tasks were found — the user decides what to do with them.
+    @discardableResult
+    func sweepExpiredTasks(now: Date, policy: SuspendedExpiryPolicy = .autoDelete) throws -> Int {
         let descriptor = FetchDescriptor<SuspendedTaskItem>()
         let allTasks = try modelContext.fetch(descriptor)
         let expired = allTasks.filter { $0.status == .active && $0.decisionDeadline <= now }
+
+        guard policy == .autoDelete else { return 0 }
 
         for task in expired {
             notificationService.cancelSuspendedTaskNotifications(for: task)
@@ -912,12 +1009,9 @@ struct SuspendedTaskLifecycleService {
         }
 
         let weekStatus: WeekStatus = date.startOfWeek == today.startOfWeek ? .present : .pending
-        let week = weekCalculator.makeWeek(for: date, status: weekStatus)
-        modelContext.insert(week)
-        guard let targetDay = week.days.first(where: { $0.dayId == dayId }) else {
-            throw WeekyiiError.dayNotFound(dayId)
-        }
-        return (targetDay, true)
+        let resolution = try WeekDataStore(modelContext: modelContext)
+            .resolveDay(on: date, weekStatus: weekStatus)
+        return (resolution.day, resolution.createdWeek)
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {
@@ -936,20 +1030,24 @@ struct SuspendedTaskLifecycleService {
         return endOfDay(for: targetDay)
     }
 
+    // Editing one resource kind must not rebuild the other, so each wrapper
+    // touches only its own kind. Passing the untouched kind through is what used
+    // to re-create it — and re-mint its identity — on every save.
+
     private func replaceSteps(for task: SuspendedTaskItem, with steps: [TaskStep]) {
-        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
+        taskMutationService.replaceTaskSteps(for: task, steps: steps)
     }
 
     private func replaceAttachments(for task: SuspendedTaskItem, with attachments: [TaskAttachment]) {
-        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
+        taskMutationService.replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     private func replaceSteps(for task: TaskItem, with steps: [TaskStep]) {
-        taskMutationService.replaceTaskResources(for: task, steps: steps, attachments: task.attachments)
+        taskMutationService.replaceTaskSteps(for: task, steps: steps)
     }
 
     private func replaceAttachments(for task: TaskItem, with attachments: [TaskAttachment]) {
-        taskMutationService.replaceTaskResources(for: task, steps: task.steps, attachments: attachments)
+        taskMutationService.replaceTaskAttachments(for: task, attachments: attachments)
     }
 
     private func endOfDay(for date: Date) -> Date {
