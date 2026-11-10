@@ -1327,7 +1327,10 @@ struct TodayView: View {
     }
 
     private func selectTask(_ task: TaskItem) {
-        if let workspaceSelectionStore {
+        if task.habit != nil {
+            // Habit tasks use their own editor, including habit-specific actions.
+            selectedTaskForDetail = task
+        } else if let workspaceSelectionStore {
             workspaceSelectionStore.select(.task(task.id), for: .today)
         } else {
             selectedTaskForDetail = task

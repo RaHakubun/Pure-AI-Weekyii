@@ -6,6 +6,36 @@ import CryptoKit
 import ImageIO
 @testable import Weekyii
 
+final class WorkspaceNavigationMappingTests: XCTestCase {
+    func testEveryWorkspaceRouteMapsToAnIOSModule() {
+        let expected: [(WorkspaceRoute, MainTab)] = [
+            (.today, .today), (.week, .today), (.search, .today),
+            (.pending, .pending), (.projects, .extensions), (.suspended, .extensions),
+            (.mindStamps, .extensions), (.extensions, .extensions),
+            (.past, .past), (.insights, .past), (.settings, .settings)
+        ]
+        XCTAssertEqual(expected.count, WorkspaceRoute.allCases.count)
+        for (route, tab) in expected {
+            XCTAssertEqual(MainTab(workspaceRoute: route), tab)
+        }
+    }
+
+    func testRestoresSpecificRouteUnlessCompactTabChanged() {
+        XCTAssertEqual(MainTab.restoredRoute(for: .extensions, previousRoute: .projects), .projects)
+        XCTAssertEqual(MainTab.restoredRoute(for: .settings, previousRoute: .projects), .settings)
+        XCTAssertEqual(MainTab.restoredRoute(for: .today, previousRoute: .week), .week)
+        let afterLeavingProjects = MainTab.restoredRoute(for: .today, previousRoute: .projects)
+        XCTAssertEqual(MainTab.restoredRoute(for: .extensions, previousRoute: afterLeavingProjects), .extensions)
+    }
+
+    func testLayoutBoundaries() {
+        XCTAssertEqual(WeekLayoutClass(availableWidth: 649), .compact)
+        XCTAssertEqual(WeekLayoutClass(availableWidth: 650), .regular)
+        XCTAssertEqual(WeekLayoutClass(availableWidth: 999), .regular)
+        XCTAssertEqual(WeekLayoutClass(availableWidth: 1000), .wide)
+    }
+}
+
 final class KillTimeFireTests: XCTestCase {
     func testEarlierCutoffAlwaysHasMoreFireAcrossTheWholeDay() {
         var previous = KillTimeFlameBackground.intensity(remainingMinutes: 0)

@@ -7,6 +7,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
     case pending
     case projects
     case suspended
+    case extensions
     case past
     case insights
     case mindStamps
@@ -22,6 +23,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: "未来"
         case .projects: "项目"
         case .suspended: "悬置箱"
+        case .extensions: String(localized: "tab.extensions")
         case .past: "过去"
         case .insights: "洞察"
         case .mindStamps: "印记"
@@ -37,6 +39,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: "calendar.badge.plus"
         case .projects: "folder"
         case .suspended: "hourglass"
+        case .extensions: "square.grid.2x2"
         case .past: "clock.arrow.circlepath"
         case .insights: "chart.xyaxis.line"
         case .mindStamps: "bandage.fill"
@@ -52,6 +55,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: .weekyiiPrimaryLight
         case .projects: .weekyiiPrimary
         case .suspended: .suspendedModuleTint
+        case .extensions: .weekyiiPrimary
         case .past: .textSecondary
         case .insights: .accentGreen
         case .mindStamps: .accentPink
@@ -61,10 +65,10 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
     }
 
     static let nowRoutes: [WorkspaceRoute] = [.today, .week]
-    static let planningRoutes: [WorkspaceRoute] = [.pending, .projects, .suspended]
+    static let planningRoutes: [WorkspaceRoute] = [.pending, .projects, .suspended, .extensions]
     static let reflectionRoutes: [WorkspaceRoute] = [.past, .insights, .mindStamps]
     static let persistentRoutes: [WorkspaceRoute] = [
-        .today, .week, .pending, .projects, .suspended,
+        .today, .week, .pending, .projects, .suspended, .extensions,
         .past, .insights, .mindStamps, .search, .settings
     ]
 }
@@ -82,10 +86,14 @@ enum WorkspaceSelection: Hashable {
 }
 
 enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
+    case vip
     case appearance
+    case language
     case rhythm
     case taskTypes
+    case past
     case future
+    case suspended
     case projects
     case data
     case about
@@ -95,10 +103,14 @@ enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .vip: String(localized: "vip.title", defaultValue: "VIP 服务")
         case .appearance: "外观与主题"
+        case .language: String(localized: "settings.language.title", defaultValue: "语言")
         case .rhythm: "今日节奏"
         case .taskTypes: "任务管理"
+        case .past: String(localized: "settings.section.past", defaultValue: "过去")
         case .future: "未来"
+        case .suspended: String(localized: "settings.suspended.header", defaultValue: "悬置箱")
         case .projects: "项目"
         case .data: "数据与安全"
         case .about: "关于 Weekyii"
@@ -108,10 +120,14 @@ enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
+        case .vip: "crown.fill"
         case .appearance: "paintpalette.fill"
+        case .language: "globe"
         case .rhythm: "timer"
         case .taskTypes: "tag.fill"
+        case .past: "clock.arrow.circlepath"
         case .future: "calendar.badge.clock"
+        case .suspended: "hourglass"
         case .projects: "folder.fill"
         case .data: "lock.shield.fill"
         case .about: "info.circle.fill"
@@ -136,10 +152,19 @@ private struct WorkspaceSelectionStoreKey: EnvironmentKey {
     static let defaultValue: WorkspaceSelectionStore? = nil
 }
 
+private struct WorkspaceOpenInspectorKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
 extension EnvironmentValues {
     var workspaceSelectionStore: WorkspaceSelectionStore? {
         get { self[WorkspaceSelectionStoreKey.self] }
         set { self[WorkspaceSelectionStoreKey.self] = newValue }
+    }
+
+    var workspaceOpenInspector: (() -> Void)? {
+        get { self[WorkspaceOpenInspectorKey.self] }
+        set { self[WorkspaceOpenInspectorKey.self] = newValue }
     }
 }
 
@@ -158,7 +183,9 @@ struct WorkspaceShell: View {
 
     var body: some View {
         Group {
-            if layoutMetrics.layoutClass == .wide {
+            // The extensions hub owns its own navigation and has no
+            // route-scoped inspector. Give it the full detail column.
+            if layoutMetrics.layoutClass == .wide && selectedRoute != .extensions {
                 wideWorkspace
             } else {
                 regularWorkspace
@@ -190,7 +217,7 @@ struct WorkspaceShell: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             WorkspaceSidebar(
                 selectedRoute: $selectedRoute,
-                showsInspectorButton: true,
+                showsInspectorButton: selectedRoute != .extensions,
                 onShowInspector: { showingInspector = true }
             )
             .navigationSplitViewColumnWidth(min: 218, ideal: 246, max: 286)
@@ -200,6 +227,7 @@ struct WorkspaceShell: View {
                 animationsActive: animationsActive
             )
             .environment(\.workspaceSelectionStore, selectionStore)
+            .environment(\.workspaceOpenInspector, { showingInspector = true })
         }
         .navigationSplitViewStyle(.balanced)
     }
@@ -263,7 +291,6 @@ private struct WorkspaceSidebar: View {
     @Binding var selectedRoute: WorkspaceRoute
     let showsInspectorButton: Bool
     let onShowInspector: () -> Void
-    @State private var showingExtensions = false
     @State private var showingFullSettings = false
 
     var body: some View {
@@ -292,10 +319,6 @@ private struct WorkspaceSidebar: View {
             routeSection("回望", routes: WorkspaceRoute.reflectionRoutes)
 
             Section("系统") {
-                Button { showingExtensions = true } label: {
-                    Label("扩展与习惯", systemImage: "square.grid.2x2")
-                }
-                .accessibilityIdentifier("workspaceFullExtensions")
                 routeRow(.settings)
                 Button { showingFullSettings = true } label: {
                     Label("完整设置", systemImage: "gearshape")
@@ -322,10 +345,6 @@ private struct WorkspaceSidebar: View {
             }
         }
         .accessibilityIdentifier("workspaceSidebar")
-        .sheet(isPresented: $showingExtensions) {
-            ExtensionsHubView(animationsActive: true)
-                .environment(\.workspaceSelectionStore, nil)
-        }
         .sheet(isPresented: $showingFullSettings) {
             SettingsView()
                 .environment(\.workspaceSelectionStore, nil)
@@ -404,6 +423,10 @@ private struct WorkspaceRouteTabs: View {
             WorkspaceProjectsRouteHost()
         case .suspended:
             WorkspaceSuspendedRouteHost()
+        case .extensions:
+            ExtensionsHubView(animationsActive: animationsActive && selectedRoute == .extensions)
+                .environment(\.workspaceSelectionStore, nil)
+                .accessibilityIdentifier("workspaceExtensionsContent")
         case .mindStamps:
             WorkspaceMindStampsRouteHost()
         case .past:
@@ -523,6 +546,7 @@ private struct WorkspaceMindStampsRouteHost: View {
 
 private struct WorkspaceSettingsCategoriesView: View {
     @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
+    @Environment(\.workspaceOpenInspector) private var openInspector
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
     @State private var selectedSection: WorkspaceSettingsSection = .appearance
 
@@ -539,6 +563,7 @@ private struct WorkspaceSettingsCategoriesView: View {
                         Button {
                             selectedSection = section
                             workspaceSelectionStore?.select(.setting(section), for: .settings)
+                            openInspector?()
                         } label: {
                             HStack(spacing: WeekSpacing.md) {
                                 Image(systemName: section.systemImage)
@@ -553,12 +578,12 @@ private struct WorkspaceSettingsCategoriesView: View {
                                 Text(section.title)
                                     .font(.headline)
                                     .foregroundStyle(Color.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                                Spacer()
-
-                                Image(systemName: "sidebar.right")
+                                Image(systemName: selectedSection == section ? "checkmark.circle.fill" : "chevron.right")
                                     .font(.caption.weight(.bold))
-                                    .foregroundStyle(Color.textTertiary)
+                                    .foregroundStyle(selectedSection == section ? Color.weekyiiPrimary : Color.textTertiary)
                             }
                             .padding(WeekSpacing.lg)
                             .background(
@@ -578,6 +603,7 @@ private struct WorkspaceSettingsCategoriesView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
                         .accessibilityIdentifier("workspaceSettingsCategory_\(section.rawValue)")
                     }
                 }
@@ -1008,6 +1034,8 @@ private struct WorkspaceInspectorView: View {
             } else {
                 emptyInspector("新增悬置任务", systemImage: "hourglass.badge.plus")
             }
+        case .extensions:
+            EmptyView()
         case .past:
             if let selection = resolvedSelection {
                 selectionContent(selection)
@@ -1305,6 +1333,8 @@ private struct WorkspaceInspectorView: View {
                 .map(\.dayId)
         case .mindStamps:
             return stamps.map { "stamp-\($0.id.uuidString)" }
+        case .extensions:
+            return []
         case .search:
             return days.map(\.dayId)
                 + weeks.map(\.weekId)
@@ -1437,7 +1467,7 @@ private struct WorkspaceInspectorView: View {
                 .map { .insightDay($0.dayId) }
         case .mindStamps:
             return stamps.first.map { .mindStamp($0.id) }
-        case .search:
+        case .search, .extensions:
             return nil
         case .settings:
             return .setting(.appearance)
@@ -1581,6 +1611,8 @@ private struct WorkspaceInspectorView: View {
             return false
         case .mindStamps:
             if case .mindStamp = selection { return true }
+            return false
+        case .extensions:
             return false
         case .search:
             return true
@@ -2088,6 +2120,19 @@ private struct WorkspaceSuspendedInspectorActions: View {
     @State private var showingEditor = false
     @State private var showingAssignment = false
     @State private var showingDeleteConfirmation = false
+    @State private var errorMessage: String?
+
+    private func performMutation(_ action: (ExtensionsViewModel) -> Void) -> Bool {
+        guard let viewModel else { return false }
+        viewModel.errorMessage = nil
+        action(viewModel)
+        if let error = viewModel.errorMessage {
+            errorMessage = error
+            return false
+        }
+        NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+        return true
+    }
 
     var body: some View {
         WorkspaceInspectorSection(title: "操作") {
@@ -2105,12 +2150,10 @@ private struct WorkspaceSuspendedInspectorActions: View {
             }
             Menu {
                 Button("续期 10 天") {
-                    viewModel?.extendSuspendedTask(task, by: 10)
-                    NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    _ = performMutation { $0.extendSuspendedTask(task, by: 10) }
                 }
                 Button("续期 30 天") {
-                    viewModel?.extendSuspendedTask(task, by: 30)
-                    NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    _ = performMutation { $0.extendSuspendedTask(task, by: 30) }
                 }
             } label: {
                 Label("调整期限", systemImage: "clock.arrow.circlepath")
@@ -2144,25 +2187,27 @@ private struct WorkspaceSuspendedInspectorActions: View {
                 initialSteps: task.steps,
                 initialAttachments: task.attachments
             ) { title, description, type, typeID, countdownDays, steps, attachments in
-                viewModel?.updateSuspendedTask(
-                    task,
-                    title: title,
-                    description: description,
-                    type: type,
-                    taskTypeIdRaw: typeID,
-                    countdownDays: countdownDays,
-                    steps: steps,
-                    attachments: attachments
-                )
+                _ = performMutation {
+                    $0.updateSuspendedTask(
+                        task,
+                        title: title,
+                        description: description,
+                        type: type,
+                        taskTypeIdRaw: typeID,
+                        countdownDays: countdownDays,
+                        steps: steps,
+                        attachments: attachments
+                    )
+                }
             }
         }
         .sheet(isPresented: $showingAssignment, onDismiss: {
             viewModel?.refresh()
         }) {
             SuspendedTaskAssignSheet(taskTitle: task.title) { date in
-                viewModel?.assignSuspendedTask(task, to: date)
-                selectionStore.select(nil, for: .suspended)
-                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                if performMutation({ $0.assignSuspendedTask(task, to: date) }) {
+                    selectionStore.select(nil, for: .suspended)
+                }
             }
         }
         .confirmationDialog(
@@ -2171,13 +2216,21 @@ private struct WorkspaceSuspendedInspectorActions: View {
             titleVisibility: .visible
         ) {
             Button("删除", role: .destructive) {
-                viewModel?.deleteSuspendedTask(task)
-                selectionStore.select(nil, for: .suspended)
-                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                if performMutation({ $0.deleteSuspendedTask(task) }) {
+                    selectionStore.select(nil, for: .suspended)
+                }
             }
             Button("取消", role: .cancel) { }
         } message: {
             Text("删除后不会保留后路。")
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 }

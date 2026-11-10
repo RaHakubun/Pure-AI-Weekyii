@@ -268,22 +268,30 @@ struct SettingsView: View {
     @ViewBuilder
     private func workspaceSettingsPage(_ section: WorkspaceSettingsSection) -> some View {
         switch section {
+        case .vip:
+            erasedVIPServicePage()
         case .appearance:
-            appearanceSettingsPage
+            erasedAppearanceSettingsPage()
+        case .language:
+            erasedLanguageSettingsPage()
         case .rhythm:
-            todayRhythmSettingsPage
+            erasedTodayRhythmSettingsPage()
         case .taskTypes:
-            taskTypeSettingsPage
+            erasedTaskTypeSettingsPage()
+        case .past:
+            erasedPastSettingsPage()
         case .future:
-            futureSettingsPage
+            erasedFutureSettingsPage()
+        case .suspended:
+            erasedSuspendedSettingsPage()
         case .projects:
-            ProjectSettingsView()
+            erasedProjectSettingsPage()
         case .data:
-            dataSettingsPage
+            erasedDataSettingsPage()
         case .about:
-            AboutWeekyiiPage()
+            erasedAboutWeekyiiPage()
         case .diagnostics:
-            developerSettingsPage
+            erasedDeveloperSettingsPage()
         }
     }
 

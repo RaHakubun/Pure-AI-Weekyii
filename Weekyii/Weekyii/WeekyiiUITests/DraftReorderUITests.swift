@@ -140,7 +140,7 @@ final class DraftReorderUITests: XCTestCase {
         case "mainSidebar_settings":
             workspaceID = "workspaceFullSettings"
         case "mainSidebar_extensions":
-            workspaceID = "workspaceFullExtensions"
+            workspaceID = "workspaceRoute_extensions"
         default:
             workspaceID = sidebarID
         }
@@ -976,7 +976,7 @@ final class IPadLayoutUITests: XCTestCase {
         }
     }
 
-    func testRegularWidthUsesSidebarAndTodayColumns() {
+    func testRegularWidthUsesSidebarAndTodayWorkspace() {
         XCUIDevice.shared.orientation = .landscapeLeft
 
         let app = XCUIApplication()
@@ -991,8 +991,9 @@ final class IPadLayoutUITests: XCTestCase {
         let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayWorkspaceContent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["todayTaskColumn"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["todayAuxiliaryColumn"].waitForExistence(timeout: 5))
+        let inspector = app.descendants(matching: .any)["workspaceInspector"]
+        let inspectorButton = app.buttons["workspaceInspectorButton"]
+        XCTAssertTrue(inspector.exists || inspectorButton.exists)
     }
 
     func testRotationKeepsSelectedModule() {
@@ -1024,7 +1025,7 @@ final class IPadLayoutUITests: XCTestCase {
         app.launchArguments = ["-uiTesting", "1"]
         app.launch()
 
-        for route in ["projects", "suspended", "insights", "mindStamps"] {
+        for route in ["projects", "suspended", "extensions", "insights", "mindStamps"] {
             XCTAssertTrue(
                 app.descendants(matching: .any)["workspaceRoute_\(route)"]
                     .waitForExistence(timeout: 5)
@@ -1110,5 +1111,47 @@ final class IPadLayoutUITests: XCTestCase {
 
         app.descendants(matching: .any)["workspaceRoute_insights"].tap()
         XCTAssertFalse(app.staticTexts["执行方式"].exists)
+    }
+
+    func testExtensionsHubAndSettingsScreenshots() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let extensions = app.descendants(matching: .any)["workspaceRoute_extensions"]
+        XCTAssertTrue(extensions.waitForExistence(timeout: 5))
+        extensions.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceExtensionsContent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["extensionsHabitsSeeAllButton"].waitForExistence(timeout: 5))
+        let hubShot = XCTAttachment(screenshot: app.screenshot())
+        hubShot.name = "ipad-extensions-hub"
+        hubShot.lifetime = .keepAlways
+        add(hubShot)
+
+        let settings = app.descendants(matching: .any)["workspaceRoute_settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.buttons["workspaceSettingsCategory_vip"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["workspaceSettingsCategory_language"].waitForExistence(timeout: 5))
+        let settingsShot = XCTAttachment(screenshot: app.screenshot())
+        settingsShot.name = "ipad-settings-categories"
+        settingsShot.lifetime = .keepAlways
+        add(settingsShot)
+    }
+
+    func testRegularWidthSettingsCategoryOpensInspector() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        let settings = app.descendants(matching: .any)["workspaceRoute_settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        let language = app.buttons["workspaceSettingsCategory_language"]
+        XCTAssertTrue(language.waitForExistence(timeout: 5))
+        language.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceInspector"].waitForExistence(timeout: 5))
     }
 }
