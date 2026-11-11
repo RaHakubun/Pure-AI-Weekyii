@@ -1,5 +1,8 @@
 .worktrees/
 
+# Local release archives (ipa, xcarchive, provisioning). Keep on disk, never commit.
+/release-artifacts/
+
 # OS / Xcode per-user artefacts (never share these)
 .DS_Store
 xcuserdata/

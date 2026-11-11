@@ -109,6 +109,19 @@ enum VIPEntitlementResolver {
             || UserDefaults.standard.bool(forKey: developerOverrideKey) {
             return VIPAccess(source: .developer)
         }
+        // TEMP(2026-11-06) App Store 截图期间：Debug 构建一律模拟「年度订阅已开通」。
+        // 用 .subscription 而不是 .betaTester，是为了让 VIP 页显示「年度 VIP · 已开通」
+        // 而不是「测试版 · 已自动开通 VIP」，截图不会带出测试字样。
+        // 截图完成后删除本块即可；Release / Beta 构建都走不到这里。
+        // 条件看起来恒真（-uiTesting 上面已返回），保留它是为了让下面那段
+        // StoreKit 读取逻辑在 Debug 下依然「可达」，避免编译器报 unreachable。
+        if !ProcessInfo.processInfo.arguments.contains("-uiTesting") {
+            return VIPAccess(
+                source: .subscription,
+                product: .yearly,
+                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60)
+            )
+        }
         #endif
 
         var best = VIPAccess.inactive

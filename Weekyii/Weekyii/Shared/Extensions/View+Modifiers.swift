@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Draws a `ThemeSurfaceSkin`: fill, border (or gradient tube), a hard offset
 /// shadow or a soft glow, and the paper "second sheet" under the bottom edge.
@@ -490,8 +493,14 @@ extension View {
 
 private struct ThemedGroupedListModifier: ViewModifier {
     @Environment(\.themeSkin) private var skin
+    @Environment(\.themePaletteIdentity) private var paletteIdentity
 
     func body(content: Content) -> some View {
+        // `Color.backgroundPrimary` is a static computed property backed by shared
+        // defaults, not view state. Reading the identity registers this body as a
+        // dependency of theme changes — including classic ↔ classic switches,
+        // where `themeSkin` is the very same `.classic` value and never changes.
+        let _ = paletteIdentity
         let skinned = skin.card != nil
         content
             .scrollContentBackground(skinned ? .hidden : .automatic)
@@ -501,8 +510,19 @@ private struct ThemedGroupedListModifier: ViewModifier {
 
 private struct ThemedListRowsModifier: ViewModifier {
     @Environment(\.themeSkin) private var skin
+    @Environment(\.themePaletteIdentity) private var paletteIdentity
 
     func body(content: Content) -> some View {
-        content.listRowBackground(skin.card != nil ? Color.backgroundSecondary : nil)
+        let _ = paletteIdentity
+        let skinned = skin.card != nil
+        // Always hand the row a concrete fill. Passing `nil` for classic themes
+        // leaves the reused UIKit cell's previous tinted backgroundView in place
+        // when switching back from a personalised skin, which is what produced the
+        // stale white/yellow rows. `secondarySystemGroupedBackground` is exactly
+        // the system cell fill `nil` resolves to, so classic themes are unchanged.
+        let rowFill: Color = skinned
+            ? Color.backgroundSecondary
+            : Color(uiColor: .secondarySystemGroupedBackground)
+        content.listRowBackground(rowFill)
     }
 }

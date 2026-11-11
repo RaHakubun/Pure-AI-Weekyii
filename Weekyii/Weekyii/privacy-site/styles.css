@@ -409,3 +409,37 @@ strong {
     scroll-behavior: auto;
   }
 }
+
+/* Support page */
+.support-intro {
+  margin: 20px 0 0;
+  color: var(--ink);
+  font-size: 16.5px;
+}
+
+.support-contact .contact {
+  margin: 4px 0 10px;
+}
+
+.faq h3 {
+  margin: 28px 0 6px;
+  color: var(--ink);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.faq h3:first-child {
+  margin-top: 0;
+}
+
+.faq p {
+  margin: 0;
+}
+
+.support-policy {
+  margin-top: 46px;
+  padding-top: 26px;
+  border-top: 1px solid var(--rule);
+  font-size: 15px;
+}

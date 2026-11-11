@@ -10,6 +10,12 @@
     "·" : {
 
     },
+    "· lúmë" : {
+
+    },
+    "· sí" : {
+
+    },
     "·%lld" : {
 
     },
@@ -12160,12 +12166,6 @@
         }
       }
     },
-    "theme.quenya.name" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quenya" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "昆雅" } }
-      }
-    },
     "theme.cat.name" : {
       "localizations" : {
         "en" : {
@@ -12228,6 +12228,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "纸感"
+          }
+        }
+      }
+    },
+    "theme.quenya.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quenya"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昆雅"
           }
         }
       }
@@ -17084,6 +17100,9 @@
           }
         }
       }
+    },
+    "   " : {
+
     }
   },
   "version" : "1.0"

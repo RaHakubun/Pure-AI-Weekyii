@@ -76,7 +76,9 @@ struct ContentView: View {
                 .tag(MainTab.settings)
         }
         .environment(\.weekyiiReduceMotion, reduceMotion)
-        // Theme and appearance changes already invalidate this view through UserSettings.
+        // Settings intentionally has no `.id(visualIdentity)`: that would rebuild
+        // its NavigationStack and pop the user out of the theme picker on every
+        // switch. Its content refreshes via `themePaletteIdentity` instead.
         // Keyed on `structureRevision`, not `dataRevision`: rebuilding the TabView
         // discards every tab's navigation stack, which is right after an archive
         // import or a factory reset but wrong every time a sync pulls data down.

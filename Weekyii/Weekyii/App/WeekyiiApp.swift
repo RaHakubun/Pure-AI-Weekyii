@@ -678,6 +678,15 @@ struct WeekyiiApp: App {
                     // Shared components draw from this skin; publishing it here means a theme
                     // switch re-renders every reader, including Settings and presented sheets.
                     .environment(\.themeSkin, userSettings.selectedTheme.skin)
+                    // Classic themes all share `ThemeSkin.classic`, so the skin alone cannot
+                    // invalidate views that read the static palette colours. This identity
+                    // changes on every theme/appearance switch and reaches pushed navigation
+                    // destinations: without it the theme picker keeps the previous theme's
+                    // artwork, checkmark and row fills after a switch.
+                    .environment(
+                        \.themePaletteIdentity,
+                        "\(userSettings.selectedTheme.rawValue)-\(userSettings.appearanceModeRaw)"
+                    )
                     // System text styles (`.caption2`, Form rows …) follow the theme's body face;
                     // `nil` for every theme on the default face, so they are left untouched.
                     .fontDesign(userSettings.selectedTheme.skin.typography.environmentDesign)

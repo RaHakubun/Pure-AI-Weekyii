@@ -1211,13 +1211,37 @@ private struct ThemeSkinKey: EnvironmentKey {
     static let defaultValue = ThemeSkin.classic
 }
 
+private struct ThemePaletteIdentityKey: EnvironmentKey {
+    static let defaultValue = ""
+}
+
 extension EnvironmentValues {
     /// The active theme's skin, published once at the app root. Reading it from
     /// the environment (rather than `ThemeSkin.active`) makes a view re-render the
     /// moment the theme changes, so nothing keeps the previous theme's look.
+    ///
+    /// Caveat: all classic themes share the *same* `ThemeSkin.classic` value, so
+    /// switching between two classic themes does **not** invalidate readers.
+    /// Anything reading the static `Color.background*` palette must also read
+    /// `themePaletteIdentity` to be re-evaluated on those switches.
     var themeSkin: ThemeSkin {
         get { self[ThemeSkinKey.self] }
         set { self[ThemeSkinKey.self] = newValue }
+    }
+
+    /// Changes on every theme / appearance switch, including between classic
+    /// themes whose skin is identical. `Color.backgroundPrimary` and friends are
+    /// static computed properties backed by shared defaults, not SwiftUI
+    /// dependencies: reading this in a `body` is what makes them resolve fresh.
+    ///
+    /// It also reaches views already pushed in a `NavigationStack`: SwiftUI keeps
+    /// a `NavigationLink` destination's constructed view even when its parent
+    /// re-renders, so the theme picker would otherwise keep the old artwork and
+    /// checkmark. `.themedGroupedList()` / `.themedListRows()` read this value,
+    /// which invalidates that whole destination subtree.
+    var themePaletteIdentity: String {
+        get { self[ThemePaletteIdentityKey.self] }
+        set { self[ThemePaletteIdentityKey.self] = newValue }
     }
 }
 

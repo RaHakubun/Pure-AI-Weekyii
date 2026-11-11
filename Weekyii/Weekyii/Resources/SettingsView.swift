@@ -445,6 +445,9 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.row.about")
                     .themedListRows()
 
+                    // 开发者与诊断只在 Debug 构建里出现。Release / Beta 归档时整块不编译，
+                    // 因此 App Store 审核员和 TestFlight 测试员都看不到种子数据、模拟 VIP 等入口。
+                    #if DEBUG
                     NavigationLink {
                         erasedDeveloperSettingsPage()
                     } label: {
@@ -457,6 +460,7 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("settings.row.developer")
                     .themedListRows()
+                    #endif
                 } header: {
                     SettingsSectionHeader(title: "应用")
                 }
