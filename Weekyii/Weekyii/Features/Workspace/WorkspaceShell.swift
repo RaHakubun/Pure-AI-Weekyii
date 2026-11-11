@@ -178,6 +178,7 @@ struct WorkspaceShell: View {
     let animationsActive: Bool
 
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showingInspector = false
     @StateObject private var selectionStore = WorkspaceSelectionStore()
@@ -216,7 +217,11 @@ struct WorkspaceShell: View {
                 showsInspectorButton: layoutMetrics.layoutClass != .wide,
                 onShowInspector: { showingInspector = true }
             )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 250)
+            .navigationSplitViewColumnWidth(
+                min: dynamicTypeSize.isAccessibilitySize ? 260 : 200,
+                ideal: dynamicTypeSize.isAccessibilitySize ? 300 : 220,
+                max: dynamicTypeSize.isAccessibilitySize ? 340 : 250
+            )
         } detail: {
             Group {
                 if layoutMetrics.layoutClass == .wide, selectedRoute != .extensions {
@@ -285,6 +290,7 @@ private struct WorkspaceSidebar: View {
     @Binding var selectedRoute: WorkspaceRoute
     let showsInspectorButton: Bool
     let onShowInspector: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingFullSettings = false
 
     var body: some View {
@@ -292,16 +298,15 @@ private struct WorkspaceSidebar: View {
             Button {
                 selectedRoute = .search
             } label: {
-                Label {
-                    HStack {
-                        Text("搜索")
-                        Spacer()
+                HStack(spacing: 8) {
+                    WorkspaceSidebarLabel(title: "搜索", systemImage: WorkspaceRoute.search.systemImage)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer(minLength: 4)
                         Text("⌘K")
                             .font(.caption2.monospaced())
                             .foregroundStyle(Color.textTertiary)
+                            .layoutPriority(-1)
                     }
-                } icon: {
-                    Image(systemName: WorkspaceRoute.search.systemImage)
                 }
             }
             .buttonStyle(.plain)
@@ -315,21 +320,23 @@ private struct WorkspaceSidebar: View {
             Section("系统") {
                 routeRow(.settings)
                 Button { showingFullSettings = true } label: {
-                    Label("完整设置", systemImage: "gearshape")
+                    WorkspaceSidebarLabel(title: "完整设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("workspaceFullSettings")
             }
         }
         .listStyle(.sidebar)
         .listSectionSpacing(8)
-        .environment(\.defaultMinListRowHeight, 36)
+        .environment(\.defaultMinListRowHeight, dynamicTypeSize.isAccessibilitySize ? 52 : 36)
         .navigationTitle("Weekyii")
         .accessibilityIdentifier("workspaceSidebar")
         .safeAreaInset(edge: .bottom) {
             if showsInspectorButton {
                 Button(action: onShowInspector) {
-                    Label("查看上下文", systemImage: "sidebar.right")
+                    Label(dynamicTypeSize.isAccessibilitySize ? "上下文" : "查看上下文", systemImage: "sidebar.right")
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, WeekSpacing.md)
                         .padding(.vertical, WeekSpacing.sm)
@@ -368,7 +375,7 @@ private struct WorkspaceSidebar: View {
     }
 
     private func routeRow(_ route: WorkspaceRoute) -> some View {
-        Label(route.title, systemImage: route.systemImage)
+        WorkspaceSidebarLabel(title: route.title, systemImage: route.systemImage)
             .tag(route)
             .dropDestination(for: String.self) { _, _ in
                 false
@@ -379,6 +386,24 @@ private struct WorkspaceSidebar: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("workspaceRoute_\(route.rawValue)")
+    }
+}
+
+private struct WorkspaceSidebarLabel: View {
+    let title: String
+    let systemImage: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Label {
+            Text(title)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } icon: {
+            Image(systemName: systemImage)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? 28 : 22)
+        }
     }
 }
 
@@ -550,6 +575,7 @@ private struct WorkspaceSettingsCategoriesView: View {
     @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
     @Environment(\.workspaceOpenInspector) private var openInspector
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedSection: WorkspaceSettingsSection = .appearance
 
     var body: some View {
@@ -557,7 +583,10 @@ private struct WorkspaceSettingsCategoriesView: View {
             ScrollView {
                 LazyVGrid(
                     columns: [
-                        GridItem(.adaptive(minimum: 220), spacing: WeekSpacing.md)
+                        GridItem(
+                            .adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 460 : 220),
+                            spacing: WeekSpacing.md
+                        )
                     ],
                     spacing: WeekSpacing.md
                 ) {
@@ -580,7 +609,8 @@ private struct WorkspaceSettingsCategoriesView: View {
                                 Text(section.title)
                                     .font(.headline)
                                     .foregroundStyle(Color.textPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+                                    .minimumScaleFactor(0.8)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
                                 Image(systemName: selectedSection == section ? "checkmark.circle.fill" : "chevron.right")
