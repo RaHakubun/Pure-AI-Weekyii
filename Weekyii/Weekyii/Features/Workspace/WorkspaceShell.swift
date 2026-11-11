@@ -1727,6 +1727,7 @@ private struct WorkspacePendingDateActions: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.weekyiiPrimary)
+        .accessibilityIdentifier("workspacePendingCreateTask")
         .onAppear {
             guard viewModel == nil else { return }
             let created = PendingViewModel(modelContext: modelContext)
@@ -1743,8 +1744,12 @@ private struct WorkspacePendingDateActions: View {
                     initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
                     onSave: { _, _, _, _, _ in },
                     onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
+                        guard let viewModel else {
+                            errorMessage = String(localized: "error.operation_failed_retry")
+                            return
+                        }
                         do {
-                            try viewModel?.addDraftTask(
+                            try viewModel.addDraftTask(
                                 to: targetDay,
                                 title: title,
                                 description: description,
@@ -1753,18 +1758,27 @@ private struct WorkspacePendingDateActions: View {
                                 steps: steps,
                                 attachments: attachments
                             )
+                            showingEditor = false
                             NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
                         } catch {
                             errorMessage = error.localizedDescription
                         }
                     }
                 )
+                .alert(String(localized: "alert.title"), isPresented: Binding(
+                    get: { errorMessage != nil },
+                    set: { if !$0 { errorMessage = nil } }
+                )) {
+                    Button(String(localized: "action.ok"), role: .cancel) { }
+                } message: {
+                    Text(errorMessage ?? "")
+                }
             }
         }
         .alert(
             String(localized: "alert.title"),
             isPresented: Binding(
-                get: { errorMessage != nil },
+                get: { errorMessage != nil && !showingEditor },
                 set: { if !$0 { errorMessage = nil } }
             )
         ) {
@@ -1811,6 +1825,7 @@ private struct WorkspaceEditableTaskActions: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("workspaceEditTask")
                 }
                 .sheet(isPresented: $showingEditor) {
                     TaskEditorSheet(
@@ -1825,7 +1840,11 @@ private struct WorkspaceEditableTaskActions: View {
                         onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
                             do {
                                 if route == .pending, let day = task.day {
-                                    try pendingViewModel?.updateDraftTask(
+                                    guard let pendingViewModel else {
+                                        errorMessage = String(localized: "error.operation_failed_retry")
+                                        return
+                                    }
+                                    try pendingViewModel.updateDraftTask(
                                         task,
                                         in: day,
                                         title: title,
@@ -1836,27 +1855,48 @@ private struct WorkspaceEditableTaskActions: View {
                                         attachments: attachments
                                     )
                                 } else if route == .projects {
-                                extensionsViewModel?.updateProjectTask(
+                                    guard let extensionsViewModel else {
+                                        errorMessage = String(localized: "error.operation_failed_retry")
+                                        return
+                                    }
+                                    extensionsViewModel.errorMessage = nil
+                                    extensionsViewModel.updateProjectTask(
                                         task,
                                         title: title,
                                         description: description,
                                         type: type,
                                         taskTypeIdRaw: typeID,
                                         steps: steps,
-                                    attachments: attachments
-                                )
-                            }
-                            NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                                        attachments: attachments
+                                    )
+                                    if let error = extensionsViewModel.errorMessage {
+                                        errorMessage = error
+                                        return
+                                    }
+                                } else {
+                                    errorMessage = String(localized: "error.operation_failed_retry")
+                                    return
+                                }
+                                showingEditor = false
+                                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
                             } catch {
                                 errorMessage = error.localizedDescription
                             }
                         }
                     )
+                    .alert(String(localized: "alert.title"), isPresented: Binding(
+                        get: { errorMessage != nil },
+                        set: { if !$0 { errorMessage = nil } }
+                    )) {
+                        Button(String(localized: "action.ok"), role: .cancel) { }
+                    } message: {
+                        Text(errorMessage ?? "")
+                    }
                 }
                 .alert(
                     String(localized: "alert.title"),
                     isPresented: Binding(
-                        get: { errorMessage != nil },
+                        get: { errorMessage != nil && !showingEditor },
                         set: { if !$0 { errorMessage = nil } }
                     )
                 ) {

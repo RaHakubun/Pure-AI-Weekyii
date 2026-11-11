@@ -1182,6 +1182,30 @@ final class IPadLayoutUITests: XCTestCase {
         assertBoundedSheet(in: app, screenshotName: "ipad-suspended-editor")
     }
 
+    func testPendingInspectorSaveClosesEditor() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedPendingWeek", "1"]
+        app.launch()
+        let pending = app.descendants(matching: .any)["workspaceRoute_pending"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 5))
+        pending.tap()
+        let inspectorButton = app.buttons["workspaceInspectorButton"]
+        if inspectorButton.waitForExistence(timeout: 2) {
+            inspectorButton.tap()
+        }
+        let create = app.buttons["workspacePendingCreateTask"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let title = app.textFields["taskEditorTitleField"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText("iPad inspector task")
+        app.buttons["taskEditorSaveButton"].tap()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iPad inspector task"].waitForExistence(timeout: 5))
+    }
+
     private func assertBoundedSheet(in app: XCUIApplication, screenshotName: String) {
         let sheet = app.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 5))
