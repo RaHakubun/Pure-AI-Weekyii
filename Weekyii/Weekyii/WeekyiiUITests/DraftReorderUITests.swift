@@ -140,7 +140,7 @@ final class DraftReorderUITests: XCTestCase {
         case "mainSidebar_settings":
             workspaceID = "workspaceFullSettings"
         case "mainSidebar_extensions":
-            workspaceID = "workspaceFullExtensions"
+            workspaceID = "workspaceRoute_extensions"
         default:
             workspaceID = sidebarID
         }
@@ -976,7 +976,7 @@ final class IPadLayoutUITests: XCTestCase {
         }
     }
 
-    func testRegularWidthUsesSidebarAndTodayColumns() {
+    func testRegularWidthUsesSidebarAndTodayWorkspace() {
         XCUIDevice.shared.orientation = .landscapeLeft
 
         let app = XCUIApplication()
@@ -991,8 +991,9 @@ final class IPadLayoutUITests: XCTestCase {
         let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["todayWorkspaceContent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["todayTaskColumn"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["todayAuxiliaryColumn"].waitForExistence(timeout: 5))
+        let inspector = app.descendants(matching: .any)["workspaceInspector"]
+        let inspectorButton = app.buttons["workspaceInspectorButton"]
+        XCTAssertTrue(inspector.exists || inspectorButton.exists)
     }
 
     func testRotationKeepsSelectedModule() {
@@ -1024,7 +1025,7 @@ final class IPadLayoutUITests: XCTestCase {
         app.launchArguments = ["-uiTesting", "1"]
         app.launch()
 
-        for route in ["projects", "suspended", "insights", "mindStamps"] {
+        for route in ["projects", "suspended", "extensions", "insights", "mindStamps"] {
             XCTAssertTrue(
                 app.descendants(matching: .any)["workspaceRoute_\(route)"]
                     .waitForExistence(timeout: 5)
@@ -1110,5 +1111,242 @@ final class IPadLayoutUITests: XCTestCase {
 
         app.descendants(matching: .any)["workspaceRoute_insights"].tap()
         XCTAssertFalse(app.staticTexts["执行方式"].exists)
+    }
+
+    func testExtensionsHubAndSettingsScreenshots() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let extensions = app.descendants(matching: .any)["workspaceRoute_extensions"]
+        XCTAssertTrue(extensions.waitForExistence(timeout: 5))
+        extensions.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceExtensionsContent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["extensionsHabitsSeeAllButton"].waitForExistence(timeout: 5))
+        let hubShot = XCTAttachment(screenshot: app.screenshot())
+        hubShot.name = "ipad-extensions-hub"
+        hubShot.lifetime = .keepAlways
+        add(hubShot)
+
+        let settings = app.descendants(matching: .any)["workspaceRoute_settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.buttons["workspaceSettingsCategory_vip"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["workspaceSettingsCategory_language"].waitForExistence(timeout: 5))
+        let settingsShot = XCTAttachment(screenshot: app.screenshot())
+        settingsShot.name = "ipad-settings-categories"
+        settingsShot.lifetime = .keepAlways
+        add(settingsShot)
+    }
+
+    func testRegularWidthSettingsCategoryOpensInspector() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1"]
+        app.launch()
+
+        let settings = app.descendants(matching: .any)["workspaceRoute_settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        let language = app.buttons["workspaceSettingsCategory_language"]
+        XCTAssertTrue(language.waitForExistence(timeout: 5))
+        language.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["workspaceInspector"].waitForExistence(timeout: 5))
+    }
+
+    func testTemporaryEditorsUseBoundedIPadPresentation() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "1"]
+        app.launch()
+        guard app.frame.width >= 900 else {
+            throw XCTSkip("This width check requires a sufficiently wide iPad window.")
+        }
+
+        let addTask = app.buttons["draftAddButton"]
+        XCTAssertTrue(addTask.waitForExistence(timeout: 5))
+        addTask.tap()
+        XCTAssertTrue(app.textFields["taskEditorTitleField"].waitForExistence(timeout: 5))
+        assertBoundedSheet(in: app, screenshotName: "ipad-task-editor")
+        app.buttons["taskEditorCancelButton"].tap()
+        XCTAssertTrue(app.textFields["taskEditorTitleField"].waitForNonExistence(timeout: 5))
+
+        let suspended = app.descendants(matching: .any)["workspaceRoute_suspended"]
+        XCTAssertTrue(suspended.waitForExistence(timeout: 5))
+        suspended.tap()
+        let create = app.buttons["suspendedCreateButton"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        XCTAssertTrue(app.textFields["suspendedTaskTitleField"].waitForExistence(timeout: 5))
+        assertBoundedSheet(in: app, screenshotName: "ipad-suspended-editor")
+    }
+
+    func testPendingInspectorSaveClosesEditor() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedPendingWeek", "1"]
+        app.launch()
+        let pending = app.descendants(matching: .any)["workspaceRoute_pending"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 5))
+        pending.tap()
+        let inspectorButton = app.buttons["workspaceInspectorButton"]
+        if inspectorButton.waitForExistence(timeout: 2) {
+            inspectorButton.tap()
+        }
+        let create = app.buttons["workspacePendingCreateTask"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let title = app.textFields["taskEditorTitleField"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText("iPad inspector task")
+        app.buttons["taskEditorSaveButton"].tap()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iPad inspector task"].waitForExistence(timeout: 5))
+    }
+
+    func testVisualAuditLightPortraitAndLandscape() {
+        auditWorkspace(style: "light", extraArguments: [])
+    }
+
+    func testVisualAuditDarkPortraitAndLandscape() {
+        auditWorkspace(style: "dark", extraArguments: ["-AppleInterfaceStyle", "Dark"])
+    }
+
+    func testVisualAuditLargeTypePortraitAndLandscape() {
+        auditWorkspace(
+            style: "large-type",
+            extraArguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        )
+    }
+
+    private func auditWorkspace(style: String, extraArguments: [String]) {
+        continueAfterFailure = true
+        XCUIDevice.shared.appearance = style == "dark" ? .dark : .light
+        let routes = [
+            "today", "week", "pending", "projects", "suspended", "extensions",
+            "past", "insights", "mindStamps", "search", "settings"
+        ]
+        let routeIdentifiers = [
+            "search": "workspaceCommandSearch"
+        ]
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            let app = XCUIApplication()
+            app.launchArguments = [
+                "-uiTesting", "1",
+                "-uiTestingSeedDraft", "1",
+                "-uiTestingSeedPendingWeek", "1",
+                "-AppleLanguages", "(zh-Hans)",
+                "-AppleLocale", "zh_CN"
+            ] + extraArguments
+            app.launch()
+            let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 8))
+            let posture = orientation == .portrait ? "portrait" : "landscape"
+            let prefix = "\(Int(app.frame.width))x\(Int(app.frame.height))-\(style)-\(posture)"
+            for route in routes {
+                openWorkspaceRoute(route, identifier: routeIdentifiers[route], in: app)
+                _ = app.descendants(matching: .any)["workspaceRoute_\(route)"].waitForExistence(timeout: 2)
+                saveVisualShot(app, name: "\(prefix)-\(route)")
+                if route == "today" || route == "past" || route == "settings" {
+                    app.swipeUp()
+                    saveVisualShot(app, name: "\(prefix)-\(route)-scrolled")
+                }
+                if route == "search" {
+                    let field = app.searchFields.firstMatch
+                    if field.waitForExistence(timeout: 3) {
+                        field.tap()
+                        field.typeText("任务")
+                        saveVisualShot(app, name: "\(prefix)-search-keyboard")
+                        dismissKeyboard(in: app)
+                    }
+                }
+                if route == "today" {
+                    let add = app.buttons["draftAddButton"]
+                    if add.waitForExistence(timeout: 4), add.isHittable {
+                        add.tap()
+                        _ = app.textFields["taskEditorTitleField"].waitForExistence(timeout: 4)
+                        saveVisualShot(app, name: "\(prefix)-task-editor")
+                        if app.buttons["taskEditorCancelButton"].waitForExistence(timeout: 2) {
+                            app.buttons["taskEditorCancelButton"].tap()
+                        }
+                    }
+                }
+            }
+            app.terminate()
+        }
+    }
+
+    private func openWorkspaceRoute(_ route: String, identifier: String? = nil, in app: XCUIApplication) {
+        let sidebar = app.descendants(matching: .any)["workspaceSidebar"]
+        let item = app.descendants(matching: .any)[identifier ?? "workspaceRoute_\(route)"]
+        if sidebar.exists {
+            sidebar.swipeDown()
+            sidebar.swipeDown()
+        }
+        for _ in 0..<8 {
+            if item.exists, item.isHittable { break }
+            guard sidebar.exists else { break }
+            let start = sidebar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+            let end = sidebar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertTrue(item.waitForExistence(timeout: 4), "Missing workspace route \(route)")
+        guard item.exists else { return }
+        item.tap()
+    }
+
+    private func dismissKeyboard(in app: XCUIApplication) {
+        let hide = app.keyboards.buttons["隐藏键盘"]
+        if hide.waitForExistence(timeout: 1) {
+            hide.tap()
+            return
+        }
+        if app.keyboards.firstMatch.exists {
+            app.typeText("\n")
+        }
+    }
+
+    private func saveVisualShot(_ app: XCUIApplication, name: String) {
+        let shot = app.screenshot()
+        let directory = URL(fileURLWithPath: "/tmp/ipad-visual", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? shot.pngRepresentation.write(to: directory.appendingPathComponent("\(name).png"))
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func assertBoundedSheet(in app: XCUIApplication, screenshotName: String) {
+        let sheet = app.sheets.firstMatch
+        if sheet.waitForExistence(timeout: 1) {
+            XCTAssertLessThan(sheet.frame.width, app.frame.width * 0.85, "Temporary editor should not fill a wide iPad window.")
+        } else {
+            // iPad form presentation is a popover in this Xcode/iOS pair. It is not
+            // an XCUIElement sheet; the visible card is a plain container.
+            let editor = app.textFields["taskEditorTitleField"].exists
+                ? app.textFields["taskEditorTitleField"]
+                : app.textFields["suspendedTaskTitleField"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 2))
+            let windowWidth = app.frame.width
+            let origin = editor.frame.insetBy(dx: 2, dy: 2).origin
+            let container = app.otherElements.allElementsBoundByIndex
+                .map(\.frame)
+                .filter { frame in
+                    frame.width > editor.frame.width
+                        && frame.width < windowWidth * 0.85
+                        && frame.contains(origin)
+                }
+                .min { $0.width < $1.width }
+            XCTAssertNotNil(container, "Temporary editor should use a bounded container.")
+            XCTAssertLessThan(container?.width ?? windowWidth, windowWidth * 0.85)
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = screenshotName
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 }

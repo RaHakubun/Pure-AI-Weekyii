@@ -1,12 +1,36 @@
 import SwiftUI
 import SwiftData
 
-private enum MainTab: Hashable {
+enum MainTab: Hashable {
     case past
     case today
     case pending
     case extensions
     case settings
+
+    init(workspaceRoute: WorkspaceRoute) {
+        switch workspaceRoute {
+        case .past, .insights: self = .past
+        case .today, .week, .search: self = .today
+        case .pending: self = .pending
+        case .projects, .suspended, .mindStamps, .extensions: self = .extensions
+        case .settings: self = .settings
+        }
+    }
+
+    var workspaceRoute: WorkspaceRoute {
+        switch self {
+        case .past: .past
+        case .today: .today
+        case .pending: .pending
+        case .extensions: .extensions
+        case .settings: .settings
+        }
+    }
+
+    static func restoredRoute(for tab: MainTab, previousRoute: WorkspaceRoute) -> WorkspaceRoute {
+        MainTab(workspaceRoute: previousRoute) == tab ? previousRoute : tab.workspaceRoute
+    }
 }
 
 private struct AccountResolutionPresentation: Identifiable, Equatable {
@@ -51,6 +75,25 @@ struct ContentView: View {
                 }
             }
             .environment(\.weekLayoutMetrics, metrics)
+            .onChange(of: metrics.layoutClass) { oldClass, newClass in
+                if oldClass.supportsSidebar && !newClass.supportsSidebar {
+                    selectedTab = MainTab(workspaceRoute: selectedWorkspaceRoute)
+                } else if !oldClass.supportsSidebar && newClass.supportsSidebar {
+                    // Preserve a more specific workspace route if the user
+                    // stayed on its corresponding compact tab.
+                    selectedWorkspaceRoute = MainTab.restoredRoute(
+                        for: selectedTab,
+                        previousRoute: selectedWorkspaceRoute
+                    )
+                }
+            }
+            .onChange(of: selectedTab) { _, tab in
+                guard !metrics.layoutClass.supportsSidebar else { return }
+                selectedWorkspaceRoute = MainTab.restoredRoute(
+                    for: tab,
+                    previousRoute: selectedWorkspaceRoute
+                )
+            }
         }
         .environment(\.weekyiiReduceMotion, reduceMotion)
         // Theme and appearance changes already invalidate this view through UserSettings.

@@ -57,6 +57,7 @@ struct DayDetailView: View {
             .padding(.horizontal, WeekSpacing.base)
             .padding(.top, WeekSpacing.sm)
             .padding(.bottom, 100)
+            .weekReadableContent(maxWidth: 880)
         }
         .background(Color.backgroundPrimary)
         .navigationTitle("日程详情")

@@ -110,6 +110,7 @@ struct CreateWeekSheet: View {
                 Text(errorMessage ?? "")
             }
         }
+        .weekIPadFormPresentation()
     }
 
     private var weekSelectionSection: some View {

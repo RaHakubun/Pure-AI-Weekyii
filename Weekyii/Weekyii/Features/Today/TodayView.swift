@@ -369,11 +369,18 @@ struct TodayView: View {
             }
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
             .weekReadableContent()
-            .accessibilityIdentifier("todayWorkspaceContent")
+            .background(alignment: .topLeading) {
+                // Keep this off the task controls. An identifier on the stack
+                // replaces the add button's own identifier in the accessibility tree.
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityIdentifier("todayWorkspaceContent")
+            }
         }
         .overlay(alignment: .bottom) {
             if shouldShowFloatingStartButton(for: day) {
-                if layoutMetrics.layoutClass.supportsTwoColumns {
+                if layoutMetrics.layoutClass.supportsTwoColumns, workspaceSelectionStore == nil {
                     HStack(alignment: .bottom, spacing: WeekSpacing.xl) {
                         floatingStartButtonOverlay
                             .frame(maxWidth: .infinity)
@@ -1327,7 +1334,10 @@ struct TodayView: View {
     }
 
     private func selectTask(_ task: TaskItem) {
-        if let workspaceSelectionStore {
+        if task.habit != nil {
+            // Habit tasks use their own editor, including habit-specific actions.
+            selectedTaskForDetail = task
+        } else if let workspaceSelectionStore {
             workspaceSelectionStore.select(.task(task.id), for: .today)
         } else {
             selectedTaskForDetail = task
@@ -2249,6 +2259,7 @@ private struct HabitTaskDetailSheet: View {
                 if let habit = task.habit {
                     HabitTaskDetailContent(task: task, habit: habit)
                         .weekPadding(WeekSpacing.base)
+                        .weekFormWidth()
                 }
             }
             .background(Color.backgroundPrimary)
@@ -2262,6 +2273,7 @@ private struct HabitTaskDetailSheet: View {
                 }
             }
         }
+        .weekIPadFormPresentation()
     }
 }
 
