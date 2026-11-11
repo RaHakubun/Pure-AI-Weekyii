@@ -2620,6 +2620,7 @@ private struct TaskTypeDefinitionEditorSheet: View {
                 }
             }
         }
+        .weekIPadFormPresentation()
     }
 
     private var baseKindLabel: String {

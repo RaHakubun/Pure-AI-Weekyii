@@ -373,7 +373,7 @@ struct TodayView: View {
         }
         .overlay(alignment: .bottom) {
             if shouldShowFloatingStartButton(for: day) {
-                if layoutMetrics.layoutClass.supportsTwoColumns {
+                if layoutMetrics.layoutClass.supportsTwoColumns, workspaceSelectionStore == nil {
                     HStack(alignment: .bottom, spacing: WeekSpacing.xl) {
                         floatingStartButtonOverlay
                             .frame(maxWidth: .infinity)
@@ -2252,6 +2252,7 @@ private struct HabitTaskDetailSheet: View {
                 if let habit = task.habit {
                     HabitTaskDetailContent(task: task, habit: habit)
                         .weekPadding(WeekSpacing.base)
+                        .weekFormWidth()
                 }
             }
             .background(Color.backgroundPrimary)
@@ -2265,6 +2266,7 @@ private struct HabitTaskDetailSheet: View {
                 }
             }
         }
+        .weekIPadFormPresentation()
     }
 }
 

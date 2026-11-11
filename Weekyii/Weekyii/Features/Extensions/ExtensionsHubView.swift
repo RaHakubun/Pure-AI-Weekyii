@@ -1041,6 +1041,7 @@ struct SuspendedTaskEditorSheet: View {
                     }
                 }
                 .padding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(title)
@@ -1083,6 +1084,7 @@ struct SuspendedTaskEditorSheet: View {
         .fullScreenCover(item: $imagePreviewItem) { item in
             ImageViewerScreen(image: item.image)
         }
+        .weekIPadFormPresentation()
     }
 
     private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
@@ -1310,6 +1312,7 @@ struct SuspendedTaskAssignSheet: View {
                 Spacer()
             }
             .padding(WeekSpacing.base)
+            .weekFormWidth()
             .background(Color.backgroundPrimary)
             .navigationTitle("分配到某天")
             .navigationBarTitleDisplayMode(.inline)
@@ -1325,6 +1328,7 @@ struct SuspendedTaskAssignSheet: View {
                 }
             }
         }
+        .weekIPadFormPresentation()
     }
 }
 

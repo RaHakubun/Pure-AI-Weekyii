@@ -88,6 +88,7 @@ struct MindStampEditorSheet: View {
                     }
                 }
                 .weekPadding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(String(localized: editingItem != nil ? "mindstamp.editor.edit_title" : "mindstamp.editor.create_title"))
@@ -141,6 +142,7 @@ struct MindStampEditorSheet: View {
         .fullScreenCover(item: $imagePreviewItem) { item in
             ImageViewerScreen(image: item.image)
         }
+        .weekIPadFormPresentation()
     }
 
     // 图片框：完整原图居中，空白处用同一张图的模糊版铺满

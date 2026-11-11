@@ -57,6 +57,7 @@ struct HabitEditorSheet: View {
                     footerNotes
                 }
                 .weekPadding(WeekSpacing.base)
+                .weekFormWidth()
             }
             .background(Color.backgroundPrimary)
             .navigationTitle(
@@ -83,6 +84,7 @@ struct HabitEditorSheet: View {
                 }
             }
         }
+        .weekIPadFormPresentation()
     }
 
     // MARK: - Name

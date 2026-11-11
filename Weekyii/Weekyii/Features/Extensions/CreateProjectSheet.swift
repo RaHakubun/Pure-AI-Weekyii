@@ -231,6 +231,7 @@ struct CreateProjectSheet: View {
                 Text(errorMessage ?? "")
             }
         }
+        .weekIPadFormPresentation()
     }
 
     // MARK: - Live Preview Card

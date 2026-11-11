@@ -248,6 +248,7 @@ struct TaskEditorSheet: View {
         .task {
             loadTaskTypeDefinitions()
         }
+        .weekIPadFormPresentation()
     }
 
     private func sectionHeader(titleKey: LocalizedStringKey, icon: String, accent: Color) -> some View {

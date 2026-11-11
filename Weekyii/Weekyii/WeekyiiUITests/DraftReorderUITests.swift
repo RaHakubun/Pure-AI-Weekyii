@@ -1154,4 +1154,41 @@ final class IPadLayoutUITests: XCTestCase {
         language.tap()
         XCTAssertTrue(app.descendants(matching: .any)["workspaceInspector"].waitForExistence(timeout: 5))
     }
+
+    func testTemporaryEditorsUseBoundedIPadPresentation() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-uiTestingSeedDraft", "1"]
+        app.launch()
+        guard app.frame.width >= 900 else {
+            throw XCTSkip("This width check requires a sufficiently wide iPad window.")
+        }
+
+        let addTask = app.buttons["draftAddButton"]
+        XCTAssertTrue(addTask.waitForExistence(timeout: 5))
+        addTask.tap()
+        XCTAssertTrue(app.textFields["taskEditorTitleField"].waitForExistence(timeout: 5))
+        assertBoundedSheet(in: app, screenshotName: "ipad-task-editor")
+        app.buttons["taskEditorCancelButton"].tap()
+        XCTAssertTrue(app.textFields["taskEditorTitleField"].waitForNonExistence(timeout: 5))
+
+        let suspended = app.descendants(matching: .any)["workspaceRoute_suspended"]
+        XCTAssertTrue(suspended.waitForExistence(timeout: 5))
+        suspended.tap()
+        let create = app.buttons["suspendedCreateButton"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        XCTAssertTrue(app.textFields["suspendedTaskTitleField"].waitForExistence(timeout: 5))
+        assertBoundedSheet(in: app, screenshotName: "ipad-suspended-editor")
+    }
+
+    private func assertBoundedSheet(in app: XCUIApplication, screenshotName: String) {
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+        XCTAssertLessThan(sheet.frame.width, app.frame.width * 0.85, "Temporary editor should not fill a wide iPad window.")
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = screenshotName
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 }

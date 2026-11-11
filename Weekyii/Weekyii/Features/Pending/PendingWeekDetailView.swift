@@ -57,6 +57,7 @@ struct PendingWeekDetailView: View {
                 }
             }
             .weekPadding(WeekSpacing.base)
+            .weekReadableContent(maxWidth: 980)
         }
         .background(Color.backgroundPrimary)
         .navigationTitle(week.relativeWeekLabel())

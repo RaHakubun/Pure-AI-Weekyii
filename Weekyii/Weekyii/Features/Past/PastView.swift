@@ -1197,6 +1197,7 @@ private struct PastWeekDetailView: View {
                 weekAnalyticsSection
             }
             .weekPadding(WeekSpacing.base)
+            .weekReadableContent(maxWidth: 980)
         }
         .background(Color.backgroundPrimary)
         .navigationTitle(week.relativeWeekLabel(referenceDate: Date()))

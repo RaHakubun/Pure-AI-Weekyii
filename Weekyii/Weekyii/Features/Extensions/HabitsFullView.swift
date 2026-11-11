@@ -36,7 +36,7 @@ struct HabitsFullView: View {
             }
             .padding(.horizontal, WeekSpacing.base)
             .padding(.vertical, WeekSpacing.md)
-            .frame(maxWidth: .infinity, alignment: .top)
+            .weekReadableContent(maxWidth: 980)
         }
         .background(Color.backgroundPrimary.ignoresSafeArea())
         .navigationTitle(String(localized: "habits.title", defaultValue: "我的习惯"))
