@@ -369,7 +369,14 @@ struct TodayView: View {
             }
             .padding(.bottom, shouldShowFloatingStartButton(for: day) ? floatingStartOverlayReserveHeight : 0)
             .weekReadableContent()
-            .accessibilityIdentifier("todayWorkspaceContent")
+            .background(alignment: .topLeading) {
+                // Keep this off the task controls. An identifier on the stack
+                // replaces the add button's own identifier in the accessibility tree.
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityElement()
+                    .accessibilityIdentifier("todayWorkspaceContent")
+            }
         }
         .overlay(alignment: .bottom) {
             if shouldShowFloatingStartButton(for: day) {

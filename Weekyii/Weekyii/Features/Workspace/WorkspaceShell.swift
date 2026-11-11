@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import SwiftData
 
@@ -182,19 +183,11 @@ struct WorkspaceShell: View {
     @StateObject private var selectionStore = WorkspaceSelectionStore()
 
     var body: some View {
-        Group {
-            // The extensions hub owns its own navigation and has no
-            // route-scoped inspector. Give it the full detail column.
-            if layoutMetrics.layoutClass == .wide && selectedRoute != .extensions {
-                wideWorkspace
-            } else {
-                regularWorkspace
+        workspace
+            .overlay {
+                WorkspaceKeyboardShortcuts(selectedRoute: $selectedRoute)
             }
-        }
-        .overlay {
-            WorkspaceKeyboardShortcuts(selectedRoute: $selectedRoute)
-        }
-        .sheet(isPresented: $showingInspector) {
+            .sheet(isPresented: $showingInspector) {
             NavigationStack {
                 WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
                     .navigationTitle("上下文")
@@ -213,48 +206,49 @@ struct WorkspaceShell: View {
         }
     }
 
-    private var regularWorkspace: some View {
+    /// One split view for every width. A three-column split hides the sidebar on
+    /// an 11-inch landscape iPad (1210pt), which removes the only way to change
+    /// modules. The inspector sits beside the content once the window is wide.
+    private var workspace: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             WorkspaceSidebar(
                 selectedRoute: $selectedRoute,
-                showsInspectorButton: selectedRoute != .extensions,
+                showsInspectorButton: layoutMetrics.layoutClass != .wide,
                 onShowInspector: { showingInspector = true }
             )
-            .navigationSplitViewColumnWidth(min: 218, ideal: 246, max: 286)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 250)
         } detail: {
-            WorkspaceRouteTabs(
-                selectedRoute: $selectedRoute,
-                animationsActive: animationsActive
-            )
-            .environment(\.workspaceSelectionStore, selectionStore)
-            .environment(\.workspaceOpenInspector, { showingInspector = true })
+            Group {
+                if layoutMetrics.layoutClass == .wide, selectedRoute != .extensions {
+                    HStack(spacing: 0) {
+                        routeTabs
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Divider()
+                        NavigationStack {
+                            WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
+                        }
+                        .id(selectedRoute)
+                        .frame(width: 320)
+                    }
+                } else {
+                    routeTabs
+                }
+            }
         }
         .navigationSplitViewStyle(.balanced)
     }
 
-    private var wideWorkspace: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            WorkspaceSidebar(
-                selectedRoute: $selectedRoute,
-                showsInspectorButton: false,
-                onShowInspector: { }
-            )
-            .navigationSplitViewColumnWidth(min: 218, ideal: 246, max: 286)
-        } content: {
-            WorkspaceRouteTabs(
-                selectedRoute: $selectedRoute,
-                animationsActive: animationsActive
-            )
-            .environment(\.workspaceSelectionStore, selectionStore)
-            .navigationSplitViewColumnWidth(min: 620, ideal: 800, max: 1100)
-        } detail: {
-            NavigationStack {
-                WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
+    private var routeTabs: some View {
+        WorkspaceRouteTabs(
+            selectedRoute: $selectedRoute,
+            animationsActive: animationsActive
+        )
+        .environment(\.workspaceSelectionStore, selectionStore)
+        .environment(\.workspaceOpenInspector, {
+            if layoutMetrics.layoutClass != .wide {
+                showingInspector = true
             }
-            .id(selectedRoute)
-            .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 390)
-        }
-        .navigationSplitViewStyle(.balanced)
+        })
     }
 }
 
@@ -327,7 +321,10 @@ private struct WorkspaceSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .listSectionSpacing(8)
+        .environment(\.defaultMinListRowHeight, 36)
         .navigationTitle("Weekyii")
+        .accessibilityIdentifier("workspaceSidebar")
         .safeAreaInset(edge: .bottom) {
             if showsInspectorButton {
                 Button(action: onShowInspector) {
@@ -344,7 +341,6 @@ private struct WorkspaceSidebar: View {
                 .accessibilityIdentifier("workspaceInspectorButton")
             }
         }
-        .accessibilityIdentifier("workspaceSidebar")
         .sheet(isPresented: $showingFullSettings) {
             SettingsView()
                 .environment(\.workspaceSelectionStore, nil)
@@ -381,6 +377,7 @@ private struct WorkspaceSidebar: View {
                     selectedRoute = .pending
                 }
             }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("workspaceRoute_\(route.rawValue)")
     }
 }
@@ -388,9 +385,14 @@ private struct WorkspaceSidebar: View {
 private struct WorkspaceRouteTabs: View {
     @Binding var selectedRoute: WorkspaceRoute
     let animationsActive: Bool
+    @Environment(\.weekLayoutMetrics) private var windowMetrics
 
     var body: some View {
         GeometryReader { proxy in
+            let columnWidth = proxy.size.width
+            let resolvedWidth = windowMetrics.layoutClass == .compact
+                ? columnWidth
+                : max(columnWidth, 650)
             TabView(selection: $selectedRoute) {
                 ForEach(WorkspaceRoute.persistentRoutes) { route in
                     routeContent(route)
@@ -401,7 +403,7 @@ private struct WorkspaceRouteTabs: View {
             .background(Color.backgroundPrimary)
             .environment(
                 \.weekLayoutMetrics,
-                WeekLayoutMetrics(availableWidth: proxy.size.width)
+                WeekLayoutMetrics(availableWidth: resolvedWidth)
             )
         }
     }
@@ -1489,10 +1491,10 @@ private struct WorkspaceInspectorView: View {
         case .task(let id):
             guard let task = tasks.first(where: { $0.id == id }) else { return false }
             return taskBelongsToCurrentRoute(task)
-        case .project(let id): projects.contains { $0.id == id }
-        case .suspendedTask(let id): suspendedTasks.contains { $0.id == id && $0.status == .active }
-        case .mindStamp(let id): stamps.contains { $0.id == id }
-        case .setting: true
+        case .project(let id): return projects.contains { $0.id == id }
+        case .suspendedTask(let id): return suspendedTasks.contains { $0.id == id && $0.status == .active }
+        case .mindStamp(let id): return stamps.contains { $0.id == id }
+        case .setting: return true
         }
     }
 
@@ -1707,7 +1709,6 @@ private struct WorkspacePendingDateActions: View {
     @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: PendingViewModel?
     @State private var targetDay: DayModel?
-    @State private var showingEditor = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -1718,7 +1719,6 @@ private struct WorkspacePendingDateActions: View {
                 return
             }
             targetDay = day
-            showingEditor = true
         } label: {
             Label("在这一天创建任务", systemImage: "plus.circle.fill")
                 .font(.subheadline.weight(.semibold))
@@ -1734,51 +1734,49 @@ private struct WorkspacePendingDateActions: View {
             created.refresh()
             viewModel = created
         }
-        .sheet(isPresented: $showingEditor, onDismiss: {
+        .sheet(item: $targetDay, onDismiss: {
             viewModel?.refresh()
-        }) {
-            if let targetDay {
-                TaskEditorSheet(
-                    title: String(localized: "draft.add_title"),
-                    initialType: settings.defaultTaskType,
-                    initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
-                    onSave: { _, _, _, _, _ in },
-                    onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
-                        guard let viewModel else {
-                            errorMessage = String(localized: "error.operation_failed_retry")
-                            return
-                        }
-                        do {
-                            try viewModel.addDraftTask(
-                                to: targetDay,
-                                title: title,
-                                description: description,
-                                type: type,
-                                taskTypeIdRaw: typeID,
-                                steps: steps,
-                                attachments: attachments
-                            )
-                            showingEditor = false
-                            NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
+        }) { day in
+            TaskEditorSheet(
+                title: String(localized: "draft.add_title"),
+                initialType: settings.defaultTaskType,
+                initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
+                    guard let viewModel else {
+                        errorMessage = String(localized: "error.operation_failed_retry")
+                        return
                     }
-                )
-                .alert(String(localized: "alert.title"), isPresented: Binding(
-                    get: { errorMessage != nil },
-                    set: { if !$0 { errorMessage = nil } }
-                )) {
-                    Button(String(localized: "action.ok"), role: .cancel) { }
-                } message: {
-                    Text(errorMessage ?? "")
+                    do {
+                        try viewModel.addDraftTask(
+                            to: day,
+                            title: title,
+                            description: description,
+                            type: type,
+                            taskTypeIdRaw: typeID,
+                            steps: steps,
+                            attachments: attachments
+                        )
+                        targetDay = nil
+                        NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
+            )
+            .alert(String(localized: "alert.title"), isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button(String(localized: "action.ok"), role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
         .alert(
             String(localized: "alert.title"),
             isPresented: Binding(
-                get: { errorMessage != nil && !showingEditor },
+                get: { errorMessage != nil && targetDay == nil },
                 set: { if !$0 { errorMessage = nil } }
             )
         ) {

@@ -625,7 +625,7 @@ struct PastView: View {
 
     private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
         let usesWorkspaceSelection = workspaceSelectionStore != nil
-        VStack(spacing: WeekSpacing.md) {
+        return VStack(spacing: WeekSpacing.md) {
             ForEach(weeks) { week in
                 PastWeekCard(
                     week: week,

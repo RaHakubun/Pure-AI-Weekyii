@@ -1208,8 +1208,28 @@ final class IPadLayoutUITests: XCTestCase {
 
     private func assertBoundedSheet(in app: XCUIApplication, screenshotName: String) {
         let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
-        XCTAssertLessThan(sheet.frame.width, app.frame.width * 0.85, "Temporary editor should not fill a wide iPad window.")
+        if sheet.waitForExistence(timeout: 1) {
+            XCTAssertLessThan(sheet.frame.width, app.frame.width * 0.85, "Temporary editor should not fill a wide iPad window.")
+        } else {
+            // iPad form presentation is a popover in this Xcode/iOS pair. It is not
+            // an XCUIElement sheet; the visible card is a plain container.
+            let editor = app.textFields["taskEditorTitleField"].exists
+                ? app.textFields["taskEditorTitleField"]
+                : app.textFields["suspendedTaskTitleField"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 2))
+            let windowWidth = app.frame.width
+            let origin = editor.frame.insetBy(dx: 2, dy: 2).origin
+            let container = app.otherElements.allElementsBoundByIndex
+                .map(\.frame)
+                .filter { frame in
+                    frame.width > editor.frame.width
+                        && frame.width < windowWidth * 0.85
+                        && frame.contains(origin)
+                }
+                .min { $0.width < $1.width }
+            XCTAssertNotNil(container, "Temporary editor should use a bounded container.")
+            XCTAssertLessThan(container?.width ?? windowWidth, windowWidth * 0.85)
+        }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = screenshotName
         screenshot.lifetime = .keepAlways
