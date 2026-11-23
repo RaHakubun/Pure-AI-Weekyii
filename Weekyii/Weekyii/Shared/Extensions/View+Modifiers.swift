@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Draws a `ThemeSurfaceSkin`: fill, border (or gradient tube), a hard offset
 /// shadow or a soft glow, and the paper "second sheet" under the bottom edge.
@@ -485,6 +486,17 @@ extension View {
     /// their existing compact presentation.
     func weekFormWidth() -> some View {
         modifier(WeekFormWidthModifier())
+    }
+
+    /// Use the system's bounded form presentation for temporary iPad
+    /// editors. Keep iPhone presentation and system size adaptation unchanged.
+    @ViewBuilder
+    func weekIPadFormPresentation() -> some View {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            self.presentationSizing(.form)
+        } else {
+            self
+        }
     }
 }
 

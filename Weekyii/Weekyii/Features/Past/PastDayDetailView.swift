@@ -40,6 +40,7 @@ struct PastDayDetailView: View {
                 .weekyiiCard()
             }
             .padding()
+            .weekReadableContent(maxWidth: 880)
         }
         .navigationTitle(day.dayId)
     }

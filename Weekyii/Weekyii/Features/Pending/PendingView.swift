@@ -507,7 +507,7 @@ struct PendingView: View {
     private func weeksList(weeks: [WeekModel], usesInlineSelection: Bool = false) -> some View {
         let usesWorkspaceSelection = workspaceSelectionStore != nil
         // .id 确保月份切换时整个列表整体替换而非逐个 diff，消除跨月卡片的残留动画。
-        VStack(spacing: WeekSpacing.md) {
+        return VStack(spacing: WeekSpacing.md) {
             // 统计信息
             if workspaceSelectionStore == nil {
                 WeekCard(accentColor: .accentOrange) {

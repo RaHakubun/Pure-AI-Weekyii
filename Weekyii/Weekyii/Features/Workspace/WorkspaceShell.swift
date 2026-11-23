@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import SwiftData
 
@@ -7,6 +8,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
     case pending
     case projects
     case suspended
+    case extensions
     case past
     case insights
     case mindStamps
@@ -22,6 +24,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: "未来"
         case .projects: "项目"
         case .suspended: "悬置箱"
+        case .extensions: String(localized: "tab.extensions")
         case .past: "过去"
         case .insights: "洞察"
         case .mindStamps: "印记"
@@ -37,6 +40,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: "calendar.badge.plus"
         case .projects: "folder"
         case .suspended: "hourglass"
+        case .extensions: "square.grid.2x2"
         case .past: "clock.arrow.circlepath"
         case .insights: "chart.xyaxis.line"
         case .mindStamps: "bandage.fill"
@@ -52,6 +56,7 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
         case .pending: .weekyiiPrimaryLight
         case .projects: .weekyiiPrimary
         case .suspended: .suspendedModuleTint
+        case .extensions: .weekyiiPrimary
         case .past: .textSecondary
         case .insights: .accentGreen
         case .mindStamps: .accentPink
@@ -61,10 +66,10 @@ enum WorkspaceRoute: String, CaseIterable, Identifiable, Hashable {
     }
 
     static let nowRoutes: [WorkspaceRoute] = [.today, .week]
-    static let planningRoutes: [WorkspaceRoute] = [.pending, .projects, .suspended]
+    static let planningRoutes: [WorkspaceRoute] = [.pending, .projects, .suspended, .extensions]
     static let reflectionRoutes: [WorkspaceRoute] = [.past, .insights, .mindStamps]
     static let persistentRoutes: [WorkspaceRoute] = [
-        .today, .week, .pending, .projects, .suspended,
+        .today, .week, .pending, .projects, .suspended, .extensions,
         .past, .insights, .mindStamps, .search, .settings
     ]
 }
@@ -82,10 +87,14 @@ enum WorkspaceSelection: Hashable {
 }
 
 enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
+    case vip
     case appearance
+    case language
     case rhythm
     case taskTypes
+    case past
     case future
+    case suspended
     case projects
     case data
     case about
@@ -95,10 +104,14 @@ enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .vip: String(localized: "vip.title", defaultValue: "VIP 服务")
         case .appearance: "外观与主题"
+        case .language: String(localized: "settings.language.title", defaultValue: "语言")
         case .rhythm: "今日节奏"
         case .taskTypes: "任务管理"
+        case .past: String(localized: "settings.section.past", defaultValue: "过去")
         case .future: "未来"
+        case .suspended: String(localized: "settings.suspended.header", defaultValue: "悬置箱")
         case .projects: "项目"
         case .data: "数据与安全"
         case .about: "关于 Weekyii"
@@ -108,10 +121,14 @@ enum WorkspaceSettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
+        case .vip: "crown.fill"
         case .appearance: "paintpalette.fill"
+        case .language: "globe"
         case .rhythm: "timer"
         case .taskTypes: "tag.fill"
+        case .past: "clock.arrow.circlepath"
         case .future: "calendar.badge.clock"
+        case .suspended: "hourglass"
         case .projects: "folder.fill"
         case .data: "lock.shield.fill"
         case .about: "info.circle.fill"
@@ -136,10 +153,19 @@ private struct WorkspaceSelectionStoreKey: EnvironmentKey {
     static let defaultValue: WorkspaceSelectionStore? = nil
 }
 
+private struct WorkspaceOpenInspectorKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
 extension EnvironmentValues {
     var workspaceSelectionStore: WorkspaceSelectionStore? {
         get { self[WorkspaceSelectionStoreKey.self] }
         set { self[WorkspaceSelectionStoreKey.self] = newValue }
+    }
+
+    var workspaceOpenInspector: (() -> Void)? {
+        get { self[WorkspaceOpenInspectorKey.self] }
+        set { self[WorkspaceOpenInspectorKey.self] = newValue }
     }
 }
 
@@ -152,22 +178,17 @@ struct WorkspaceShell: View {
     let animationsActive: Bool
 
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showingInspector = false
     @StateObject private var selectionStore = WorkspaceSelectionStore()
 
     var body: some View {
-        Group {
-            if layoutMetrics.layoutClass == .wide {
-                wideWorkspace
-            } else {
-                regularWorkspace
+        workspace
+            .overlay {
+                WorkspaceKeyboardShortcuts(selectedRoute: $selectedRoute)
             }
-        }
-        .overlay {
-            WorkspaceKeyboardShortcuts(selectedRoute: $selectedRoute)
-        }
-        .sheet(isPresented: $showingInspector) {
+            .sheet(isPresented: $showingInspector) {
             NavigationStack {
                 WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
                     .navigationTitle("上下文")
@@ -186,47 +207,53 @@ struct WorkspaceShell: View {
         }
     }
 
-    private var regularWorkspace: some View {
+    /// One split view for every width. A three-column split hides the sidebar on
+    /// an 11-inch landscape iPad (1210pt), which removes the only way to change
+    /// modules. The inspector sits beside the content once the window is wide.
+    private var workspace: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             WorkspaceSidebar(
                 selectedRoute: $selectedRoute,
-                showsInspectorButton: true,
+                showsInspectorButton: layoutMetrics.layoutClass != .wide,
                 onShowInspector: { showingInspector = true }
             )
-            .navigationSplitViewColumnWidth(min: 218, ideal: 246, max: 286)
-        } detail: {
-            WorkspaceRouteTabs(
-                selectedRoute: $selectedRoute,
-                animationsActive: animationsActive
+            .navigationSplitViewColumnWidth(
+                min: dynamicTypeSize.isAccessibilitySize ? 260 : 200,
+                ideal: dynamicTypeSize.isAccessibilitySize ? 300 : 220,
+                max: dynamicTypeSize.isAccessibilitySize ? 340 : 250
             )
-            .environment(\.workspaceSelectionStore, selectionStore)
+        } detail: {
+            Group {
+                if layoutMetrics.layoutClass == .wide, selectedRoute != .extensions {
+                    HStack(spacing: 0) {
+                        routeTabs
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Divider()
+                        NavigationStack {
+                            WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
+                        }
+                        .id(selectedRoute)
+                        .frame(width: 320)
+                    }
+                } else {
+                    routeTabs
+                }
+            }
         }
         .navigationSplitViewStyle(.balanced)
     }
 
-    private var wideWorkspace: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            WorkspaceSidebar(
-                selectedRoute: $selectedRoute,
-                showsInspectorButton: false,
-                onShowInspector: { }
-            )
-            .navigationSplitViewColumnWidth(min: 218, ideal: 246, max: 286)
-        } content: {
-            WorkspaceRouteTabs(
-                selectedRoute: $selectedRoute,
-                animationsActive: animationsActive
-            )
-            .environment(\.workspaceSelectionStore, selectionStore)
-            .navigationSplitViewColumnWidth(min: 620, ideal: 800, max: 1100)
-        } detail: {
-            NavigationStack {
-                WorkspaceInspectorView(route: $selectedRoute, selectionStore: selectionStore)
+    private var routeTabs: some View {
+        WorkspaceRouteTabs(
+            selectedRoute: $selectedRoute,
+            animationsActive: animationsActive
+        )
+        .environment(\.workspaceSelectionStore, selectionStore)
+        .environment(\.workspaceOpenInspector, {
+            if layoutMetrics.layoutClass != .wide {
+                showingInspector = true
             }
-            .id(selectedRoute)
-            .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 390)
-        }
-        .navigationSplitViewStyle(.balanced)
+        })
     }
 }
 
@@ -263,7 +290,7 @@ private struct WorkspaceSidebar: View {
     @Binding var selectedRoute: WorkspaceRoute
     let showsInspectorButton: Bool
     let onShowInspector: () -> Void
-    @State private var showingExtensions = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingFullSettings = false
 
     var body: some View {
@@ -271,16 +298,15 @@ private struct WorkspaceSidebar: View {
             Button {
                 selectedRoute = .search
             } label: {
-                Label {
-                    HStack {
-                        Text("搜索")
-                        Spacer()
+                HStack(spacing: 8) {
+                    WorkspaceSidebarLabel(title: "搜索", systemImage: WorkspaceRoute.search.systemImage)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer(minLength: 4)
                         Text("⌘K")
                             .font(.caption2.monospaced())
                             .foregroundStyle(Color.textTertiary)
+                            .layoutPriority(-1)
                     }
-                } icon: {
-                    Image(systemName: WorkspaceRoute.search.systemImage)
                 }
             }
             .buttonStyle(.plain)
@@ -292,24 +318,25 @@ private struct WorkspaceSidebar: View {
             routeSection("回望", routes: WorkspaceRoute.reflectionRoutes)
 
             Section("系统") {
-                Button { showingExtensions = true } label: {
-                    Label("扩展与习惯", systemImage: "square.grid.2x2")
-                }
-                .accessibilityIdentifier("workspaceFullExtensions")
                 routeRow(.settings)
                 Button { showingFullSettings = true } label: {
-                    Label("完整设置", systemImage: "gearshape")
+                    WorkspaceSidebarLabel(title: "完整设置", systemImage: "gearshape")
                 }
                 .accessibilityIdentifier("workspaceFullSettings")
             }
         }
         .listStyle(.sidebar)
+        .listSectionSpacing(8)
+        .environment(\.defaultMinListRowHeight, dynamicTypeSize.isAccessibilitySize ? 52 : 36)
         .navigationTitle("Weekyii")
+        .accessibilityIdentifier("workspaceSidebar")
         .safeAreaInset(edge: .bottom) {
             if showsInspectorButton {
                 Button(action: onShowInspector) {
-                    Label("查看上下文", systemImage: "sidebar.right")
+                    Label(dynamicTypeSize.isAccessibilitySize ? "上下文" : "查看上下文", systemImage: "sidebar.right")
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, WeekSpacing.md)
                         .padding(.vertical, WeekSpacing.sm)
@@ -320,11 +347,6 @@ private struct WorkspaceSidebar: View {
                 .padding(.bottom, WeekSpacing.xs)
                 .accessibilityIdentifier("workspaceInspectorButton")
             }
-        }
-        .accessibilityIdentifier("workspaceSidebar")
-        .sheet(isPresented: $showingExtensions) {
-            ExtensionsHubView(animationsActive: true)
-                .environment(\.workspaceSelectionStore, nil)
         }
         .sheet(isPresented: $showingFullSettings) {
             SettingsView()
@@ -353,7 +375,7 @@ private struct WorkspaceSidebar: View {
     }
 
     private func routeRow(_ route: WorkspaceRoute) -> some View {
-        Label(route.title, systemImage: route.systemImage)
+        WorkspaceSidebarLabel(title: route.title, systemImage: route.systemImage)
             .tag(route)
             .dropDestination(for: String.self) { _, _ in
                 false
@@ -362,16 +384,40 @@ private struct WorkspaceSidebar: View {
                     selectedRoute = .pending
                 }
             }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("workspaceRoute_\(route.rawValue)")
+    }
+}
+
+private struct WorkspaceSidebarLabel: View {
+    let title: String
+    let systemImage: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Label {
+            Text(title)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } icon: {
+            Image(systemName: systemImage)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? 28 : 22)
+        }
     }
 }
 
 private struct WorkspaceRouteTabs: View {
     @Binding var selectedRoute: WorkspaceRoute
     let animationsActive: Bool
+    @Environment(\.weekLayoutMetrics) private var windowMetrics
 
     var body: some View {
         GeometryReader { proxy in
+            let columnWidth = proxy.size.width
+            let resolvedWidth = windowMetrics.layoutClass == .compact
+                ? columnWidth
+                : max(columnWidth, 650)
             TabView(selection: $selectedRoute) {
                 ForEach(WorkspaceRoute.persistentRoutes) { route in
                     routeContent(route)
@@ -382,7 +428,7 @@ private struct WorkspaceRouteTabs: View {
             .background(Color.backgroundPrimary)
             .environment(
                 \.weekLayoutMetrics,
-                WeekLayoutMetrics(availableWidth: proxy.size.width)
+                WeekLayoutMetrics(availableWidth: resolvedWidth)
             )
         }
     }
@@ -404,6 +450,10 @@ private struct WorkspaceRouteTabs: View {
             WorkspaceProjectsRouteHost()
         case .suspended:
             WorkspaceSuspendedRouteHost()
+        case .extensions:
+            ExtensionsHubView(animationsActive: animationsActive && selectedRoute == .extensions)
+                .environment(\.workspaceSelectionStore, nil)
+                .accessibilityIdentifier("workspaceExtensionsContent")
         case .mindStamps:
             WorkspaceMindStampsRouteHost()
         case .past:
@@ -523,7 +573,9 @@ private struct WorkspaceMindStampsRouteHost: View {
 
 private struct WorkspaceSettingsCategoriesView: View {
     @Environment(\.workspaceSelectionStore) private var workspaceSelectionStore
+    @Environment(\.workspaceOpenInspector) private var openInspector
     @Environment(\.weekLayoutMetrics) private var layoutMetrics
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedSection: WorkspaceSettingsSection = .appearance
 
     var body: some View {
@@ -531,7 +583,10 @@ private struct WorkspaceSettingsCategoriesView: View {
             ScrollView {
                 LazyVGrid(
                     columns: [
-                        GridItem(.adaptive(minimum: 220), spacing: WeekSpacing.md)
+                        GridItem(
+                            .adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 460 : 220),
+                            spacing: WeekSpacing.md
+                        )
                     ],
                     spacing: WeekSpacing.md
                 ) {
@@ -539,6 +594,7 @@ private struct WorkspaceSettingsCategoriesView: View {
                         Button {
                             selectedSection = section
                             workspaceSelectionStore?.select(.setting(section), for: .settings)
+                            openInspector?()
                         } label: {
                             HStack(spacing: WeekSpacing.md) {
                                 Image(systemName: section.systemImage)
@@ -553,12 +609,13 @@ private struct WorkspaceSettingsCategoriesView: View {
                                 Text(section.title)
                                     .font(.headline)
                                     .foregroundStyle(Color.textPrimary)
+                                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                                Spacer()
-
-                                Image(systemName: "sidebar.right")
+                                Image(systemName: selectedSection == section ? "checkmark.circle.fill" : "chevron.right")
                                     .font(.caption.weight(.bold))
-                                    .foregroundStyle(Color.textTertiary)
+                                    .foregroundStyle(selectedSection == section ? Color.weekyiiPrimary : Color.textTertiary)
                             }
                             .padding(WeekSpacing.lg)
                             .background(
@@ -578,6 +635,7 @@ private struct WorkspaceSettingsCategoriesView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
                         .accessibilityIdentifier("workspaceSettingsCategory_\(section.rawValue)")
                     }
                 }
@@ -1008,6 +1066,8 @@ private struct WorkspaceInspectorView: View {
             } else {
                 emptyInspector("新增悬置任务", systemImage: "hourglass.badge.plus")
             }
+        case .extensions:
+            EmptyView()
         case .past:
             if let selection = resolvedSelection {
                 selectionContent(selection)
@@ -1305,6 +1365,8 @@ private struct WorkspaceInspectorView: View {
                 .map(\.dayId)
         case .mindStamps:
             return stamps.map { "stamp-\($0.id.uuidString)" }
+        case .extensions:
+            return []
         case .search:
             return days.map(\.dayId)
                 + weeks.map(\.weekId)
@@ -1437,7 +1499,7 @@ private struct WorkspaceInspectorView: View {
                 .map { .insightDay($0.dayId) }
         case .mindStamps:
             return stamps.first.map { .mindStamp($0.id) }
-        case .search:
+        case .search, .extensions:
             return nil
         case .settings:
             return .setting(.appearance)
@@ -1459,10 +1521,10 @@ private struct WorkspaceInspectorView: View {
         case .task(let id):
             guard let task = tasks.first(where: { $0.id == id }) else { return false }
             return taskBelongsToCurrentRoute(task)
-        case .project(let id): projects.contains { $0.id == id }
-        case .suspendedTask(let id): suspendedTasks.contains { $0.id == id && $0.status == .active }
-        case .mindStamp(let id): stamps.contains { $0.id == id }
-        case .setting: true
+        case .project(let id): return projects.contains { $0.id == id }
+        case .suspendedTask(let id): return suspendedTasks.contains { $0.id == id && $0.status == .active }
+        case .mindStamp(let id): return stamps.contains { $0.id == id }
+        case .setting: return true
         }
     }
 
@@ -1582,6 +1644,8 @@ private struct WorkspaceInspectorView: View {
         case .mindStamps:
             if case .mindStamp = selection { return true }
             return false
+        case .extensions:
+            return false
         case .search:
             return true
         case .settings:
@@ -1675,7 +1739,6 @@ private struct WorkspacePendingDateActions: View {
     @EnvironmentObject private var settings: UserSettings
     @State private var viewModel: PendingViewModel?
     @State private var targetDay: DayModel?
-    @State private var showingEditor = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -1686,7 +1749,6 @@ private struct WorkspacePendingDateActions: View {
                 return
             }
             targetDay = day
-            showingEditor = true
         } label: {
             Label("在这一天创建任务", systemImage: "plus.circle.fill")
                 .font(.subheadline.weight(.semibold))
@@ -1695,44 +1757,56 @@ private struct WorkspacePendingDateActions: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.weekyiiPrimary)
+        .accessibilityIdentifier("workspacePendingCreateTask")
         .onAppear {
             guard viewModel == nil else { return }
             let created = PendingViewModel(modelContext: modelContext)
             created.refresh()
             viewModel = created
         }
-        .sheet(isPresented: $showingEditor, onDismiss: {
+        .sheet(item: $targetDay, onDismiss: {
             viewModel?.refresh()
-        }) {
-            if let targetDay {
-                TaskEditorSheet(
-                    title: String(localized: "draft.add_title"),
-                    initialType: settings.defaultTaskType,
-                    initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
-                    onSave: { _, _, _, _, _ in },
-                    onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
-                        do {
-                            try viewModel?.addDraftTask(
-                                to: targetDay,
-                                title: title,
-                                description: description,
-                                type: type,
-                                taskTypeIdRaw: typeID,
-                                steps: steps,
-                                attachments: attachments
-                            )
-                            NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
+        }) { day in
+            TaskEditorSheet(
+                title: String(localized: "draft.add_title"),
+                initialType: settings.defaultTaskType,
+                initialTypeIdRaw: settings.defaultTaskTypeIdRaw,
+                onSave: { _, _, _, _, _ in },
+                onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
+                    guard let viewModel else {
+                        errorMessage = String(localized: "error.operation_failed_retry")
+                        return
                     }
-                )
+                    do {
+                        try viewModel.addDraftTask(
+                            to: day,
+                            title: title,
+                            description: description,
+                            type: type,
+                            taskTypeIdRaw: typeID,
+                            steps: steps,
+                            attachments: attachments
+                        )
+                        targetDay = nil
+                        NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            )
+            .alert(String(localized: "alert.title"), isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button(String(localized: "action.ok"), role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
         .alert(
             String(localized: "alert.title"),
             isPresented: Binding(
-                get: { errorMessage != nil },
+                get: { errorMessage != nil && targetDay == nil },
                 set: { if !$0 { errorMessage = nil } }
             )
         ) {
@@ -1779,6 +1853,7 @@ private struct WorkspaceEditableTaskActions: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("workspaceEditTask")
                 }
                 .sheet(isPresented: $showingEditor) {
                     TaskEditorSheet(
@@ -1793,7 +1868,11 @@ private struct WorkspaceEditableTaskActions: View {
                         onSaveWithTypeId: { title, description, type, typeID, steps, attachments in
                             do {
                                 if route == .pending, let day = task.day {
-                                    try pendingViewModel?.updateDraftTask(
+                                    guard let pendingViewModel else {
+                                        errorMessage = String(localized: "error.operation_failed_retry")
+                                        return
+                                    }
+                                    try pendingViewModel.updateDraftTask(
                                         task,
                                         in: day,
                                         title: title,
@@ -1804,27 +1883,48 @@ private struct WorkspaceEditableTaskActions: View {
                                         attachments: attachments
                                     )
                                 } else if route == .projects {
-                                extensionsViewModel?.updateProjectTask(
+                                    guard let extensionsViewModel else {
+                                        errorMessage = String(localized: "error.operation_failed_retry")
+                                        return
+                                    }
+                                    extensionsViewModel.errorMessage = nil
+                                    extensionsViewModel.updateProjectTask(
                                         task,
                                         title: title,
                                         description: description,
                                         type: type,
                                         taskTypeIdRaw: typeID,
                                         steps: steps,
-                                    attachments: attachments
-                                )
-                            }
-                            NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                                        attachments: attachments
+                                    )
+                                    if let error = extensionsViewModel.errorMessage {
+                                        errorMessage = error
+                                        return
+                                    }
+                                } else {
+                                    errorMessage = String(localized: "error.operation_failed_retry")
+                                    return
+                                }
+                                showingEditor = false
+                                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
                             } catch {
                                 errorMessage = error.localizedDescription
                             }
                         }
                     )
+                    .alert(String(localized: "alert.title"), isPresented: Binding(
+                        get: { errorMessage != nil },
+                        set: { if !$0 { errorMessage = nil } }
+                    )) {
+                        Button(String(localized: "action.ok"), role: .cancel) { }
+                    } message: {
+                        Text(errorMessage ?? "")
+                    }
                 }
                 .alert(
                     String(localized: "alert.title"),
                     isPresented: Binding(
-                        get: { errorMessage != nil },
+                        get: { errorMessage != nil && !showingEditor },
                         set: { if !$0 { errorMessage = nil } }
                     )
                 ) {
@@ -2088,6 +2188,19 @@ private struct WorkspaceSuspendedInspectorActions: View {
     @State private var showingEditor = false
     @State private var showingAssignment = false
     @State private var showingDeleteConfirmation = false
+    @State private var errorMessage: String?
+
+    private func performMutation(_ action: (ExtensionsViewModel) -> Void) -> Bool {
+        guard let viewModel else { return false }
+        viewModel.errorMessage = nil
+        action(viewModel)
+        if let error = viewModel.errorMessage {
+            errorMessage = error
+            return false
+        }
+        NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+        return true
+    }
 
     var body: some View {
         WorkspaceInspectorSection(title: "操作") {
@@ -2105,12 +2218,10 @@ private struct WorkspaceSuspendedInspectorActions: View {
             }
             Menu {
                 Button("续期 10 天") {
-                    viewModel?.extendSuspendedTask(task, by: 10)
-                    NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    _ = performMutation { $0.extendSuspendedTask(task, by: 10) }
                 }
                 Button("续期 30 天") {
-                    viewModel?.extendSuspendedTask(task, by: 30)
-                    NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                    _ = performMutation { $0.extendSuspendedTask(task, by: 30) }
                 }
             } label: {
                 Label("调整期限", systemImage: "clock.arrow.circlepath")
@@ -2144,25 +2255,27 @@ private struct WorkspaceSuspendedInspectorActions: View {
                 initialSteps: task.steps,
                 initialAttachments: task.attachments
             ) { title, description, type, typeID, countdownDays, steps, attachments in
-                viewModel?.updateSuspendedTask(
-                    task,
-                    title: title,
-                    description: description,
-                    type: type,
-                    taskTypeIdRaw: typeID,
-                    countdownDays: countdownDays,
-                    steps: steps,
-                    attachments: attachments
-                )
+                _ = performMutation {
+                    $0.updateSuspendedTask(
+                        task,
+                        title: title,
+                        description: description,
+                        type: type,
+                        taskTypeIdRaw: typeID,
+                        countdownDays: countdownDays,
+                        steps: steps,
+                        attachments: attachments
+                    )
+                }
             }
         }
         .sheet(isPresented: $showingAssignment, onDismiss: {
             viewModel?.refresh()
         }) {
             SuspendedTaskAssignSheet(taskTitle: task.title) { date in
-                viewModel?.assignSuspendedTask(task, to: date)
-                selectionStore.select(nil, for: .suspended)
-                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                if performMutation({ $0.assignSuspendedTask(task, to: date) }) {
+                    selectionStore.select(nil, for: .suspended)
+                }
             }
         }
         .confirmationDialog(
@@ -2171,13 +2284,21 @@ private struct WorkspaceSuspendedInspectorActions: View {
             titleVisibility: .visible
         ) {
             Button("删除", role: .destructive) {
-                viewModel?.deleteSuspendedTask(task)
-                selectionStore.select(nil, for: .suspended)
-                NotificationCenter.default.post(name: .workspaceDataDidChange, object: nil)
+                if performMutation({ $0.deleteSuspendedTask(task) }) {
+                    selectionStore.select(nil, for: .suspended)
+                }
             }
             Button("取消", role: .cancel) { }
         } message: {
             Text("删除后不会保留后路。")
+        }
+        .alert(String(localized: "alert.title"), isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button(String(localized: "action.ok"), role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 }

@@ -209,6 +209,7 @@ struct AddProjectTaskSheet: View {
             taskType = settings.defaultTaskType
             taskTypeIdRaw = settings.defaultTaskTypeIdRaw
         }
+        .weekIPadFormPresentation()
     }
 
     private var sortedSelectedDates: [DateComponents] {

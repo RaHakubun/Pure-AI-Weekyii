@@ -23,7 +23,7 @@ struct HabitDetailView: View {
             }
             .padding(.horizontal, WeekSpacing.base)
             .padding(.vertical, WeekSpacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .weekReadableContent(maxWidth: 880)
         }
         .background(Color.backgroundPrimary.ignoresSafeArea())
         .navigationTitle(habit.name)
