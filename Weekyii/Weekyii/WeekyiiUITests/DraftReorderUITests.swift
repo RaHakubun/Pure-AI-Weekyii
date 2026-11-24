@@ -457,6 +457,41 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertEqual(confirmButton.label, "确认开始")
     }
 
+    func testProjectDisplaySwitchKeepsExistingProjectAndOpensDetail() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "1", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+
+        let extensions = app.tabBars.buttons["扩展"]
+        XCTAssertTrue(extensions.waitForExistence(timeout: 8))
+        extensions.tap()
+        let projects = app.buttons["extensionsProjectsSeeAllButton"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 5))
+        projects.tap()
+        let create = app.buttons["projectsEmptyCreateButton"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let name = app.textFields["输入项目名称"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("PreviewProject")
+        app.buttons["创建"].tap()
+        let modePicker = app.descendants(matching: .any)["projectDisplayModePicker"]
+        XCTAssertTrue(modePicker.waitForExistence(timeout: 5))
+        app.buttons["轨迹"].tap()
+        let track = app.descendants(matching: .any)["projectTrackView"]
+        XCTAssertTrue(track.waitForExistence(timeout: 5))
+        let item = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "projectTrackRow_")).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        item.tap()
+        XCTAssertTrue(app.navigationBars["PreviewProject"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(track.waitForExistence(timeout: 5))
+        app.buttons["磁贴"].tap()
+        XCTAssertFalse(track.exists)
+        XCTAssertTrue(app.staticTexts["PreviewProject"].exists)
+    }
+
     func testExtensionsEmptyStateDoesNotShowDuplicateCreateButtons() {
         let app = XCUIApplication()
         app.launchArguments = [

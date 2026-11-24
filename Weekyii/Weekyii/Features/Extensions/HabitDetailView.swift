@@ -173,12 +173,11 @@ struct HabitDetailView: View {
     // MARK: - Statistics
 
     private func statisticsCard(stats: HabitStatistics) -> some View {
-        WeekCard(accentColor: habit.habitColor) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
-                Text(String(localized: "habit.stats.title", defaultValue: "统计"))
-                    .font(.titleSmall)
-                    .foregroundColor(.textPrimary)
-
+        VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+            Text(String(localized: "habit.stats.title", defaultValue: "统计"))
+                .font(.titleSmall)
+                .foregroundColor(.textPrimary)
+            WeekCard(accentColor: habit.habitColor) {
                 HStack(spacing: 0) {
                     statColumn(
                         title: String(localized: "habit.stats.current_streak", defaultValue: "当前连续"),

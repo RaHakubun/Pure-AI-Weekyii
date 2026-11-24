@@ -99,47 +99,21 @@ struct HabitsFullView: View {
         let progress = todayProgress
         let fraction: Double = progress.scheduled == 0 ? 0 : Double(progress.completed) / Double(progress.scheduled)
         return WeekCard(accentColor: .accentGreen) {
-            HStack(alignment: .center, spacing: WeekSpacing.md) {
-                VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                    Text(String(localized: "habits.title", defaultValue: "我的习惯"))
-                        .font(.titleSmall)
-                        .foregroundColor(.textPrimary)
-
-                    ProgressView(value: fraction)
-                        .tint(.accentGreen)
-
-                    Text(String(localized: "habits.subtitle", defaultValue: "习惯按重复计划在当天自动加入草稿区"))
-                        .font(.caption)
-                        .foregroundColor(.textSecondary)
-                }
-
-                // Right: compact ring
-                ZStack {
-                    Circle()
-                        .stroke(Color.accentGreen.opacity(0.15), lineWidth: 4)
-                    Circle()
-                        .trim(from: 0, to: min(max(fraction, 0), 1))
-                        .stroke(Color.accentGreen, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 0) {
-                        Text(
-                            String(
-                                format: String(localized: "habits.today.progress", defaultValue: "今日完成 %lld/%lld"),
-                                locale: Locale.current,
-                                Int64(progress.completed),
-                                Int64(progress.scheduled)
-                            )
-                        )
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.accentGreen)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                    }
-                    .frame(width: 44)
-                }
-                .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                Text(String(localized: "habits.visual.today", defaultValue: "今日完成"))
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.textSecondary)
+                Text("\(progress.completed) / \(progress.scheduled)")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.accentGreen)
+                    .accessibilityLabel(Text(String(format: String(localized: "habits.today.progress", defaultValue: "今日完成 %lld/%lld"), locale: Locale.current, Int64(progress.completed), Int64(progress.scheduled))))
+                ProgressView(value: fraction)
+                    .tint(.accentGreen)
+                Text(String(localized: "habits.subtitle", defaultValue: "习惯按重复计划在当天自动加入草稿区"))
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -188,15 +162,17 @@ struct HabitsFullView: View {
                         .foregroundColor(habit.isActive ? .textPrimary : .textSecondary)
                         .lineLimit(1)
 
-                    Text(habit.scheduleSummary)
-                        .font(.caption)
-                        .foregroundColor(.textSecondary)
-                        .lineLimit(1)
+                    HStack(spacing: WeekSpacing.xs) {
+                        Text(habit.scheduleSummary)
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+                            .lineLimit(1)
+                        streakChip(stats.currentStreak)
+                    }
                 }
 
                 Spacer(minLength: WeekSpacing.sm)
 
-                streakChip(stats.currentStreak)
                 HabitTodayStatusChip(status: stats.todayStatus)
 
                 Image(systemName: "chevron.right")

@@ -444,7 +444,6 @@ private struct SuspendedTasksFullView: View {
         let groups = taskGroups
         ScrollView {
             VStack(spacing: WeekSpacing.md) {
-                guidanceCard
                 statsCard
 
                 if viewModel.suspendedTasks.isEmpty {
@@ -561,29 +560,20 @@ private struct SuspendedTasksFullView: View {
         }
     }
 
-    private var guidanceCard: some View {
+    private var statsCard: some View {
         WeekCard(accentColor: .suspendedModuleTint) {
-            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-                Text("在这里记录任务思绪")
-                    .font(.headline)
-                    .foregroundColor(.textPrimary)
-
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 Text("暂存未分配日期的任务。到期前可续期、分配或删除。")
                     .font(.caption)
                     .foregroundColor(.textSecondary)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: WeekSpacing.sm) {
+                    statColumn(value: "\(stats.total)", label: "总数")
+                    statColumn(value: "\(stats.dueSoon)", label: "7天内到期")
+                    statColumn(value: "\(stats.dueToday)", label: "今日到期")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var statsCard: some View {
-        WeekCard(accentColor: .suspendedModuleTint) {
-            HStack(spacing: WeekSpacing.sm) {
-                statColumn(value: "\(stats.total)", label: "总数")
-                statColumn(value: "\(stats.dueSoon)", label: "7天内到期")
-                statColumn(value: "\(stats.dueToday)", label: "今日到期")
-            }
         }
     }
 
@@ -685,7 +675,15 @@ private struct SuspendedTasksFullView: View {
             suspendedMetaRow(task)
 
             HStack(spacing: WeekSpacing.sm) {
-                Spacer()
+                Button {
+                    assigningTask = task
+                } label: {
+                    Label("分配到某天", systemImage: "calendar.badge.plus")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(Color.suspendedModuleTint)
+                .accessibilityIdentifier("suspendedAssignButton_\(task.id.uuidString)")
+                Spacer(minLength: 0)
 
                 Menu {
                     Button("分配到某天", systemImage: "calendar.badge.plus") {
@@ -2036,6 +2034,17 @@ private struct ProjectsFullView: View {
         }
     }
 
+    private enum ProjectDisplayMode: String, CaseIterable, Identifiable {
+        case tiles, track
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .tiles: String(localized: "project.display.tiles", defaultValue: "磁贴")
+            case .track: String(localized: "project.display.track", defaultValue: "轨迹")
+            }
+        }
+    }
+
     private enum BoardMetrics {
         static let columnSpacing: CGFloat = 6
         static let rowSpacing: CGFloat = 6
@@ -2052,6 +2061,7 @@ private struct ProjectsFullView: View {
     @State private var deletingProject: ProjectModel?
     @State private var errorMessage: String?
     @State private var selectedFilter: ProjectFilter = .current
+    @State private var displayMode: ProjectDisplayMode = .tiles
 
     init(viewModel: ExtensionsViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -2122,6 +2132,16 @@ private struct ProjectsFullView: View {
                     }
                     .pickerStyle(.segmented)
 
+                    if !isEditingTiles {
+                        Picker(String(localized: "project.display.label", defaultValue: "项目视图"), selection: $displayMode) {
+                            ForEach(ProjectDisplayMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("projectDisplayModePicker")
+                    }
+
                     if selectedFilter == .current, !isEditingTiles, let summary = overdueSummary {
                         HStack(spacing: 5) {
                             Image(systemName: "exclamationmark.triangle.fill")
@@ -2151,6 +2171,8 @@ private struct ProjectsFullView: View {
                             .padding(.vertical, WeekSpacing.lg)
                         }
 
+                    } else if displayMode == .track {
+                        projectTrack
                     } else {
                         if isEditingTiles {
                             Text(String(localized: "project.tiles.edit_hint"))
@@ -2188,6 +2210,101 @@ private struct ProjectsFullView: View {
         }
     }
 
+    // A presentation-only alternative using the same filtered, ordered projects and snapshots.
+    // It does not edit the board order or task data; each row opens the existing detail.
+    private var projectTrack: some View {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            Text(selectedFilter == .current
+                 ? String(localized: "project.display.track.heading", defaultValue: "每个项目的下一步")
+                 : String(localized: "project.display.track.summary", defaultValue: "项目概览"))
+                .font(.titleSmall)
+                .foregroundStyle(Color.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+                ForEach(tileProjects) { project in
+                    let snapshot = snapshotForTile(project)
+                    NavigationLink(destination: ProjectDetailView(project: project, viewModel: viewModel)) {
+                        projectTrackRow(project, snapshot: snapshot)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("projectTrackRow_\(project.id.uuidString)")
+                }
+            }
+            .background(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.backgroundTertiary)
+                    .frame(width: 1)
+                    .padding(.leading, 4.5)
+                    .padding(.vertical, WeekSpacing.lg)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityIdentifier("projectTrackView")
+    }
+
+    private func projectTrackRow(_ project: ProjectModel, snapshot: ProjectTileSnapshot) -> some View {
+        let color = Color.weekyiiEmphasis(hex: snapshot.colorHex)
+        let fraction = snapshot.totalCount > 0 ? Double(snapshot.completedCount) / Double(snapshot.totalCount) : 0
+        return HStack(alignment: .top, spacing: WeekSpacing.sm) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .padding(.top, WeekSpacing.lg)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+                    Text(snapshot.name)
+                        .font(.bodyMedium.weight(.semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(2)
+                    Spacer(minLength: WeekSpacing.xs)
+                    if snapshot.totalCount > 0 {
+                        Text("\(snapshot.completedCount) / \(snapshot.totalCount)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                if snapshot.totalCount > 0 {
+                    ProgressView(value: min(max(fraction, 0), 1))
+                        .tint(color)
+                } else {
+                    Text(String(localized: "project.tasks.empty"))
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                if selectedFilter == .current && snapshot.totalCount > 0 {
+                    HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.sm) {
+                        Text(String(localized: "project.detail.next", defaultValue: "下一步"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(color)
+                        Text(snapshot.nextTaskTitle ?? String(localized: "project.detail.no_next", defaultValue: "暂无待办任务"))
+                            .font(.caption)
+                            .foregroundStyle(Color.textPrimary)
+                            .lineLimit(2)
+                    }
+                    if let date = snapshot.nextTaskDate, snapshot.nextTaskTitle != nil {
+                        Text(date, format: .dateTime.month().day())
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+                if snapshot.expiredCount > 0 {
+                    Text(String(format: String(localized: "project.card.expired"), snapshot.expiredCount))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.taskDDL)
+                }
+            }
+            .padding(WeekSpacing.base)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous).stroke(Color.backgroundTertiary, lineWidth: 1))
+        }
+    }
+
     private func filterLabel(_ filter: ProjectFilter) -> String {
         let count = viewModel.projects.filter { filter.includes($0.status) }.count
         return count > 0 ? "\(filter.title) · \(count)" : filter.title
@@ -2218,7 +2335,7 @@ private struct ProjectsFullView: View {
                 .accessibilityIdentifier("projectsToolbarCreateButton")
             }
         }
-        if !tileProjects.isEmpty {
+        if !tileProjects.isEmpty && displayMode == .tiles {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(isEditingTiles ? String(localized: "action.done") : String(localized: "action.edit")) {
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
