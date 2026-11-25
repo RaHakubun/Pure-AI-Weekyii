@@ -1,11 +1,15 @@
 import Foundation
 
-enum WeekyiiError: LocalizedError {
+enum WeekyiiError: LocalizedError, Equatable {
     case dayNotFound(String)
     case taskNotFound(UUID)
     case cannotStartEmptyDay
     case cannotEditStartedDay
     case killTimePassed
+    case killTimePreviewOutdated
+    case killTimeImmediateExpireConfirmationRequired(expiredCount: Int)
+    case killTimeImmediateExpireImpactChanged(expiredCount: Int)
+    case killTimeDeadlineUnavailable
     case dateFormatInvalid
     case taskTitleEmpty
     case operationFailedRetry
@@ -16,6 +20,11 @@ enum WeekyiiError: LocalizedError {
     case flexibleModeRequired
     case draftZoneLocked
     case executionQueueEmpty
+    case projectReadOnly
+    case projectHasOpenTasks
+    case projectDateOutOfRange
+    case projectTaskStateLocked
+    case cannotPostponeHabitTask
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +38,14 @@ enum WeekyiiError: LocalizedError {
             return String(localized: "error.cannot_edit_started", defaultValue: "Started days cannot be edited.")
         case .killTimePassed:
             return String(localized: "error.kill_time_passed", defaultValue: "Kill time has passed.")
+        case .killTimePreviewOutdated:
+            return "今日日期或已保存的截止时间已变化，请重新选择。"
+        case .killTimeImmediateExpireConfirmationRequired(let expiredCount):
+            return "截止时间已到，请重新确认是否立即过期今日任务（\(expiredCount) 项）。"
+        case .killTimeImmediateExpireImpactChanged(let expiredCount):
+            return "待过期项目数量已变化为 \(expiredCount) 项，请重新确认后再提交。"
+        case .killTimeDeadlineUnavailable:
+            return "此日期不存在该本地时刻，请选择其他截止时间。"
         case .dateFormatInvalid:
             return String(localized: "error.date_format_invalid", defaultValue: "Invalid date format.")
         case .taskTitleEmpty:
@@ -49,6 +66,16 @@ enum WeekyiiError: LocalizedError {
             return "草稿区仍处于冻结状态。"
         case .executionQueueEmpty:
             return "草稿区没有可交换的任务。"
+        case .projectReadOnly:
+            return "已完成或已归档的项目为只读状态，请先重新打开项目。"
+        case .projectHasOpenTasks:
+            return "项目仍有未完成任务，暂时不能结项。"
+        case .projectDateOutOfRange:
+            return "任务日期必须位于项目的开始与结束日期之间。"
+        case .projectTaskStateLocked:
+            return "该任务所属日期已启动或结束，不能从项目页面修改。"
+        case .cannotPostponeHabitTask:
+            return "习惯任务属于当天，不能后移。"
         }
     }
 }

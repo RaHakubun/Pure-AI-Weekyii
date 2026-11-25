@@ -1,0 +1,142 @@
+{
+  "identifier": "9C1D7E2A",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "198.0",
+      "familyShareable": false,
+      "internalID": "21600005",
+      "localizations": [
+        {
+          "description": "一次买断，永久使用 iCloud 同步、灵动模式和全部 VIP 主题。",
+          "displayName": "Weekyii VIP 永久版",
+          "locale": "zh_Hans"
+        },
+        {
+          "description": "One-time purchase. iCloud sync, Flexible mode and all VIP themes, forever.",
+          "displayName": "Weekyii VIP Lifetime",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.fluentdesign.Weekyii.vip.lifetime",
+      "referenceName": "VIP Lifetime",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "zh_Hans",
+    "_storefront": "CHN",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "21600001",
+      "localizations": [
+        {
+          "description": "",
+          "displayName": "Weekyii VIP",
+          "locale": "zh_Hans"
+        },
+        {
+          "description": "",
+          "displayName": "Weekyii VIP",
+          "locale": "en_US"
+        }
+      ],
+      "name": "Weekyii VIP",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "68.0",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "21600004",
+          "introductoryOffer": {
+            "internalID": "21600006",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P2W"
+          },
+          "localizations": [
+            {
+              "description": "iCloud 同步、灵动模式和全部 VIP 主题，按年订阅。",
+              "displayName": "Weekyii VIP 年度",
+              "locale": "zh_Hans"
+            },
+            {
+              "description": "iCloud sync, Flexible mode and all VIP themes, billed yearly.",
+              "displayName": "Weekyii VIP Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.fluentdesign.Weekyii.vip.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "VIP Yearly",
+          "subscriptionGroupID": "21600001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "28.0",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "21600003",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "iCloud 同步、灵动模式和全部 VIP 主题，按季度订阅。",
+              "displayName": "Weekyii VIP 季度",
+              "locale": "zh_Hans"
+            },
+            {
+              "description": "iCloud sync, Flexible mode and all VIP themes, billed every 3 months.",
+              "displayName": "Weekyii VIP Quarterly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.fluentdesign.Weekyii.vip.quarterly",
+          "recurringSubscriptionPeriod": "P3M",
+          "referenceName": "VIP Quarterly",
+          "subscriptionGroupID": "21600001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "12.0",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "21600002",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "iCloud 同步、灵动模式和全部 VIP 主题，按月订阅。",
+              "displayName": "Weekyii VIP 月度",
+              "locale": "zh_Hans"
+            },
+            {
+              "description": "iCloud sync, Flexible mode and all VIP themes, billed monthly.",
+              "displayName": "Weekyii VIP Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.fluentdesign.Weekyii.vip.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "VIP Monthly",
+          "subscriptionGroupID": "21600001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

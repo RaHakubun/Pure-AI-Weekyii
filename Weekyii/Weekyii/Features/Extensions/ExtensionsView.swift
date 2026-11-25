@@ -139,7 +139,7 @@ struct ExtensionsView: View {
                 Text(tab.title)
                     .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundColor(selectedTab == tab ? .white : .textSecondary)
+            .foregroundColor(selectedTab == tab ? .weekyiiOnPrimary : .textSecondary)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(
@@ -192,12 +192,12 @@ struct ExtensionsView: View {
                                 Text(String(localized: "project.add"))
                                     .font(.system(size: 14, weight: .semibold))
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(.weekyiiOnPrimary)
                             .padding(.horizontal, WeekSpacing.xl)
                             .padding(.vertical, WeekSpacing.md)
                             .background(Color.weekyiiGradient)
                             .clipShape(Capsule())
-                            .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
+                            .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 6, x: 0, y: 3)
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .padding(.bottom, WeekSpacing.lg)
@@ -255,12 +255,12 @@ struct ExtensionsView: View {
                         Text(String(localized: "project.add"))
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.weekyiiOnPrimary)
                     .padding(.horizontal, WeekSpacing.xl)
                     .padding(.vertical, WeekSpacing.md)
                     .background(Color.weekyiiGradient)
                     .clipShape(Capsule())
-                    .shadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .weekSoftShadow(color: Color.weekyiiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -279,8 +279,10 @@ private struct ProjectInlineCard: View {
 
     private let maxVisibleTasks = 4
     @State private var appeared = false
+    @Environment(\.taskTypePresentationCatalog) private var taskTypeCatalog
 
-    private var projectColor: Color { Color(hex: project.color) }
+    /// 卡片在浅色背景上，项目色只作前景/描边，亮色系需压暗到可读档位。
+    private var projectColor: Color { Color.weekyiiEmphasis(hex: project.color) }
     private var isFinished: Bool { project.status == .completed || project.status == .archived }
 
     var body: some View {
@@ -326,7 +328,7 @@ private struct ProjectInlineCard: View {
                     }
             }
         }
-        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .weekSoftShadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         // Entry animation
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 12)
@@ -414,7 +416,9 @@ private struct ProjectInlineCard: View {
     }
 
     private func taskRow(_ task: TaskItem) -> some View {
-        HStack(spacing: WeekSpacing.sm) {
+        let taskType = taskTypeCatalog.resolve(idRaw: task.taskTypeIdRaw, fallback: task.taskType)
+
+        return HStack(spacing: WeekSpacing.sm) {
             ZStack {
                 Circle()
                     .strokeBorder(
@@ -447,13 +451,13 @@ private struct ProjectInlineCard: View {
                             .font(.system(size: 10))
                     }
 
-                    if task.taskType == .ddl {
-                        Text(task.taskType.displayName)
+                    if taskType.baseKind == .ddl {
+                        Text(taskType.name)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(task.taskType.color)
+                            .background(taskType.color)
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }

@@ -7,12 +7,14 @@ import SwiftData
 final class WeekViewModel {
     private let modelContext: ModelContext
     private let timeProvider: TimeProviding
-    private let weekCalculator = WeekCalculator()
 
     var presentWeek: WeekModel?
     var errorMessage: String?
 
-    init(modelContext: ModelContext, timeProvider: TimeProviding) {
+    init(
+        modelContext: ModelContext,
+        timeProvider: TimeProviding
+    ) {
         self.modelContext = modelContext
         self.timeProvider = timeProvider
     }
@@ -44,9 +46,15 @@ final class WeekViewModel {
         for week in presentWeeks {
             week.status = .past
         }
-        let week = weekCalculator.makeWeek(for: timeProvider.today, status: .present)
-        modelContext.insert(week)
-        persist { presentWeek = week }
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: timeProvider.today, status: .present)
+            resolution.week.status = .present
+            persist { presentWeek = resolution.week }
+        } catch {
+            errorMessage = error.localizedDescription
+            presentWeek = nil
+        }
     }
 
     private func persist(onSuccess: () -> Void) {

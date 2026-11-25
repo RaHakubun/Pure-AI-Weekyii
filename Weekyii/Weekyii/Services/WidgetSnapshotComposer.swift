@@ -11,12 +11,14 @@ enum WidgetSnapshotComposer {
         selectedTheme: WeekTheme,
         appearanceMode: AppearanceMode,
         today: DayModel?,
-        presentWeek: WeekModel?
+        presentWeek: WeekModel?,
+        taskTypes: TaskTypeCatalog? = nil,
+        languageCode: String? = Bundle.main.preferredLocalizations.first
     ) -> WidgetSnapshot {
         WidgetSnapshot(
             generatedAt: now,
             theme: selectedTheme.widgetThemeSnapshot(appearanceMode: appearanceMode),
-            today: makeTodaySnapshot(now: now, today: today),
+            today: makeTodaySnapshot(now: now, today: today, taskTypes: taskTypes, languageCode: languageCode),
             weekDays: makeWeekDays(now: now, week: presentWeek)
         )
     }
@@ -39,7 +41,8 @@ enum WidgetSnapshotComposer {
             selectedTheme: theme,
             appearanceMode: appearanceMode,
             today: today,
-            presentWeek: presentWeek
+            presentWeek: presentWeek,
+            taskTypes: try? TaskTypeCatalog.load(in: modelContext)
         )
 
         let store = WidgetSnapshotStore()
@@ -69,7 +72,15 @@ enum WidgetSnapshotComposer {
         return weeks.first(where: { $0.status == .present })
     }
 
-    private static func makeTodaySnapshot(now: Date, today: DayModel?) -> WidgetTodaySnapshot {
+    /// How many upcoming tasks the widgets can show at most (large shows 3, plus one spare).
+    static let upcomingLimit = 4
+
+    private static func makeTodaySnapshot(
+        now: Date,
+        today: DayModel?,
+        taskTypes: TaskTypeCatalog?,
+        languageCode: String?
+    ) -> WidgetTodaySnapshot {
         guard let today else {
             return WidgetTodaySnapshot(
                 dayId: now.dayId,
@@ -82,7 +93,10 @@ enum WidgetSnapshotComposer {
                 draftCount: 0,
                 frozenCount: 0,
                 completionPercent: 0,
-                previewTasks: []
+                previewTasks: [],
+                dayEndsAt: nextDayStart(after: now),
+                upcomingTasks: [],
+                languageCode: languageCode
             )
         }
 
@@ -96,14 +110,9 @@ enum WidgetSnapshotComposer {
         let completed = complete.count
         let completionPercent = total == 0 ? 0 : Int(((Double(completed) / Double(total)) * 100).rounded())
 
-        let previews = allTasks.prefix(3).map { task in
-            WidgetTaskPreview(
-                id: task.id,
-                title: task.title,
-                taskTypeRaw: task.taskType.rawValue,
-                zoneRaw: task.zone.rawValue
-            )
-        }
+        let previews = allTasks.prefix(3).map { preview(for: $0, taskTypes: taskTypes) }
+        let upcoming = (frozen + draft).prefix(upcomingLimit).map { preview(for: $0, taskTypes: taskTypes) }
+        let focusType = today.focusTask.flatMap { typeDefinition(for: $0, taskTypes: taskTypes) }
 
         return WidgetTodaySnapshot(
             dayId: today.dayId,
@@ -116,8 +125,35 @@ enum WidgetSnapshotComposer {
             draftCount: draft.count,
             frozenCount: frozen.count,
             completionPercent: min(max(completionPercent, 0), 100),
-            previewTasks: previews
+            previewTasks: previews,
+            // Same deadline the state machine uses to expire the day.
+            killTime: KillTimeDeadline.date(for: today.date, hour: today.killTimeHour, minute: today.killTimeMinute),
+            dayEndsAt: nextDayStart(after: today.date),
+            focusTypeName: focusType?.name,
+            focusTypeColorHex: focusType?.colorHex,
+            upcomingTasks: upcoming,
+            languageCode: languageCode
         )
+    }
+
+    private static func preview(for task: TaskItem, taskTypes: TaskTypeCatalog?) -> WidgetTaskPreview {
+        WidgetTaskPreview(
+            id: task.id,
+            title: task.title,
+            taskTypeRaw: task.taskType.rawValue,
+            zoneRaw: task.zone.rawValue,
+            typeColorHex: typeDefinition(for: task, taskTypes: taskTypes)?.colorHex
+        )
+    }
+
+    private static func typeDefinition(for task: TaskItem, taskTypes: TaskTypeCatalog?) -> TaskTypeDefinition? {
+        guard let taskTypes else { return nil }
+        return taskTypes.definition(for: task.taskTypeIdRaw.isEmpty ? task.taskType.rawValue : task.taskTypeIdRaw)
+    }
+
+    /// Start of the app day after `date`, in the app's anchored time zone (the same one `dayId` uses).
+    private static func nextDayStart(after date: Date) -> Date? {
+        WeekyiiTimeZone.calendar.date(byAdding: .day, value: 1, to: date.startOfDay)
     }
 
     private static func makeWeekDays(now: Date, week: WeekModel?) -> [WidgetWeekDaySnapshot] {

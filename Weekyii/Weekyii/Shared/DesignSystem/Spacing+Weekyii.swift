@@ -33,21 +33,31 @@ enum WeekSpacing {
 
 // MARK: - Corner Radius
 
+/// Radii resolve against the active theme (`ThemeSkin.radii`), like the font
+/// tokens, so call sites never mention a theme. Classic themes keep 8 / 12 / 16 / 24.
 enum WeekRadius {
     /// 8pt - 小圆角
-    static let small: CGFloat = 8
+    static var small: CGFloat { ThemeSkin.active.radii?.small ?? 8 }
     
     /// 12pt - 中等圆角
-    static let medium: CGFloat = 12
+    static var medium: CGFloat { ThemeSkin.active.radii?.medium ?? 12 }
     
     /// 16pt - 大圆角
-    static let large: CGFloat = 16
+    static var large: CGFloat { ThemeSkin.active.radii?.large ?? 16 }
     
     /// 24pt - 超大圆角
-    static let xlarge: CGFloat = 24
+    static var xlarge: CGFloat { ThemeSkin.active.radii?.xlarge ?? 24 }
     
     /// 完全圆角
     static let full: CGFloat = 999
+
+    /// Scales a one-off radius (an icon tile's 9 pt, a panel's 14 pt …) by the
+    /// theme's radius scale, so ad-hoc chrome follows the theme without a token of
+    /// its own. Classic themes get `value` back unchanged.
+    static func scaled(_ value: CGFloat) -> CGFloat {
+        guard let radii = ThemeSkin.active.radii else { return value }
+        return value * radii.medium / 12
+    }
 }
 
 // MARK: - Shadows

@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct AddProjectTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: UserSettings
+    @Query(sort: \TaskTypeDefinition.sortOrder) private var taskTypeDefinitions: [TaskTypeDefinition]
     let project: ProjectModel
     let viewModel: ExtensionsViewModel
 
@@ -53,26 +55,27 @@ struct AddProjectTaskSheet: View {
 
                             ScrollView(.horizontal) {
                                 HStack(spacing: WeekSpacing.xs) {
-                                    ForEach(TaskType.allCases, id: \.self) { type in
+                                    ForEach(availableTaskTypeDefinitions, id: \.idRaw) { definition in
                                         Button {
-                                            taskType = type
-                                            taskTypeIdRaw = type.rawValue
+                                            taskType = definition.baseKind
+                                            taskTypeIdRaw = definition.idRaw
                                         } label: {
                                             HStack(spacing: WeekSpacing.xs) {
-                                                Image(systemName: type.iconName)
+                                                Image(systemName: definition.iconName)
                                                     .font(.caption)
-                                                Text(type.displayName)
+                                                Text(definition.name)
                                                     .font(.captionBold)
                                                     .lineLimit(1)
                                                     .minimumScaleFactor(0.78)
                                             }
-                                            .foregroundColor(taskType == type ? type.color : .textSecondary)
-                                            .frame(width: 78, height: 34)
-                                            .background(taskType == type ? type.color.opacity(0.15) : Color.backgroundTertiary)
+                                            .foregroundColor(taskTypeIdRaw == definition.idRaw ? definition.color : .textSecondary)
+                                            .frame(minWidth: 78, minHeight: 36)
+                                            .padding(.horizontal, 8)
+                                            .background(taskTypeIdRaw == definition.idRaw ? definition.color.opacity(0.15) : Color.backgroundTertiary)
                                             .clipShape(Capsule())
                                             .overlay(
                                                 Capsule()
-                                                    .stroke(taskType == type ? type.color : Color.clear, lineWidth: 1)
+                                                    .stroke(taskTypeIdRaw == definition.idRaw ? definition.color : Color.clear, lineWidth: 1)
                                             )
                                         }
                                         .buttonStyle(.plain)
@@ -118,7 +121,7 @@ struct AddProjectTaskSheet: View {
                                 if !selectedDates.isEmpty {
                                     Text(String(format: String(localized: "project.task.dates.count"), selectedDates.count))
                                         .font(.caption)
-                                        .foregroundColor(Color(hex: project.color))
+                                        .foregroundColor(Color.weekyiiEmphasis(hex: project.color))
                                 }
                             }
 
@@ -139,10 +142,10 @@ struct AddProjectTaskSheet: View {
                                         if let date = calendar.date(from: dc) {
                                             Text(date, format: .dateTime.month().day())
                                                 .font(.caption)
-                                                .foregroundColor(Color(hex: project.color))
+                                                .foregroundColor(Color.weekyiiEmphasis(hex: project.color))
                                                 .padding(.horizontal, WeekSpacing.sm)
                                                 .padding(.vertical, WeekSpacing.xs)
-                                                .background(Color(hex: project.color).opacity(0.1))
+                                                .background(Color.weekyiiEmphasis(hex: project.color).opacity(0.1))
                                                 .clipShape(Capsule())
                                                 .onTapGesture {
                                                     selectedDates.remove(dc)
@@ -215,10 +218,25 @@ struct AddProjectTaskSheet: View {
         }
     }
 
+    private var availableTaskTypeDefinitions: [TaskTypeDefinition] {
+        let active = taskTypeDefinitions.filter { !$0.isArchived }
+        if active.isEmpty { return TaskTypeDefinition.builtInDefinitions() }
+        if active.contains(where: { $0.idRaw == taskTypeIdRaw }) { return active }
+        if let selected = taskTypeDefinitions.first(where: { $0.idRaw == taskTypeIdRaw }) {
+            return active + [selected]
+        }
+        return active
+    }
+
     private func createTasks() {
+        let dates = sortedSelectedDates.compactMap { calendar.date(from: $0) }
+        if let placementError = dates.compactMap({ viewModel.projectTaskPlacementError(for: project, on: $0) }).first {
+            errorMessage = placementError
+            return
+        }
+
         var firstFailureMessage: String?
-        for dc in sortedSelectedDates {
-            guard let date = calendar.date(from: dc) else { continue }
+        for date in dates {
             let result = viewModel.addTask(
                 to: project,
                 title: title.trimmingCharacters(in: .whitespaces),
@@ -353,11 +371,11 @@ struct AddProjectTaskSheet: View {
                         ZStack {
                             if isSelected && day.isCurrent && isWithinProject {
                                 Circle()
-                                    .fill(Color(hex: project.color))
+                                    .fill(Color.weekyiiEmphasis(hex: project.color))
                                     .frame(width: 34, height: 34)
                             } else if isToday && day.isCurrent {
                                 Circle()
-                                    .stroke(Color(hex: project.color), lineWidth: 1.5)
+                                    .stroke(Color.weekyiiEmphasis(hex: project.color), lineWidth: 1.5)
                                     .frame(width: 34, height: 34)
                             }
 
@@ -366,7 +384,7 @@ struct AddProjectTaskSheet: View {
                                 .foregroundColor(
                                     (!isSelectable) ? .textTertiary.opacity(0.3) :
                                     isSelected ? .white :
-                                    isToday ? Color(hex: project.color) :
+                                    isToday ? Color.weekyiiEmphasis(hex: project.color) :
                                     .textPrimary
                                 )
                         }
@@ -382,8 +400,10 @@ struct AddProjectTaskSheet: View {
 
 // MARK: - FlowLayout
 
-private struct FlowLayout: Layout {
+struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+    /// Vertical gap between wrapped lines; defaults to `spacing`.
+    var lineSpacing: CGFloat? = nil
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = arrangeSubviews(proposal: proposal, subviews: subviews)
@@ -409,7 +429,7 @@ private struct FlowLayout: Layout {
             let size = subview.sizeThatFits(.unspecified)
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
-                currentY += lineHeight + spacing
+                currentY += lineHeight + (lineSpacing ?? spacing)
                 lineHeight = 0
             }
             positions.append(CGPoint(x: currentX, y: currentY))

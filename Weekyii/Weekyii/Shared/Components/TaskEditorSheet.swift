@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 import Photos
 import SwiftData
+import ImageIO
+@preconcurrency import UIKit
 
 struct TaskEditorSheet: View {
     let title: String
@@ -61,7 +63,8 @@ struct TaskEditorSheet: View {
                     id: UUID(),
                     title: step.title,
                     isCompleted: step.isCompleted,
-                    sortOrder: index
+                    sortOrder: index,
+                    createdAt: step.createdAt
                 )
             }
         )
@@ -114,7 +117,7 @@ struct TaskEditorSheet: View {
                             }
                         }
                     }
-                    
+
                     WeekCard {
                         sectionHeader(
                             titleKey: "task.steps",
@@ -232,6 +235,7 @@ struct TaskEditorSheet: View {
                 }
             }
     }
+
         .alert("步骤全文", isPresented: $showingStepFullText) {
             Button(String(localized: "action.ok"), role: .cancel) { }
         } message: {
@@ -301,7 +305,8 @@ struct TaskEditorSheet: View {
                     .minimumScaleFactor(0.78)
             }
             .foregroundColor(isSelected ? color : .textSecondary)
-            .frame(width: 78, height: 34)
+            .frame(minWidth: 78, minHeight: 36)
+            .padding(.horizontal, 8)
             .background(isSelected ? color.opacity(0.15) : Color.backgroundTertiary)
             .clipShape(Capsule())
             .overlay(
@@ -434,7 +439,6 @@ struct TaskEditorSheet: View {
     @ViewBuilder
     private func attachmentTile(_ attachment: TaskAttachment) -> some View {
         let fileLabel = attachment.fileName.isEmpty ? "Attachment" : attachment.fileName
-        let previewImage = attachment.data.flatMap { UIImage(data: $0) }
 
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: WeekRadius.medium)
@@ -448,13 +452,11 @@ struct TaskEditorSheet: View {
                         .padding(8)
                 }
 
-            if let data = attachment.data, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let data = attachment.data {
+                AttachmentThumbnail(data: data)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+                    .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
                     .overlay(alignment: .bottomLeading) {
                         Rectangle()
                             .fill(.black.opacity(0.32))
@@ -482,9 +484,84 @@ struct TaskEditorSheet: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard let previewImage else { return }
-            imagePreviewItem = ImagePreviewItem(image: previewImage)
+            guard let data = attachment.data else { return }
+            Task {
+                let image = await Task.detached(priority: .userInitiated) {
+                    UIImage(data: data)?.preparingForDisplay()
+                }.value
+                if let image { imagePreviewItem = ImagePreviewItem(image: image) }
+            }
         }
+    }
+}
+
+struct AttachmentThumbnail: View {
+    let data: Data
+    @State private var image: UIImage?
+    @State private var didFail = false
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+            } else if didFail {
+                ZStack {
+                    Color.accentOrangeLight.opacity(0.12)
+                    Image(systemName: "photo")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.textTertiary)
+                }
+            } else {
+                ZStack {
+                    Color.accentOrangeLight.opacity(0.12)
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+        .task(id: data.count) {
+            let decoded = await ImageDataDecoder.thumbnail(from: data, maxPixelSize: 320, priority: .utility)
+            image = decoded
+            didFail = decoded == nil
+        }
+    }
+}
+
+/// Decodes stored image data off the main thread for display. Only the
+/// in-memory image is scaled; the stored data itself is never changed.
+enum ImageDataDecoder {
+    /// A decoded copy whose longer side is at most `maxPixelSize` pixels,
+    /// with EXIF orientation applied.
+    static func thumbnail(
+        from data: Data,
+        maxPixelSize: CGFloat,
+        priority: TaskPriority = .userInitiated
+    ) async -> UIImage? {
+        await Task.detached(priority: priority) {
+            decodeThumbnail(from: data, maxPixelSize: maxPixelSize)
+        }.value
+    }
+
+    /// The full-resolution image, decoded ahead of display (for the full-screen viewer).
+    static func fullImage(from data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(data: data)?.preparingForDisplay()
+        }.value
+    }
+
+    private nonisolated static func decodeThumbnail(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 
@@ -493,6 +570,9 @@ private struct TaskStepDraft: Identifiable {
     var title: String
     var isCompleted: Bool
     var sortOrder: Int
+    /// Carried across from the persisted step so that saving an untouched step
+    /// does not look like a content change to the sync layer.
+    var createdAt: Date = Date()
 }
 
 struct ImagePreviewItem: Identifiable {

@@ -4,6 +4,9 @@ import Combine
 final class AppState: ObservableObject, AppStateStore {
     @Published var daysStartedCount: Int = 0
     @Published var dataRevision: Int = 0
+    /// Bumped only when the whole business store is replaced or wiped. See
+    /// `bumpStructureRevision()`.
+    @Published var structureRevision: Int = 0
     @Published var stateTransitionRevision: Int = 0
     @Published var systemStartDate: Date?
     @Published var lastProcessedDate: Date?
@@ -46,9 +49,15 @@ final class AppState: ObservableObject, AppStateStore {
         save()
     }
 
+    func markRollover(at date: Date) {
+        lastRolloverAt = date
+        save()
+    }
+
     func reset() {
         daysStartedCount = 0
         dataRevision += 1
+        structureRevision += 1
         stateTransitionRevision = 0
         systemStartDate = nil
         lastProcessedDate = nil
@@ -60,6 +69,15 @@ final class AppState: ObservableObject, AppStateStore {
     func bumpDataRevision() {
         dataRevision += 1
         save()
+    }
+
+    /// Bumped only when the whole business store is replaced or wiped (archive
+    /// import, factory reset). Views keyed on this are rebuilt, which throws away
+    /// every tab's navigation stack — acceptable for a reseed, wrong for a sync.
+    /// Deliberately not persisted: it only needs to differ within one launch, and
+    /// persisting it would change the archive's AppState record.
+    func bumpStructureRevision() {
+        structureRevision += 1
     }
 
     func bumpStateTransitionRevision() {

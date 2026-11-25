@@ -30,7 +30,8 @@ struct WeekStatCard: View {
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 // 日期范围
                 HStack {
-                    Image(systemName: "calendar")
+                    CatCoveredSymbol(systemName: "calendar", pointSize: 17)
+                        .font(.body)
                         .foregroundColor(.weekyiiPrimary)
                     Text(formatDateRange())
                         .font(.titleSmall)

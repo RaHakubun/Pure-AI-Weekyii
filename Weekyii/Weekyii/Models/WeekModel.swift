@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 final class WeekModel {
-    @Attribute(.unique) var weekId: String
-    var startDate: Date
-    var endDate: Date
-    var status: WeekStatus
+    var weekId: String = ""
+    var startDate: Date = Date.distantPast
+    var endDate: Date = Date.distantPast
+    var status: WeekStatus = WeekStatus.pending
 
-    @Relationship(deleteRule: .cascade, inverse: \DayModel.week)
-    var days: [DayModel] = []
+    @Relationship(deleteRule: .cascade, originalName: "days", inverse: \DayModel.week)
+    private var dayRecords: [DayModel]? = []
 
     var completedTasksCount: Int = 0
     var expiredTasksCount: Int = 0
@@ -20,6 +20,11 @@ final class WeekModel {
         self.startDate = startDate
         self.endDate = endDate
         self.status = status
+    }
+
+    var days: [DayModel] {
+        get { dayRecords ?? [] }
+        set { dayRecords = newValue }
     }
 
     var weekNumber: Int {

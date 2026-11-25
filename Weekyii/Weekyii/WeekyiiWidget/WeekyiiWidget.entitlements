@@ -4,7 +4,7 @@
 <dict>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.com.fluentdesign.Weekyii.shared</string>
+        <string>group.com.fluentdesign.Weekyii</string>
     </array>
 </dict>
 </plist>

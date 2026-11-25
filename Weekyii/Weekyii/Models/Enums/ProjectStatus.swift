@@ -1,6 +1,6 @@
 import Foundation
 
-enum ProjectStatus: String, Codable, CaseIterable {
+enum ProjectStatus: String, Codable, CaseIterable, Equatable, Hashable {
     case planning
     case active
     case completed

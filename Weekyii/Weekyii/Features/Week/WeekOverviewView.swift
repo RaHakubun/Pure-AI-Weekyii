@@ -183,7 +183,10 @@ struct WeekOverviewView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = WeekViewModel(modelContext: modelContext, timeProvider: TimeProvider())
+                viewModel = WeekViewModel(
+                    modelContext: modelContext,
+                    timeProvider: TimeProvider()
+                )
             }
             viewModel?.refresh()
         }
@@ -227,19 +230,23 @@ struct WeekOverviewContentView: View {
             if let week = viewModel?.presentWeek {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                     WeekStatCard(week: week)
-                    WeekCard {
-                        WeekTopologyView(
-                            week: week,
-                            viewport: $topologyViewport,
-                            selectedDayID: $selectedDayID,
-                            isFullScreen: false,
-                            onOpenFullScreen: {
-                                showingTopologyFullScreen = true
-                            },
-                            onOpenTask: { taskID in
-                                selectedTopologyTask = task(with: taskID, in: week)
-                            }
-                        )
+                    if WeekTopologySnapshot.hasContent(in: week) {
+                        WeekCard {
+                            WeekTopologyView(
+                                week: week,
+                                viewport: $topologyViewport,
+                                selectedDayID: $selectedDayID,
+                                isFullScreen: false,
+                                onOpenFullScreen: {
+                                    showingTopologyFullScreen = true
+                                },
+                                onOpenTask: { taskID in
+                                    selectedTopologyTask = task(with: taskID, in: week)
+                                }
+                            )
+                        }
+                    } else {
+                        WeekTopologyEmptyState()
                     }
                     WeekOverviewDetailSection(
                         week: week,
@@ -264,7 +271,10 @@ struct WeekOverviewContentView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = WeekViewModel(modelContext: modelContext, timeProvider: TimeProvider())
+                viewModel = WeekViewModel(
+                    modelContext: modelContext,
+                    timeProvider: TimeProvider()
+                )
             }
             viewModel?.refresh()
         }
@@ -311,8 +321,11 @@ struct WeekOverviewContentView: View {
             return
         }
 
-        let snapshot = WeekTopologySnapshot(week: week)
+        // Resolve the cheap guard first: there is nothing to reconcile unless a
+        // node is selected, and building a snapshot to discover that is wasted.
         guard let selectedNodeID = topologyViewport.selectedNodeID else { return }
+
+        let snapshot = WeekTopologySnapshot(week: week)
         let selectedNodeStillExists = snapshot.days.contains { day in
             selectedNodeID == day.id ||
             WeekTopologyResultKind.allCases.contains(where: { day.groupID(for: $0) == selectedNodeID }) ||
@@ -351,6 +364,34 @@ struct WeekOverviewContentView: View {
     }
 }
 
+private struct WeekTopologyEmptyState: View {
+    var body: some View {
+        WeekCard(accentColor: .weekyiiPrimary) {
+            HStack(alignment: .center, spacing: WeekSpacing.md) {
+                CatCoveredSymbol(systemName: "calendar.badge.plus", pointSize: 22)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color.weekyiiPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.weekyiiPrimary.opacity(0.1), in: Circle())
+
+                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                    Text("本周还没有任务")
+                        .font(.bodyMedium.weight(.semibold))
+                        .foregroundStyle(Color.textPrimary)
+                    Text("创建任务后，这里会按日期显示任务数量与完成状态。")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("weekTopologyEmptyState")
+    }
+}
+
 private struct WeekOverviewDetailSection: View {
     let week: WeekModel
     @Binding var displayMode: WeekOverviewDisplayMode
@@ -367,30 +408,33 @@ private struct WeekOverviewDetailSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
-            Text("本周详情")
-                .font(.titleSmall)
-                .foregroundStyle(Color.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .overlay(alignment: .trailing) {
-                    Button {
-                        displayMode = displayMode.next
-                    } label: {
-                        Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(Color.weekyiiPrimary)
-                            .frame(width: 46, height: 46)
-                            .background(
-                                Circle()
-                                    .fill(Color.backgroundSecondary)
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.backgroundTertiary, lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("weekOverviewModeCycleButton")
+            HStack(alignment: .center, spacing: WeekSpacing.sm) {
+                Text("本周详情")
+                    .font(.titleSmall)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    displayMode = displayMode.next
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Color.weekyiiPrimary)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            Circle()
+                                .fill(Color.backgroundSecondary)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.backgroundTertiary, lineWidth: 1)
+                        )
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("weekOverviewModeCycleButton")
+            }
+            .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
 
             WeekOverviewModeSwitcher(displayMode: $displayMode)
 
@@ -479,7 +523,7 @@ private struct WeekOverviewModeSwitcher: View {
                         Text(mode.title)
                             .font(.callout.weight(.semibold))
                     }
-                    .foregroundStyle(displayMode == mode ? Color.white : Color.textSecondary)
+                    .foregroundStyle(displayMode == mode ? Color.weekyiiOnPrimary : Color.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, WeekSpacing.md)
                     .background(

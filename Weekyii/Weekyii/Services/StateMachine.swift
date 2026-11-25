@@ -9,6 +9,7 @@ protocol AppStateStore: AnyObject {
     var stateTransitionRevision: Int { get set }
     func save()
     func markProcessed(at date: Date)
+    func markRollover(at date: Date)
     func incrementDaysStarted()
     func bumpStateTransitionRevision()
 }
@@ -24,10 +25,12 @@ struct StateReconcileReport: Equatable {
     var repairedFocusCount: Int = 0
     var repairedStatusCount: Int = 0
     var repairedOrderCount: Int = 0
+    var repairedDuplicateCount: Int = 0
     var createdTodayDayCount: Int = 0
+    var garbageCollectedTaskCount: Int = 0
 
     var totalRepairCount: Int {
-        repairedFocusCount + repairedStatusCount + repairedOrderCount + createdTodayDayCount
+        repairedFocusCount + repairedStatusCount + repairedOrderCount + repairedDuplicateCount + createdTodayDayCount
     }
 }
 
@@ -35,10 +38,11 @@ struct DataInvariantRepairReport: Equatable {
     var repairedFocusCount: Int = 0
     var repairedStatusCount: Int = 0
     var repairedOrderCount: Int = 0
+    var repairedDuplicateCount: Int = 0
     var createdTodayDayCount: Int = 0
 
     var totalRepairs: Int {
-        repairedFocusCount + repairedStatusCount + repairedOrderCount + createdTodayDayCount
+        repairedFocusCount + repairedStatusCount + repairedOrderCount + repairedDuplicateCount + createdTodayDayCount
     }
 }
 
@@ -62,7 +66,6 @@ struct StateMachine {
     private let userSettings: any KillTimeSettings
     private let repairService: any DataInvariantRepairing
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(
         modelContainer: ModelContainer,
@@ -111,12 +114,16 @@ struct StateMachine {
         report.repairedFocusCount = repairReport.repairedFocusCount
         report.repairedStatusCount = repairReport.repairedStatusCount
         report.repairedOrderCount = repairReport.repairedOrderCount
+        report.repairedDuplicateCount = repairReport.repairedDuplicateCount
         report.createdTodayDayCount = repairReport.createdTodayDayCount
 
         refreshWeekSummaryMetrics()
+        report.garbageCollectedTaskCount = TaskGarbageCollector(modelContext: modelContext)
+            .collect(referenceDate: timeProvider.today)
         appState.markProcessed(at: now)
-        appState.bumpStateTransitionRevision()
         persist()
+
+        appState.bumpStateTransitionRevision()
         report.processedAt = now
         return report
     }
@@ -130,6 +137,8 @@ struct StateMachine {
             appState.lastProcessedDate = timeProvider.today
             appState.lastRolloverAt = timeProvider.now
             appState.save()
+        } else if appState.lastRolloverAt == nil {
+            appState.markRollover(at: timeProvider.now)
         }
     }
 
@@ -166,10 +175,26 @@ struct StateMachine {
         let today = timeProvider.today
         let descriptor = FetchDescriptor<DayModel>()
         let allDays = (try? modelContext.fetch(descriptor)) ?? []
+        let emptyPastDays = allDays.filter { day in
+            day.date < today
+                && day.status == .empty
+        }
+        let expiredPastDays = allDays.filter { $0.date < today && $0.status == .expired }
+        let habits = emptyPastDays.isEmpty && expiredPastDays.isEmpty
+            ? []
+            : ((try? modelContext.fetch(FetchDescriptor<HabitModel>())) ?? [])
+        // Revisit persisted expired dates so a failed settlement can retry without a new marker.
+        _ = HabitRecordService.settleExpiredDays(expiredPastDays, among: habits, at: timeProvider.now)
+        let scheduledEmptyDayIds = Set(emptyPastDays
+            .filter { HabitRecordService.hasScheduledHabit(on: $0, among: habits) }
+            .map(\.dayId))
+
         var expiredCount = 0
         for day in allDays where day.date < today {
-            guard day.status == .execute || day.status == .draft else { continue }
-            let pendingExpiredCount = day.status == .draft ? 0 : (day.focusTaskCount + day.frozenTasks.count)
+            let hasOpenTasks = day.status == .execute || day.status == .draft
+            let isScheduledEmptyDay = day.status == .empty && scheduledEmptyDayIds.contains(day.dayId)
+            guard hasOpenTasks || isScheduledEmptyDay else { continue }
+            let pendingExpiredCount = day.status == .execute ? (day.focusTaskCount + day.frozenTasks.count) : 0
             if expire(day: day, expiredCount: pendingExpiredCount) {
                 expiredCount += 1
             }
@@ -227,21 +252,21 @@ struct StateMachine {
 
     private func processKillTime() -> Int {
         guard let today = fetchDay(by: timeProvider.today.dayId) else { return 0 }
-        guard today.status == .execute || today.status == .draft else { return 0 }
+        if today.status == .expired {
+            // Retry an incomplete same-day habit settlement on later reconciliations.
+            HabitRecordService.settleExpiredDay(today, in: modelContext, at: timeProvider.now)
+            return 0
+        }
+        guard today.status == .execute || today.status == .draft || today.status == .empty else { return 0 }
 
         guard let killDate = killDate(for: today) else { return 0 }
-        if timeProvider.now >= killDate {
-            let expiredCount: Int
-            if today.status == .draft {
-                expiredCount = 0
-            } else {
-                expiredCount = today.focusTaskCount + today.frozenTasks.count
-            }
-            _ = expire(day: today, expiredCount: expiredCount)
-            notificationService.cancelKillTimeNotification(for: today)
-            return 1
-        }
-        return 0
+        guard timeProvider.now >= killDate else { return 0 }
+        guard today.status != .empty || HabitRecordService.hasScheduledHabit(on: today, in: modelContext) else { return 0 }
+
+        let expiredCount = today.status == .execute ? today.focusTaskCount + today.frozenTasks.count : 0
+        _ = expire(day: today, expiredCount: expiredCount)
+        notificationService.cancelKillTimeNotification(for: today)
+        return 1
     }
 
     private func syncTodayDefaultKillTimeIfNeeded(lastProcessedBeforeRun: Date?) {
@@ -255,17 +280,21 @@ struct StateMachine {
         guard shouldSyncTodayDefault else { return }
         guard let todayDay = fetchOrCreateTodayDay() else { return }
 
+        let isLegacyUntouchedDay = todayDay.status == .empty
+            && todayDay.initiatedAt == nil
+            && todayDay.tasks.isEmpty
+            && todayDay.killTimeHour == 20
+            && todayDay.killTimeMinute == 0
+        guard todayDay.followsDefaultKillTime || isLegacyUntouchedDay else {
+            return
+        }
         todayDay.killTimeHour = userSettings.defaultKillTimeHour
         todayDay.killTimeMinute = userSettings.defaultKillTimeMinute
         todayDay.followsDefaultKillTime = true
     }
 
     private func killDate(for day: DayModel) -> Date? {
-        var components = calendar.dateComponents([.year, .month, .day], from: day.date)
-        components.hour = day.killTimeHour
-        components.minute = day.killTimeMinute
-        components.second = 0
-        return calendar.date(from: components)
+        KillTimeDeadline.date(for: day.date, hour: day.killTimeHour, minute: day.killTimeMinute)
     }
 
     @discardableResult
@@ -274,17 +303,9 @@ struct StateMachine {
         day.status = .expired
         day.expiredCount = expiredCount
         day.isDraftZoneUnlocked = false
-        removeTasks(in: [.draft, .focus, .frozen], from: day)
+        HabitRecordService.settleExpiredDay(day, in: modelContext, at: timeProvider.now)
         notificationService.cancelKillTimeNotification(for: day)
         return true
-    }
-
-    private func removeTasks(in zones: [TaskZone], from day: DayModel) {
-        let toRemove = day.tasks.filter { zones.contains($0.zone) }
-        day.tasks.removeAll { zones.contains($0.zone) }
-        for task in toRemove {
-            modelContext.delete(task)
-        }
     }
 
     private func finalizeWeekToPast(_ week: WeekModel) {
@@ -293,9 +314,14 @@ struct StateMachine {
     }
 
     private func createPresentWeek(for date: Date) {
-        let week = weekCalculator.makeWeek(for: date, status: .present)
-        modelContext.insert(week)
-        persist()
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveWeek(containing: date, status: .present)
+            resolution.week.status = .present
+            persist()
+        } catch {
+            appState.runtimeErrorMessage = error.localizedDescription
+        }
     }
 
     private func fetchDay(by dayId: String) -> DayModel? {
@@ -338,11 +364,19 @@ struct StateMachine {
     private func processExpiredSuspendedTasks() -> Int {
         let service = SuspendedTaskLifecycleService(modelContext: modelContext, notificationService: notificationService)
         do {
-            return try service.sweepExpiredTasks(now: timeProvider.now)
+            return try service.sweepExpiredTasks(now: timeProvider.now, policy: Self.suspendedExpiryPolicy)
         } catch {
             appState.runtimeErrorMessage = error.localizedDescription
             return 0
         }
+    }
+
+    /// Read straight from `UserDefaults` so `StateMachine` stays decoupled from
+    /// `UserSettings`, matching `WeekyiiPersistence.backupRetentionCount`.
+    private static var suspendedExpiryPolicy: SuspendedExpiryPolicy {
+        let raw = UserDefaults.standard.string(forKey: "suspendedExpiryPolicy")
+            ?? SuspendedExpiryPolicy.autoDelete.rawValue
+        return SuspendedExpiryPolicy(rawValue: raw) ?? .autoDelete
     }
 
     private func updateMetrics(for week: WeekModel) {
@@ -374,6 +408,41 @@ struct StateMachine {
     }
 }
 
+/// Controlled cleanup for old expired days. This deliberately deletes only
+/// open-zone task records; DayModel rows and completed-zone history remain
+/// queryable. It runs during normal local reconciliation, after current-day
+/// state transitions have been processed.
+@MainActor
+struct TaskGarbageCollector {
+    let modelContext: ModelContext
+    let retentionWeeks: Int
+
+    init(modelContext: ModelContext, retentionWeeks: Int = 8) {
+        self.modelContext = modelContext
+        self.retentionWeeks = max(retentionWeeks, 2)
+    }
+
+    @discardableResult
+    func collect(referenceDate: Date) -> Int {
+        let calendar = WeekyiiTimeZone.calendar
+        let currentWeekStart = referenceDate.startOfWeek
+        guard let cutoff = calendar.date(byAdding: .weekOfYear, value: -retentionWeeks, to: currentWeekStart) else {
+            return 0
+        }
+        let cutoffDayId = cutoff.dayId
+        let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
+        var deletedCount = 0
+
+        for day in days where day.status == .expired && day.dayId < cutoffDayId {
+            for task in day.tasks where task.zone == .draft || task.zone == .focus || task.zone == .frozen {
+                modelContext.delete(task)
+                deletedCount += 1
+            }
+        }
+        return deletedCount
+    }
+}
+
 private extension DayModel {
     var focusTaskCount: Int { focusTask == nil ? 0 : 1 }
 }
@@ -382,7 +451,6 @@ private extension DayModel {
 struct DataInvariantRepairService: DataInvariantRepairing {
     private let modelContainer: ModelContainer
     private let calendar = Calendar(identifier: .iso8601)
-    private let weekCalculator = WeekCalculator()
 
     init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -393,8 +461,33 @@ struct DataInvariantRepairService: DataInvariantRepairing {
     }
 
     func repair(referenceDate: Date) -> DataInvariantRepairReport {
+        (try? performRepair(referenceDate: referenceDate, strictPersistence: false))
+            ?? DataInvariantRepairReport()
+    }
+
+    func repairForBootstrap(referenceDate: Date) throws -> DataInvariantRepairReport {
+        try performRepair(referenceDate: referenceDate, strictPersistence: true)
+    }
+
+    private func performRepair(
+        referenceDate: Date,
+        strictPersistence: Bool
+    ) throws -> DataInvariantRepairReport {
         var report = DataInvariantRepairReport()
-        let days = (try? modelContext.fetch(FetchDescriptor<DayModel>())) ?? []
+        report.repairedDuplicateCount = try mergeDuplicateBuiltInTaskTypes(
+            strictPersistence: strictPersistence
+        )
+        report.repairedDuplicateCount += try mergeDuplicateWeeksAndDays(
+            strictPersistence: strictPersistence
+        )
+        report.repairedStatusCount += try normalizeWeekStatuses(
+            referenceDate: referenceDate,
+            strictPersistence: strictPersistence
+        )
+        let days: [DayModel] = try fetch(
+            FetchDescriptor<DayModel>(),
+            strictPersistence: strictPersistence
+        )
         let today = calendar.startOfDay(for: referenceDate)
 
         for day in days {
@@ -409,14 +502,191 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             }
         }
 
-        if ensureTodayExists(today: today) {
+        if try ensureTodayExists(today: today, strictPersistence: strictPersistence) {
             report.createdTodayDayCount += 1
         }
-
         if report.totalRepairs > 0 {
-            try? modelContext.save()
+            if strictPersistence {
+                try modelContext.save()
+            } else {
+                try? modelContext.save()
+            }
         }
         return report
+    }
+
+    private func normalizeWeekStatuses(
+        referenceDate: Date,
+        strictPersistence: Bool
+    ) throws -> Int {
+        let today = calendar.startOfDay(for: referenceDate)
+        let currentWeekId = today.weekId
+        let weeks: [WeekModel] = try fetch(
+            FetchDescriptor<WeekModel>(),
+            strictPersistence: strictPersistence
+        )
+        var changedCount = 0
+
+        for week in weeks {
+            let expectedStatus: WeekStatus
+            if week.weekId == currentWeekId {
+                expectedStatus = .present
+            } else if week.endDate < today {
+                expectedStatus = .past
+            } else {
+                expectedStatus = .pending
+            }
+
+            if week.status != expectedStatus {
+                week.status = expectedStatus
+                changedCount += 1
+            }
+        }
+
+        return changedCount
+    }
+
+    private func mergeDuplicateWeeksAndDays(strictPersistence: Bool) throws -> Int {
+        var repairCount = 0
+        let weeks: [WeekModel] = try fetch(
+            FetchDescriptor<WeekModel>(),
+            strictPersistence: strictPersistence
+        )
+        let weekGroups = Dictionary(grouping: weeks.filter { !$0.weekId.isEmpty }, by: \.weekId)
+
+        for group in weekGroups.values where group.count > 1 {
+            let canonical = group.max { weekRichness($0) < weekRichness($1) } ?? group[0]
+            for duplicate in group where duplicate !== canonical {
+                canonical.startDate = min(canonical.startDate, duplicate.startDate)
+                canonical.endDate = max(canonical.endDate, duplicate.endDate)
+                canonical.status = preferredWeekStatus(canonical.status, duplicate.status)
+                canonical.completedTasksCount = max(canonical.completedTasksCount, duplicate.completedTasksCount)
+                canonical.expiredTasksCount = max(canonical.expiredTasksCount, duplicate.expiredTasksCount)
+                canonical.totalStartedDays = max(canonical.totalStartedDays, duplicate.totalStartedDays)
+
+                for day in duplicate.days {
+                    day.week = canonical
+                    if !canonical.days.contains(where: { $0 === day }) {
+                        canonical.days.append(day)
+                    }
+                }
+                duplicate.days = []
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        let days: [DayModel] = try fetch(
+            FetchDescriptor<DayModel>(),
+            strictPersistence: strictPersistence
+        )
+        let dayGroups = Dictionary(grouping: days.filter { !$0.dayId.isEmpty }, by: \.dayId)
+        for group in dayGroups.values where group.count > 1 {
+            let canonical = group.max { dayRichness($0) < dayRichness($1) } ?? group[0]
+            for duplicate in group where duplicate !== canonical {
+                mergeDay(duplicate, into: canonical)
+                duplicate.tasks = []
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        return repairCount
+    }
+
+    private func mergeDuplicateBuiltInTaskTypes(strictPersistence: Bool) throws -> Int {
+        let definitions: [TaskTypeDefinition] = try fetch(
+            FetchDescriptor<TaskTypeDefinition>(),
+            strictPersistence: strictPersistence
+        )
+        var repairCount = 0
+
+        for expected in TaskTypeDefinition.builtInDefinitions() {
+            let matches = definitions.filter { $0.idRaw == expected.idRaw }
+            guard matches.count > 1, let canonical = matches.first else { continue }
+
+            canonical.name = expected.name
+            canonical.iconName = expected.iconName
+            canonical.colorHex = expected.colorHex
+            canonical.baseKindRaw = expected.baseKindRaw
+            canonical.sortOrder = expected.sortOrder
+            canonical.isBuiltIn = true
+            canonical.isArchived = false
+
+            for duplicate in matches.dropFirst() {
+                modelContext.delete(duplicate)
+                repairCount += 1
+            }
+        }
+
+        return repairCount
+    }
+
+    private func weekRichness(_ week: WeekModel) -> Int {
+        week.days.reduce(week.days.count) { $0 + $1.tasks.count }
+    }
+
+    private func dayRichness(_ day: DayModel) -> Int {
+        day.tasks.count * 10 + dayStatusRank(day.status)
+    }
+
+    private func mergeDay(_ source: DayModel, into target: DayModel) {
+        for task in source.tasks {
+            task.day = target
+            if !target.tasks.contains(where: { $0 === task }) {
+                target.tasks.append(task)
+            }
+        }
+
+        if dayStatusRank(source.status) > dayStatusRank(target.status) {
+            target.status = source.status
+        }
+        target.expiredCount = max(target.expiredCount, source.expiredCount)
+        target.initiatedAt = earliest(target.initiatedAt, source.initiatedAt)
+        target.closedAt = latest(target.closedAt, source.closedAt)
+        target.isDraftZoneUnlocked = target.isDraftZoneUnlocked || source.isDraftZoneUnlocked
+        if target.executionMode == .strict, source.executionMode == .flexible {
+            target.executionMode = .flexible
+        }
+    }
+
+    private func preferredWeekStatus(_ lhs: WeekStatus, _ rhs: WeekStatus) -> WeekStatus {
+        let rank: (WeekStatus) -> Int = { status in
+            switch status {
+            case .past: return 0
+            case .pending: return 1
+            case .present: return 2
+            }
+        }
+        return rank(lhs) >= rank(rhs) ? lhs : rhs
+    }
+
+    private func dayStatusRank(_ status: DayStatus) -> Int {
+        switch status {
+        case .empty: return 0
+        case .draft: return 1
+        case .execute: return 2
+        case .expired: return 3
+        case .completed: return 4
+        }
+    }
+
+    private func earliest(_ lhs: Date?, _ rhs: Date?) -> Date? {
+        switch (lhs, rhs) {
+        case let (left?, right?): return min(left, right)
+        case let (left?, nil): return left
+        case let (nil, right?): return right
+        case (nil, nil): return nil
+        }
+    }
+
+    private func latest(_ lhs: Date?, _ rhs: Date?) -> Date? {
+        switch (lhs, rhs) {
+        case let (left?, right?): return max(left, right)
+        case let (left?, nil): return left
+        case let (nil, right?): return right
+        case (nil, nil): return nil
+        }
     }
 
     private func normalizeFocusZone(in day: DayModel) -> Bool {
@@ -431,7 +701,9 @@ struct DataInvariantRepairService: DataInvariantRepairing {
     private func normalizeTaskOrder(in day: DayModel) -> Bool {
         var changed = false
 
-        let draft = day.sortedDraftTasks
+        let draft = day.tasks
+            .filter { $0.zone == .draft }
+            .sorted { $0.order < $1.order }
         for (index, task) in draft.enumerated() where task.order != index + 1 {
             task.order = index + 1
             changed = true
@@ -439,15 +711,26 @@ struct DataInvariantRepairService: DataInvariantRepairing {
 
         if day.status == .execute {
             var sequence = 1
-            if let focus = day.focusTask, focus.order != sequence {
+            let focus = day.tasks
+                .filter { $0.zone == .focus }
+                .min { $0.order < $1.order }
+            if let focus, focus.order != sequence {
                 focus.order = sequence
                 changed = true
             }
-            if day.focusTask != nil { sequence += 1 }
-            for frozen in day.frozenTasks where frozen.order != sequence {
-                frozen.order = sequence
+            if focus != nil { sequence += 1 }
+            let frozenTasks = day.tasks
+                .filter { $0.zone == .frozen }
+                .sorted { $0.order < $1.order }
+            // Advance the sequence for every queued task, including ones whose
+            // order is already correct; otherwise the next task is renumbered onto
+            // an order that is already taken and the queue order becomes unstable.
+            for frozen in frozenTasks {
+                if frozen.order != sequence {
+                    frozen.order = sequence
+                    changed = true
+                }
                 sequence += 1
-                changed = true
             }
         }
 
@@ -460,16 +743,20 @@ struct DataInvariantRepairService: DataInvariantRepairing {
         let frozenCount = day.tasks.filter { $0.zone == .frozen }.count
         let completedCount = day.tasks.filter { $0.zone == .complete }.count
 
-        let hasOpen = draftCount + focusCount + frozenCount > 0
         let newStatus: DayStatus
 
-        switch day.status {
+        if day.closedAt != nil {
+            newStatus = .completed
+        } else if day.status == .expired {
+            // Expiration is a time-derived terminal outcome. Late CloudKit records
+            // stay in their original zones but must not reopen the day.
+            newStatus = .expired
+        } else {
+            switch day.status {
         case .expired:
-            if hasOpen {
-                newStatus = focusCount + frozenCount > 0 ? .execute : .draft
-            } else {
-                newStatus = .expired
-            }
+            // Handled by the terminal branch above; retained for exhaustive
+            // matching if DayStatus gains compiler-visible cases in the future.
+            newStatus = .expired
         case .empty:
             if focusCount + frozenCount > 0 {
                 newStatus = .execute
@@ -510,9 +797,7 @@ struct DataInvariantRepairService: DataInvariantRepairing {
             } else {
                 newStatus = .empty
             }
-            if newStatus == .completed && day.closedAt == nil {
-                day.closedAt = now
-            }
+        }
         }
 
         var changed = false
@@ -528,38 +813,36 @@ struct DataInvariantRepairService: DataInvariantRepairing {
         return changed
     }
 
-    private func ensureTodayExists(today: Date) -> Bool {
-        if fetchDay(by: today.dayId) != nil {
+    private func ensureTodayExists(today: Date, strictPersistence: Bool) throws -> Bool {
+        if try fetchDay(by: today.dayId, strictPersistence: strictPersistence) != nil {
             return false
         }
 
-        let weekId = today.weekId
-        let week: WeekModel
-        if let existing = fetchWeek(by: weekId) {
-            week = existing
-            if week.status != .present {
-                week.status = .present
-            }
-        } else {
-            week = weekCalculator.makeWeek(for: today, status: .present)
-            modelContext.insert(week)
+        do {
+            let resolution = try WeekDataStore(modelContext: modelContext)
+                .resolveDay(on: today, weekStatus: .present)
+            resolution.day.week?.status = .present
+            return resolution.createdWeek || resolution.createdDay
+        } catch {
+            if strictPersistence { throw error }
+            return false
         }
-
-        if week.days.contains(where: { $0.dayId == today.dayId }) == false {
-            let day = DayModel(dayId: today.dayId, date: today, status: .empty)
-            week.days.append(day)
-        }
-
-        return true
     }
 
-    private func fetchDay(by dayId: String) -> DayModel? {
+    private func fetchDay(by dayId: String, strictPersistence: Bool) throws -> DayModel? {
         let descriptor = FetchDescriptor<DayModel>(predicate: #Predicate { $0.dayId == dayId })
-        return try? modelContext.fetch(descriptor).first
+        return try fetch(descriptor, strictPersistence: strictPersistence).first
     }
 
-    private func fetchWeek(by weekId: String) -> WeekModel? {
-        let descriptor = FetchDescriptor<WeekModel>(predicate: #Predicate { $0.weekId == weekId })
-        return try? modelContext.fetch(descriptor).first
+    private func fetch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        strictPersistence: Bool
+    ) throws -> [T] {
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            if strictPersistence { throw error }
+            return []
+        }
     }
 }
