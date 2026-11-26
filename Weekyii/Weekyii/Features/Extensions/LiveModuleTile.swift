@@ -96,13 +96,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
             shapedFaces.themedSurface(card)
         } else {
             shapedFaces
-                .background(Color.backgroundSecondary)
-                .clipShape(.rect(cornerRadius: WeekRadius.medium))
-                .overlay {
-                    RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
-                        .stroke(currentTint.opacity(0.16), lineWidth: 1)
-                }
-                .weekSoftShadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+                .extensionAccentSurface(currentTint, strength: 1.0)
         }
     }
 
@@ -303,5 +297,59 @@ private struct QuenyaEightPointStar: Shape {
                                    y: rect.midY - rect.height * 0.1,
                                    width: rect.width * 0.2, height: rect.height * 0.2))
         return path
+    }
+}
+
+
+/// A theme-aware, presentation-only wash for extension surfaces. Theme skins
+/// keep their existing material; the default uses semantic colors in both modes.
+private struct ExtensionAccentSurface: ViewModifier {
+    let tint: Color
+    let strength: Double
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.themeSkin) private var skin
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let card = skin.card {
+            content.themedSurface(
+                card,
+                tint: card.tintsWithAccent ? (card.hidesAccentBar ? tint : tint.weekPaperDye) : nil,
+                tintOpacity: (colorScheme == .dark ? 0.18 : 0.20) * strength
+            )
+        } else {
+            let shape = RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous)
+            content
+                .background {
+                    shape.fill(Color.backgroundSecondary)
+                        .overlay {
+                            shape.fill(LinearGradient(
+                                colors: [tint.opacity((colorScheme == .dark ? 0.22 : 0.30) * strength),
+                                         tint.opacity((colorScheme == .dark ? 0.09 : 0.12) * strength)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            if strength >= 0.8 {
+                                Circle()
+                                    .stroke(tint.opacity(colorScheme == .dark ? 0.12 : 0.10), lineWidth: 14)
+                                    .frame(width: 92, height: 92)
+                                    .offset(x: 24, y: -28)
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                }
+                .clipShape(shape)
+                .overlay { shape.stroke(tint.opacity(0.16 * strength), lineWidth: 1) }
+                .weekSoftShadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+        }
+    }
+}
+
+extension View {
+    func extensionAccentSurface(_ tint: Color, strength: Double = 1) -> some View {
+        modifier(ExtensionAccentSurface(tint: tint, strength: strength))
     }
 }

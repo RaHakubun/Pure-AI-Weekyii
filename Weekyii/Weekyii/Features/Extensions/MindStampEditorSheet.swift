@@ -35,7 +35,7 @@ struct MindStampEditorSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: WeekSpacing.lg) {
                     // Text input
-                    WeekCard {
+                    WeekCard(accentColor: .accentPink) {
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                             Text(String(localized: "mindstamp.editor.text"))
                                 .font(.bodyMedium)

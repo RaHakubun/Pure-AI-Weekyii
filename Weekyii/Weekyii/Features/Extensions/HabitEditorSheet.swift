@@ -88,7 +88,7 @@ struct HabitEditorSheet: View {
     // MARK: - Name
 
     private var nameCard: some View {
-        WeekCard {
+        WeekCard(accentColor: .accentGreen) {
             VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                 Text(String(localized: "habit.editor.name", defaultValue: "名称"))
                     .font(.bodyMedium)

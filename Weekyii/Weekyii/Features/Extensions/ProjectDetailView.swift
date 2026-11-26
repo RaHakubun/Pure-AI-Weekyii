@@ -283,8 +283,7 @@ struct ProjectDetailView: View {
                 .font(.titleMedium)
                 .foregroundStyle(Color.textPrimary)
 
-            WeekCard(accentColor: projectColor) {
-                VStack(alignment: .leading, spacing: WeekSpacing.md) {
+            VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.xs) {
                         Text("\(snapshot.completedCount) / \(snapshot.totalCount)")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -315,7 +314,9 @@ struct ProjectDetailView: View {
                         .clipShape(.rect(cornerRadius: WeekRadius.medium))
                     }
                 }
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(WeekSpacing.lg)
+                .extensionAccentSurface(projectColor, strength: 0.6)
 
             WeekCard {
                 HStack(alignment: .center, spacing: WeekSpacing.sm) {

@@ -7,6 +7,7 @@ struct HabitsFullView: View {
     @State private var showingEditor = false
     @State private var errorMessage: String?
     @EnvironmentObject private var appState: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(viewModel: HabitViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -98,8 +99,7 @@ struct HabitsFullView: View {
     private var progressCard: some View {
         let progress = todayProgress
         let fraction: Double = progress.scheduled == 0 ? 0 : Double(progress.completed) / Double(progress.scheduled)
-        return WeekCard(accentColor: .accentGreen) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        return VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 Text(String(localized: "habits.visual.today", defaultValue: "今日完成"))
                     .font(.caption.weight(.medium))
                     .foregroundColor(.textSecondary)
@@ -114,7 +114,8 @@ struct HabitsFullView: View {
                     .foregroundColor(.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
+            .padding(WeekSpacing.lg)
+            .extensionAccentSurface(.accentGreen)
     }
 
 
@@ -149,35 +150,24 @@ struct HabitsFullView: View {
         return NavigationLink {
             HabitDetailView(habit: habit, viewModel: viewModel)
         } label: {
-            HStack(spacing: WeekSpacing.md) {
-                Image(systemName: habit.iconName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(habit.habitColor)
-                    .frame(width: 36, height: 36)
-                    .background(habit.habitColor.opacity(0.12), in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(habit.name)
-                        .font(.bodyMedium)
-                        .foregroundColor(habit.isActive ? .textPrimary : .textSecondary)
-                        .lineLimit(1)
-
-                    HStack(spacing: WeekSpacing.xs) {
-                        Text(habit.scheduleSummary)
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-                            .lineLimit(1)
-                        streakChip(stats.currentStreak)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    // Give the name and status independent lines at accessibility sizes.
+                    VStack(alignment: .leading, spacing: WeekSpacing.sm) {
+                        habitIdentity(habit, streak: stats.currentStreak)
+                        HabitTodayStatusChip(status: stats.todayStatus)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(spacing: WeekSpacing.md) {
+                        habitIdentity(habit, streak: stats.currentStreak)
+                        Spacer(minLength: WeekSpacing.sm)
+                        HabitTodayStatusChip(status: stats.todayStatus)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.textTertiary)
                     }
                 }
-
-                Spacer(minLength: WeekSpacing.sm)
-
-                HabitTodayStatusChip(status: stats.todayStatus)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.textTertiary)
             }
             .padding(.horizontal, WeekSpacing.md)
             .padding(.vertical, WeekSpacing.md)
@@ -187,6 +177,37 @@ struct HabitsFullView: View {
         .accessibilityIdentifier("habitRow_\(habit.id.uuidString)")
     }
 
+
+    private func habitIdentity(_ habit: HabitModel, streak: Int) -> some View {
+        HStack(alignment: .top, spacing: WeekSpacing.md) {
+            Image(systemName: habit.iconName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(habit.habitColor)
+                .frame(width: 36, height: 36)
+                .background(habit.habitColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(habit.name)
+                    .font(.bodyMedium)
+                    .foregroundColor(habit.isActive ? .textPrimary : .textSecondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text(habit.scheduleSummary)
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
+                    streakChip(streak)
+                } else {
+                    HStack(spacing: WeekSpacing.xs) {
+                        Text(habit.scheduleSummary)
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+                            .lineLimit(1)
+                        streakChip(streak)
+                    }
+                }
+            }
+        }
+    }
 
     @ViewBuilder
     private func streakChip(_ streak: Int) -> some View {
@@ -267,6 +288,7 @@ struct HabitTodayStatusChip: View {
         let presentation = presentation
         return Text(presentation.text)
             .font(.caption2.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(presentation.tint)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)

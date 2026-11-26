@@ -7,6 +7,54 @@
     "—" : {
 
     },
+    "extensions.visual.heading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A little more room for life"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给生活，多一点空间"
+          }
+        }
+      }
+    },
+    "mindstamp.visual.heading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep a little moment."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把此刻，轻轻留住。"
+          }
+        }
+      }
+    },
+    "mindstamp.visual.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep your words or a picture here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字或图片，都可以留在这里"
+          }
+        }
+      }
+    },
     "habits.visual.today" : {
       "localizations" : {
         "en" : {

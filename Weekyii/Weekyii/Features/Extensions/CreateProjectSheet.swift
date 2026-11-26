@@ -52,7 +52,7 @@ struct CreateProjectSheet: View {
                     previewCard
 
                     // 名称
-                    WeekCard {
+                    WeekCard(accentColor: Color.weekyiiEmphasis(hex: selectedColor)) {
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                             Text(String(localized: "project.create.name"))
                                 .font(.bodyMedium)

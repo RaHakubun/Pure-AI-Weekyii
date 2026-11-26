@@ -11,6 +11,7 @@ struct HabitDetailView: View {
     @State private var showingDeleteConfirm = false
     @State private var alertMessage: String?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
@@ -112,36 +113,40 @@ struct HabitDetailView: View {
     }
 
     private func identitySection(stats: HabitStatistics) -> some View {
-        WeekCard(accentColor: habit.habitColor) {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
             HStack(alignment: .top, spacing: WeekSpacing.md) {
                 Image(systemName: habit.iconName)
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(habit.habitColor)
                     .frame(width: 58, height: 58)
-                    .background(habit.habitColor.opacity(0.12), in: Circle())
-
+                    .background(habit.habitColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
                 VStack(alignment: .leading, spacing: 5) {
                     Text(habit.name)
                         .font(.titleMedium)
                         .foregroundColor(.textPrimary)
-                        .lineLimit(2)
-
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("\(habit.category.displayName) · \(habit.scheduleSummary)")
                         .font(.subheadline)
                         .foregroundColor(.textSecondary)
-
+                        .fixedSize(horizontal: false, vertical: true)
                     if habit.startDate != nil {
                         Text(startsOnText)
                             .font(.caption)
                             .foregroundColor(.textTertiary)
                     }
                 }
-
                 Spacer(minLength: 0)
-
+                if !dynamicTypeSize.isAccessibilitySize {
+                    HabitTodayStatusChip(status: stats.todayStatus)
+                }
+            }
+            if dynamicTypeSize.isAccessibilitySize {
                 HabitTodayStatusChip(status: stats.todayStatus)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(WeekSpacing.lg)
+        .extensionAccentSurface(habit.habitColor)
     }
 
 
@@ -178,27 +183,29 @@ struct HabitDetailView: View {
                 .font(.titleSmall)
                 .foregroundColor(.textPrimary)
             WeekCard(accentColor: habit.habitColor) {
-                HStack(spacing: 0) {
-                    statColumn(
-                        title: String(localized: "habit.stats.current_streak", defaultValue: "当前连续"),
-                        value: "\(stats.currentStreak)"
-                    )
-                    Divider().frame(height: 36)
-                    statColumn(
-                        title: String(localized: "habit.stats.longest_streak", defaultValue: "最长连续"),
-                        value: "\(stats.longestStreak)"
-                    )
-                    Divider().frame(height: 36)
-                    statColumn(
-                        title: String(localized: "habit.stats.completion_rate", defaultValue: "完成率"),
-                        value: stats.completionRatePercent.map { "\($0)%" }
-                            ?? String(localized: "habit.stats.placeholder", defaultValue: "—")
-                    )
-                    Divider().frame(height: 36)
-                    statColumn(
-                        title: String(localized: "habit.stats.total_completed", defaultValue: "累计完成"),
-                        value: "\(stats.completedCount)"
-                    )
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Grid(horizontalSpacing: WeekSpacing.md, verticalSpacing: WeekSpacing.md) {
+                            GridRow {
+                                statColumn(title: String(localized: "habit.stats.current_streak", defaultValue: "当前连续"), value: "\(stats.currentStreak)")
+                                statColumn(title: String(localized: "habit.stats.longest_streak", defaultValue: "最长连续"), value: "\(stats.longestStreak)")
+                            }
+                            GridRow {
+                                statColumn(title: String(localized: "habit.stats.completion_rate", defaultValue: "完成率"), value: stats.completionRatePercent.map { "\($0)%" } ?? String(localized: "habit.stats.placeholder", defaultValue: "—"))
+                                statColumn(title: String(localized: "habit.stats.total_completed", defaultValue: "累计完成"), value: "\(stats.completedCount)")
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 0) {
+                            statColumn(title: String(localized: "habit.stats.current_streak", defaultValue: "当前连续"), value: "\(stats.currentStreak)")
+                            Divider().frame(height: 36)
+                            statColumn(title: String(localized: "habit.stats.longest_streak", defaultValue: "最长连续"), value: "\(stats.longestStreak)")
+                            Divider().frame(height: 36)
+                            statColumn(title: String(localized: "habit.stats.completion_rate", defaultValue: "完成率"), value: stats.completionRatePercent.map { "\($0)%" } ?? String(localized: "habit.stats.placeholder", defaultValue: "—"))
+                            Divider().frame(height: 36)
+                            statColumn(title: String(localized: "habit.stats.total_completed", defaultValue: "累计完成"), value: "\(stats.completedCount)")
+                        }
+                    }
                 }
                 .animation(.snappy(duration: 0.25), value: stats)
             }

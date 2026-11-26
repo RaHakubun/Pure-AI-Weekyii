@@ -41,6 +41,17 @@ struct ExtensionsHubView: View {
                     VStack(spacing: WeekSpacing.md) {
                         if let mindStampViewModel, let viewModel, let habitViewModel {
                             VStack(spacing: WeekSpacing.md) {
+                                HStack(alignment: .center, spacing: WeekSpacing.sm) {
+                                    Text(String(localized: "extensions.visual.heading", defaultValue: "给生活，多一点空间"))
+                                        .font(.titleSmall)
+                                        .foregroundStyle(Color.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "sparkles")
+                                        .foregroundStyle(Color.accentGreen)
+                                        .accessibilityHidden(true)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 LazyVGrid(
                                     columns: [
                                         GridItem(.flexible(), spacing: WeekSpacing.md),
@@ -144,8 +155,8 @@ private struct SuspendedTasksModulePreview: View {
                 isActive: animationsActive,
                 accessibilityIdentifier: "extensionsSuspendedLiveTile",
                 aspectRatio: 1,
-                tint: { _ in Color.suspendedModuleTint },
-                emptyTint: .suspendedModuleTint,
+                tint: { _ in Color.accentOrange },
+                emptyTint: .accentOrange,
                 quenyaMotif: .rings
             ) { task in
                 SuspendedTaskLiveTile(task: task, totalCount: viewModel.suspendedTasks.count)
@@ -528,6 +539,8 @@ private struct SuspendedTasksFullView: View {
             SuspendedTaskAssignSheet(taskTitle: task.title) { targetDate in
                 viewModel.assignSuspendedTask(task, to: targetDate)
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
             "删除悬置任务",
@@ -561,8 +574,7 @@ private struct SuspendedTasksFullView: View {
     }
 
     private var statsCard: some View {
-        WeekCard(accentColor: .suspendedModuleTint) {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 Text("暂存未分配日期的任务。到期前可续期、分配或删除。")
                     .font(.caption)
                     .foregroundColor(.textSecondary)
@@ -574,7 +586,8 @@ private struct SuspendedTasksFullView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
+            .padding(WeekSpacing.lg)
+            .extensionAccentSurface(.accentOrange)
     }
 
     private var emptyState: some View {
@@ -717,8 +730,7 @@ private struct SuspendedTasksFullView: View {
             }
         }
         .padding(WeekSpacing.md)
-        .background(Color.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: WeekRadius.medium))
+        .extensionAccentSurface(task.remainingDays() <= 7 ? .accentOrange : .accentGreen, strength: 0.38)
     }
 
     private func suspendedMetaRow(_ task: SuspendedTaskItem) -> some View {
@@ -838,7 +850,7 @@ private struct SuspendedTaskEditorSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: WeekSpacing.lg) {
-                    WeekCard(accentColor: .suspendedModuleTint) {
+                    WeekCard(accentColor: .accentOrange) {
                         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
                             Text("在这里记录未决定具体时限的任务")
                                 .font(.titleSmall)
@@ -2240,6 +2252,8 @@ private struct ProjectsFullView: View {
                     .accessibilityHidden(true)
             }
         }
+        // Keep the container discoverable without overwriting each row's identifier.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("projectTrackView")
     }
 
@@ -2300,8 +2314,7 @@ private struct ProjectsFullView: View {
             }
             .padding(WeekSpacing.base)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.backgroundSecondary, in: RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: WeekRadius.medium, style: .continuous).stroke(Color.backgroundTertiary, lineWidth: 1))
+            .extensionAccentSurface(color, strength: 0.35)
         }
     }
 
@@ -3295,6 +3308,17 @@ private struct MindStampsFullView: View {
                 if viewModel.stamps.isEmpty {
                     emptyState
                 } else {
+                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                        Text(String(localized: "mindstamp.visual.heading", defaultValue: "把此刻，轻轻留住。"))
+                            .font(.titleSmall)
+                            .foregroundStyle(Color.textPrimary)
+                        Text(String(localized: "mindstamp.visual.subtitle", defaultValue: "文字或图片，都可以留在这里"))
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(WeekSpacing.lg)
+                    .extensionAccentSurface(.accentPink)
                     MindStampListView(viewModel: viewModel)
                 }
             }

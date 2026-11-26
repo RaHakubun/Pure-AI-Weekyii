@@ -87,8 +87,7 @@ struct MindStampListView: View {
     }
 
     private func stampCard(_ stamp: MindStampItem, index: Int) -> some View {
-        WeekCard {
-            VStack(alignment: .leading, spacing: WeekSpacing.md) {
+        VStack(alignment: .leading, spacing: WeekSpacing.md) {
                 HStack(alignment: .top, spacing: WeekSpacing.md) {
                     if let blob = stamp.imageBlob {
                         Button {
@@ -156,7 +155,8 @@ struct MindStampListView: View {
                     }
                 }
             }
-        }
+        .padding(WeekSpacing.lg)
+        .extensionAccentSurface(.accentPink, strength: stamp.imageBlob == nil ? 0.65 : 0.30)
     }
 
     // 看大图时才在后台解码原图
