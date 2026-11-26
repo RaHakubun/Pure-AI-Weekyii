@@ -65,7 +65,7 @@ struct ContentView: View {
             ExtensionsHubView(animationsActive: selectedTab == .extensions && scenePhase == .active && !reduceMotion)
                 .id(visualIdentity)
                 .tabItem {
-                    tabLabel(String(localized: "tab.extensions"), systemImage: "square.grid.2x2")
+                    tabLabel(String(localized: "tab.extensions"), systemImage: "circle.grid.2x2")
                 }
                 .tag(MainTab.extensions)
 

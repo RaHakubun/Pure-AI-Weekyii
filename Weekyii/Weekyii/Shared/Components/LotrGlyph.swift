@@ -45,7 +45,7 @@ enum LotrGlyph: String, CaseIterable {
         case "clock.arrow.circlepath": self = .redBook
         case "clock", "clock.fill": self = .hourglass
         case "calendar", "calendar.badge.clock": self = .map
-        case "square.grid.2x2": self = .phial
+        case "square.grid.2x2", "circle.grid.2x2": self = .phial
         case "gearshape": self = .brooch
         case "snowflake": self = .caradhras
         case "checkmark.circle", "checkmark.circle.fill": self = .whiteTree

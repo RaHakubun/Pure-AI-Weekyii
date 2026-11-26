@@ -43,7 +43,7 @@ enum CatGlyph: String, CaseIterable {
             self = .alarm
         case "clock.arrow.circlepath", "snowflake":
             self = .curl
-        case "square.grid.2x2", "folder", "folder.fill":
+        case "square.grid.2x2", "circle.grid.2x2", "folder", "folder.fill":
             self = .box
         case "gearshape", "gearshape.fill":
             self = .bell

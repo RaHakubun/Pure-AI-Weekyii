@@ -7,22 +7,6 @@
     "—" : {
 
     },
-    "extensions.visual.heading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A little more room for life"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "给生活，多一点空间"
-          }
-        }
-      }
-    },
     "mindstamp.visual.heading" : {
       "localizations" : {
         "en" : {

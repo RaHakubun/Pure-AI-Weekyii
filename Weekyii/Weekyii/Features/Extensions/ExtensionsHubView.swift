@@ -42,17 +42,6 @@ struct ExtensionsHubView: View {
                     VStack(spacing: WeekSpacing.md) {
                         if let mindStampViewModel, let viewModel, let habitViewModel {
                             VStack(spacing: WeekSpacing.md) {
-                                HStack(alignment: .center, spacing: WeekSpacing.sm) {
-                                    Text(String(localized: "extensions.visual.heading", defaultValue: "给生活，多一点空间"))
-                                        .font(.titleSmall)
-                                        .foregroundStyle(Color.textPrimary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Spacer(minLength: 0)
-                                    Image(systemName: "sparkles")
-                                        .foregroundStyle(Color.accentGreen)
-                                        .accessibilityHidden(true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
                                 if dynamicTypeSize.isAccessibilitySize {
                                     // At accessibility sizes the shortcuts need their natural
                                     // height and the full available width, not a fixed square.
