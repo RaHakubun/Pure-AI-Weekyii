@@ -21,6 +21,7 @@ struct ExtensionsHubView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var settings: UserSettings
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewModel: ExtensionsViewModel?
     @State private var mindStampViewModel: MindStampViewModel?
     @State private var habitViewModel: HabitViewModel?
@@ -52,15 +53,24 @@ struct ExtensionsHubView: View {
                                         .accessibilityHidden(true)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                LazyVGrid(
-                                    columns: [
-                                        GridItem(.flexible(), spacing: WeekSpacing.md),
-                                        GridItem(.flexible())
-                                    ],
-                                    spacing: WeekSpacing.md
-                                ) {
-                                    MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: moduleTilesActive)
-                                    SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
+                                if dynamicTypeSize.isAccessibilitySize {
+                                    // At accessibility sizes the shortcuts need their natural
+                                    // height and the full available width, not a fixed square.
+                                    VStack(spacing: WeekSpacing.md) {
+                                        MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: moduleTilesActive)
+                                        SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
+                                    }
+                                } else {
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(.flexible(), spacing: WeekSpacing.md),
+                                            GridItem(.flexible())
+                                        ],
+                                        spacing: WeekSpacing.md
+                                    ) {
+                                        MindStampsModulePreview(viewModel: mindStampViewModel, animationsActive: moduleTilesActive)
+                                        SuspendedTasksModulePreview(viewModel: viewModel, animationsActive: moduleTilesActive)
+                                    }
                                 }
 
                                 HabitsModulePreview(viewModel: habitViewModel, animationsActive: moduleTilesActive)
@@ -144,6 +154,7 @@ struct ExtensionsHubView: View {
 private struct SuspendedTasksModulePreview: View {
     let viewModel: ExtensionsViewModel
     let animationsActive: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationLink {
@@ -154,7 +165,8 @@ private struct SuspendedTasksModulePreview: View {
                 initialDelay: .seconds(4.0),
                 isActive: animationsActive,
                 accessibilityIdentifier: "extensionsSuspendedLiveTile",
-                aspectRatio: 1,
+                aspectRatio: dynamicTypeSize.isAccessibilitySize ? nil : 1,
+                minHeight: dynamicTypeSize.isAccessibilitySize ? 150 : 0,
                 tint: { _ in Color.accentOrange },
                 emptyTint: .accentOrange,
                 quenyaMotif: .rings
@@ -233,6 +245,7 @@ private struct HabitLiveTile: View {
     let streak: Int
     let completedToday: Int
     let scheduledToday: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var subtitle: String {
         guard streak > 0 else { return habit.scheduleSummary }
@@ -249,6 +262,7 @@ private struct HabitLiveTile: View {
                 title: String(localized: "extensions.module.habits.title", defaultValue: "习惯追踪"),
                 icon: habit.iconName,
                 tint: habit.habitColor,
+                conceptIcon: "repeat",
                 trailing: String(
                     format: String(localized: "extensions.hub.habits.today_progress", defaultValue: "今日 %1$lld / %2$lld"),
                     locale: Locale.current,
@@ -259,13 +273,15 @@ private struct HabitLiveTile: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(habit.name)
-                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .font(.system(.title3, design: .serif, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(Color.textTertiary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HabitWeekStrip(days: HabitWeekStripDay.currentWeek(for: habit), tint: habit.habitColor)
@@ -398,7 +414,8 @@ private struct ProjectsModulePreview: View {
                 stretches: true,
                 tint: { Color.weekyiiEmphasis(hex: $0.colorHex) },
                 emptyTint: .weekyiiPrimary,
-                quenyaMotif: .tree
+                quenyaMotif: .tree,
+                showsTopAccent: true
             ) { snapshot in
                 ProjectFocusLiveTile(
                     snapshot: snapshot,
@@ -1320,6 +1337,7 @@ enum SuspendedTaskMetaFormatter {
 private struct MindStampsModulePreview: View {
     let viewModel: MindStampViewModel
     let animationsActive: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationLink {
@@ -1330,7 +1348,8 @@ private struct MindStampsModulePreview: View {
                 initialDelay: .seconds(2.4),
                 isActive: animationsActive,
                 accessibilityIdentifier: "extensionsMindStampsLiveTile",
-                aspectRatio: 1,
+                aspectRatio: dynamicTypeSize.isAccessibilitySize ? nil : 1,
+                minHeight: dynamicTypeSize.isAccessibilitySize ? 150 : 0,
                 tint: { _ in Color.accentPink },
                 emptyTint: .accentPink,
                 quenyaMotif: .star
@@ -1369,6 +1388,7 @@ private struct HubEmptyTile: View {
     let message: String
     let icon: String
     let tint: Color
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
@@ -1377,7 +1397,8 @@ private struct HubEmptyTile: View {
             Text(message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.textSecondary)
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(String(localized: "extensions.hub.empty.tap_to_see_all"))
                 .font(.caption)
                 .foregroundStyle(Color.textTertiary)
@@ -1392,19 +1413,27 @@ private struct HabitEmptyLiveTile: View {
     let message: String
     let icon: String
     let tint: Color
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
             HubModuleLabel(title: title, icon: icon, tint: tint, trailing: "")
 
-            HStack(alignment: .center, spacing: WeekSpacing.sm) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: WeekSpacing.sm))
+                : AnyLayout(HStackLayout(alignment: .center, spacing: WeekSpacing.sm))
+            layout {
                 Image(systemName: "plus.circle.fill")
                     .font(.title3)
                     .foregroundStyle(tint.opacity(0.7))
+                    .accessibilityHidden(true)
                 Text(message)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.textSecondary)
-                Spacer(minLength: 0)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer(minLength: 0)
+                }
                 Label(
                     String(localized: "extensions.hub.empty.tap_to_see_all"),
                     systemImage: "chevron.right"
@@ -1421,6 +1450,7 @@ private struct HabitEmptyLiveTile: View {
 private struct MindStampLiveTile: View {
     let stamp: MindStampItem
     let totalCount: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var image: UIImage? {
         guard let blob = stamp.imageBlob else { return nil }
@@ -1428,48 +1458,49 @@ private struct MindStampLiveTile: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .topLeading) {
-                Color.accentPink.opacity(0.08)
+        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+            HubModuleLabel(
+                title: String(localized: "extensions.module.mindstamps.title") + " · \(totalCount)",
+                icon: "bandage.fill",
+                tint: image == nil ? .accentPink : .white,
+                textColor: image == nil ? .textTertiary : .white.opacity(0.85),
+                trailing: "",
+                overImage: image != nil
+            )
 
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
+            Spacer(minLength: WeekSpacing.sm)
 
-                    LinearGradient(
-                        colors: [.black.opacity(0.02), .black.opacity(0.58)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+            Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : "\u{201C}\(stamp.text)\u{201D}")
+                .font(.system(.title3, design: .serif))
+                .foregroundStyle(image == nil ? Color.textPrimary : .white)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : (image == nil ? 3 : 2))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+
+            Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
+                .font(.caption2)
+                .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
+        }
+        .padding(WeekSpacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+            GeometryReader { proxy in
+                ZStack {
+                    Color.accentPink.opacity(0.08)
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                        LinearGradient(
+                            colors: [.black.opacity(0.02), .black.opacity(0.58)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
                 }
-
-                VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                    HubModuleLabel(
-                        title: String(localized: "extensions.module.mindstamps.title") + " · \(totalCount)",
-                        icon: "bandage.fill",
-                        tint: image == nil ? .accentPink : .white,
-                        textColor: image == nil ? .textTertiary : .white.opacity(0.85),
-                        trailing: "",
-                        overImage: image != nil
-                    )
-
-                    Spacer(minLength: 0)
-
-                    Text(stamp.text.isEmpty ? String(localized: "extensions.hub.mindstamps.image_only") : "\u{201C}\(stamp.text)\u{201D}")
-                        .font(.system(size: 19, weight: .regular, design: .serif))
-                        .foregroundStyle(image == nil ? Color.textPrimary : .white)
-                        .lineLimit(image == nil ? 3 : 2)
-                        .minimumScaleFactor(0.8)
-                        .multilineTextAlignment(.leading)
-
-                    Text(stamp.createdAt, format: .dateTime.month().day().hour().minute())
-                        .font(.caption2)
-                        .foregroundStyle(image == nil ? Color.textTertiary : .white.opacity(0.82))
-                }
-                .padding(WeekSpacing.md)
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                .clipped()
+                .accessibilityHidden(true)
             }
         }
     }
@@ -1478,6 +1509,7 @@ private struct MindStampLiveTile: View {
 private struct SuspendedTaskLiveTile: View {
     let task: SuspendedTaskItem
     let totalCount: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let calendar = Calendar(identifier: .iso8601)
 
     private var deadline: Date { calendar.startOfDay(for: task.decisionDeadline) }
@@ -1519,17 +1551,21 @@ private struct SuspendedTaskLiveTile: View {
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            let countdownLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 4))
+            countdownLayout {
                 Text(countdown.value)
                     .font(.system(size: 40, weight: .regular, design: .serif))
                     .foregroundStyle(countdownColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.6)
                     .contentTransition(.numericText())
                 Text(countdown.caption)
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: 6) {
@@ -1539,7 +1575,8 @@ private struct SuspendedTaskLiveTile: View {
                 Text(task.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(task.title + ", " + task.taskType.displayName)
@@ -1552,6 +1589,7 @@ private struct SuspendedTaskLiveTile: View {
 private struct ProjectFocusLiveTile: View {
     let snapshot: ProjectTileSnapshot
     let projectCount: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let calendar = Calendar(identifier: .iso8601)
 
     /// 焦点卡在浅色卡片上呈现，项目色只作前景与描边，过亮的色系需压暗后才可读。
@@ -1615,6 +1653,7 @@ private struct ProjectFocusLiveTile: View {
                 title: String(localized: "extensions.module.projects.title"),
                 icon: snapshot.icon,
                 tint: projectColor,
+                conceptIcon: "folder",
                 trailing: String(
                     format: String(localized: "extensions.hub.projects.total_projects", defaultValue: "共 %lld 个项目"),
                     locale: Locale.current,
@@ -1622,12 +1661,18 @@ private struct ProjectFocusLiveTile: View {
                 )
             )
 
-            HStack(alignment: .firstTextBaseline) {
+            let titleLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: WeekSpacing.xs))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+            titleLayout {
                 Text(snapshot.name)
-                    .font(.system(size: 24, weight: .semibold, design: .serif))
+                    .font(.system(.title2, design: .serif, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: WeekSpacing.sm)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer(minLength: WeekSpacing.sm)
+                }
                 if snapshot.totalCount > 0 {
                     Text(
                         String(
@@ -1663,7 +1708,8 @@ private struct ProjectFocusLiveTile: View {
                             Text(entry.title)
                                 .font(.caption)
                                 .foregroundStyle(Color.textSecondary)
-                                .lineLimit(1)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: WeekSpacing.sm)
                             if let date = entry.date {
                                 Text(date, format: .dateTime.month().day())
@@ -1753,7 +1799,8 @@ private struct ProjectFocusLiveTile: View {
                 Text(snapshot.nextTaskTitle ?? String(localized: "extensions.hub.projects.no_next_task"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(snapshot.nextTaskTitle != nil ? Color.textPrimary : Color.textTertiary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let date = snapshot.nextTaskDate {
                     Text(nextTaskDateText(date))
                         .font(.caption2)
@@ -1901,6 +1948,7 @@ private struct ProjectEmptyLiveTile: View {
                 ThemedSymbol(systemName: "folder", size: 56)
                     .font(.system(size: 56, weight: .ultraLight))
                     .foregroundStyle(Color.weekyiiPrimary.opacity(0.22))
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 3) {
                     Text(String(localized: "extensions.hub.projects.empty"))
@@ -1929,11 +1977,14 @@ private struct HubModuleLabel: View {
     let title: String
     var icon: String? = nil
     var tint: Color = .textTertiary
+    /// A small semantic cue, independent of a user-selected habit/project icon.
+    var conceptIcon: String? = nil
     var textColor: Color = .textTertiary
     let trailing: String
     /// Drawn over a photo: keep the caller's light colours.
     var overImage: Bool = false
     @Environment(\.themeSkin) private var skin
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         if skin.drawsMiddleEarthGlyphs, let section = skin.section, !overImage {
@@ -1951,18 +2002,22 @@ private struct HubModuleLabel: View {
                 ThemedSymbol(systemName: icon, size: 16)
                     .foregroundColor(section.iconInk?.color ?? tint)
                     .frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
             }
             WeekSectionHeader.rubricText(title, section: section, ink: .textSecondary)
                 .font(.caption.weight(.semibold))
                 .tracking(max(section.titleTracking, 0.6))
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+            conceptMark
             Spacer(minLength: 0)
             if !trailing.isEmpty {
                 Text(trailing)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(section.countInk?.color ?? textColor)
                     .monospacedDigit()
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -1982,20 +2037,34 @@ private struct HubModuleLabel: View {
                 .foregroundStyle(tint)
                 .frame(width: 24, height: 24)
                 .background(tint.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
             }
             Text(title)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(textColor)
                 .tracking(0.4)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
+            conceptMark
             Spacer(minLength: 0)
             if !trailing.isEmpty {
                 Text(trailing)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(textColor)
                     .monospacedDigit()
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var conceptMark: some View {
+        if let conceptIcon {
+            Image(systemName: conceptIcon)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(tint.opacity(0.75))
+                .accessibilityHidden(true)
         }
     }
 }

@@ -122,13 +122,21 @@ struct HabitDetailView: View {
                     .background(habit.habitColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
                 VStack(alignment: .leading, spacing: 5) {
                     Text(habit.name)
-                        .font(.titleMedium)
+                        // Keep the title above its scalable subtitle at every
+                        // Dynamic Type size without capping accessibility text.
+                        .font(.system(
+                            .title2,
+                            design: ThemeSkin.active.typography.titleDesign,
+                            weight: ThemeSkin.active.typography.titleWeight ?? .semibold
+                        ))
                         .foregroundColor(.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("habitDetailName")
                     Text("\(habit.category.displayName) · \(habit.scheduleSummary)")
                         .font(.subheadline)
                         .foregroundColor(.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("habitDetailSummary")
                     if habit.startDate != nil {
                         Text(startsOnText)
                             .font(.caption)

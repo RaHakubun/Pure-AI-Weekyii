@@ -21,6 +21,7 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
     let tint: (Item) -> Color
     let emptyTint: Color
     var quenyaMotif: QuenyaHubMotif? = nil
+    var showsTopAccent: Bool = false
     @ViewBuilder let content: (Item) -> Content
     @ViewBuilder let emptyContent: () -> EmptyContent
 
@@ -63,6 +64,17 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
 
     var body: some View {
         tileSurface
+            .overlay(alignment: .topLeading) {
+                if showsTopAccent {
+                    Capsule()
+                        .fill(currentTint.opacity(colorScheme == .dark ? 0.65 : 0.55))
+                        .frame(width: 54, height: 3)
+                        .padding(.leading, WeekSpacing.md)
+                        .padding(.top, 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
             .contentShape(Rectangle())
             .overlay { naturalHeightProbe }
             .accessibilityIdentifier(accessibilityIdentifier)
@@ -96,7 +108,9 @@ struct LiveModuleTile<Item: Identifiable, Content: View, EmptyContent: View>: Vi
             shapedFaces.themedSurface(card)
         } else {
             shapedFaces
-                .extensionAccentSurface(currentTint, strength: 1.0)
+                // A quiet wash gives the content contrast; the small header
+                // icons, rather than a large ornament, identify each module.
+                .extensionAccentSurface(currentTint, strength: 0.55)
         }
     }
 
@@ -240,22 +254,22 @@ private struct QuenyaHubDecoration: View {
             switch motif {
             case .star:
                 QuenyaEightPointStar()
-                    .stroke(Color.weekyiiPrimary.opacity(0.25), lineWidth: 0.8)
-                    .frame(width: 50, height: 50)
-                    .position(x: proxy.size.width - 33, y: 59)
+                    .stroke(Color.weekyiiPrimary.opacity(0.11), lineWidth: 0.8)
+                    .frame(width: 24, height: 24)
+                    .position(x: proxy.size.width - 22, y: 48)
             case .rings:
                 ZStack {
                     Circle().stroke(lineWidth: 0.8)
                     Circle().inset(by: 7).stroke(lineWidth: 0.8)
                 }
-                .foregroundStyle(Color.weekyiiPrimary.opacity(0.18))
-                .frame(width: 47, height: 47)
-                .position(x: proxy.size.width - 36, y: 67)
+                .foregroundStyle(Color.weekyiiPrimary.opacity(0.10))
+                .frame(width: 24, height: 24)
+                .position(x: proxy.size.width - 22, y: 48)
             case .inscription:
                 if proxy.size.width >= 240 {
                     Text("\u{E02E}\u{E046}\u{E022}\u{E046}\u{E010} \u{E024}\u{E02C}\u{E044}\u{E022}\u{E040} \u{E022}\u{E02C}\u{E04C}\u{E011}\u{E046}\u{E010}\u{E051} \u{E02E}\u{E04A}\u{E011}\u{E046}\u{E00C}\u{E044}\u{E02E}\u{E046}\u{E022}\u{E015}\u{E04A}")
                         .font(.custom("AlcarinTengwar-Regular", size: 13))
-                        .foregroundStyle(Color.weekyiiPrimary.opacity(0.38))
+                        .foregroundStyle(Color.weekyiiPrimary.opacity(0.12))
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .frame(width: 132, alignment: .trailing)
@@ -267,9 +281,9 @@ private struct QuenyaHubDecoration: View {
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(colorScheme == .dark ? Color.white : Color.weekyiiPrimary)
-                    .opacity(0.26)
-                    .frame(width: min(proxy.size.width * 0.34, 112), height: 132)
-                    .position(x: proxy.size.width - 69, y: min(proxy.size.height * 0.56, 150))
+                    .opacity(0.08)
+                    .frame(width: min(proxy.size.width * 0.18, 56), height: 68)
+                    .position(x: proxy.size.width - 35, y: min(proxy.size.height * 0.56, 150))
             }
         }
         .allowsHitTesting(false)
