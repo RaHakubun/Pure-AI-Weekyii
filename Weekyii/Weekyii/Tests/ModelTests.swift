@@ -5036,6 +5036,18 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_pendingWeekOutlook_dayCountsIncludeZeroAndAreNotCappedAtTen() {
+        let week = makeOutlookWeek(
+            regular: [0, 11, 0, 2, 0, 0, 0],
+            ddl: [0, 2, 0, 0, 0, 0, 0],
+            leisure: [0, 0, 0, 0, 0, 0, 1]
+        )
+        let outlook = PendingViewModel.buildWeekOutlook(for: week)
+        XCTAssertEqual(outlook.days.map(\.taskCount), [0, 13, 0, 2, 0, 0, 1])
+        XCTAssertEqual(outlook.days.map(\.deadlineCount), [0, 2, 0, 0, 0, 0, 0])
+    }
+
+    @MainActor
     func test_pendingWeekOutlook_relaxedTone() {
         let week = makeOutlookWeek(
             regular: [1, 1, 1, 0, 0, 0, 0],

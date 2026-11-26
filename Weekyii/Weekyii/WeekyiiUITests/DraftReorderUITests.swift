@@ -620,6 +620,43 @@ final class DraftReorderUITests: XCTestCase {
         XCTAssertEqual(hintLabel.label, "右上角点 + 新建呆胶布")
     }
 
+    func testPendingWeekOutlookSwitchKeepsCardHeightAndNavigation() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting", "1", "-uiTestingSeedPendingWeek", "1",
+            "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"
+        ]
+        app.launch()
+
+        let pendingTab = app.tabBars.buttons["未来"]
+        XCTAssertTrue(pendingTab.waitForExistence(timeout: 5))
+        pendingTab.tap()
+
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'pendingWeekCard_'")).firstMatch
+        let content = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'pendingWeekOutlookContent_'")).firstMatch
+        let trend = app.buttons["轨迹"].firstMatch
+        let highlights = app.buttons["重点"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertTrue(content.waitForExistence(timeout: 5))
+        XCTAssertTrue(trend.waitForExistence(timeout: 5))
+        XCTAssertTrue(highlights.waitForExistence(timeout: 5))
+        guard card.exists, content.exists, trend.exists, highlights.exists else { return }
+        let originalHeight = content.frame.height
+
+        trend.tap()
+        XCTAssertTrue(trend.isSelected)
+        XCTAssertTrue(card.exists, "Changing the outlook mode must not navigate away")
+        XCTAssertTrue(content.exists)
+        XCTAssertEqual(content.frame.height, originalHeight, accuracy: 1.5)
+        highlights.tap()
+        XCTAssertTrue(highlights.isSelected)
+        XCTAssertTrue(card.exists)
+        XCTAssertEqual(content.frame.height, originalHeight, accuracy: 1.5)
+
+        card.tap()
+        XCTAssertTrue(app.buttons["pendingDraftAddButton"].waitForExistence(timeout: 5))
+    }
+
     func testPendingWeekDetailShowsDraftCrudEntryPoints() {
         let app = XCUIApplication()
         app.launchArguments = [
