@@ -151,17 +151,42 @@ struct PendingWeekCard: View {
         }
     }
 
+    /// Compact two-way switch. The system `.segmented` picker is 32 pt tall,
+    /// which out-weighs the caption text it sits next to; this draws at ~23 pt.
     private var modePicker: some View {
-        Picker(String(localized: "pending.week.outlook.displayMode", defaultValue: "周预报视图"), selection: $displayMode) {
-            Text(String(localized: "pending.week.outlook.highlights", defaultValue: "重点"))
-                .tag(OutlookDisplayMode.highlights)
-            Text(String(localized: "pending.week.outlook.trend", defaultValue: "轨迹"))
-                .tag(OutlookDisplayMode.trend)
+        HStack(spacing: 2) {
+            modeSegment(.highlights, title: String(localized: "pending.week.outlook.highlights", defaultValue: "重点"))
+            modeSegment(.trend, title: String(localized: "pending.week.outlook.trend", defaultValue: "轨迹"))
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 150)
+        .padding(2)
+        .background(Color.textTertiary.opacity(0.12), in: .capsule)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pendingWeekOutlookPicker_\(week.weekId)")
+    }
+
+    private func modeSegment(_ mode: OutlookDisplayMode, title: String) -> some View {
+        let isOn = displayMode == mode
+        return Button {
+            displayMode = mode
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isOn ? Color.textPrimary : Color.textSecondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 3)
+                .background {
+                    if isOn {
+                        // Paper-coloured thumb in light, a lifted white in dark:
+                        // backgroundPrimary would sink into the dark panel.
+                        Capsule()
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.14) : Color.backgroundPrimary)
+                            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.10), radius: 1, y: 0.5)
+                    }
+                }
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
     private var taskTotal: some View {
