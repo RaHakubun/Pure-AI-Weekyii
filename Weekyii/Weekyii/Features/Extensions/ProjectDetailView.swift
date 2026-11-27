@@ -7,6 +7,7 @@ struct ProjectDetailView: View {
     @State private var showingAddTaskSheet = false
     @State private var showingEditProjectSheet = false
     @State private var showingDeleteAlert = false
+    @State private var showingCompleteConfirm = false
     @State private var deletingTask: TaskItem?
     @State private var editingTask: TaskItem?
     @State private var selectedDayID: String?
@@ -18,6 +19,19 @@ struct ProjectDetailView: View {
     private var projectColor: Color { Color.weekyiiEmphasis(hex: project.color) }
     private var snapshot: ProjectDetailSnapshot { viewModel.projectDetailSnapshot(for: project) }
     private var isProjectWritable: Bool { project.status == .planning || project.status == .active }
+
+    /// Completed or archived: the project is a record now, not a work surface.
+    private var isProjectClosed: Bool { project.status == .completed || project.status == .archived }
+
+    /// Closing with unfinished work is allowed, but only after saying how much
+    /// is left. A fully completed project still closes in one tap.
+    private func requestComplete() {
+        if snapshot.remainingCount > 0 {
+            showingCompleteConfirm = true
+        } else {
+            viewModel.updateStatus(project, to: .completed)
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -80,6 +94,24 @@ struct ProjectDetailView: View {
             Text(String(localized: "project.delete.choice.message"))
         }
         .confirmationDialog(
+            String(localized: "project.complete.confirm.title", defaultValue: "结项后项目转为只读"),
+            isPresented: $showingCompleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "project.complete.confirm.action", defaultValue: "结项")) {
+                viewModel.updateStatus(project, to: .completed)
+            }
+            Button(String(localized: "action.cancel"), role: .cancel) { }
+        } message: {
+            Text(String(
+                format: String(
+                    localized: "project.complete.confirm.message",
+                    defaultValue: "还有 %lld 项任务未完成。它们会保留在项目里，随时可以回来查看。"
+                ),
+                Int64(snapshot.remainingCount)
+            ))
+        }
+        .confirmationDialog(
             String(localized: "project.task.delete.confirm"),
             isPresented: Binding(
                 get: { deletingTask != nil },
@@ -131,9 +163,9 @@ struct ProjectDetailView: View {
                         showingEditProjectSheet = true
                     }
                 }
-                if project.status == .active && project.isAllCompleted {
+                if project.status == .active {
                     Button(String(localized: "project.action.complete")) {
-                        viewModel.updateStatus(project, to: .completed)
+                        requestComplete()
                     }
                 }
                 if project.status == .completed {
@@ -234,9 +266,10 @@ struct ProjectDetailView: View {
                     Label("项目已完成", systemImage: "checkmark.circle.fill")
                         .font(.titleSmall)
                         .foregroundStyle(Color.accentGreen)
-                    Text("已完成项目保持只读。你可以归档收纳，或重新打开继续添加任务。")
+                    Text(completedSummaryText)
                         .font(.caption)
                         .foregroundStyle(Color.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     HStack {
                         Button("重新打开") {
                             viewModel.updateStatus(project, to: .active)
@@ -277,11 +310,57 @@ struct ProjectDetailView: View {
         max(snapshot.remainingCount - snapshot.expiredCount, 0)
     }
 
+    /// Nothing is "待办" once the project is closed — the same number reads as leftovers.
+    private var openTaskLabel: String {
+        isProjectClosed
+            ? String(localized: "project.detail.leftover", defaultValue: "未逾期遗留")
+            : String(localized: "project.detail.open", defaultValue: "未逾期待办")
+    }
+
+    private var weekOpenTemplate: String {
+        isProjectClosed
+            ? String(localized: "project.detail.week_leftover", defaultValue: "遗留 %lld")
+            : String(localized: "project.detail.week_open", defaultValue: "待办 %lld")
+    }
+
+    private var completedSummaryText: String {
+        if snapshot.remainingCount > 0 {
+            return String(
+                format: String(
+                    localized: "project.complete.summary.leftover",
+                    defaultValue: "完成 %lld 项，遗留 %lld 项。遗留任务保留在项目里，可随时回来查看；项目为只读，可归档或重新打开。"
+                ),
+                Int64(snapshot.completedCount),
+                Int64(snapshot.remainingCount)
+            )
+        }
+        return String(
+            localized: "project.complete.summary.all_done",
+            defaultValue: "全部任务已完成。项目保持只读，你可以归档收纳，或重新打开继续添加任务。"
+        )
+    }
+
     private var summarySection: some View {
         VStack(alignment: .leading, spacing: WeekSpacing.md) {
-            Text(String(localized: "project.detail.progress", defaultValue: "项目进展"))
-                .font(.titleMedium)
-                .foregroundStyle(Color.textPrimary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(String(localized: "project.detail.progress", defaultValue: "项目进展"))
+                    .font(.titleMedium)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer(minLength: WeekSpacing.sm)
+                // The all-done path keeps its green confirmation card, so this
+                // button only appears when that card is not on screen.
+                if project.status == .active && !project.isAllCompleted {
+                    Button {
+                        requestComplete()
+                    } label: {
+                        Text(String(localized: "project.action.complete"))
+                            .font(.captionBold)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(projectColor)
+                }
+            }
 
             VStack(alignment: .leading, spacing: WeekSpacing.md) {
                     HStack(alignment: .firstTextBaseline, spacing: WeekSpacing.xs) {
@@ -296,7 +375,7 @@ struct ProjectDetailView: View {
                     HStack(alignment: .top, spacing: WeekSpacing.sm) {
                         summaryMetric(String(localized: "project.stat.completed"), value: snapshot.completedCount, color: .accentGreen)
                         summaryMetric(String(localized: "project.stat.expired"), value: snapshot.expiredCount, color: .taskDDL)
-                        summaryMetric(String(localized: "project.detail.open", defaultValue: "未逾期待办"), value: openTaskCount, color: .textPrimary)
+                        summaryMetric(openTaskLabel, value: openTaskCount, color: .textPrimary)
                     }
                     if snapshot.expiredCount > 0 {
                         Label {
@@ -318,40 +397,43 @@ struct ProjectDetailView: View {
                 .padding(WeekSpacing.lg)
                 .extensionAccentSurface(projectColor, strength: 0.6)
 
-            WeekCard {
-                HStack(alignment: .center, spacing: WeekSpacing.sm) {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .foregroundStyle(projectColor)
-                    VStack(alignment: .leading, spacing: WeekSpacing.xs) {
-                        Text(String(localized: "project.detail.next", defaultValue: "下一步"))
-                            .font(.captionBold)
-                            .foregroundStyle(Color.textPrimary)
-                        if let title = snapshot.nextTaskTitle {
-                            Text(title)
-                                .font(.bodyMedium)
+            // A closed project has no next step; leftover titles live in the ledger below.
+            if !isProjectClosed {
+                WeekCard {
+                    HStack(alignment: .center, spacing: WeekSpacing.sm) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .foregroundStyle(projectColor)
+                        VStack(alignment: .leading, spacing: WeekSpacing.xs) {
+                            Text(String(localized: "project.detail.next", defaultValue: "下一步"))
+                                .font(.captionBold)
                                 .foregroundStyle(Color.textPrimary)
-                                .lineLimit(2)
-                            if let date = snapshot.nextTaskDate {
-                                Text(date, format: .dateTime.month().day().weekday(.abbreviated))
+                            if let title = snapshot.nextTaskTitle {
+                                Text(title)
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(Color.textPrimary)
+                                    .lineLimit(2)
+                                if let date = snapshot.nextTaskDate {
+                                    Text(date, format: .dateTime.month().day().weekday(.abbreviated))
+                                        .font(.caption)
+                                        .foregroundStyle(Color.textSecondary)
+                                }
+                            } else {
+                                Text(String(localized: "project.detail.no_next", defaultValue: "暂无待办任务"))
                                     .font(.caption)
                                     .foregroundStyle(Color.textSecondary)
                             }
-                        } else {
-                            Text(String(localized: "project.detail.no_next", defaultValue: "暂无待办任务"))
-                                .font(.caption)
-                                .foregroundStyle(Color.textSecondary)
                         }
-                    }
-                    Spacer(minLength: WeekSpacing.sm)
-                    if snapshot.nextTaskTitle == nil && isProjectWritable {
-                        Button {
-                            showingAddTaskSheet = true
-                        } label: {
-                            Label(String(localized: "project.detail.add_task", defaultValue: "添加任务"), systemImage: "plus")
-                                .font(.captionBold)
-                                .foregroundStyle(projectColor)
+                        Spacer(minLength: WeekSpacing.sm)
+                        if snapshot.nextTaskTitle == nil && isProjectWritable {
+                            Button {
+                                showingAddTaskSheet = true
+                            } label: {
+                                Label(String(localized: "project.detail.add_task", defaultValue: "添加任务"), systemImage: "plus")
+                                    .font(.captionBold)
+                                    .foregroundStyle(projectColor)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -362,11 +444,15 @@ struct ProjectDetailView: View {
         GeometryReader { geometry in
             let total = max(snapshot.totalCount, 0)
             let completed = min(max(snapshot.completedCount, 0), total)
-            let overdue = min(max(snapshot.expiredCount, 0), total - completed)
+            // While the project runs, only overdue work is flagged in orange.
+            // Once it is closed, every unfinished task is a leftover.
+            let flagged = isProjectClosed
+                ? total - completed
+                : min(max(snapshot.expiredCount, 0), total - completed)
             HStack(spacing: 0) {
                 if total > 0 {
                     Color.accentGreen.frame(width: geometry.size.width * CGFloat(completed) / CGFloat(total))
-                    Color.taskDDL.frame(width: geometry.size.width * CGFloat(overdue) / CGFloat(total))
+                    Color.taskDDL.frame(width: geometry.size.width * CGFloat(flagged) / CGFloat(total))
                 }
                 Color.backgroundTertiary
             }
@@ -431,7 +517,7 @@ struct ProjectDetailView: View {
                 HStack(spacing: WeekSpacing.md) {
                     legendItem("checkmark", title: String(localized: "project.stat.completed"), color: .accentGreen)
                     legendItem("exclamationmark", title: String(localized: "project.stat.expired"), color: .taskDDL)
-                    legendItem("circle.fill", title: String(localized: "project.detail.open", defaultValue: "未逾期待办"), color: projectColor)
+                    legendItem("circle.fill", title: openTaskLabel, color: projectColor)
                 }
                 ForEach(ProjectDetailWeek.groups(from: snapshot.sections)) { week in
                     weekCard(week)
@@ -471,7 +557,7 @@ struct ProjectDetailView: View {
                             .foregroundStyle(Color.taskDDL)
                     }
                     if week.openCount > 0 {
-                        Text(countText(String(localized: "project.detail.week_open", defaultValue: "待办 %lld"), count: week.openCount))
+                        Text(countText(weekOpenTemplate, count: week.openCount))
                             .foregroundStyle(projectColor)
                     }
                 }
@@ -494,7 +580,8 @@ struct ProjectDetailView: View {
     private func dayButton(_ date: Date, section: ProjectTaskLedgerSection?) -> some View {
         let selected = selectedDayID == date.dayId
         let completed = section?.tasks.filter { $0.zone == .complete }.count ?? 0
-        let open = section?.tasks.filter { $0.zone != .complete }.count ?? 0
+        let overdueIDs = section?.overdueTaskIDs ?? []
+        let open = section?.tasks.filter { $0.zone != .complete && !overdueIDs.contains($0.id) }.count ?? 0
         let overdue = section?.expiredCount ?? 0
         let accessibilitySummary = [
             countText(String(localized: "project.detail.week_completed", defaultValue: "完成 %lld"), count: completed),
@@ -550,19 +637,15 @@ struct ProjectDetailView: View {
                     .font(.captionBold)
                     .foregroundStyle(Color.textPrimary)
                 Spacer()
-                let count = (section?.tasks.count ?? 0) + (section?.expiredCount ?? 0)
+                let count = section?.tasks.count ?? 0
                 Text(countText(String(localized: "project.detail.day_count", defaultValue: "%lld 项任务"), count: count))
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
             }
             if let section {
-                if section.expiredCount > 0 {
-                    Label(expiredCountText(section.expiredCount), systemImage: "exclamationmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(Color.taskDDL)
-                }
+                // Each row carries its own 逾期 badge, so no day-level repeat here.
                 ForEach(section.tasks) { task in
-                    taskRow(task)
+                    taskRow(task, isOverdue: section.overdueTaskIDs.contains(task.id))
                 }
             } else {
                 Text(String(localized: "project.detail.no_tasks_day", defaultValue: "当天没有任务"))
@@ -595,7 +678,7 @@ struct ProjectDetailView: View {
         return formatter.string(from: date)
     }
 
-    private func taskRow(_ task: TaskItem) -> some View {
+    private func taskRow(_ task: TaskItem, isOverdue: Bool) -> some View {
         VStack(alignment: .leading, spacing: WeekSpacing.sm) {
             HStack(alignment: .top, spacing: WeekSpacing.sm) {
                 Button {
@@ -628,6 +711,16 @@ struct ProjectDetailView: View {
                     .foregroundStyle(Color.textSecondary)
 
                 TaskZoneBadge(zone: task.zone)
+
+                if isOverdue {
+                    Text(String(localized: "project.task.overdue", defaultValue: "逾期"))
+                        .font(.captionBold)
+                        .foregroundStyle(Color.taskDDL)
+                        .padding(.horizontal, WeekSpacing.sm)
+                        .padding(.vertical, WeekSpacing.xs)
+                        .background(Color.taskDDL.opacity(0.15))
+                        .clipShape(.capsule)
+                }
 
                 if task.taskType == .ddl {
                     Image(systemName: "flame.fill")
@@ -715,7 +808,14 @@ struct ProjectDetailWeek: Identifiable {
     var days: [Date] { (0..<7).map { start.addingDays($0) } }
     var completedCount: Int { sections.reduce(0) { $0 + $1.tasks.filter { $0.zone == .complete }.count } }
     var expiredCount: Int { sections.reduce(0) { $0 + $1.expiredCount } }
-    var openCount: Int { sections.reduce(0) { $0 + $1.tasks.filter { $0.zone != .complete }.count } }
+    /// Unfinished but not overdue — overdue tasks are counted by `expiredCount`.
+    var openCount: Int {
+        sections.reduce(0) { total, section in
+            total + section.tasks.filter {
+                $0.zone != .complete && !section.overdueTaskIDs.contains($0.id)
+            }.count
+        }
+    }
 
     func section(on date: Date) -> ProjectTaskLedgerSection? {
         sections.first { $0.id == date.dayId }

@@ -297,10 +297,9 @@ final class ExtensionsViewModel {
             errorMessage = "当前项目状态不能执行该操作。"
             return
         }
-        if status == .completed && !project.isAllCompleted {
-            errorMessage = WeekyiiError.projectHasOpenTasks.localizedDescription
-            return
-        }
+        // Closing a project no longer requires every task to be done: unfinished
+        // tasks stay attached to the project so their titles remain readable.
+        // The confirmation for that lives in the project detail view.
 
         project.status = status
         do {
@@ -732,11 +731,14 @@ struct ProjectTileSnapshot: Equatable {
 
 struct ProjectTaskLedgerSection: Identifiable {
     let date: Date
-    /// Tasks shown with details: completed and still-actionable ones.
+    /// Every task on this day, completed or not. A project is a record rather
+    /// than an execution queue, so an overdue task keeps its title and stays
+    /// readable here — unlike the day views, which only count it.
     let tasks: [TaskItem]
     let isExpandedByDefault: Bool
-    /// Overdue tasks on this day. Count only, never listed (see ProjectTaskTimeline).
+    /// How many of `tasks` are overdue. They are listed, just flagged.
     var expiredCount: Int = 0
+    var overdueTaskIDs: Set<UUID> = []
 
     var id: String {
         date.dayId
@@ -775,19 +777,23 @@ enum ProjectDetailComposer {
 
         return grouped
             .map { date, tasks in
-                let visibleTasks = tasks
-                    .filter { !ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar) }
-                    .sorted { lhs, rhs in
-                        if lhs.order != rhs.order {
-                            return lhs.order < rhs.order
-                        }
-                        return lhs.id.uuidString < rhs.id.uuidString
+                let sortedTasks = tasks.sorted { lhs, rhs in
+                    if lhs.order != rhs.order {
+                        return lhs.order < rhs.order
                     }
+                    return lhs.id.uuidString < rhs.id.uuidString
+                }
+                let overdueIDs = Set(
+                    tasks
+                        .filter { ProjectTaskTimeline.isOverdue($0, today: today, calendar: calendar) }
+                        .map(\.id)
+                )
                 return ProjectTaskLedgerSection(
                     date: date,
-                    tasks: visibleTasks,
+                    tasks: sortedTasks,
                     isExpandedByDefault: date >= today,
-                    expiredCount: tasks.count - visibleTasks.count
+                    expiredCount: overdueIDs.count,
+                    overdueTaskIDs: overdueIDs
                 )
             }
             .sorted { $0.date < $1.date }

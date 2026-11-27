@@ -7,134 +7,6 @@
     "—" : {
 
     },
-    "mindstamp.visual.heading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep a little moment."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "把此刻，轻轻留住。"
-          }
-        }
-      }
-    },
-    "mindstamp.visual.subtitle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep your words or a picture here."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文字或图片，都可以留在这里"
-          }
-        }
-      }
-    },
-    "habits.visual.today" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Today completed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "今日完成"
-          }
-        }
-      }
-    },
-    "project.display.tiles" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tiles"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "磁贴"
-          }
-        }
-      }
-    },
-    "project.display.track" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轨迹"
-          }
-        }
-      }
-    },
-    "project.display.label" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Project view"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "项目视图"
-          }
-        }
-      }
-    },
-    "project.display.track.heading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Next step for each project"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个项目的下一步"
-          }
-        }
-      }
-    },
-    "project.display.track.summary" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Project overview"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "项目概览"
-          }
-        }
-      }
-    },
     "·" : {
 
     },
@@ -3681,6 +3553,22 @@
         }
       }
     },
+    "habits.visual.today" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日完成"
+          }
+        }
+      }
+    },
     "kill_time.label" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4418,6 +4306,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "呆胶布"
+          }
+        }
+      }
+    },
+    "mindstamp.visual.heading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep a little moment."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把此刻，轻轻留住。"
+          }
+        }
+      }
+    },
+    "mindstamp.visual.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep your words or a picture here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字或图片，都可以留在这里"
           }
         }
       }
@@ -5632,86 +5552,6 @@
         }
       }
     },
-    "pending.week.outlook.displayMode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Outlook view"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "周预报视图"
-          }
-        }
-      }
-    },
-    "pending.week.outlook.highlights" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Highlights"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重点"
-          }
-        }
-      }
-    },
-    "pending.week.outlook.trend" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trend"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轨迹"
-          }
-        }
-      }
-    },
-    "pending.week.outlook.total" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld tasks"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 项任务"
-          }
-        }
-      }
-    },
-    "pending.week.outlook.trendSummary" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seven-day task trend"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "七天任务轨迹"
-          }
-        }
-      }
-    },
     "pending.week.outlook.dayCount" : {
       "localizations" : {
         "en" : {
@@ -5724,22 +5564,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@，%2$lld 项任务"
-          }
-        }
-      }
-    },
-    "pending.week.outlook.peak" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ busiest · %2$lld tasks"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@最多 · %2$lld 项"
           }
         }
       }
@@ -5760,6 +5584,23 @@
         }
       }
     },
+    "pending.week.outlook.displayMode" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outlook view"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周预报视图"
+          }
+        }
+      }
+    },
     "pending.week.outlook.empty" : {
       "localizations" : {
         "en" : {
@@ -5772,6 +5613,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还没有安排任务"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.highlights" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlights"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重点"
           }
         }
       }
@@ -5920,6 +5777,22 @@
         }
       }
     },
+    "pending.week.outlook.peak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ busiest · %2$lld tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@最多 · %2$lld 项"
+          }
+        }
+      }
+    },
     "pending.week.outlook.reason.projectDue" : {
       "localizations" : {
         "en" : {
@@ -6060,6 +5933,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "平稳推进"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.total" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 项任务"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.trend" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trend"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨迹"
+          }
+        }
+      }
+    },
+    "pending.week.outlook.trendSummary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seven-day task trend"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "七天任务轨迹"
           }
         }
       }
@@ -6303,6 +6224,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还有%d项..."
+          }
+        }
+      }
+    },
+    "project.complete.confirm.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark Complete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结项"
+          }
+        }
+      }
+    },
+    "project.complete.confirm.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tasks are still open. They stay in the project and you can review them any time."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %lld 项任务未完成。它们会保留在项目里，随时可以回来查看。"
+          }
+        }
+      }
+    },
+    "project.complete.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This project becomes read-only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结项后项目转为只读"
+          }
+        }
+      }
+    },
+    "project.complete.summary.all_done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every task is done. The project stays read-only; archive it, or reopen it to add more."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部任务已完成。项目保持只读，你可以归档收纳，或重新打开继续添加任务。"
+          }
+        }
+      }
+    },
+    "project.complete.summary.leftover" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld done, %2$lld left. Leftovers stay in the project and remain readable; the project is read-only, so archive or reopen it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成 %1$lld 项，遗留 %2$lld 项。遗留任务保留在项目里，可随时回来查看；项目为只读，可归档或重新打开。"
           }
         }
       }
@@ -6613,6 +6614,22 @@
         }
       }
     },
+    "project.detail.leftover" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leftover"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未逾期遗留"
+          }
+        }
+      }
+    },
     "project.detail.monday_sunday" : {
       "localizations" : {
         "en" : {
@@ -6789,6 +6806,22 @@
         }
       }
     },
+    "project.detail.week_leftover" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld left"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遗留 %lld"
+          }
+        }
+      }
+    },
     "project.detail.week_open" : {
       "localizations" : {
         "en" : {
@@ -6817,6 +6850,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每周任务"
+          }
+        }
+      }
+    },
+    "project.display.label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project view"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目视图"
+          }
+        }
+      }
+    },
+    "project.display.tiles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiles"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "磁贴"
+          }
+        }
+      }
+    },
+    "project.display.track" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨迹"
+          }
+        }
+      }
+    },
+    "project.display.track.heading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next step for each project"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个项目的下一步"
+          }
+        }
+      }
+    },
+    "project.display.track.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project overview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目概览"
           }
         }
       }
@@ -7336,6 +7449,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入任务名称"
+          }
+        }
+      }
+    },
+    "project.task.overdue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overdue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逾期"
           }
         }
       }
@@ -8841,6 +8970,7 @@
       }
     },
     "settings.developer.simulate_vip" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8857,6 +8987,7 @@
       }
     },
     "settings.developer.simulate_vip.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15272,9 +15403,6 @@
         }
       }
     },
-    "在这里记录任务思绪" : {
-
-    },
     "在这里记录未决定具体时限的任务" : {
 
     },
@@ -15455,9 +15583,6 @@
           }
         }
       }
-    },
-    "已完成项目保持只读。你可以归档收纳，或重新打开继续添加任务。" : {
-
     },
     "已归档" : {
       "extractionState" : "stale",

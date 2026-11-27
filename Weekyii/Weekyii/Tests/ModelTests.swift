@@ -4604,7 +4604,7 @@ final class ModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_projectCannotCompleteWithOpenTasks() throws {
+    func test_projectCompletesWithOpenTasksAndKeepsThem() throws {
         let container = try WeekyiiPersistence.makeModelContainer(inMemory: true)
         let context = container.mainContext
         let today = Calendar(identifier: .iso8601).startOfDay(for: Date())
@@ -4618,8 +4618,12 @@ final class ModelTests: XCTestCase {
         let viewModel = ExtensionsViewModel(modelContext: context)
         viewModel.updateStatus(project, to: .completed)
 
-        XCTAssertEqual(project.status, .active)
-        XCTAssertEqual(viewModel.errorMessage, WeekyiiError.projectHasOpenTasks.localizedDescription)
+        XCTAssertEqual(project.status, .completed)
+        XCTAssertNil(viewModel.errorMessage)
+        // A closed project keeps its unfinished work so the titles stay readable.
+        XCTAssertEqual(project.tasks.map(\.title), ["Open"])
+        XCTAssertEqual(project.completedTaskCount, 0)
+        XCTAssertFalse(project.isAllCompleted)
     }
 
     @MainActor
@@ -4786,7 +4790,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(snapshot.remainingCount, 1)
     }
 
-    func test_projectTaskLedgerSections_hideOverdueTasksButKeepCount() {
+    func test_projectTaskLedgerSections_listOverdueTasksAndFlagThem() {
         let calendar = Calendar(identifier: .iso8601)
         let today = calendar.startOfDay(for: Date())
         let yesterday = today.addingDays(-1)
@@ -4811,11 +4815,35 @@ final class ModelTests: XCTestCase {
         )
 
         XCTAssertEqual(sections.count, 2)
-        XCTAssertEqual(sections[0].tasks.map(\.title), ["Past done"])
+        XCTAssertEqual(sections[0].tasks.map(\.title), ["Past done", "Past overdue"])
         XCTAssertEqual(sections[0].expiredCount, 1)
-        XCTAssertTrue(sections[1].tasks.isEmpty)
+        XCTAssertEqual(sections[0].overdueTaskIDs, [pastOverdue.id])
+        XCTAssertEqual(sections[1].tasks.map(\.title), ["Today overdue"])
         XCTAssertEqual(sections[1].expiredCount, 1)
-        XCTAssertFalse(sections.flatMap(\.tasks).contains { $0.zone != .complete && $0.day?.status == .expired })
+        XCTAssertEqual(sections[1].overdueTaskIDs, [todayOverdue.id])
+    }
+
+    func test_projectDetailWeek_countsOverdueSeparatelyFromOpen() {
+        let calendar = Calendar(identifier: .iso8601)
+        let today = calendar.startOfDay(for: Date())
+
+        let done = TaskItem(title: "Done", order: 1, zone: .complete)
+        let overdue = TaskItem(title: "Overdue", order: 2, zone: .draft)
+        let open = TaskItem(title: "Open", order: 3, zone: .draft)
+
+        let section = ProjectTaskLedgerSection(
+            date: today,
+            tasks: [done, overdue, open],
+            isExpandedByDefault: true,
+            expiredCount: 1,
+            overdueTaskIDs: [overdue.id]
+        )
+        let week = ProjectDetailWeek(start: today.startOfWeek, sections: [section])
+
+        // A listed overdue task must not also be counted as an open one.
+        XCTAssertEqual(week.completedCount, 1)
+        XCTAssertEqual(week.expiredCount, 1)
+        XCTAssertEqual(week.openCount, 1)
     }
 
     @MainActor
